@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  overscroll-behavior-x: none;
+  background: transparent;
+}
+
+:root {
+  /* Light Theme */
+  --widget-bg: #ffffff;
+  --widget-fg: #0b0b0b;
+  --widget-card: #f9fafb;
+  --widget-border: #e4e4e7;
+  --widget-primary: #ff5c00;
+  --widget-primary-fg: #ffffff;
+  --widget-muted: #71717a;
+  --widget-nav-bg: rgba(255, 255, 255, 0.8);
+  --widget-nav-border: rgba(0, 0, 0, 0.08);
+}
+
+.dark {
+  /* Dark Theme - Premium Deep */
+  --widget-bg: #060606;
+  --widget-fg: #e8e8e8;
+  --widget-card: #0f0f0f;
+  --widget-border: rgba(255, 255, 255, 0.07);
+  --widget-primary: #ff5500;
+  /* Default brand orange */
+  --widget-primary-fg: #ffffff;
+  --widget-muted: #666666;
+  --widget-nav-bg: rgba(12, 12, 12, 0.9);
+  --widget-nav-border: rgba(255, 255, 255, 0.06);
+}
+
+@layer utilities {
+  .bg-stitch-gradient {
+    /* Deep, rich dark background - no harsh gradients */
+    background: radial-gradient(
+      ellipse at 50% 0%,
+      #111111 0%,
+      #060606 60%,
+      #020202 100%
+    );
+  }
+
+  .bg-stitch-glow {
+    /* Extremely subtle brand glow - barely visible */
+    background: radial-gradient(
+      ellipse at 50% -10%,
+      rgba(var(--widget-primary-rgb), 0.04) 0%,
+      transparent 60%
+    );
+  }
+
+  .shadow-stitch-glow {
+    box-shadow: 0 0 40px -15px rgba(var(--widget-primary-rgb), 0.15);
+  }
+
+  .shadow-btn-glow {
+    /* Soft, premium button shadow - not overpowering */
+    box-shadow: 0 2px 12px rgba(var(--widget-primary-rgb), 0.25);
+  }
+
+  .glass-navbar {
+    background: var(--widget-nav-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--widget-nav-border);
+  }
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: transparent;
+  color: var(--widget-fg);
+  overflow-x: hidden;
+  touch-action: pan-y;
+  transition:
+    background-color 0.3s,
+    color 0.3s;
+}
+
+#root {
+  position: fixed;
+  inset: 0;
+}
+
+.widget-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  overscroll-behavior-x: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ff5c00;
+}
+
+/* Typing cursor animation */
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.typing-cursor {
+  animation: blink 1s infinite;
+}

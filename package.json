@@ -6,9 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "widget:dev": "npm --prefix apps/widget-v2 run dev",
+    "widget:build": "npm --prefix apps/widget-v2 run build"
   },
   "dependencies": {
+    "@composio/core": "^0.1.50",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.57.4",
+    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/forms": "^0.5.11",
+    "@xyflow/react": "^12.10.1",
+    "framer-motion": "^12.36.0",
+    "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"

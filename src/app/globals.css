@@ -1,26 +1,100 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/container-queries";
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-on-primary-fixed: #2a1207;
+  --color-secondary-fixed: #f5e5dc;
+  --color-on-secondary: #ffffff;
+  --color-on-background: #121826;
+  --color-primary-fixed-dim: #ffb58d;
+  --color-secondary-fixed-dim: #d6c2b5;
+  --color-surface-container-high: #e7ebf0;
+  --color-on-primary: #ffffff;
+  --color-surface-dim: #e2e7ec;
+  --color-surface-container-low: #f7f8fb;
+  --color-surface-bright: #fbfcfe;
+  --color-on-surface-variant: #667085;
+  --color-surface-container: #eef2f6;
+  --color-secondary-container: #f5e5dc;
+  --color-on-primary-container: #fffbff;
+  --color-tertiary-fixed-dim: #d0c7c2;
+  --color-on-secondary-fixed-variant: #324054;
+  --color-surface-variant: #dfe5eb;
+  --color-on-error: #ffffff;
+  --color-on-secondary-fixed: #122033;
+  --color-outline-variant: #d7dde5;
+  --color-inverse-primary: #ffb58d;
+  --color-inverse-surface: #202734;
+  --color-on-tertiary-container: #fefcff;
+  --color-on-primary-fixed-variant: #5a250c;
+  --color-on-secondary-container: #526077;
+  --color-surface-container-highest: #dfe5eb;
+  --color-on-error-container: #93000a;
+  --color-inverse-on-surface: #f5f7fa;
+  --color-on-tertiary-fixed: #141b2b;
+  --color-surface-tint: #f26b2f;
+  --color-on-surface: #0f1728;
+  --color-tertiary-container: #697386;
+  --color-primary-fixed: #ffe3d4;
+  --color-surface: #f7f8fb;
+  --color-on-tertiary-fixed-variant: #404758;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-outline: #98a2b3;
+  --color-on-tertiary: #ffffff;
+  --color-background: #f3f5f8;
+  --color-primary-container: #ffd6c2;
+  --color-tertiary: #4f5c73;
+  --color-secondary: #475467;
+  --color-surface-container-lowest: #ffffff;
+  --color-primary: #f26b2f;
+  --color-tertiary-fixed: #F2DFD7;
+
+  --color-success: #008955;
+  --color-success-container: #d6f6e7;
+  --color-on-success-container: #002112;
+
+  --font-headline: var(--font-manrope);
+  --font-body: var(--font-inter);
+  --font-label: var(--font-inter);
+  --font-sans: var(--font-inter);
+
+  --radius-DEFAULT: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-full: 0.75rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer utilities {
+  .signature-gradient {
+    background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+  }
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(18px);
+  }
+  .app-shell-gradient {
+    background:
+      radial-gradient(circle at top left, rgba(242, 107, 47, 0.08), transparent 28%),
+      linear-gradient(180deg, #f7f8fb 0%, #edf1f5 100%);
   }
 }
 
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(242, 107, 47, 0.06), transparent 24%),
+    linear-gradient(180deg, #f7f8fb 0%, #eef2f6 100%);
+  color: var(--color-on-surface);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-headline), sans-serif;
 }

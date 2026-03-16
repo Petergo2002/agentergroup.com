@@ -1,0 +1,24 @@
+
+> agentergroup-web@0.1.0 lint
+> eslint
+
+
+/Users/petergorgees/Dev/Agentergroup.com/src/app/(app)/agents/[id]/preview/page.tsx
+  127:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/petergorgees/Dev/Agentergroup.com/src/app/(app)/settings/page.tsx
+  46:21  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/petergorgees/Dev/Agentergroup.com/src/app/agents/[id]/builder/page.tsx
+  188:17  warning  'setNodes' is assigned a value but never used                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  233:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  302:60  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+
+/Users/petergorgees/Dev/Agentergroup.com/src/app/layout.tsx
+  28:9  warning  Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font  @next/next/no-page-custom-font
+
+/Users/petergorgees/Dev/Agentergroup.com/src/components/layout/Topbar.tsx
+  34:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+✖ 7 problems (1 error, 6 warnings)
+
