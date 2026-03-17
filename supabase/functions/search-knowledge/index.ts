@@ -17,11 +17,13 @@ function json(data: unknown, status = 200) {
 Deno.serve(async (request) => {
   const authHeader = request.headers.get("Authorization");
   const internalServiceKey = request.headers.get("x-internal-service-key");
+  const apiKeyHeader = request.headers.get("apikey");
   const internalAuthorization =
     authHeader === `Bearer ${supabaseServiceRoleKey}` ||
     authHeader === supabaseServiceRoleKey;
   const isInternalRequest =
     (internalServiceKey && internalServiceKey === supabaseServiceRoleKey) ||
+    (apiKeyHeader && apiKeyHeader === supabaseServiceRoleKey) ||
     internalAuthorization;
 
   if (!authHeader && !isInternalRequest) {
