@@ -11,7 +11,8 @@
     "widget:build": "npm --prefix apps/widget-v2 run build"
   },
   "dependencies": {
-    "@composio/core": "^0.1.50",
+    "@composio/core": "^0.6.5",
+    "@composio/openai": "^0.6.5",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.4",
     "@tailwindcss/container-queries": "^0.1.1",

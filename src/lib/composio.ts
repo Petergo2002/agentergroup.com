@@ -1,4 +1,5 @@
 import { Composio } from "@composio/core";
+import { OpenAIProvider } from "@composio/openai";
 import type OpenAI from "openai";
 import { hasComposioEnv } from "@/lib/env";
 import type { DriveImportFileRecord } from "@/lib/types";
@@ -51,8 +52,15 @@ export interface SyncedConnectedAccount {
   toolkitData: Record<string, unknown>;
 }
 
+interface MCPSessionInfo {
+  url: string;
+  headers: Record<string, string>;
+}
+
 const SESSION_TTL_MS = 1000 * 60 * 30;
 const toolRouterSessionCache = new Map<string, ToolRouterSessionRef>();
+const composioSessionCache = new Map<string, Awaited<ReturnType<Composio["create"]>>>();
+const MCP_SESSION_CACHE = new Map<string, MCPSessionInfo>();
 
 function normalizeConnectionStatus(value?: string | null) {
   const status = (value ?? "").toUpperCase();
@@ -191,14 +199,20 @@ function normalizeConnectedAccount(
   };
 }
 
+let composioClient: Composio | null = null;
+
 export function createComposioClient() {
   if (!hasComposioEnv()) {
     return null;
   }
 
-  return new Composio({
-    apiKey: process.env.COMPOSIO_API_KEY,
-  });
+  if (!composioClient) {
+    composioClient = new Composio({
+      apiKey: process.env.COMPOSIO_API_KEY,
+    });
+  }
+
+  return composioClient;
 }
 
 export async function getOrCreateToolRouterSession(userId: string) {
@@ -211,22 +225,74 @@ export async function getOrCreateToolRouterSession(userId: string) {
   const composio = createComposioClient();
 
   if (!composio) {
+    console.error("[Composio] No composio client available");
     return null;
   }
 
-  const session = await composio.experimental.toolRouter.createSession(userId, {
-    manuallyManageConnections: true,
+  try {
+    const session = await composio.create(userId, {
+      toolkits: SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
+    });
+
+    const nextValue = {
+      sessionId: session.sessionId,
+      url: session.mcp.url,
+      createdAt: Date.now(),
+    };
+
+    toolRouterSessionCache.set(userId, nextValue);
+    composioSessionCache.set(userId, session);
+
+    console.log("[Composio] Created session for user:", userId, "Session ID:", session.sessionId);
+    return nextValue;
+  } catch (error) {
+    console.error("[Composio] Failed to create session:", error);
+    return null;
+  }
+}
+
+export async function getComposioSession(userId: string) {
+  const cached = composioSessionCache.get(userId);
+
+  if (cached) {
+    return cached;
+  }
+
+  const composio = createComposioClient();
+
+  if (!composio) {
+    return null;
+  }
+
+  const session = await composio.create(userId, {
     toolkits: SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
   });
 
-  const nextValue = {
-    sessionId: session.sessionId,
-    url: session.url,
-    createdAt: Date.now(),
+  composioSessionCache.set(userId, session);
+  return session;
+}
+
+export async function getMCPSession(userId: string) {
+  const cacheKey = `${userId}`;
+  const cached = MCP_SESSION_CACHE.get(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const session = await getComposioSession(userId);
+
+  if (!session) {
+    return null;
+  }
+
+  const mcpInfo = {
+    url: session.mcp.url,
+    headers: session.mcp.headers ?? {},
   };
 
-  toolRouterSessionCache.set(userId, nextValue);
-  return nextValue;
+  MCP_SESSION_CACHE.set(cacheKey, mcpInfo);
+  return mcpInfo;
 }
 
 export async function listConnectedAccounts(userId: string) {
@@ -236,7 +302,7 @@ export async function listConnectedAccounts(userId: string) {
     return [];
   }
 
-  const session = await getOrCreateToolRouterSession(userId);
+  const session = await getComposioSession(userId);
   const response = await composio.connectedAccounts.list({
     userIds: [userId],
     toolkitSlugs: SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
@@ -246,8 +312,10 @@ export async function listConnectedAccounts(userId: string) {
     ? response.items
     : []) as unknown as ComposioConnectedAccountItem[];
 
+  const toolRouterSession = toolRouterSessionCache.get(userId);
+
   return items
-    .map((item) => normalizeConnectedAccount(item, session))
+    .map((item) => normalizeConnectedAccount(item, toolRouterSession ?? null))
     .filter(Boolean) as SyncedConnectedAccount[];
 }
 
@@ -304,8 +372,9 @@ export async function createConnectionRequest(userId: string, toolkitSlug: strin
     throw new Error("Unsupported integration.");
   }
 
-  const session = await getOrCreateToolRouterSession(userId);
-  const request = await composio.toolkits.authorize(userId, integration.slug);
+  const session = await getComposioSession(userId);
+  
+  const request = await composio.connectedAccounts.link(userId, toolkitSlug);
 
   return {
     id: request.id,
@@ -318,18 +387,27 @@ export async function getWrappedTools(userId: string, toolkitSlugs: string[]) {
   const composio = createComposioClient();
 
   if (!composio) {
+    console.error("[Composio] No composio client available in getWrappedTools");
     return [];
   }
 
   const allowedTools = getAllowedChatToolsForToolkits(toolkitSlugs);
 
   if (allowedTools.length === 0) {
+    console.log("[Composio] No allowed tools for toolkits:", toolkitSlugs);
     return [];
   }
 
-  return composio.tools.get(userId, {
-    tools: allowedTools,
-  });
+  try {
+    const tools = await composio.tools.get(userId, {
+      tools: allowedTools,
+    });
+    console.log("[Composio] Got tools for user:", userId, "Tools count:", allowedTools.length);
+    return tools;
+  } catch (error) {
+    console.error("[Composio] Failed to get tools:", error);
+    return [];
+  }
 }
 
 export async function handleChatToolCalls(
@@ -339,10 +417,63 @@ export async function handleChatToolCalls(
   const composio = createComposioClient();
 
   if (!composio) {
+    console.error("[Composio] No composio client available in handleChatToolCalls");
     return [];
   }
 
-  return composio.provider.handleToolCalls(userId, chatCompletion);
+  const session = await getComposioSession(userId);
+
+  if (!session) {
+    console.error("[Composio] No session available in handleChatToolCalls for user:", userId);
+    return [];
+  }
+
+  if (!composio.provider) {
+    console.error("[Composio] No provider available in handleChatToolCalls");
+    return [];
+  }
+
+  try {
+    const toolCalls = chatCompletion.choices?.[0]?.message?.tool_calls;
+    if (toolCalls && toolCalls.length > 0) {
+      const toolNames = toolCalls.map(tc => "function" in tc ? (tc.function?.name ?? "unknown") : ("name" in tc ? tc.name : "unknown")).join(", ");
+      console.log("[Composio] Handling tool calls for user:", userId, "Tool calls:", toolNames);
+    }
+    
+    const results = await composio.provider.handleToolCalls(userId, chatCompletion);
+    
+    if (results && results.length > 0) {
+      console.log("[Composio] Tool call results:", results.length);
+    }
+    
+    return results;
+  } catch (error) {
+    console.error("[Composio] Failed to handle tool calls:", error);
+    return [];
+  }
+}
+
+export async function executeToolCall(
+  userId: string,
+  toolName: string,
+  arguments_: Record<string, unknown>,
+) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  const result = await composio.tools.execute(toolName, {
+    userId,
+    arguments: arguments_,
+  });
+
+  if (!result.successful) {
+    throw new Error(result.error ?? `Failed to execute tool: ${toolName}`);
+  }
+
+  return result.data;
 }
 
 export async function listDriveImportFiles(

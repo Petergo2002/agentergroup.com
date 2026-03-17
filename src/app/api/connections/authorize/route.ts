@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
         toolkit_data: connectionRequest.session
           ? {
               toolRouterSessionId: connectionRequest.session.sessionId,
-              toolRouterSessionUrl: connectionRequest.session.url,
+              toolRouterSessionUrl: connectionRequest.session.mcp.url,
             }
           : {},
         created_by: user.id,
