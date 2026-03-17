@@ -460,10 +460,27 @@ export async function runAgentChat({
       onStatus(`Using tool: ${toolNames}...`);
     }
 
-    const iterationToolMessages = (await handleChatToolCalls(
-      toolUserId,
-      finalCompletion as unknown as OpenAI.Chat.ChatCompletion,
-    )) as unknown as ToolMessage[];
+    let iterationToolMessages: ToolMessage[];
+
+    try {
+      iterationToolMessages = (await handleChatToolCalls(
+        toolUserId,
+        finalCompletion as unknown as OpenAI.Chat.ChatCompletion,
+      )) as unknown as ToolMessage[];
+    } catch (toolError) {
+      console.error(`Tool execution failed for user ${toolUserId}:`, toolError);
+      
+      const errorMessage =
+        toolError instanceof Error ? toolError.message : "Unknown integration error";
+
+      // If the tool crashes, feed the error back to the LLM so it can respond gracefully
+      iterationToolMessages = toolCallsArray.map((tc) => ({
+        role: "tool",
+        tool_call_id: tc.id,
+        name: tc.function.name,
+        content: `Error executing tool: ${errorMessage}`,
+      }));
+    }
 
     toolMessages.push(...iterationToolMessages);
     conversationMessages.push(assistantMessage, ...iterationToolMessages);
