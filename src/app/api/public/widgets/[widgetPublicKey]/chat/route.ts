@@ -208,11 +208,6 @@ export async function POST(
       activeAgentId: selected!.agent.id,
     });
 
-    const history = await loadOrderedWidgetSessionHistory(
-      supabase,
-      widgetSession.id,
-    );
-
     await insertWidgetMessages(supabase, {
       widgetSessionId: widgetSession.id,
       widgetId: loaded.widget.id,
@@ -220,6 +215,11 @@ export async function POST(
       agentId: selected!.agent.id,
       messages: [{ role: "user", content: message }],
     });
+
+    const history = await loadOrderedWidgetSessionHistory(
+      supabase,
+      widgetSession.id,
+    );
 
     const selectedVersionId = preview.isPreview
       ? selected!.publishedVersionId ?? selected!.agent.published_version_id
@@ -242,56 +242,73 @@ export async function POST(
     );
     const runtimeAgent = getWidgetRuntimeAgent(selected!.agent, publishedVersion);
 
-    const result = await runAgentChat({
-      supabase: supabase as never,
-      agent: runtimeAgent,
-      input: message,
-      history: history.map((item) => ({
-        role:
-          item.role === "assistant"
-            ? "assistant"
-            : item.role === "tool"
-              ? "tool"
-              : "user",
-        content: item.content,
-        tool_call_id:
-          typeof item.metadata?.tool_call_id === "string"
-            ? item.metadata.tool_call_id
-            : null,
-      })),
-      toolUserId: selected!.agent.created_by,
-      audience: "widget",
-      widgetPublicKey: loaded.widget.widget_public_key,
-    });
-
-    await insertWidgetMessages(supabase, {
-      widgetSessionId: widgetSession.id,
-      widgetId: loaded.widget.id,
-      widgetAgentId: selected!.persistedWidgetAgentId,
-      agentId: selected!.agent.id,
-      messages: [
-        ...result.toolMessages.map((toolMessage) => ({
-          role: "tool" as const,
-          content: String(toolMessage.content ?? ""),
-          metadata: toolMessage,
-        })),
-        {
-          role: "assistant" as const,
-          content: result.assistantContent,
-          metadata: result.assistantMetadata,
-        },
-      ],
-    });
-
     const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode(
-            sseChunk({ content: result.assistantContent }),
-          ),
-        );
-        controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
-        controller.close();
+      async start(controller) {
+        try {
+          const result = await runAgentChat({
+            supabase: supabase as never,
+            agent: runtimeAgent,
+            input: message,
+            history: history.map((item) => ({
+              role:
+                item.role === "assistant"
+                  ? "assistant"
+                  : item.role === "tool"
+                    ? "tool"
+                    : "user",
+              content: item.content,
+              tool_call_id:
+                typeof item.metadata?.tool_call_id === "string"
+                  ? item.metadata.tool_call_id
+                  : null,
+            })),
+            toolUserId: selected!.agent.created_by,
+            audience: "widget",
+            widgetPublicKey: loaded.widget.widget_public_key,
+            onToken: (() => {
+              let cumulativeContent = "";
+              return (token: string) => {
+                cumulativeContent += token;
+                const encoder = new TextEncoder();
+                controller.enqueue(encoder.encode(sseChunk({ content: cumulativeContent })));
+              };
+            })(),
+            onStatus: (statusMessage) => {
+              // Optionally emit status updates as specialized chunks, or simple debug info
+              // Let's send a status chunk so frontend could handle 'searching...'
+              const encoder = new TextEncoder();
+              // Example payload frontend can parse if they want
+              controller.enqueue(encoder.encode(sseChunk({ status: statusMessage })));
+            }
+          });
+
+          await insertWidgetMessages(supabase, {
+            widgetSessionId: widgetSession.id,
+            widgetId: loaded.widget.id,
+            widgetAgentId: selected!.persistedWidgetAgentId,
+            agentId: selected!.agent.id,
+            messages: [
+              ...result.toolMessages.map((toolMessage) => ({
+                role: "tool" as const,
+                content: String(toolMessage.content ?? ""),
+                metadata: toolMessage,
+              })),
+              {
+                role: "assistant" as const,
+                content: result.assistantContent,
+                metadata: result.assistantMetadata,
+              },
+            ],
+          });
+
+          controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+        } catch (error) {
+          console.error("Stream generation error:", error);
+          controller.enqueue(new TextEncoder().encode(sseChunk({ error: "Stream error occurred." })));
+          controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+        } finally {
+          controller.close();
+        }
       },
     });
 

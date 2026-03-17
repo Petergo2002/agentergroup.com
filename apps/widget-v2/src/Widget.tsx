@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import {
   type CSSProperties,
-  type FormEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -25,7 +24,6 @@ import {
   getWidgetConfig,
   sendWidgetEvent,
   sendWidgetMessage,
-  submitWidgetLead,
   type WidgetRequestContext,
 } from "./lib/api";
 import {
@@ -38,16 +36,8 @@ import type {
   Message,
   WidgetAgentConfig,
   WidgetConfig,
-  WidgetContactFormSettings,
-  WidgetInteractionMode,
   WidgetPreviewOverride,
 } from "./types";
-
-const DEFAULT_CONTACT_FORM_SETTINGS: WidgetContactFormSettings = {
-  submitButtonText: "Send",
-  successMessage: "Thanks! We'll get back to you soon.",
-  introText: "Leave your details and we'll contact you.",
-};
 
 interface WidgetProps {
   widgetPublicKey: string;
@@ -235,19 +225,12 @@ function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
               typeof agent.icon === "string" && agent.icon.trim()
                 ? agent.icon.trim()
                 : null,
-            interactionMode:
-              agent.interactionMode === "contact_form"
-                ? "contact_form"
-                : "chat",
+            interactionMode: "chat",
             greeting: (agent.greeting?.trim() === "Hi! How can I help you today?" && language === "sv") ? "Hej! Hur kan jag hjälpa dig idag?" : (agent.greeting?.trim() || (language === "sv" ? "Hej! Hur kan jag hjälpa dig idag?" : "Hi! How can I help you today?")),
             placeholder: (agent.placeholder?.trim() === "Write a message..." && language === "sv") ? "Skriv ett meddelande..." : (agent.placeholder?.trim() || (language === "sv" ? "Skriv ett meddelande..." : "Write a message...")),
             quickActions: Array.isArray(agent.quickActions)
               ? agent.quickActions
               : [],
-            contactFormSettings: {
-              ...DEFAULT_CONTACT_FORM_SETTINGS,
-              ...(agent.contactFormSettings ?? {}),
-            },
           } satisfies WidgetAgentConfig;
         })
         .filter(Boolean) as WidgetAgentConfig[]
@@ -279,14 +262,6 @@ function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
     },
     agents: normalizedAgents,
   };
-}
-
-function resolveInteractionMode(
-  selectedAgent: WidgetAgentConfig | null,
-): WidgetInteractionMode {
-  return selectedAgent?.interactionMode === "contact_form"
-    ? "contact_form"
-    : "chat";
 }
 
 function resolveWidgetLanguage(config: WidgetConfig | null): "sv" | "en" {
@@ -338,15 +313,6 @@ export default function Widget({
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
-  const [contactName, setContactName] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [contactMessage, setContactMessage] = useState("");
-  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
-  const [contactSubmitSuccess, setContactSubmitSuccess] = useState(false);
-  const [contactSubmitError, setContactSubmitError] = useState<string | null>(
-    null,
-  );
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"home" | "messages">("home");
   const [hasUnread, setHasUnread] = useState(false);
@@ -405,12 +371,6 @@ export default function Widget({
       setHasUnread(false);
       setActiveTab("home");
       setError(null);
-      setContactSubmitError(null);
-      setContactSubmitSuccess(false);
-      setContactName("");
-      setContactEmail("");
-      setContactPhone("");
-      setContactMessage("");
       setSelectedWidgetAgentId(
         config?.home.mode === "single_auto" ? config.agents[0]?.widgetAgentId ?? null : null,
       );
@@ -895,59 +855,7 @@ export default function Widget({
     }
   };
 
-  const submitContactForm = async (event?: FormEvent) => {
-    event?.preventDefault();
-    if (isSubmittingContact || !widgetPublicKey || !selectedAgent) return;
 
-    const name = contactName.trim();
-    const email = contactEmail.trim();
-    const phone = contactPhone.trim();
-    const message = contactMessage.trim();
-
-    if (!name || !email) {
-      setContactSubmitError("Name and email are required.");
-      return;
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setContactSubmitError("Enter a valid email address.");
-      return;
-    }
-
-    setIsSubmittingContact(true);
-    setContactSubmitError(null);
-    setContactSubmitSuccess(false);
-
-    try {
-      await submitWidgetLead(
-        widgetPublicKey,
-        {
-          sessionId,
-          widgetAgentId: selectedAgent.widgetAgentId,
-          name,
-          email,
-          phone: phone || undefined,
-          message: message || undefined,
-        },
-        requestContext,
-      );
-
-      setContactSubmitSuccess(true);
-      setContactName("");
-      setContactEmail("");
-      setContactPhone("");
-      setContactMessage("");
-    } catch (nextError) {
-      setContactSubmitError(
-        nextError instanceof Error ? nextError.message : "Could not submit form.",
-      );
-    } finally {
-      setIsSubmittingContact(false);
-    }
-  };
-
-  const interactionMode = resolveInteractionMode(selectedAgent);
-  const isContactFormMode = interactionMode === "contact_form";
   const widgetLanguage = config ? resolveWidgetLanguage(config) : "en";
   const isChooserMode =
     config?.home.mode === "chooser" && selectedAgent === null;
@@ -955,11 +863,7 @@ export default function Widget({
   const navLabelMessages = widgetLanguage === "sv" ? "Meddelanden" : "Messages";
   const newChatLabel = widgetLanguage === "sv" ? "Starta ny chatt" : "Start a new chat";
 
-  useEffect(() => {
-    if (config && selectedAgent && isContactFormMode && activeTab === "home") {
-      setActiveTab("messages");
-    }
-  }, [activeTab, config, isContactFormMode, selectedAgent]);
+
 
   useEffect(() => {
     if (config?.home.mode === "chooser" && !selectedAgent && activeTab === "messages") {
@@ -1100,15 +1004,12 @@ export default function Widget({
                   setActiveTab("home");
                 }}
                 onSwitchToMessages={() => setActiveTab("messages")}
-                isContactFormMode={isContactFormMode}
               />
             ) : (
               <MessagesTab
                 key="messages"
                 config={config}
                 selectedAgent={selectedAgent}
-                isContactFormMode={isContactFormMode}
-                quotaFallbackActive={false}
                 messages={messages}
                 input={input}
                 setInput={setInput}
@@ -1116,20 +1017,6 @@ export default function Widget({
                 isStreaming={isStreaming}
                 hasStarted={hasStarted}
                 sendMessage={sendMessage}
-                contactName={contactName}
-                setContactName={setContactName}
-                contactEmail={contactEmail}
-                setContactEmail={setContactEmail}
-                contactPhone={contactPhone}
-                setContactPhone={setContactPhone}
-                contactMessage={contactMessage}
-                setContactMessage={setContactMessage}
-                isSubmittingContact={isSubmittingContact}
-                contactSubmitSuccess={contactSubmitSuccess}
-                setContactSubmitSuccess={setContactSubmitSuccess}
-                contactSubmitError={contactSubmitError}
-                setContactSubmitError={setContactSubmitError}
-                submitContactForm={submitContactForm}
               />
             )}
           </AnimatePresence>
@@ -1138,8 +1025,7 @@ export default function Widget({
         <AnimatePresence>
           {selectedAgent &&
             !isChooserMode &&
-            !(activeTab === "messages" && hasStarted) &&
-            !isContactFormMode && (
+            !(activeTab === "messages" && hasStarted) && (
             <motion.nav
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

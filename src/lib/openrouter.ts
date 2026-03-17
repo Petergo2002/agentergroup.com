@@ -4,12 +4,14 @@ interface OpenRouterChatOptions {
   model?: string;
   messages: Array<Record<string, unknown>>;
   tools?: Array<Record<string, unknown>>;
+  stream?: boolean;
 }
 
 export async function createOpenRouterChatCompletion({
   model,
   messages,
   tools = [],
+  stream = false,
 }: OpenRouterChatOptions) {
   if (!hasOpenRouterEnv()) {
     throw new Error("OPENROUTER_API_KEY is missing.");
@@ -28,12 +30,12 @@ export async function createOpenRouterChatCompletion({
       messages,
       tools: tools.length > 0 ? tools : undefined,
       tool_choice: tools.length > 0 ? "auto" : undefined,
+      stream,
     }),
   });
 
-  const payload = await response.json();
-
   if (!response.ok) {
+    const payload = await response.json().catch(() => null);
     const message =
       payload?.error?.message ||
       payload?.message ||
@@ -41,5 +43,51 @@ export async function createOpenRouterChatCompletion({
     throw new Error(message);
   }
 
-  return payload;
+  if (stream) {
+    return streamOpenRouterResponse(response);
+  }
+
+  return response.json();
+}
+
+export async function* streamOpenRouterResponse(response: Response) {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Response body is not readable.");
+  }
+
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.trim() === "") continue;
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          if (data === "[DONE]") {
+            return;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            yield parsed;
+          } catch (e) {
+            // Ignore incomplete or unparseable chunks
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }

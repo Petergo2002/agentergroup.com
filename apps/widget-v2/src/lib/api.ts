@@ -117,30 +117,6 @@ export async function sendWidgetMessage(
   });
 }
 
-export async function submitWidgetLead(
-  widgetPublicKey: string,
-  body: {
-    sessionId: string;
-    widgetAgentId?: string;
-    name: string;
-    email: string;
-    phone?: string;
-    message?: string;
-  },
-  context: WidgetRequestContext,
-) {
-  const response = await fetch(buildWidgetUrl(widgetPublicKey, "/leads"), {
-    method: "POST",
-    headers: buildWidgetHeaders(context),
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    await parseError(response);
-  }
-
-  return response.json().catch(() => null);
-}
 
 export async function sendWidgetEvent(
   widgetPublicKey: string,

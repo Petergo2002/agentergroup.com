@@ -1,12 +1,10 @@
 import { motion } from "framer-motion";
-import { MessageSquare } from "lucide-react";
 import type { WidgetAgentConfig, WidgetConfig } from "../types";
 
 interface HomeTabProps {
   config: WidgetConfig;
   selectedAgent: WidgetAgentConfig | null;
   isChooserMode: boolean;
-  isContactFormMode: boolean;
   onSelectAgent: (widgetAgentId: string) => void;
   onSendMessage: (text?: string) => void;
   onSwitchToMessages: () => void;
@@ -31,7 +29,6 @@ export function HomeTab({
   config,
   selectedAgent,
   isChooserMode,
-  isContactFormMode,
   onSelectAgent,
   onSendMessage,
   onSwitchToMessages,
@@ -39,11 +36,6 @@ export function HomeTab({
   const t = TRANSLATIONS[config.widget.language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
 
   const handleQuickAction = (prompt: string) => {
-    if (isContactFormMode) {
-      onSwitchToMessages();
-      return;
-    }
-
     onSendMessage(prompt);
     onSwitchToMessages();
   };
@@ -88,7 +80,7 @@ export function HomeTab({
                         {agent.label}
                       </h2>
                       <span className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-widget-muted">
-                        {agent.interactionMode === "contact_form" ? t.contactBadge : t.chatBadge}
+                        {t.chatBadge}
                       </span>
                     </div>
                     <p className="mt-2 text-sm leading-6 text-widget-muted">
@@ -131,58 +123,46 @@ export function HomeTab({
             </p>
           ) : null}
 
-          {isContactFormMode ? (
-            <button
-              onClick={onSwitchToMessages}
-              className="relative mt-8 flex w-full max-w-sm items-center justify-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-widget-primary py-3.5 text-widget-primary-fg shadow-btn-glow transition-transform active:scale-95"
-            >
-              <MessageSquare className="h-5 w-5 opacity-90" />
-              <span className="text-base font-bold tracking-wide">
-                Contact us
-              </span>
-            </button>
-          ) : (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                const formData = new FormData(event.currentTarget);
-                const text = formData.get("message") as string;
-                if (text?.trim()) {
-                  onSendMessage(text.trim());
-                  onSwitchToMessages();
-                  return;
-                }
-
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const formData = new FormData(event.currentTarget);
+              const text = formData.get("message") as string;
+              if (text?.trim()) {
+                onSendMessage(text.trim());
                 onSwitchToMessages();
-              }}
-              className="relative mt-8 w-full max-w-sm shadow-lg shadow-black/5"
+                return;
+              }
+
+              onSwitchToMessages();
+            }}
+            className="relative mt-8 w-full max-w-sm shadow-lg shadow-black/5"
+          >
+            <input
+              type="text"
+              name="message"
+              placeholder={selectedAgent.placeholder || "How can we help?"}
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.05] py-3.5 pl-5 pr-14 text-base font-medium text-widget-fg shadow-inner placeholder:text-widget-fg/40 transition-all focus:border-widget-primary/50 focus:outline-none focus:ring-2 focus:ring-widget-primary/50"
+            />
+            <button
+              type="submit"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-widget-primary p-2.5 text-widget-primary-fg shadow-btn-glow transition-all hover:scale-105 hover:opacity-100 active:scale-95"
             >
-              <input
-                type="text"
-                name="message"
-                placeholder={selectedAgent.placeholder || "How can we help?"}
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] py-3.5 pl-5 pr-14 text-base font-medium text-widget-fg shadow-inner placeholder:text-widget-fg/40 transition-all focus:border-widget-primary/50 focus:outline-none focus:ring-2 focus:ring-widget-primary/50"
-              />
-              <button
-                type="submit"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-widget-primary p-2.5 text-widget-primary-fg shadow-btn-glow transition-all hover:scale-105 hover:opacity-100 active:scale-95"
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="ml-0.5 h-4 w-4"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="ml-0.5 h-4 w-4"
-                >
-                  <path d="M5 12h14" />
-                  <path d="m12 5 7 7-7 7" />
-                </svg>
-              </button>
-            </form>
-          )}
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </button>
+          </form>
         </div>
 
         {quickActions.length > 0 ? (

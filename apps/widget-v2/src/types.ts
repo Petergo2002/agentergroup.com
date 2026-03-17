@@ -1,17 +1,10 @@
 export type WidgetLanguage = "sv" | "en";
 export type WidgetTheme = "dark" | "light";
-export type WidgetInteractionMode = "chat" | "contact_form";
 
 export interface WidgetQuickAction {
   label: string;
   prompt: string;
   icon?: string | null;
-}
-
-export interface WidgetContactFormSettings {
-  submitButtonText: string;
-  successMessage: string;
-  introText: string;
 }
 
 export interface WidgetAgentConfig {
@@ -20,11 +13,10 @@ export interface WidgetAgentConfig {
   label: string;
   description: string;
   icon?: string | null;
-  interactionMode: WidgetInteractionMode;
+  interactionMode: "chat";
   greeting: string;
   placeholder: string;
   quickActions: WidgetQuickAction[];
-  contactFormSettings: WidgetContactFormSettings;
 }
 
 export interface WidgetConfig {

@@ -612,8 +612,8 @@ export async function loadOrderedWidgetSessionHistory(
         order: (
           column: string,
           options: { ascending: boolean },
-        ) => Promise<WidgetQueryResult<unknown[]>>;
-      }).order("created_at", { ascending: true })
+        ) => WidgetSelectBuilder<unknown[]> & { limit: (count: number) => Promise<WidgetQueryResult<unknown[]>> };
+      }).order("created_at", { ascending: false }).limit(20)
     : await selectBuilder.maybeSingle();
 
   if (result.error) {
@@ -625,6 +625,8 @@ export async function loadOrderedWidgetSessionHistory(
     : result.data
       ? [result.data]
       : [];
+      
+  rows.reverse();    
   return rows as WidgetSessionMessageRecord[];
 }
 

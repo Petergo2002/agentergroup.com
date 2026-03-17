@@ -312,7 +312,12 @@ export async function runAgentChat({
   audience,
   knowledgeAccessToken,
   widgetPublicKey,
-}: AgentRuntimeInput): Promise<AgentRuntimeResult> {
+  onToken,
+  onStatus,
+}: AgentRuntimeInput & {
+  onToken?: (token: string) => void;
+  onStatus?: (status: string) => void;
+}): Promise<AgentRuntimeResult> {
   const { connectedToolkits, readyKnowledgeSources } = await loadRuntimeContext(
     supabase,
     agent.id,
@@ -341,6 +346,7 @@ export async function runAgentChat({
 
   if (readyKnowledgeSources.length > 0) {
     try {
+      if (onStatus) onStatus("Searching specific knowledge...");
       knowledgeMatches = await retrieveKnowledgeMatches({
         supabase,
         workspaceId: agent.workspace_id,
@@ -374,42 +380,98 @@ export async function runAgentChat({
   const toolMessages: ToolMessage[] = [];
   let finalCompletion: Record<string, unknown> | null = null;
   let finalAssistantMessage: Record<string, unknown> | null = null;
+  let assistantContent = "";
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration += 1) {
-    const completion = await createOpenRouterChatCompletion({
+    if (onStatus && iteration > 0) onStatus("Thinking...");
+    
+    // Check if tools are currently available, if not, or if this is the last iteration, 
+    // we should stream the response back. Actually, we can stream every iteration.
+    // If it decides to use a tool, it streams the tool call (which we hide from onToken).
+    // If it decides to write text, it streams the text (which we pass to onToken).
+    
+    const stream = await createOpenRouterChatCompletion({
       model: agent.model,
       messages: conversationMessages,
       tools: toolDefinitions,
-    });
+      stream: true,
+    }) as AsyncGenerator<any, void, unknown>;
 
-    finalCompletion = completion as Record<string, unknown>;
-    const assistantMessage = completion?.choices?.[0]?.message as
-      | Record<string, unknown>
-      | undefined;
-    const toolCalls = (assistantMessage?.tool_calls ?? []) as unknown as ModelToolCall[];
+    finalCompletion = { choices: [{ message: { role: "assistant", content: "", tool_calls: [] } }] };
+    let hasToolCalls = false;
+    let iterationContent = "";
+    const accumulatedToolCalls = new Map<number, any>();
 
-    if (!assistantMessage) {
+    for await (const chunk of stream) {
+      // Keep final completion mostly intact for metadata
+      if (chunk.model) finalCompletion.model = chunk.model;
+      if (chunk.id) finalCompletion.id = chunk.id;
+      
+      const delta = chunk.choices?.[0]?.delta;
+      if (!delta) continue;
+
+      if (delta.content) {
+        iterationContent += delta.content;
+        assistantContent += delta.content;
+        if (onToken) onToken(delta.content);
+      }
+
+      if (delta.tool_calls) {
+        hasToolCalls = true;
+        for (const pt of delta.tool_calls) {
+          if (!accumulatedToolCalls.has(pt.index)) {
+            accumulatedToolCalls.set(pt.index, {
+              id: pt.id || "",
+              type: "function",
+              function: {
+                name: pt.function?.name || "",
+                arguments: pt.function?.arguments || ""
+              }
+            });
+          } else {
+            const existing = accumulatedToolCalls.get(pt.index)!;
+            if (pt.id) existing.id += pt.id;
+            if (pt.function?.name) existing.function.name += pt.function.name;
+            if (pt.function?.arguments) existing.function.arguments += pt.function.arguments;
+          }
+        }
+      }
+    }
+
+    const toolCallsArray = Array.from(accumulatedToolCalls.values());
+    const assistantMessage: any = {
+      role: "assistant",
+      content: iterationContent,
+    };
+    
+    if (toolCallsArray.length > 0) {
+        assistantMessage.tool_calls = toolCallsArray;
+    }
+
+    (finalCompletion as any).choices[0].message = assistantMessage;
+
+    if (!hasToolCalls || toolDefinitions.length === 0) {
+      finalAssistantMessage = assistantMessage as Record<string, unknown>;
       break;
     }
 
-    if (toolCalls.length === 0 || toolDefinitions.length === 0) {
-      finalAssistantMessage = assistantMessage;
-      break;
+    if (onStatus) {
+      const toolNames = toolCallsArray.map(tc => tc.function.name).join(", ");
+      onStatus(`Using tool: ${toolNames}...`);
     }
 
     const iterationToolMessages = (await handleChatToolCalls(
       toolUserId,
-      completion as OpenAI.Chat.ChatCompletion,
+      finalCompletion as unknown as OpenAI.Chat.ChatCompletion,
     )) as unknown as ToolMessage[];
 
     toolMessages.push(...iterationToolMessages);
     conversationMessages.push(assistantMessage, ...iterationToolMessages);
   }
 
-  let assistantContent = extractAssistantContent(finalAssistantMessage);
-
   if (!finalAssistantMessage || !assistantContent) {
-    const recoveryCompletion = await createOpenRouterChatCompletion({
+    if (onStatus) onStatus("Finalizing...");
+    const recoveryStream = await createOpenRouterChatCompletion({
       model: agent.model,
       messages: [
         ...conversationMessages,
@@ -421,20 +483,27 @@ export async function runAgentChat({
               : "Respond directly to the user in concise natural language based on the conversation and any completed tool work. If information is missing, ask the single best follow-up question. Do not call tools. Never mention internal processing, retries, empty responses, JSON, or code.",
         },
       ],
-    });
+      stream: true,
+    }) as AsyncGenerator<any, void, unknown>;
 
-    finalCompletion = recoveryCompletion as Record<string, unknown>;
-    finalAssistantMessage =
-      (recoveryCompletion?.choices?.[0]?.message as
-        | Record<string, unknown>
-        | undefined) ?? null;
-    assistantContent = extractAssistantContent(finalAssistantMessage);
+    finalCompletion = { choices: [{ message: { role: "assistant", content: "" } }] };
+    assistantContent = "";
+    
+    for await (const chunk of recoveryStream) {
+      const delta = chunk.choices?.[0]?.delta;
+      if (delta?.content) {
+        assistantContent += delta.content;
+        if (onToken) onToken(delta.content);
+      }
+    }
+    (finalCompletion as any).choices[0].message.content = assistantContent;
+    finalAssistantMessage = (finalCompletion as any).choices[0].message;
   }
 
   assistantContent ||= EMPTY_ASSISTANT_RESPONSE_FALLBACK;
 
   return {
-    assistantContent,
+    assistantContent: assistantContent.trim(),
     assistantMetadata: {
       ...(finalAssistantMessage ?? {}),
       knowledgeMatches: getKnowledgeCitationSummary(knowledgeMatches),
