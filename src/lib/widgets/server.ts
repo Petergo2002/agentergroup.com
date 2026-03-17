@@ -182,6 +182,7 @@ export function buildWidgetCorsHeaders(request: NextRequest) {
     "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
     "Access-Control-Allow-Headers":
       "Content-Type,x-ag-widget-context,x-ag-parent-origin,x-ag-preview-token,x-ag-preview-source,x-ag-preview-revision",
+    "Access-Control-Allow-Credentials": "true",
     Vary: "Origin",
   };
 }

@@ -43,6 +43,7 @@ interface RuntimeMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
   tool_call_id?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface ToolMessage {
@@ -161,10 +162,20 @@ function mapDbMessagesToModel(messages: RuntimeMessage[]) {
         };
       }
 
-      return {
+      const result: any = {
         role: message.role,
         content: message.content,
       };
+
+      if (
+        message.role === "assistant" &&
+        message.metadata &&
+        Array.isArray(message.metadata.tool_calls)
+      ) {
+        result.tool_calls = message.metadata.tool_calls;
+      }
+
+      return result;
     });
 }
 

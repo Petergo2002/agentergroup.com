@@ -19,10 +19,12 @@ function mapHistory(messages: MessageRecord[]) {
     role: message.role,
     content: message.content,
     tool_call_id: message.tool_call_id,
+    metadata: message.metadata,
   })) as Array<{
     role: "system" | "user" | "assistant" | "tool";
     content: string;
     tool_call_id?: string | null;
+    metadata?: Record<string, unknown> | null;
   }>;
 }
 
