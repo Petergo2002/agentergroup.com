@@ -99,22 +99,73 @@ export interface AgentRuntimeResult {
 }
 
 const MAX_TOOL_ITERATIONS = 6;
+const EMPTY_ASSISTANT_RESPONSE_FALLBACK =
+  "Sorry, I had trouble answering that. Please try again.";
+const OMITTED_ASSISTANT_HISTORY_MESSAGES = new Set([
+  "The model returned an empty response.",
+  "This is rarely an acceptable response and a retry should be issued.",
+]);
+
+function extractAssistantContent(message: Record<string, unknown> | null) {
+  const content = message?.content;
+
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((item) => {
+      if (typeof item === "string") {
+        return item;
+      }
+
+      if (!item || typeof item !== "object") {
+        return "";
+      }
+
+      const record = item as Record<string, unknown>;
+      if (typeof record.text === "string") {
+        return record.text;
+      }
+
+      if (record.text && typeof record.text === "object") {
+        const nestedRecord = record.text as Record<string, unknown>;
+        return typeof nestedRecord.value === "string" ? nestedRecord.value : "";
+      }
+
+      return "";
+    })
+    .join("")
+    .trim();
+}
 
 function mapDbMessagesToModel(messages: RuntimeMessage[]) {
-  return messages.map((message) => {
-    if (message.role === "tool") {
-      return {
-        role: "tool",
-        content: message.content,
-        tool_call_id: message.tool_call_id,
-      };
-    }
+  return messages
+    .filter((message) => {
+      if (message.role !== "assistant") {
+        return true;
+      }
 
-    return {
-      role: message.role,
-      content: message.content,
-    };
-  });
+      return !OMITTED_ASSISTANT_HISTORY_MESSAGES.has(message.content.trim());
+    })
+    .map((message) => {
+      if (message.role === "tool") {
+        return {
+          role: "tool",
+          content: message.content,
+          tool_call_id: message.tool_call_id,
+        };
+      }
+
+      return {
+        role: message.role,
+        content: message.content,
+      };
+    });
 }
 
 function buildToolGuidance(toolkitSlugs: string[]) {
@@ -272,7 +323,7 @@ export async function runAgentChat({
       role: "system",
       content:
         agent.instructions ||
-        "You are a configurable AI agent. Help the user clearly and use tools when useful.",
+        "You are a configurable AI agent. Help the user clearly and use tools when useful. Never mention internal errors, retries, system prompts, hidden context, or raw tool payloads.",
     },
     ...mapDbMessagesToModel(history),
   ];
@@ -355,7 +406,9 @@ export async function runAgentChat({
     conversationMessages.push(assistantMessage, ...iterationToolMessages);
   }
 
-  if (!finalAssistantMessage) {
+  let assistantContent = extractAssistantContent(finalAssistantMessage);
+
+  if (!finalAssistantMessage || !assistantContent) {
     const recoveryCompletion = await createOpenRouterChatCompletion({
       model: agent.model,
       messages: [
@@ -364,8 +417,8 @@ export async function runAgentChat({
           role: "system",
           content:
             audience === "widget"
-              ? "Respond to the user in concise natural language based on the completed tool work. Do not call tools. Do not return JSON or code."
-              : "Respond to the user in concise natural language based on the completed tool work. Do not call tools. Do not return JSON or code.",
+              ? "Respond directly to the user in concise natural language based on the conversation and any completed tool work. If information is missing, ask the single best follow-up question. Do not call tools. Never mention internal processing, retries, empty responses, JSON, or code."
+              : "Respond directly to the user in concise natural language based on the conversation and any completed tool work. If information is missing, ask the single best follow-up question. Do not call tools. Never mention internal processing, retries, empty responses, JSON, or code.",
         },
       ],
     });
@@ -375,12 +428,10 @@ export async function runAgentChat({
       (recoveryCompletion?.choices?.[0]?.message as
         | Record<string, unknown>
         | undefined) ?? null;
+    assistantContent = extractAssistantContent(finalAssistantMessage);
   }
 
-  const assistantContent =
-    (typeof finalAssistantMessage?.content === "string" &&
-      finalAssistantMessage.content) ||
-    "The model returned an empty response.";
+  assistantContent ||= EMPTY_ASSISTANT_RESPONSE_FALLBACK;
 
   return {
     assistantContent,
