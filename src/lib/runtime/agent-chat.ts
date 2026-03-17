@@ -8,7 +8,7 @@ import {
   KNOWLEDGE_MATCH_THRESHOLD,
 } from "@/lib/knowledge";
 import { createOpenRouterChatCompletion } from "@/lib/openrouter";
-import { getSupabaseServiceRoleKey } from "@/lib/env";
+import { getSupabaseEnv, getSupabaseServiceRoleKey } from "@/lib/env";
 import type { AgentRecord, KnowledgeMatchRecord } from "@/lib/types";
 
 interface RuntimeSelectQueryResult {
@@ -202,30 +202,48 @@ async function retrieveKnowledgeMatches({
   query: string;
   knowledgeAccessToken?: string | null;
 }) {
-  const headers: Record<string, string> = knowledgeAccessToken
-    ? {
-        Authorization: `Bearer ${knowledgeAccessToken}`,
-      }
-    : {
-        "x-internal-service-key": getSupabaseServiceRoleKey(),
-      };
+  void supabase;
 
-  const searchResult = await supabase.functions.invoke("search-knowledge", {
+  const { url } = getSupabaseEnv();
+  const serviceRoleKey = getSupabaseServiceRoleKey();
+  const isUserScopedRequest = Boolean(knowledgeAccessToken);
+  const authToken = knowledgeAccessToken ?? serviceRoleKey;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${authToken}`,
+    apikey: isUserScopedRequest ? authToken : serviceRoleKey,
+  };
+
+  if (!isUserScopedRequest) {
+    headers["x-internal-service-key"] = serviceRoleKey;
+  }
+
+  const response = await fetch(`${url}/functions/v1/search-knowledge`, {
+    method: "POST",
     headers,
-    body: {
+    body: JSON.stringify({
       workspaceId,
       agentId,
       query,
       matchThreshold: KNOWLEDGE_MATCH_THRESHOLD,
       matchCount: KNOWLEDGE_MATCH_COUNT,
-    },
+    }),
   });
 
-  if (searchResult.error) {
-    throw new Error(searchResult.error.message);
+  const payload = (await response.json().catch(() => null)) as
+    | { error?: string; matches?: KnowledgeMatchRecord[] }
+    | null;
+
+  if (!response.ok) {
+    const errorMessage =
+      payload?.error ||
+      `search-knowledge returned ${response.status} for ${
+        isUserScopedRequest ? "user" : "internal"
+      } auth.`;
+    throw new Error(errorMessage);
   }
 
-  return ((searchResult.data?.matches ?? []) as KnowledgeMatchRecord[]).filter(
+  return ((payload?.matches ?? []) as KnowledgeMatchRecord[]).filter(
     (match) => typeof match.content === "string" && match.content.length > 0,
   );
 }
