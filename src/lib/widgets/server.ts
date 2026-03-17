@@ -87,6 +87,7 @@ export interface RuntimeWidgetAgentSelection {
 }
 
 const WIDGET_PREVIEW_TTL_MS = 15 * 60 * 1000;
+const DEPLOY_TIMESTAMP_SKEW_MS = 2000;
 
 async function loadWidgetAgentsWithAgents(
   supabase: WidgetAdminSupabase,
@@ -303,14 +304,17 @@ export function getWidgetNeedsRedeploy(
   const deployedAt = new Date(widget.deployed_at).getTime();
   const widgetUpdatedAt = new Date(widget.updated_at).getTime();
 
-  if (widgetUpdatedAt > deployedAt) {
+  // Deploy actions update the widget row and attached widget agent rows, and the
+  // DB trigger can stamp updated_at slightly after the app-provided deployed_at.
+  // Treat small deltas as the same deploy event rather than a real stale state.
+  if (widgetUpdatedAt - deployedAt > DEPLOY_TIMESTAMP_SKEW_MS) {
     return true;
   }
 
   return widgetAgents.some(({ widgetAgent, agent }) => {
     const widgetAgentUpdatedAt = new Date(widgetAgent.updated_at).getTime();
     return (
-      widgetAgentUpdatedAt > deployedAt ||
+      widgetAgentUpdatedAt - deployedAt > DEPLOY_TIMESTAMP_SKEW_MS ||
       widgetAgent.published_version_id !== agent.published_version_id
     );
   });

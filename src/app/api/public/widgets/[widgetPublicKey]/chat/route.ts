@@ -261,6 +261,7 @@ export async function POST(
       })),
       toolUserId: selected!.agent.created_by,
       audience: "widget",
+      widgetPublicKey: loaded.widget.widget_public_key,
     });
 
     await insertWidgetMessages(supabase, {

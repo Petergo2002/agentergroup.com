@@ -86,6 +86,7 @@ export interface AgentRuntimeInput {
   toolUserId: string;
   audience: "preview" | "widget";
   knowledgeAccessToken?: string | null;
+  widgetPublicKey?: string | null;
 }
 
 export interface AgentRuntimeResult {
@@ -195,12 +196,14 @@ async function retrieveKnowledgeMatches({
   agentId,
   query,
   knowledgeAccessToken,
+  widgetPublicKey,
 }: {
   supabase: RuntimeSupabaseLike;
   workspaceId: string;
   agentId: string;
   query: string;
   knowledgeAccessToken?: string | null;
+  widgetPublicKey?: string | null;
 }) {
   void supabase;
 
@@ -225,6 +228,7 @@ async function retrieveKnowledgeMatches({
       workspaceId,
       agentId,
       query,
+      widgetPublicKey,
       matchThreshold: KNOWLEDGE_MATCH_THRESHOLD,
       matchCount: KNOWLEDGE_MATCH_COUNT,
     }),
@@ -256,6 +260,7 @@ export async function runAgentChat({
   toolUserId,
   audience,
   knowledgeAccessToken,
+  widgetPublicKey,
 }: AgentRuntimeInput): Promise<AgentRuntimeResult> {
   const { connectedToolkits, readyKnowledgeSources } = await loadRuntimeContext(
     supabase,
@@ -291,6 +296,7 @@ export async function runAgentChat({
         agentId: agent.id,
         query: input,
         knowledgeAccessToken,
+        widgetPublicKey,
       });
 
       const knowledgeContext = buildKnowledgeContext(knowledgeMatches);

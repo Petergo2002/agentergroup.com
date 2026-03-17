@@ -23,6 +23,7 @@ export function EntityActionsMenu({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
   const updatePosition = () => {
@@ -46,7 +47,11 @@ export function EntityActionsMenu({
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const clickedTrigger = containerRef.current?.contains(target);
+      const clickedMenu = menuRef.current?.contains(target);
+
+      if (!clickedTrigger && !clickedMenu) {
         setIsOpen(false);
       }
     };
@@ -104,6 +109,7 @@ export function EntityActionsMenu({
       {isOpen
         ? createPortal(
         <div
+          ref={menuRef}
           className="fixed z-[70] min-w-[188px] rounded-2xl bg-background p-2 shadow-[0_18px_48px_rgba(15,23,42,0.16)] ring-1 ring-black/5"
           style={{ top: menuPosition.top, left: menuPosition.left }}
         >
