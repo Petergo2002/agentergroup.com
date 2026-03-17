@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useModals } from '@/components/ui/ModalProvider';
+import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
+import { EntityActionsMenu } from '@/components/ui/EntityActionsMenu';
+import { StatusToggle } from '@/components/ui/StatusToggle';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useAppContext } from '@/components/app/AppContext';
 import { createClient } from '@/lib/supabase/client';
@@ -11,7 +14,7 @@ import type { AgentRecord } from '@/lib/types';
 
 export default function AgentsPage() {
   const supabase = createClient();
-  const { workspace, user } = useAppContext();
+  const { workspace, user, membership } = useAppContext();
   const { openCreateAgent } = useModals();
   const { showToast } = useToast();
   const [agents, setAgents] = useState<AgentRecord[]>([]);
@@ -19,6 +22,42 @@ export default function AgentsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'draft' | 'archived'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [pendingAgentId, setPendingAgentId] = useState<string | null>(null);
+  const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
+  const [togglingAgentId, setTogglingAgentId] = useState<string | null>(null);
+  const [agentToDelete, setAgentToDelete] = useState<AgentRecord | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  const getAgentStateLabel = (agent: AgentRecord) => {
+    if (agent.archived_at) {
+      return 'Archived';
+    }
+
+    if (agent.status === 'active' && agent.published_version_id) {
+      return 'Live';
+    }
+
+    if (agent.status === 'paused') {
+      return 'Off';
+    }
+
+    return 'Draft';
+  };
+
+  const getAgentStateClasses = (agent: AgentRecord) => {
+    if (agent.archived_at) {
+      return 'bg-surface-container text-on-surface-variant opacity-70';
+    }
+
+    if (agent.status === 'active' && agent.published_version_id) {
+      return 'bg-primary/10 text-primary';
+    }
+
+    if (agent.status === 'paused') {
+      return 'bg-surface-container-high text-on-surface-variant';
+    }
+
+    return 'bg-background text-on-surface-variant ring-1 ring-outline-variant/10';
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -104,7 +143,6 @@ export default function AgentsPage() {
                 ...item,
                 archived_at: agent.archived_at ? null : new Date().toISOString(),
                 archived_by: agent.archived_at ? null : user.id,
-                status: agent.archived_at ? item.status : 'paused',
               }
             : item,
         ),
@@ -116,6 +154,111 @@ export default function AgentsPage() {
       showToast(message, 'error');
     } finally {
       setPendingAgentId(null);
+    }
+  };
+
+  const handleStatusToggle = async (agent: AgentRecord) => {
+    if (agent.archived_at) {
+      showToast('Restore the agent before changing its status.', 'error');
+      return;
+    }
+
+    const nextStatus = agent.status === 'active' ? 'paused' : 'active';
+    setTogglingAgentId(agent.id);
+
+    try {
+      const response = await fetch(`/api/agents/${agent.id}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to update agent status.');
+      }
+
+      setAgents((current) =>
+        current.map((item) =>
+          item.id === agent.id
+            ? {
+                ...item,
+                status: nextStatus,
+              }
+            : item,
+        ),
+      );
+      showToast(nextStatus === 'active' ? 'Agent turned on.' : 'Agent turned off.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to update agent status.',
+        'error',
+      );
+    } finally {
+      setTogglingAgentId(null);
+    }
+  };
+
+  const handlePermanentDelete = async (agent: AgentRecord) => {
+    if (membership.role !== 'owner') {
+      showToast('Only workspace owners can permanently delete an agent.', 'error');
+      return;
+    }
+
+    if (!agent.archived_at) {
+      showToast('Archive the agent first before permanently deleting it.', 'error');
+      return;
+    }
+
+    setAgentToDelete(agent);
+    setDeleteConfirmation('');
+  };
+
+  const closeDeleteModal = () => {
+    if (deletingAgentId) {
+      return;
+    }
+
+    setAgentToDelete(null);
+    setDeleteConfirmation('');
+  };
+
+  const confirmPermanentDelete = async () => {
+    if (!agentToDelete) {
+      return;
+    }
+
+    setDeletingAgentId(agentToDelete.id);
+
+    try {
+      const response = await fetch(`/api/agents/${agentToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          confirmationName: deleteConfirmation,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? 'Failed to delete agent.');
+      }
+
+      setAgents((current) => current.filter((item) => item.id !== agentToDelete.id));
+      setAgentToDelete(null);
+      setDeleteConfirmation('');
+      showToast('Agent permanently deleted.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete agent.';
+      showToast(message, 'error');
+    } finally {
+      setDeletingAgentId(null);
     }
   };
 
@@ -195,84 +338,118 @@ export default function AgentsPage() {
             {filteredAgents.map((agent) => (
               <div
                 key={agent.id}
-                className="grid items-center gap-6 px-8 py-7 transition-colors hover:bg-surface-container-low/45 lg:grid-cols-[1.1fr_0.85fr_0.35fr_0.45fr_auto]"
+                className="px-8 py-7 transition-colors hover:bg-surface-container-low/45"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-on-surface">{agent.name}</p>
-                  <p className="mt-1.5 max-w-sm line-clamp-2 text-sm leading-6 text-on-surface-variant">
-                    {agent.description || 'Architecting intelligence, one prompt at a time.'}
-                  </p>
-                </div>
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex min-w-0 flex-1 flex-col gap-4 xl:flex-row xl:items-center xl:gap-8">
+                    <div className="min-w-0 xl:min-w-[260px] xl:flex-[1.1]">
+                      <p className="truncate text-base font-semibold text-on-surface">{agent.name}</p>
+                      <p className="mt-1.5 max-w-xl line-clamp-2 text-sm leading-6 text-on-surface-variant">
+                        {agent.description || 'Architecting intelligence, one prompt at a time.'}
+                      </p>
+                    </div>
 
-                <div className="flex flex-wrap gap-2.5">
-                  <div className="flex items-center gap-2 rounded-full border border-outline-variant/20 bg-background px-3.5 py-1.5">
-                    <span className="material-symbols-outlined text-base text-on-surface-variant/55">
-                      psychology
-                    </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant/85">
-                      {agent.model}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2.5 xl:flex-[0.9]">
+                      <div className="flex items-center gap-2 rounded-full bg-background px-3.5 py-1.5 ring-1 ring-outline-variant/10">
+                        <span className="material-symbols-outlined text-base text-on-surface-variant/55">
+                          psychology
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant/85">
+                          {agent.model}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-full bg-background px-3.5 py-1.5 ring-1 ring-outline-variant/10">
+                        <span className="material-symbols-outlined text-base text-on-surface-variant/55">
+                          chat_bubble
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant/85">
+                          {agent.starter_prompts.length} Prompts
+                        </span>
+                      </div>
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] ${getAgentStateClasses(agent)}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${
+                          agent.archived_at
+                            ? 'bg-on-surface-variant'
+                            : agent.status === 'active'
+                              ? 'bg-primary animate-pulse'
+                              : 'bg-on-surface-variant/40'
+                        }`} />
+                        {getAgentStateLabel(agent)}
+                      </span>
+                      {!agent.published_version_id && !agent.archived_at ? (
+                        <span className="text-[11px] font-medium text-on-surface-variant">
+                          Publish first to turn on
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 rounded-full border border-outline-variant/20 bg-background px-3.5 py-1.5">
-                    <span className="material-symbols-outlined text-base text-on-surface-variant/55">
-                      chat_bubble
-                    </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant/85">
-                      {agent.starter_prompts.length} Prompts
-                    </span>
+
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5 xl:gap-3">
+                    <div className="text-xs font-medium text-on-surface-variant/60">
+                      Updated {formatRelativeDate(agent.updated_at)}
+                    </div>
+                    <StatusToggle
+                      checked={agent.status === 'active' && !agent.archived_at}
+                      onClick={() => void handleStatusToggle(agent)}
+                      disabled={
+                        Boolean(agent.archived_at) ||
+                        togglingAgentId === agent.id ||
+                        pendingAgentId === agent.id ||
+                        deletingAgentId === agent.id ||
+                        (agent.status !== 'active' && !agent.published_version_id)
+                      }
+                      label={`Toggle ${agent.name}`}
+                      activeLabel="On"
+                      inactiveLabel="Off"
+                    />
+                    <Link
+                      href={`/agents/${agent.id}/builder`}
+                      className="rounded-full px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                    >
+                      Builder
+                    </Link>
+                    <Link
+                      href={`/agents/${agent.id}/preview`}
+                      className="rounded-full bg-on-surface px-4 py-2.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
+                    >
+                      Preview
+                    </Link>
+                    <EntityActionsMenu
+                      onArchiveToggle={() => void handleArchiveToggle(agent)}
+                      archiveLabel={agent.archived_at ? 'Restore' : 'Archive'}
+                      archiveDisabled={
+                        pendingAgentId === agent.id ||
+                        deletingAgentId === agent.id ||
+                        togglingAgentId === agent.id
+                      }
+                      onDelete={() => void handlePermanentDelete(agent)}
+                      deleteDisabled={
+                        deletingAgentId === agent.id ||
+                        pendingAgentId === agent.id ||
+                        togglingAgentId === agent.id ||
+                        !agent.archived_at ||
+                        membership.role !== 'owner'
+                      }
+                    />
                   </div>
-                </div>
-
-                <div className="flex justify-start">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] ${
-                    agent.archived_at 
-                      ? 'bg-surface-container text-on-surface-variant opacity-60' 
-                      : agent.status === 'active'
-                        ? 'bg-primary/10 text-primary border border-primary/20'
-                        : 'bg-surface-container-high text-on-surface-variant border border-outline-variant/10'
-                  }`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${
-                      agent.archived_at ? 'bg-on-surface-variant' : agent.status === 'active' ? 'bg-primary animate-pulse' : 'bg-on-surface-variant/40'
-                    }`} />
-                    {agent.archived_at ? 'archived' : agent.status}
-                  </span>
-                </div>
-
-                <div className="flex items-center text-xs font-medium text-on-surface-variant/60 whitespace-nowrap">
-                  Updated {formatRelativeDate(agent.updated_at)}
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Link
-                    href={`/agents/${agent.id}/builder`}
-                    className="flex items-center gap-2 rounded-full border border-outline-variant/20 bg-background px-4 py-2.5 text-xs font-semibold text-on-surface-variant transition-all hover:bg-surface-container-low hover:text-on-surface hover:border-outline-variant/40 active:scale-[0.98]"
-                  >
-                    <span className="material-symbols-outlined text-sm">construction</span>
-                    Builder
-                  </Link>
-                  <Link
-                    href={`/agents/${agent.id}/preview`}
-                    className="flex items-center gap-2 rounded-full bg-on-surface px-4 py-2.5 text-xs font-semibold text-background shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
-                  >
-                    <span className="material-symbols-outlined text-sm">visibility</span>
-                    Preview
-                  </Link>
-                  <button
-                    onClick={() => void handleArchiveToggle(agent)}
-                    disabled={pendingAgentId === agent.id}
-                    title={agent.archived_at ? 'Restore Agent' : 'Archive Agent'}
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant/60 transition-all hover:bg-error/5 hover:text-error hover:border-error/20 active:scale-[0.95] disabled:opacity-50"
-                  >
-                    <span className="material-symbols-outlined text-lg">
-                      {pendingAgentId === agent.id ? 'sync' : agent.archived_at ? 'unarchive' : 'archive'}
-                    </span>
-                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+      <ConfirmDeleteModal
+        isOpen={Boolean(agentToDelete)}
+        title="Delete Agent"
+        entityName={agentToDelete?.name ?? ''}
+        entityLabel="Agent"
+        description="This permanently removes the agent, including its drafts, versions, widget assignments, chats, and runs."
+        confirmationValue={deleteConfirmation}
+        onConfirmationChange={setDeleteConfirmation}
+        onClose={closeDeleteModal}
+        onConfirm={() => void confirmPermanentDelete()}
+        isDeleting={deletingAgentId === agentToDelete?.id}
+      />
     </div>
   );
 }

@@ -219,7 +219,7 @@ export function buildWidgetRuntimeConfig(
     agents: orderedAgents.map(({ widgetAgent, agent }) => ({
       widgetAgentId: widgetAgent.id,
       agentId: widgetAgent.agent_id,
-      label: widgetAgent.label,
+      label: agent.name,
       description: widgetAgent.description,
       icon: widgetAgent.icon,
       interactionMode: widgetAgent.interaction_mode,

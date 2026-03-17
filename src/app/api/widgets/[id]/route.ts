@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { createAuditLog } from "@/lib/runtime/observability";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeAllowedOrigins } from "@/lib/widgets";
 import {
@@ -151,4 +152,86 @@ export async function PATCH(
     ...summary,
     previewToken,
   });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const context = await ensureWorkspaceContext(supabase as never, user);
+  const loaded = await loadWidgetById(supabase as never, id);
+
+  if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {
+    return NextResponse.json({ error: "Widget not found." }, { status: 404 });
+  }
+
+  if (context.membership.role !== "owner") {
+    return NextResponse.json(
+      { error: "Only workspace owners can permanently delete a widget." },
+      { status: 403 },
+    );
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const confirmationName =
+    typeof body.confirmationName === "string" ? body.confirmationName.trim() : "";
+
+  if (confirmationName !== loaded.widget.name) {
+    return NextResponse.json(
+      { error: "Confirmation name did not match the widget name." },
+      { status: 400 },
+    );
+  }
+
+  const deleteResult = await supabase
+    .from("widgets")
+    .delete()
+    .eq("id", id)
+    .eq("workspace_id", context.workspace.id)
+    .select("id")
+    .maybeSingle();
+
+  if (deleteResult.error) {
+    return NextResponse.json(
+      { error: deleteResult.error.message || "Failed to delete widget." },
+      { status: 500 },
+    );
+  }
+
+  if (!deleteResult.data) {
+    return NextResponse.json(
+      {
+        error:
+          "Widget deletion was blocked. Verify the widget still exists and that delete access is enabled.",
+      },
+      { status: 500 },
+    );
+  }
+
+  try {
+    await createAuditLog(supabase, {
+      workspaceId: context.workspace.id,
+      actorId: user.id,
+      action: "widget.deleted",
+      summary: `Permanently deleted widget "${loaded.widget.name}".`,
+      metadata: {
+        deletedWidgetId: loaded.widget.id,
+        deletedWidgetName: loaded.widget.name,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to write widget delete audit log", error);
+  }
+
+  return NextResponse.json({ ok: true });
 }

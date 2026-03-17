@@ -589,7 +589,7 @@ export async function listDashboardConversations(
         widgetAgentId: widgetAgent?.id ?? session.active_widget_agent_id ?? null,
         agentId: session.active_agent_id ?? null,
         agentName: agent?.name ?? null,
-        agentLabel: widgetAgent?.label ?? agent?.name ?? null,
+        agentLabel: agent?.name ?? widgetAgent?.label ?? null,
         source:
           session.source === "hosted" ? "hosted" : "embedded",
         startedAt: session.first_seen_at,
@@ -752,7 +752,7 @@ export async function getDashboardConversationDetail(
       widgetAgentId: widgetAgent?.id ?? session.active_widget_agent_id ?? null,
       agentId: session.active_agent_id ?? null,
       agentName: agent?.name ?? null,
-      agentLabel: widgetAgent?.label ?? agent?.name ?? null,
+      agentLabel: agent?.name ?? widgetAgent?.label ?? null,
       source: session.source === "hosted" ? "hosted" : "embedded",
       startedAt: session.first_seen_at,
       lastActivityAt: session.last_seen_at,

@@ -3,6 +3,10 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useAppContext } from '@/components/app/AppContext';
+import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
+import { EntityActionsMenu } from '@/components/ui/EntityActionsMenu';
+import { StatusToggle } from '@/components/ui/StatusToggle';
 import { useToast } from '@/components/ui/ToastProvider';
 import { formatRelativeDate } from '@/lib/utils';
 
@@ -20,11 +24,24 @@ interface WidgetListItem {
 export default function WidgetsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { membership } = useAppContext();
   const { showToast } = useToast();
   const [widgets, setWidgets] = useState<WidgetListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingWidgetId, setDeletingWidgetId] = useState<string | null>(null);
+  const [togglingWidgetId, setTogglingWidgetId] = useState<string | null>(null);
+  const [widgetToDelete, setWidgetToDelete] = useState<WidgetListItem | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const highlightedAgentId = searchParams.get('agent');
+
+  const getWidgetStateLabel = (widget: WidgetListItem) => {
+    if (widget.status === 'deployed') {
+      return 'Live';
+    }
+
+    return 'Off';
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -100,6 +117,104 @@ export default function WidgetsPage() {
     }
   };
 
+  const handlePermanentDelete = async (widget: WidgetListItem) => {
+    if (membership.role !== 'owner') {
+      showToast('Only workspace owners can permanently delete a widget.', 'error');
+      return;
+    }
+
+    setWidgetToDelete(widget);
+    setDeleteConfirmation('');
+  };
+
+  const handleStatusToggle = async (widget: WidgetListItem) => {
+    const nextStatus = widget.status === 'deployed' ? 'draft' : 'deployed';
+    setTogglingWidgetId(widget.id);
+
+    try {
+      const response = await fetch(`/api/widgets/${widget.id}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to update widget status.');
+      }
+
+      setWidgets((current) =>
+        current.map((item) =>
+          item.id === widget.id
+            ? {
+                ...item,
+                status: nextStatus,
+                needsRedeploy: false,
+              }
+            : item,
+        ),
+      );
+      showToast(nextStatus === 'deployed' ? 'Widget turned on.' : 'Widget turned off.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to update widget status.',
+        'error',
+      );
+    } finally {
+      setTogglingWidgetId(null);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    if (deletingWidgetId) {
+      return;
+    }
+
+    setWidgetToDelete(null);
+    setDeleteConfirmation('');
+  };
+
+  const confirmPermanentDelete = async () => {
+    if (!widgetToDelete) {
+      return;
+    }
+
+    setDeletingWidgetId(widgetToDelete.id);
+
+    try {
+      const response = await fetch(`/api/widgets/${widgetToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          confirmationName: deleteConfirmation,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to delete widget.');
+      }
+
+      setWidgets((current) => current.filter((item) => item.id !== widgetToDelete.id));
+      setWidgetToDelete(null);
+      setDeleteConfirmation('');
+      showToast('Widget permanently deleted.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to delete widget.',
+        'error',
+      );
+    } finally {
+      setDeletingWidgetId(null);
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -151,54 +266,93 @@ export default function WidgetsPage() {
         ) : (
           <div className="divide-y divide-outline-variant/10">
             {sortedWidgets.map((widget) => (
-              <Link
+              <div
                 key={widget.id}
-                href={`/widgets/${widget.id}`}
-                className="grid gap-4 px-8 py-7 transition-colors hover:bg-surface-container-low/45 lg:grid-cols-[1fr_0.5fr_0.35fr_auto]"
+                className="px-8 py-7 transition-colors hover:bg-surface-container-low/45"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-on-surface">{widget.name}</p>
-                  <p className="mt-1.5 truncate text-sm text-on-surface-variant">
-                    {widget.hostedUrl}
-                  </p>
-                </div>
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex min-w-0 flex-1 flex-col gap-4 xl:flex-row xl:items-center xl:gap-8">
+                    <Link href={`/widgets/${widget.id}`} className="min-w-0 xl:min-w-[300px] xl:flex-1">
+                      <p className="truncate text-base font-semibold text-on-surface">{widget.name}</p>
+                      <p className="mt-1.5 truncate text-sm text-on-surface-variant">
+                        {widget.hostedUrl}
+                      </p>
+                    </Link>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-outline-variant/20 bg-background px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant/85">
-                    {widget.attachedAgentCount} agents
-                  </span>
-                  {widget.needsRedeploy ? (
-                    <span className="rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
-                      Needs Redeploy
-                    </span>
-                  ) : null}
-                </div>
+                    <Link
+                      href={`/widgets/${widget.id}`}
+                      className="flex flex-wrap items-center gap-2.5 xl:flex-[0.9]"
+                    >
+                      <span className="rounded-full bg-background px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant/85 ring-1 ring-outline-variant/10">
+                        {widget.attachedAgentCount} agents
+                      </span>
+                      {widget.needsRedeploy ? (
+                        <span className="rounded-full bg-primary/10 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
+                          Needs update
+                        </span>
+                      ) : null}
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] ${
+                          widget.status === 'deployed'
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-surface-container text-on-surface-variant'
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            widget.status === 'deployed' ? 'bg-primary' : 'bg-on-surface-variant/40'
+                          }`}
+                        />
+                        {getWidgetStateLabel(widget)}
+                      </span>
+                    </Link>
+                  </div>
 
-                <div className="flex items-center">
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] ${
-                      widget.status === 'deployed'
-                        ? 'border border-primary/20 bg-primary/10 text-primary'
-                        : 'border border-outline-variant/10 bg-surface-container text-on-surface-variant'
-                    }`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        widget.status === 'deployed' ? 'bg-primary' : 'bg-on-surface-variant/40'
-                      }`}
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5 xl:gap-3">
+                    <div className="text-xs font-medium text-on-surface-variant/60">
+                      Updated {formatRelativeDate(widget.updatedAt)}
+                    </div>
+                    <StatusToggle
+                      checked={widget.status === 'deployed'}
+                      onClick={() => void handleStatusToggle(widget)}
+                      disabled={togglingWidgetId === widget.id || deletingWidgetId === widget.id}
+                      label={`Toggle ${widget.name}`}
+                      activeLabel="On"
+                      inactiveLabel="Off"
                     />
-                    {widget.status}
-                  </span>
+                    <Link
+                      href={`/widgets/${widget.id}`}
+                      className="rounded-full bg-on-surface px-4 py-2.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
+                    >
+                      Open
+                    </Link>
+                    <EntityActionsMenu
+                      onDelete={() => void handlePermanentDelete(widget)}
+                      deleteDisabled={
+                        deletingWidgetId === widget.id ||
+                        togglingWidgetId === widget.id ||
+                        membership.role !== 'owner'
+                      }
+                    />
+                  </div>
                 </div>
-
-                <div className="text-right text-xs font-medium text-on-surface-variant/60">
-                  Updated {formatRelativeDate(widget.updatedAt)}
-                </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
       </div>
+      <ConfirmDeleteModal
+        isOpen={Boolean(widgetToDelete)}
+        title="Delete Widget"
+        entityName={widgetToDelete?.name ?? ''}
+        entityLabel="Widget"
+        description="This permanently removes the widget, including its attached agents, sessions, messages, leads, and preview drafts."
+        confirmationValue={deleteConfirmation}
+        onConfirmationChange={setDeleteConfirmation}
+        onClose={closeDeleteModal}
+        onConfirm={() => void confirmPermanentDelete()}
+        isDeleting={deletingWidgetId === widgetToDelete?.id}
+      />
     </div>
   );
 }

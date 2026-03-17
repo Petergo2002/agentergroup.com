@@ -34,7 +34,6 @@ export async function POST(
     .update({
       archived_at: archived ? new Date().toISOString() : null,
       archived_by: archived ? user.id : null,
-      status: archived ? "paused" : agent.status,
     })
     .eq("id", agentId);
 

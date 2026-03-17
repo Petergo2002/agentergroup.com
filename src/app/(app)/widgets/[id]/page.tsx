@@ -48,7 +48,6 @@ interface WidgetFormState {
 
 interface AttachedAgentState {
   agentId: string;
-  label: string;
   description: string;
   icon: string;
   sortOrder: number;
@@ -126,7 +125,6 @@ function getInitialAttachedAgents(summary: WidgetDetailResponse): AttachedAgentS
     .sort((left, right) => left.widgetAgent.sort_order - right.widgetAgent.sort_order)
     .map(({ widgetAgent, agent }, index) => ({
       agentId: widgetAgent.agent_id,
-      label: widgetAgent.label,
       description: widgetAgent.description,
       icon: widgetAgent.icon ?? '',
       sortOrder: index,
@@ -166,7 +164,7 @@ function buildDraftPreviewPayload(
     },
     agents: attachedAgents.map((item, index) => ({
       agentId: item.agentId,
-      label: item.label,
+      label: item.agent.name,
       description: item.description,
       icon: item.icon || null,
       sortOrder: index,
@@ -328,7 +326,6 @@ export default function WidgetDetailPage() {
       ...current,
       {
         agentId: agent.id,
-        label: agent.name,
         description: agent.description || '',
         icon: '',
         sortOrder: current.length,
@@ -406,7 +403,7 @@ export default function WidgetDetailPage() {
         body: JSON.stringify({
           agents: attachedAgents.map((item, index) => ({
             agentId: item.agentId,
-            label: item.label,
+            label: item.agent.name,
             description: item.description,
             icon: item.icon || null,
             sortOrder: index,
@@ -623,7 +620,7 @@ export default function WidgetDetailPage() {
           <div className="rounded-[1.6rem] border border-outline-variant/10 bg-background px-5 py-4">
             <p className={sectionLabelClassName}>Preview Source</p>
             <p className="mt-3 text-sm leading-7 text-on-surface-variant">
-              Preview reflects the current draft, including unsaved changes to structure, labels, and branding.
+              Preview reflects the current draft, including unsaved changes to structure, agent setup, and branding.
             </p>
           </div>
           <div className="rounded-[1.6rem] border border-outline-variant/10 bg-background px-5 py-4">
@@ -922,14 +919,6 @@ export default function WidgetDetailPage() {
 
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                       <label className="block space-y-2">
-                        <span className={fieldLabelClassName}>Widget Label</span>
-                        <input
-                          value={item.label}
-                          onChange={(event) => setAttachedAgents((current) => current.map((entry) => entry.agentId === item.agentId ? { ...entry, label: event.target.value } : entry))}
-                          className={inputClassName}
-                        />
-                      </label>
-                      <label className="block space-y-2">
                         <span className={fieldLabelClassName}>Greeting Message</span>
                         <input
                           value={item.greeting || ''}
@@ -1049,7 +1038,7 @@ export default function WidgetDetailPage() {
                     className="rounded-[1.5rem] border border-outline-variant/10 bg-background px-4 py-4"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-on-surface">{item.label}</p>
+                      <p className="text-sm font-semibold text-on-surface">{item.agent.name}</p>
                       <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/60">
                         #{index + 1}
                       </span>
