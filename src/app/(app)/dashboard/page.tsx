@@ -25,8 +25,7 @@ interface WorkspaceSummaryState {
 const summaryCardClassName =
   "rounded-[1.6rem] border border-outline-variant/35 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]";
 
-const quickLinkCardClassName =
-  "rounded-[1.6rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-0.5 hover:border-outline-variant/50";
+
 
 export default function DashboardPage() {
   const supabase = createClient();
@@ -230,13 +229,9 @@ export default function DashboardPage() {
     };
   }, [showToast, supabase, workspace.id]);
 
-  const overview = state.data?.overview;
   const recentConversations = state.data?.conversations ?? [];
   const activeAgents = agents.filter(
     (agent) => !agent.archived_at && agent.status === "active",
-  ).length;
-  const draftAgents = agents.filter(
-    (agent) => !agent.archived_at && agent.status === "draft",
   ).length;
   const summaryCards = [
     ["Active Agents", String(activeAgents)],

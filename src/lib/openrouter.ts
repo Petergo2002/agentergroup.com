@@ -81,7 +81,7 @@ export async function* streamOpenRouterResponse(response: Response) {
           try {
             const parsed = JSON.parse(data);
             yield parsed;
-          } catch (e) {
+          } catch {
             // Ignore incomplete or unparseable chunks
           }
         }

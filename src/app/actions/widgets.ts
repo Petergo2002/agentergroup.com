@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { NextRequest, NextResponse } from 'next/server';
 import { ensureWorkspaceContext } from '@/lib/app/bootstrap';
 import { createClient } from '@/lib/supabase/server';
 import { slugify } from '@/lib/utils';

@@ -10,6 +10,8 @@ interface EntityActionsMenuProps {
   onDelete?: () => void;
   deleteLabel?: string;
   deleteDisabled?: boolean;
+  buttonClassName?: string;
+  iconClassName?: string;
 }
 
 export function EntityActionsMenu({
@@ -19,6 +21,8 @@ export function EntityActionsMenu({
   onDelete,
   deleteLabel = 'Delete',
   deleteDisabled = false,
+  buttonClassName = "flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant/65 transition-colors hover:bg-surface-container hover:text-on-surface",
+  iconClassName = "material-symbols-outlined text-[20px]",
 }: EntityActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -101,9 +105,9 @@ export function EntityActionsMenu({
           }
           setIsOpen((current) => !current);
         }}
-        className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant/65 transition-colors hover:bg-surface-container hover:text-on-surface"
+        className={buttonClassName}
       >
-        <span className="material-symbols-outlined text-[20px]">more_horiz</span>
+        <span className={iconClassName}>more_horiz</span>
       </button>
 
       {isOpen

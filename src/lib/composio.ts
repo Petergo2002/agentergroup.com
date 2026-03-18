@@ -1,5 +1,4 @@
 import { Composio } from "@composio/core";
-import { OpenAIProvider } from "@composio/openai";
 import type OpenAI from "openai";
 import { hasComposioEnv } from "@/lib/env";
 import type { DriveImportFileRecord } from "@/lib/types";
@@ -302,7 +301,7 @@ export async function listConnectedAccounts(userId: string) {
     return [];
   }
 
-  const session = await getComposioSession(userId);
+  await getComposioSession(userId);
   const response = await composio.connectedAccounts.list({
     userIds: [userId],
     toolkitSlugs: SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),

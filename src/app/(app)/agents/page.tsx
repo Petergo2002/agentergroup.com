@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useModals } from '@/components/ui/ModalProvider';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { EntityActionsMenu } from '@/components/ui/EntityActionsMenu';
-import { StatusToggle } from '@/components/ui/StatusToggle';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useAppContext } from '@/components/app/AppContext';
 import { createClient } from '@/lib/supabase/client';
@@ -41,22 +40,6 @@ export default function AgentsPage() {
     }
 
     return 'Draft';
-  };
-
-  const getAgentStateClasses = (agent: AgentRecord) => {
-    if (agent.archived_at) {
-      return 'bg-surface-container text-on-surface-variant opacity-70';
-    }
-
-    if (agent.status === 'active' && agent.published_version_id) {
-      return 'bg-primary/10 text-primary';
-    }
-
-    if (agent.status === 'paused') {
-      return 'bg-surface-container-high text-on-surface-variant';
-    }
-
-    return 'bg-background text-on-surface-variant ring-1 ring-outline-variant/10';
   };
 
   useEffect(() => {
@@ -321,7 +304,7 @@ export default function AgentsPage() {
             ))}
           </div>
         ) : filteredAgents.length === 0 ? (
-          <div className="rounded-[1.8rem] border border-outline-variant/30 bg-surface-container-lowest px-6 py-16 text-center shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+          <div className="rounded-[1.8rem] bg-white px-6 py-16 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
             <span className="material-symbols-outlined rounded-full bg-primary/5 p-4 text-3xl text-primary">
               hub
             </span>
@@ -338,39 +321,41 @@ export default function AgentsPage() {
             {filteredAgents.map((agent) => (
               <div
                 key={agent.id}
-                className="flex flex-col gap-5 rounded-[1.7rem] border border-outline-variant/20 bg-white px-6 py-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all hover:border-outline-variant/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] md:flex-row md:items-center md:justify-between"
+                className="flex flex-col gap-5 rounded-[1.7rem] border border-transparent bg-white px-6 py-5 shadow-[0_2px_10px_rgb(0,0,0,0.04)] transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] md:flex-row md:items-center md:justify-between"
               >
                 {/* Left: Name and Description */}
                 <div className="min-w-0 flex-1 md:max-w-[30%]">
-                  <p className="truncate text-[15px] font-bold text-on-surface">{agent.name}</p>
-                  <p className="mt-1 truncate text-sm text-on-surface-variant/80">
+                  <p className="truncate text-[15px] font-bold text-[#1E293B]">{agent.name}</p>
+                  <p className="mt-1 truncate text-sm text-[#94A3B8]">
                     {agent.description || 'Architecting intelligence, one prompt at a time.'}
                   </p>
                 </div>
 
                 {/* Middle: Badges */}
-                <div className="flex shrink-0 flex-wrap items-center gap-2 md:flex-1 md:justify-center">
-                  <div className="flex h-8 items-center gap-1.5 rounded-full bg-surface-container px-3 text-on-surface-variant/80">
-                    <span className="material-symbols-outlined text-[15px]">
-                      psychology
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                      {agent.model}
-                    </span>
-                  </div>
-                  
-                  <div className="flex h-8 items-center gap-1.5 rounded-full bg-surface-container px-3 text-on-surface-variant/80">
-                    <span className="material-symbols-outlined text-[14px]">
-                      chat_bubble
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                      {agent.starter_prompts.length} Prompts
-                    </span>
+                <div className="flex flex-col items-center gap-2 md:flex-1 md:justify-center">
+                  <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
+                    <div className="flex h-8 items-center gap-1.5 rounded-[0.6rem] bg-[#F1F5F9] px-3.5 text-[#64748B]">
+                      <span className="material-symbols-outlined text-[15px]">
+                        psychology
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        {agent.model}
+                      </span>
+                    </div>
+                    
+                    <div className="flex h-8 items-center gap-1.5 rounded-[0.6rem] bg-[#F1F5F9] px-3.5 text-[#64748B]">
+                      <span className="material-symbols-outlined text-[14px]">
+                        chat_bubble
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        {agent.starter_prompts.length} Prompts
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex h-8 items-center gap-1.5 rounded-full bg-[#FF6B52]/10 px-3 text-[#FF6B52]">
+                  <div className="flex h-7 items-center gap-1.5 rounded-full bg-[#FFF0ED] px-3 text-[#FF6B52]">
                     <span className={`h-1.5 w-1.5 rounded-full ${agent.archived_at ? 'bg-on-surface-variant' : agent.status === 'active' ? 'bg-[#FF6B52] animate-pulse' : 'bg-[#FF6B52]/40'}`} />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                    <span className="text-[9px] font-bold uppercase tracking-wider">
                       {getAgentStateLabel(agent)}
                     </span>
                   </div>
@@ -378,7 +363,7 @@ export default function AgentsPage() {
 
                 {/* Right: Actions */}
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 md:flex-1">
-                  <div className="mr-2 text-xs font-medium text-on-surface-variant/60">
+                  <div className="mr-2 text-xs font-medium text-[#94A3B8]">
                     Updated {formatRelativeDate(agent.updated_at)}
                   </div>
                   
@@ -394,24 +379,24 @@ export default function AgentsPage() {
                     }
                     className="flex h-8 items-center rounded-full bg-[#FFF0ED] p-0.5 text-[10px] font-bold tracking-wider transition-opacity disabled:opacity-50"
                   >
-                    <span className={`flex h-full items-center justify-center rounded-full px-3 ${agent.status !== 'active' ? 'text-on-surface-variant' : 'text-[#FF6B52]/60'}`}>
+                    <span className={`flex h-full items-center justify-center rounded-full px-3 ${agent.status !== 'active' ? 'text-[#FF6B52]/60' : 'text-[#FF6B52]/60'}`}>
                       OFF
                     </span>
-                    <span className={`flex h-full items-center justify-center rounded-full px-3 transition-colors ${agent.status === 'active' && !agent.archived_at ? 'bg-[#FF6B52] text-white shadow-sm' : 'text-on-surface-variant'}`}>
+                    <span className={`flex h-full items-center justify-center rounded-full px-3 transition-colors ${agent.status === 'active' && !agent.archived_at ? 'bg-[#FF6B52] text-white shadow-sm' : 'text-[#FF6B52]/60'}`}>
                       ON
                     </span>
                   </button>
 
                   <Link
                     href={`/agents/${agent.id}/builder`}
-                    className="rounded-full px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:text-on-surface"
+                    className="px-2 py-2 text-xs font-bold text-[#64748B] transition-colors hover:text-[#1E293B]"
                   >
                     Builder
                   </Link>
                   
                   <Link
                     href={`/agents/${agent.id}/preview`}
-                    className="h-8 rounded-xl bg-[#0F1728] px-4 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                    className="flex h-8 items-center justify-center rounded-lg bg-[#0F1728] px-4 text-xs font-bold text-white transition-opacity hover:opacity-90"
                   >
                     Preview
                   </Link>
@@ -432,6 +417,8 @@ export default function AgentsPage() {
                       !agent.archived_at ||
                       membership.role !== 'owner'
                     }
+                    buttonClassName="flex h-8 w-10 items-center justify-center rounded-lg border-[1.5px] border-[#2563EB] text-[#2563EB] transition-colors hover:bg-[#2563EB]/5 bg-white ml-2"
+                    iconClassName="material-symbols-outlined text-[18px]"
                   />
                 </div>
               </div>

@@ -53,13 +53,7 @@ interface ToolMessage {
   [key: string]: unknown;
 }
 
-interface ModelToolCall {
-  id?: string;
-  function?: {
-    name?: string;
-    arguments?: string;
-  };
-}
+
 
 /** Shape of a single chunk from an OpenRouter streaming response. */
 interface StreamChunkToolCallPart {
@@ -125,42 +119,7 @@ const OMITTED_ASSISTANT_HISTORY_MESSAGES = new Set([
   "This is rarely an acceptable response and a retry should be issued.",
 ]);
 
-function extractAssistantContent(message: Record<string, unknown> | null) {
-  const content = message?.content;
 
-  if (typeof content === "string") {
-    return content.trim();
-  }
-
-  if (!Array.isArray(content)) {
-    return "";
-  }
-
-  return content
-    .map((item) => {
-      if (typeof item === "string") {
-        return item;
-      }
-
-      if (!item || typeof item !== "object") {
-        return "";
-      }
-
-      const record = item as Record<string, unknown>;
-      if (typeof record.text === "string") {
-        return record.text;
-      }
-
-      if (record.text && typeof record.text === "object") {
-        const nestedRecord = record.text as Record<string, unknown>;
-        return typeof nestedRecord.value === "string" ? nestedRecord.value : "";
-      }
-
-      return "";
-    })
-    .join("")
-    .trim();
-}
 
 function mapDbMessagesToModel(messages: RuntimeMessage[]) {
   return messages
@@ -477,7 +436,7 @@ export async function runAgentChat({
         assistantMessage.tool_calls = toolCallsArray;
     }
 
-    (finalCompletion as any).choices[0].message = assistantMessage;
+    (finalCompletion as { choices: Array<{ message: unknown }> }).choices[0].message = assistantMessage;
 
     if (!hasToolCalls || toolDefinitions.length === 0) {
       finalAssistantMessage = assistantMessage as Record<string, unknown>;

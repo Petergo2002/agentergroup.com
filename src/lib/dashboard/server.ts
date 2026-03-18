@@ -85,8 +85,7 @@ export async function fetchDashboardAnalytics(
     .select("id, name")
     .eq("workspace_id", context.workspace.id);
 
-  const widgetMap = new Map((allWidgets ?? []).map((w) => [w.id, w.name]));
-  const agentMap = new Map((allAgents ?? []).map((a) => [a.id, a.name]));
+
 
   const formattedConversations = (conversations ?? []).map((conv: Record<string, unknown>) => {
     const widget = conv.widget as { name: string } | null;
