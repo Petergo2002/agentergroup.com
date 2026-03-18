@@ -162,7 +162,7 @@ function mapDbMessagesToModel(messages: RuntimeMessage[]) {
         };
       }
 
-      const result: any = {
+      const result: Record<string, unknown> = {
         role: message.role,
         content: message.content,
       };
@@ -406,7 +406,7 @@ export async function runAgentChat({
       messages: conversationMessages,
       tools: toolDefinitions,
       stream: true,
-    }) as AsyncGenerator<any, void, unknown>;
+    }) as AsyncGenerator<Record<string, unknown>, void, unknown>;
 
     finalCompletion = { choices: [{ message: { role: "assistant", content: "", tool_calls: [] } }] };
     let hasToolCalls = false;
@@ -450,7 +450,7 @@ export async function runAgentChat({
     }
 
     const toolCallsArray = Array.from(accumulatedToolCalls.values());
-    const assistantMessage: any = {
+    const assistantMessage: Record<string, unknown> = {
       role: "assistant",
       content: iterationContent,
     };
@@ -512,7 +512,7 @@ export async function runAgentChat({
         },
       ],
       stream: true,
-    }) as AsyncGenerator<any, void, unknown>;
+    }) as AsyncGenerator<Record<string, unknown>, void, unknown>;
 
     finalCompletion = { choices: [{ message: { role: "assistant", content: "" } }] };
     assistantContent = "";
@@ -524,8 +524,8 @@ export async function runAgentChat({
         if (onToken) onToken(delta.content);
       }
     }
-    (finalCompletion as any).choices[0].message.content = assistantContent;
-    finalAssistantMessage = (finalCompletion as any).choices[0].message;
+    (finalCompletion as Record<string, unknown>)["choices"] = [{ message: { role: "assistant", content: assistantContent } }];
+    finalAssistantMessage = { role: "assistant", content: assistantContent };
   }
 
   assistantContent ||= EMPTY_ASSISTANT_RESPONSE_FALLBACK;
