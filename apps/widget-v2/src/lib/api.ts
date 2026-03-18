@@ -32,7 +32,9 @@ export function resolveWidgetApiBase() {
   return "https://dashboard.agentergroup.com";
 }
 
-const API_BASE = resolveWidgetApiBase();
+function getApiBase(): string {
+  return resolveWidgetApiBase();
+}
 
 function buildWidgetHeaders(
   context: WidgetRequestContext,
@@ -79,7 +81,7 @@ async function parseError(response: Response) {
 }
 
 function buildWidgetUrl(widgetPublicKey: string, path: string) {
-  return `${API_BASE}/api/public/widgets/${encodeURIComponent(widgetPublicKey)}${path}`;
+  return `${getApiBase()}/api/public/widgets/${encodeURIComponent(widgetPublicKey)}${path}`;
 }
 
 export async function getWidgetConfig(
