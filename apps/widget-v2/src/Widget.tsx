@@ -982,7 +982,6 @@ export default function Widget({
             </AnimatePresence>
 
             {config.brand.logoUrl ? (
-              {/* Brand logo - Vite widget, not a Next.js app */}
               <img // eslint-disable-line jsx-a11y/img-redundant-alt
                 src={config.brand.logoUrl}
                 alt={config.brand.name}
