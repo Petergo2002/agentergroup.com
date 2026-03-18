@@ -240,14 +240,9 @@ export default function DashboardPage() {
   ).length;
   const summaryCards = [
     ["Active Agents", String(activeAgents)],
-    ["Draft Agents", String(draftAgents)],
     ["Live Widgets", String(workspaceSummary.liveWidgets)],
     ["Connected Apps", String(workspaceSummary.connectedApps)],
-  ] as const;
-  const supportCards = [
-    ["Total Agents", String(agents.length)],
     ["Knowledge Sources", String(workspaceSummary.knowledgeSources)],
-    ["Failures (30d)", String(overview?.failures ?? 0)],
   ] as const;
 
   const formatAgentState = (agent: AgentRecord) => {
@@ -330,67 +325,6 @@ export default function DashboardPage() {
                 </p>
               </div>
             ))}
-      </section>
-
-      <section className="mt-4 grid gap-4 md:grid-cols-3">
-        {state.isLoading || isAgentsLoading || workspaceSummary.isLoading
-          ? Array.from({ length: 3 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-[110px] animate-pulse rounded-[1.4rem] bg-surface-container-low"
-              />
-            ))
-          : supportCards.map(([label, value]) => (
-              <div
-                key={label}
-                className="rounded-[1.35rem] border border-outline-variant/25 bg-surface-container-lowest px-5 py-4"
-              >
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/65">
-                  {label}
-                </p>
-                <p className="mt-3 text-2xl font-headline font-bold text-on-surface">
-                  {value}
-                </p>
-              </div>
-            ))}
-      </section>
-
-      <section className="mt-8 grid gap-4 lg:grid-cols-3">
-        <Link href="/analytics" className={quickLinkCardClassName}>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/65">
-            Analytics
-          </p>
-          <h2 className="mt-4 text-xl font-headline font-bold text-on-surface">
-            Review customer activity
-          </h2>
-          <p className="mt-3 text-sm leading-7 text-on-surface-variant">
-            Open the conversation inbox, inspect transcripts, and follow captured leads.
-          </p>
-        </Link>
-
-        <Link href="/widgets" className={quickLinkCardClassName}>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/65">
-            Widgets
-          </p>
-          <h2 className="mt-4 text-xl font-headline font-bold text-on-surface">
-            Maintain live surfaces
-          </h2>
-          <p className="mt-3 text-sm leading-7 text-on-surface-variant">
-            Control branding, specialist routing, preview links, and deployment status.
-          </p>
-        </Link>
-
-        <Link href="/agents" className={quickLinkCardClassName}>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/65">
-            Agents
-          </p>
-          <h2 className="mt-4 text-xl font-headline font-bold text-on-surface">
-            Build specialists
-          </h2>
-          <p className="mt-3 text-sm leading-7 text-on-surface-variant">
-            Create and publish focused agents for support, booking, research, or sales.
-          </p>
-        </Link>
       </section>
 
       <section className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
