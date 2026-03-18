@@ -205,8 +205,48 @@ function parsePreviewResetMessage(
 
 
 
+const WIDGET_DEFAULTS: Record<"sv" | "en", {
+  agentLabel: string;
+  greeting: string;
+  placeholder: string;
+  homeTitle: string;
+  greetingFallback: string;
+  placeholderFallback: string;
+}> = {
+  sv: {
+    agentLabel: "AI-Agent",
+    greeting: "Hej! Hur kan jag hjälpa dig idag?",
+    greetingFallback: "Hi! How can I help you today?",
+    placeholder: "Skriv ett meddelande...",
+    placeholderFallback: "Write a message...",
+    homeTitle: "Hur kan vi hjälpa till?",
+  },
+  en: {
+    agentLabel: "AI Agent",
+    greeting: "Hi! How can I help you today?",
+    greetingFallback: "Hej! Hur kan jag hjälpa dig idag?",
+    placeholder: "Write a message...",
+    placeholderFallback: "Skriv ett meddelande...",
+    homeTitle: "How can we help?",
+  },
+};
+
+function getLocalizedDefault(
+  value: string | null | undefined,
+  key: keyof typeof WIDGET_DEFAULTS["en"],
+  language: "sv" | "en",
+): string {
+  const trimmed = value?.trim() ?? "";
+  const defaults = WIDGET_DEFAULTS[language];
+  const opposite = WIDGET_DEFAULTS[language === "sv" ? "en" : "sv"];
+  // If empty or still holds the opposite language default, return localized default
+  if (!trimmed || trimmed === opposite[key]) return defaults[key];
+  return trimmed;
+}
+
 function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
   const language = resolveWidgetLanguage(config);
+  const d = WIDGET_DEFAULTS[language];
 
   const normalizedAgents = Array.isArray(config.agents)
     ? config.agents
@@ -218,15 +258,15 @@ function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
           return {
             widgetAgentId: String(agent.widgetAgentId ?? "").trim(),
             agentId: String(agent.agentId ?? "").trim(),
-            label: agent.label?.trim() || (language === "sv" ? "AI-Agent" : "AI Agent"),
+            label: agent.label?.trim() || d.agentLabel,
             description: agent.description?.trim() || "",
             icon:
               typeof agent.icon === "string" && agent.icon.trim()
                 ? agent.icon.trim()
                 : null,
             interactionMode: "chat",
-            greeting: (agent.greeting?.trim() === "Hi! How can I help you today?" && language === "sv") ? "Hej! Hur kan jag hjälpa dig idag?" : (agent.greeting?.trim() || (language === "sv" ? "Hej! Hur kan jag hjälpa dig idag?" : "Hi! How can I help you today?")),
-            placeholder: (agent.placeholder?.trim() === "Write a message..." && language === "sv") ? "Skriv ett meddelande..." : (agent.placeholder?.trim() || (language === "sv" ? "Skriv ett meddelande..." : "Write a message...")),
+            greeting: getLocalizedDefault(agent.greeting, "greeting", language),
+            placeholder: getLocalizedDefault(agent.placeholder, "placeholder", language),
             quickActions: Array.isArray(agent.quickActions)
               ? agent.quickActions
               : [],
@@ -256,7 +296,7 @@ function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
         config.home?.mode === "single_auto" && normalizedAgents.length === 1
           ? "single_auto"
           : "chooser",
-      title: (config.home?.title?.trim() === "How can we help?" && language === "sv") ? "Hur kan vi hjälpa till?" : (config.home?.title?.trim() || (language === "sv" ? "Hur kan vi hjälpa till?" : "How can we help?")),
+      title: getLocalizedDefault(config.home?.title, "homeTitle", language),
       subtitle: config.home?.subtitle ?? null,
     },
     agents: normalizedAgents,
