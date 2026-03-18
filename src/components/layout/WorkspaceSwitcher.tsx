@@ -224,10 +224,10 @@ export function WorkspaceSwitcher({
         >
           <div className="mb-2 flex items-start justify-between gap-4 border-b border-outline-variant/15 pb-2 px-1.5 pt-1">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#64748B]">
                 Workspaces
               </p>
-              <p className="mt-1.5 text-sm font-semibold text-on-surface">Switch client context</p>
+              <p className="mt-1.5 text-[15px] font-bold text-[#0F172A]">Switch client context</p>
             </div>
             <button
               className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-low"
@@ -245,24 +245,24 @@ export function WorkspaceSwitcher({
               return (
                 <button
                   key={entry.workspace.id}
-                  className={`flex w-full items-center justify-between rounded-xl border border-transparent px-3 py-2 text-left transition-colors duration-200 ${
+                  className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition-colors duration-200 ${
                     isActive
-                      ? "bg-surface-container shadow-sm text-on-surface"
-                      : "bg-transparent text-on-surface hover:bg-surface-container-low"
+                      ? "bg-[#F1F5F9] text-[#0F172A]"
+                      : "bg-transparent text-[#475569] hover:bg-[#F8FAFC]"
                   }`}
                   disabled={isSubmitting}
                   onClick={() => void handleWorkspaceSwitch(entry.workspace.id)}
                   type="button"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{entry.workspace.name}</div>
-                    <div className="truncate text-[11px] uppercase tracking-[0.22em] text-on-surface-variant">
+                    <div className="truncate text-[14px] font-bold">{entry.workspace.name}</div>
+                    <div className="truncate text-[11px] font-bold uppercase tracking-widest text-[#64748B]">
                       {entry.membership.role} · {entry.workspace.slug}
                     </div>
                   </div>
                   {isActive ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-outline-variant/20 bg-background px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
-                      <Check className="h-3 w-3" strokeWidth={2.2} />
+                    <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[#64748B] shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                      <Check className="h-3 w-3" strokeWidth={3} />
                       Active
                     </span>
                   ) : null}
@@ -271,39 +271,39 @@ export function WorkspaceSwitcher({
             })}
           </div>
 
-          <div className="mt-2 border-t border-outline-variant/15 pt-3 px-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+          <div className="mt-3 border-t border-[#F1F5F9] pt-4 px-1.5 pb-1">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#64748B] mb-3">
               Create workspace
             </p>
-            <form className="mt-2 space-y-2.5" onSubmit={(event) => void handleCreateWorkspace(event)}>
-              <div className="space-y-1">
-                <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+            <form className="mt-2 space-y-3" onSubmit={(event) => void handleCreateWorkspace(event)}>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-extrabold uppercase tracking-widest text-[#64748B]">
                   Name
                 </label>
                 <input
-                  className="w-full rounded-xl border border-outline-variant/20 bg-background px-3 py-2 text-sm text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/60 focus:border-outline-variant/45"
+                  className="w-full rounded-xl bg-[#F8FAFC] border border-transparent px-4 py-2.5 text-[14px] text-[#0F172A] outline-none transition-colors placeholder:text-[#94A3B8] focus:border-[#E2E8F0] focus:bg-white"
                   onChange={(event) => setName(event.target.value)}
                   placeholder="Acme Dental"
                   value={name}
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-extrabold uppercase tracking-widest text-[#64748B]">
                   Description
                 </label>
                 <input
-                  className="w-full rounded-xl border border-outline-variant/20 bg-background px-3 py-2 text-sm text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/60 focus:border-outline-variant/45"
+                  className="w-full rounded-xl bg-[#F8FAFC] border border-transparent px-4 py-2.5 text-[14px] text-[#0F172A] outline-none transition-colors placeholder:text-[#94A3B8] focus:border-[#E2E8F0] focus:bg-white"
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="Optional"
                   value={description}
                 />
               </div>
               <button
-                className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-on-surface px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#64748B] px-4 py-3 text-[14px] font-bold tracking-wide text-white transition-all hover:bg-[#475569] disabled:opacity-50"
                 disabled={isSubmitting || !name.trim()}
                 type="submit"
               >
-                <Plus className="h-[0.95rem] w-[0.95rem]" strokeWidth={2.2} />
+                <Plus className="h-[18px] w-[18px]" strokeWidth={2.5} />
                 {isSubmitting ? "Saving..." : "Create workspace"}
               </button>
             </form>

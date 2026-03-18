@@ -331,31 +331,19 @@ export default function AgentsPage() {
                   </p>
                 </div>
 
-                {/* Middle: Badges */}
-                <div className="flex flex-col items-center gap-2.5 md:flex-[1.2] md:items-end md:pr-4">
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                    <div className="flex h-7 items-center gap-1.5 rounded-full bg-[#F1F5F9] px-3.5 text-[#64748B]">
-                      <span className="material-symbols-outlined text-[13px]">
-                        psychology
-                      </span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">
-                        {agent.model}
-                      </span>
-                    </div>
-                    
-                    <div className="flex h-7 items-center gap-1.5 rounded-full bg-[#F1F5F9] px-3.5 text-[#64748B]">
-                      <span className="material-symbols-outlined text-[13px]">
-                        chat_bubble
-                      </span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">
-                        {agent.starter_prompts.length} Prompts
-                      </span>
-                    </div>
-                  </div>
+                {/* Middle: Details */}
+                <div className="flex flex-col items-start justify-center gap-1.5 md:flex-[1.2] md:items-end md:pr-8">
+                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#0F172A]">
+                    {agent.model}
+                  </span>
+                  
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-[#64748B]">
+                    {agent.starter_prompts.length} Prompts
+                  </span>
 
-                  <div className="flex h-[22px] items-center gap-1.5 rounded-full bg-[#FFF0ED] px-2.5 text-[#FF6B52]">
+                  <div className="flex items-center gap-1.5">
                     <span className={`h-1.5 w-1.5 rounded-full ${agent.archived_at ? 'bg-on-surface-variant' : agent.status === 'active' ? 'bg-[#FF6B52] animate-pulse' : 'bg-[#FF6B52]/40'}`} />
-                    <span className="text-[9px] font-bold uppercase tracking-widest">
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${agent.archived_at ? 'text-[#94A3B8]' : 'text-[#FF6B52]'}`}>
                       {getAgentStateLabel(agent)}
                     </span>
                   </div>

@@ -335,6 +335,51 @@ export interface DashboardAnalyticsResponse {
   };
 }
 
+/** A single debug event captured during one agent turn. Stored in message metadata. */
+export interface DebugEvent {
+  /** Event type */
+  type:
+    | "tool_call"
+    | "tool_result"
+    | "tool_error"
+    | "tool_empty_result"
+    | "session_miss"
+    | "session_created"
+    | "recovery_triggered"
+    | "llm_error"
+    | "knowledge_hit";
+  /** Milliseconds since the start of this agent turn */
+  ts: number;
+  /** Tool name (for tool_* events) */
+  name?: string;
+  /** Abbreviated tool arguments */
+  args?: Record<string, unknown>;
+  /** Abbreviated tool result (first 300 chars if string) */
+  result?: unknown;
+  /** Error message */
+  error?: string;
+  /** Which loop iteration (0-indexed) was active */
+  iterationIndex?: number;
+}
+
+/** Full debug trace for one assistant turn. Stored in assistant message metadata.debugTrace. */
+export interface DebugTrace {
+  /** Total wall-clock time for this turn in milliseconds */
+  durationMs: number;
+  /** How many LLM iterations were used */
+  iterationsUsed: number;
+  /** Tool names that were available */
+  toolsAvailable: string[];
+  /** Number of knowledge chunks matched */
+  knowledgeHits: number;
+  /** Ordered list of events that happened during this turn */
+  events: DebugEvent[];
+  /** True if any error occurred */
+  hadError: boolean;
+  /** Short human-readable summary of the error */
+  errorSummary?: string;
+}
+
 export interface DashboardConversationDetailResponse {
   conversation: {
     widgetSessionId: string;
@@ -365,6 +410,7 @@ export interface DashboardConversationDetailResponse {
     role: "user" | "assistant";
     content: string;
     createdAt: string;
+    debugTrace?: DebugTrace | null;
   }>;
 }
 

@@ -718,7 +718,7 @@ export async function getDashboardConversationDetail(
   const [transcriptData, leadData] = await Promise.all([
     supabase
       .from("widget_session_messages")
-      .select("id, role, content, created_at")
+      .select("id, role, content, metadata, created_at")
       .eq("widget_session_id", session.id)
       .in("role", ["user", "assistant"])
       .order("created_at", { ascending: true }),
@@ -766,12 +766,13 @@ export async function getDashboardConversationDetail(
           createdAt: leadData.data.created_at,
         }
       : null,
-    transcript: ((transcriptData.data ?? []) as AnalyticsWidgetMessageRow[]).map(
+    transcript: ((transcriptData.data ?? []) as any[]).map(
       (message) => ({
         id: message.id,
         role: message.role === "assistant" ? "assistant" : "user",
         content: message.content,
         createdAt: message.created_at,
+        debugTrace: message.metadata?.debugTrace ?? null,
       }),
     ),
   };

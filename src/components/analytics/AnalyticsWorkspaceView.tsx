@@ -10,7 +10,9 @@ import type {
   DashboardAnalyticsRange,
   DashboardAnalyticsResponse,
   DashboardConversationDetailResponse,
+  DebugTrace,
 } from "@/lib/types";
+import { ChevronDown, ChevronRight, Bug, Clock, Activity, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface DashboardAnalyticsState {
   isLoading: boolean;
@@ -104,6 +106,101 @@ function ConversationRow({
   );
 }
 
+function DebugPanel({ trace }: { trace: DebugTrace }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-low text-on-surface-variant">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-on-surface/5"
+      >
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider">
+          {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          <span>Debug Trace</span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider opacity-70">
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {(trace.durationMs / 1000).toFixed(1)}s
+          </span>
+          <span className="flex items-center gap-1">
+            <Activity className="h-3 w-3" />
+            {trace.iterationsUsed} iter
+          </span>
+          <span className="flex items-center gap-1">
+            <Bug className="h-3 w-3" />
+            {trace.events.length} events
+          </span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-outline-variant/10 p-3 text-[11px] font-mono leading-relaxed">
+          {trace.hadError && trace.errorSummary && (
+            <div className="mb-3 flex items-start gap-2 rounded bg-error/10 p-2 text-error">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{trace.errorSummary}</span>
+            </div>
+          )}
+          
+          <div className="space-y-2">
+            {trace.events.map((event, i) => {
+              const isError = event.type.includes("error") || event.type === "session_miss";
+              const isSuccess = event.type === "tool_result" || event.type === "session_created" || event.type === "knowledge_hit";
+              
+              return (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="w-12 shrink-0 text-right opacity-50 text-[10px]">
+                    +{event.ts}ms
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      {isError ? (
+                        <AlertCircle className="h-3 w-3 text-error shrink-0" />
+                      ) : isSuccess ? (
+                        <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />
+                      ) : (
+                        <Activity className="h-3 w-3 opacity-50 shrink-0" />
+                      )}
+                      <span className={`font-semibold ${isError ? "text-error" : ""}`}>
+                        {event.type}
+                      </span>
+                      {event.name && (
+                        <span className="truncate opacity-70 px-1.5 rounded bg-on-surface/5">
+                          {event.name}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {event.error && (
+                      <div className="mt-1 pl-4.5 text-error whitespace-pre-wrap break-words">
+                        {event.error}
+                      </div>
+                    )}
+                    
+                    {event.args && (
+                      <div className="mt-1 pl-4.5 opacity-70 whitespace-pre-wrap break-words max-h-24 overflow-y-auto">
+                        args: {JSON.stringify(event.args)}
+                      </div>
+                    )}
+                    
+                    {!!event.result && (
+                      <div className="mt-1 pl-4.5 opacity-70 whitespace-pre-wrap break-words max-h-24 overflow-y-auto">
+                        result: {typeof event.result === 'string' ? event.result : JSON.stringify(event.result)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ConversationDetail({
   detail,
   isLoading,
@@ -190,9 +287,14 @@ function ConversationDetail({
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] opacity-70">
                       {message.role === "user" ? "User" : "Assistant"}
                     </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                    <p className="border-b border-outline-variant/10 pb-3 mt-2 whitespace-pre-wrap text-sm leading-6">
                       {message.content}
                     </p>
+                    
+                    {message.role === "assistant" && message.debugTrace && (
+                      <DebugPanel trace={message.debugTrace} />
+                    )}
+                    
                     <p className="mt-3 text-[11px] opacity-60">
                       {formatRelativeDate(message.createdAt)}
                     </p>

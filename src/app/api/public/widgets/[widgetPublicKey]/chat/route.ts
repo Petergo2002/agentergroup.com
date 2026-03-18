@@ -296,7 +296,10 @@ export async function POST(
               {
                 role: "assistant" as const,
                 content: result.assistantContent,
-                metadata: result.assistantMetadata,
+                metadata: {
+                  ...result.assistantMetadata,
+                  ...(result.debugTrace ? { debugTrace: result.debugTrace } : {})
+                },
               },
             ],
           });

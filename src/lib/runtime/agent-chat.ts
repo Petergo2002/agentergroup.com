@@ -109,6 +109,7 @@ export interface AgentRuntimeResult {
   toolMessages: ToolMessage[];
   knowledgeMatches: KnowledgeMatchRecord[];
   connectedToolkits: string[];
+  debugTrace?: import("@/lib/types").DebugTrace;
 }
 
 const MAX_TOOL_ITERATIONS = 6;
@@ -370,6 +371,11 @@ export async function runAgentChat({
   let finalAssistantMessage: Record<string, unknown> | null = null;
   let assistantContent = "";
 
+  const debugEvents: import("@/lib/types").DebugEvent[] = [];
+  const startTimeMs = Date.now();
+  let hadError = false;
+  let errorSummary: string | undefined;
+
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration += 1) {
     if (onStatus && iteration > 0) onStatus("Thinking...");
     
@@ -383,6 +389,16 @@ export async function runAgentChat({
       messages: conversationMessages,
       tools: toolDefinitions,
       stream: true,
+    }).catch(error => {
+      hadError = true;
+      errorSummary = "LLM completion failed";
+      debugEvents.push({
+        type: "llm_error",
+        ts: Date.now() - startTimeMs,
+        error: error instanceof Error ? error.message : "Unknown LLM error",
+        iterationIndex: iteration
+      });
+      throw error;
     }) as AsyncGenerator<StreamChunk, void, unknown>;
 
     finalCompletion = { choices: [{ message: { role: "assistant", content: "", tool_calls: [] } }] };
@@ -448,18 +464,96 @@ export async function runAgentChat({
       onStatus(`Using tool: ${toolNames}...`);
     }
 
-    let iterationToolMessages: ToolMessage[];
+    // Record tool call events
+    for (const tc of toolCallsArray) {
+      // Safely parse arguments for debug logging, ignoring parse errors
+      let parsedArgs: Record<string, unknown> | undefined;
+      try {
+        if (tc.function.arguments) {
+          parsedArgs = JSON.parse(tc.function.arguments);
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      debugEvents.push({
+        type: "tool_call",
+        ts: Date.now() - startTimeMs,
+        name: tc.function.name,
+        args: parsedArgs,
+        iterationIndex: iteration
+      });
+    }
+
+    let iterationToolMessages: ToolMessage[] = [];
 
     try {
-      iterationToolMessages = (await handleChatToolCalls(
+      // We updated handleChatToolCalls in composio.ts to return { results, sessionWasRecreated }
+      const toolCallResult = await handleChatToolCalls(
         toolUserId,
         finalCompletion as unknown as OpenAI.Chat.ChatCompletion,
-      )) as unknown as ToolMessage[];
+      );
+      
+      const { results, sessionWasRecreated } = toolCallResult as unknown as { results: ToolMessage[], sessionWasRecreated: boolean };
+      
+      if (sessionWasRecreated) {
+        debugEvents.push({
+          type: "session_miss",
+          ts: Date.now() - startTimeMs,
+          error: "Composio session cache missed. Recreated session successfully.",
+          iterationIndex: iteration
+        });
+      }
+
+      if (!results || results.length === 0) {
+        debugEvents.push({
+          type: "tool_empty_result",
+          ts: Date.now() - startTimeMs,
+          error: "Composio returned 0 results for the tool calls. Synthesizing empty results.",
+          iterationIndex: iteration
+        });
+        
+        // Fix for Bug 1: Synthesize empty results so LLM doesn't crash on next turn
+        iterationToolMessages = toolCallsArray.map((tc) => ({
+          role: "tool",
+          tool_call_id: tc.id,
+          name: tc.function.name,
+          content: `Tool executed, but no result was returned.`,
+        }));
+      } else {
+        iterationToolMessages = results;
+        
+        // Log tool results
+        for (const msg of iterationToolMessages) {
+          let abbrResult = msg.content;
+          if (typeof abbrResult === "string" && abbrResult.length > 300) {
+            abbrResult = abbrResult.substring(0, 300) + "...";
+          }
+          debugEvents.push({
+            type: "tool_result",
+            ts: Date.now() - startTimeMs,
+            name: String(msg.name ?? "unknown"),
+            result: abbrResult,
+            iterationIndex: iteration
+          });
+        }
+      }
     } catch (toolError) {
       console.error(`Tool execution failed for user ${toolUserId}:`, toolError);
+      hadError = true;
+      const errorMessage = toolError instanceof Error ? toolError.message : "Unknown integration error";
       
-      const errorMessage =
-        toolError instanceof Error ? toolError.message : "Unknown integration error";
+      if (errorSummary === undefined) {
+        errorSummary = `Tool error: ${errorMessage}`;
+      }
+
+      debugEvents.push({
+        type: "tool_error",
+        ts: Date.now() - startTimeMs,
+        name: toolCallsArray.map(tc => tc.function.name).join(","),
+        error: errorMessage,
+        iterationIndex: iteration
+      });
 
       // If the tool crashes, feed the error back to the LLM so it can respond gracefully
       iterationToolMessages = toolCallsArray.map((tc) => ({
@@ -476,6 +570,13 @@ export async function runAgentChat({
 
   if (!finalAssistantMessage || !assistantContent) {
     if (onStatus) onStatus("Finalizing...");
+    
+    debugEvents.push({
+      type: "recovery_triggered",
+      ts: Date.now() - startTimeMs,
+      error: "LLM finished loop without generating assistant message. Triggering forced recovery prompt.",
+    });
+
     const recoveryStream = await createOpenRouterChatCompletion({
       model: agent.model,
       messages: [
@@ -505,15 +606,35 @@ export async function runAgentChat({
 
   assistantContent ||= EMPTY_ASSISTANT_RESPONSE_FALLBACK;
 
+  const durationMs = Date.now() - startTimeMs;
+  let iterationsUsed = 0;
+  for (let i = 0; i < debugEvents.length; i++) {
+    if (debugEvents[i].iterationIndex !== undefined && debugEvents[i].iterationIndex! > iterationsUsed) {
+      iterationsUsed = debugEvents[i].iterationIndex!;
+    }
+  }
+  
+  const debugTrace: import("@/lib/types").DebugTrace = {
+    durationMs,
+    iterationsUsed: iterationsUsed + 1,
+    toolsAvailable: toolDefinitions.map(t => String((t as any).function?.name || "unknown")),
+    knowledgeHits: knowledgeMatches.length,
+    events: debugEvents,
+    hadError,
+    errorSummary
+  };
+
   return {
     assistantContent: assistantContent.trim(),
     assistantMetadata: {
       ...(finalAssistantMessage ?? {}),
       knowledgeMatches: getKnowledgeCitationSummary(knowledgeMatches),
+      debugTrace,
     },
     finalCompletion,
     toolMessages,
     knowledgeMatches,
     connectedToolkits,
+    debugTrace,
   };
 }

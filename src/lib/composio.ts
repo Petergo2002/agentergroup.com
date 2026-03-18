@@ -432,24 +432,44 @@ export async function handleChatToolCalls(
     return [];
   }
 
-  try {
-    const toolCalls = chatCompletion.choices?.[0]?.message?.tool_calls;
-    if (toolCalls && toolCalls.length > 0) {
-      const toolNames = toolCalls.map(tc => "function" in tc ? (tc.function?.name ?? "unknown") : ("name" in tc ? tc.name : "unknown")).join(", ");
-      console.log("[Composio] Handling tool calls for user:", userId, "Tool calls:", toolNames);
+    let sessionToUse = session;
+    let sessionWasRecreated = false;
+
+    // Retry once if we get a serverless cache miss error from Composio.
+    try {
+      const results = await composio.provider.handleToolCalls(userId, chatCompletion);
+      
+      if (results && results.length > 0) {
+        console.log("[Composio] Tool call results:", results.length);
+      }
+      
+      return { results, sessionWasRecreated };
+    } catch (error) {
+      if (error && typeof error === "object" && "message" in error) {
+        // Look for typical missing session / unauthorized errors from Composio
+        const msg = String(error.message).toLowerCase();
+        if (msg.includes("session") || msg.includes("unauthorized") || msg.includes("not found")) {
+          console.warn("[Composio] Session appears missing or expired, attempting recreation...", userId);
+          const newSession = await composio.create(userId, {
+            toolkits: SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
+          });
+          
+          if (newSession) {
+            composioSessionCache.set(userId, newSession);
+            sessionWasRecreated = true;
+            console.log("[Composio] Session recreated successfully.");
+            
+            // Retry handling tool calls with the new session
+            const retryResults = await composio.provider.handleToolCalls(userId, chatCompletion);
+            return { results: retryResults, sessionWasRecreated };
+          }
+        }
+      }
+      
+      // If we made it here, it's either an unrecognized error or recreation failed.
+      console.error("[Composio] Failed to handle tool calls:", error);
+      throw error;
     }
-    
-    const results = await composio.provider.handleToolCalls(userId, chatCompletion);
-    
-    if (results && results.length > 0) {
-      console.log("[Composio] Tool call results:", results.length);
-    }
-    
-    return results;
-  } catch (error) {
-    console.error("[Composio] Failed to handle tool calls:", error);
-    return [];
-  }
 }
 
 export async function executeToolCall(
