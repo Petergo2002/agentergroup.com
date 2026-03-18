@@ -414,6 +414,7 @@ function createGmailNode(
 function createGoogleCalendarNode(
   position = DEFAULT_POSITIONS.googlecalendar,
   connectionId: string | null = null,
+  timezone: string = 'UTC',
   data?: Partial<BuilderNodeData>,
 ): BuilderFlowNode {
   return {
@@ -429,6 +430,7 @@ function createGoogleCalendarNode(
       status: 'idle',
       integrationSlug: 'googlecalendar',
       connectionId,
+      timezone,
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -592,10 +594,14 @@ function normalizeDefinition(
   }
 
   if (calendarNode || googleCalendarConnectionId) {
+    const calendarTimezone = calendarNode && isToolNodeData(calendarNode.data) 
+      ? (calendarNode.data as GoogleCalendarBuilderNodeData).timezone 
+      : 'UTC';
     normalizedNodes.push(
       createGoogleCalendarNode(
         calendarNode?.position ?? DEFAULT_POSITIONS.googlecalendar,
         googleCalendarConnectionId,
+        calendarTimezone,
       ),
     );
   }
@@ -1517,6 +1523,42 @@ export default function AgentBuilderPage() {
               ))}
             </div>
           </div>
+          {toolNode.data.kind === 'googlecalendar' && (
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                Timezone
+              </label>
+              <select
+                value={(toolNode.data as GoogleCalendarBuilderNodeData).timezone ?? 'UTC'}
+                onChange={(event) => {
+                  const newTimezone = event.target.value;
+                  setNodes((currentNodes) =>
+                    currentNodes.map((node) =>
+                      node.id === toolNode.id
+                        ? {
+                            ...node,
+                            data: {
+                              ...node.data,
+                              timezone: newTimezone,
+                            },
+                          }
+                        : node,
+                    ),
+                  );
+                }}
+                className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
+              >
+                {TIMEZONE_OPTIONS.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-on-surface-variant">
+                Used for calendar events and time operations.
+              </p>
+            </div>
+          )}
           <button
             onClick={() => removeOptionalNode(toolNode.data.kind)}
             className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"

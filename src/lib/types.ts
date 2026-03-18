@@ -626,6 +626,7 @@ export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
   kind: "googlecalendar";
   integrationSlug: "googlecalendar";
   connectionId: string | null;
+  timezone: string;
 }
 
 export interface OutputBuilderNodeData extends BaseBuilderNodeData {
