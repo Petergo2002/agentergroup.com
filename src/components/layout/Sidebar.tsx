@@ -97,25 +97,29 @@ export function Sidebar({
       </nav>
 
       <div className="mt-auto p-4">
-        <div className="mb-5 flex items-center gap-3 px-2">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#FF6B52]/18 bg-[#FF6B52]/8 text-xs font-bold text-[#FF6B52] shadow-sm ring-4 ring-[#FF6B52]/6">
+        <div className="group relative flex w-full items-center gap-3 rounded-xl border border-transparent px-2 py-2 transition-colors hover:bg-surface-container-low hover:border-outline-variant/20">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-variant text-xs font-bold text-on-surface-variant shadow-sm transition-colors group-hover:bg-[#FF6B52]/10 group-hover:text-[#FF6B52]">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-bold text-on-surface">
               {userEmail ?? "Workspace User"}
             </p>
-            <div className="mt-0.5 inline-flex rounded-md bg-[#FF6B52]/8 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#FF6B52]">
+            <div className="mt-0.5 inline-flex rounded-md bg-surface-container-high px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">
               {membership.role}
             </div>
           </div>
+          
+          <form action="/auth/logout" method="post" className="absolute right-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+            <button 
+              aria-label="Sign out"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" strokeWidth={2} />
+            </button>
+          </form>
         </div>
-        <form action="/auth/logout" method="post">
-          <button className="flex w-full items-center justify-center gap-2 rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-2.5 text-xs font-bold text-on-surface-variant transition-all hover:border-[#FF6B52]/25 hover:bg-[#FF6B52]/6 hover:text-[#FF6B52] active:scale-[0.98]">
-            <LogOut className="h-[1rem] w-[1rem]" strokeWidth={1.9} />
-            Sign out
-          </button>
-        </form>
       </div>
     </aside>
   );
