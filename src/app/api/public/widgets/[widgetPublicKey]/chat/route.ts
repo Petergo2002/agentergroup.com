@@ -242,6 +242,17 @@ export async function POST(
     );
     const runtimeAgent = getWidgetRuntimeAgent(selected!.agent, publishedVersion);
 
+    let calendarTimezone: string | null = null;
+    if (publishedVersion?.definition?.nodes) {
+      const nodes = publishedVersion.definition.nodes as Array<{ data?: { kind?: string; timezone?: string } }>;
+      const calendarNode = nodes.find(
+        (node) => node.data?.kind === 'googlecalendar'
+      );
+      if (calendarNode?.data?.timezone) {
+        calendarTimezone = calendarNode.data.timezone;
+      }
+    }
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -265,6 +276,7 @@ export async function POST(
             toolUserId: selected!.agent.created_by,
             audience: "widget",
             widgetPublicKey: loaded.widget.widget_public_key,
+            calendarTimezone,
             onToken: (() => {
               let cumulativeContent = "";
               return (token: string) => {

@@ -63,6 +63,22 @@ export async function POST(
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
   }
 
+  const { data: draft } = await supabase
+    .from("agent_drafts")
+    .select("definition")
+    .eq("agent_id", agentId)
+    .single();
+
+  let calendarTimezone: string | null = null;
+  if (draft?.definition?.nodes) {
+    const calendarNode = draft.definition.nodes.find(
+      (node: { data: { kind: string } }) => node.data?.kind === 'googlecalendar'
+    );
+    if (calendarNode?.data?.timezone) {
+      calendarTimezone = calendarNode.data.timezone;
+    }
+  }
+
   let threadId = providedThreadId;
 
   if (!threadId) {
@@ -203,6 +219,7 @@ export async function POST(
       toolUserId: user.id,
       audience: "preview",
       knowledgeAccessToken: session?.access_token ?? null,
+      calendarTimezone,
     });
 
     await completeRunStep(

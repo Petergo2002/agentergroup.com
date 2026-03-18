@@ -100,6 +100,7 @@ export interface AgentRuntimeInput {
   audience: "preview" | "widget";
   knowledgeAccessToken?: string | null;
   widgetPublicKey?: string | null;
+  calendarTimezone?: string | null;
 }
 
 export interface AgentRuntimeResult {
@@ -301,6 +302,7 @@ export async function runAgentChat({
   audience,
   knowledgeAccessToken,
   widgetPublicKey,
+  calendarTimezone,
   onToken,
   onStatus,
 }: AgentRuntimeInput & {
@@ -312,11 +314,13 @@ export async function runAgentChat({
     agent.id,
   );
 
-  const timezoneContext = agent.timezone
+  const effectiveTimezone = calendarTimezone ?? agent.timezone ?? 'UTC';
+  
+  const timezoneContext = effectiveTimezone
     ? (() => {
         const now = new Date();
         const formatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: agent.timezone,
+          timeZone: effectiveTimezone,
           weekday: 'long',
           year: 'numeric',
           month: 'long',
@@ -326,7 +330,7 @@ export async function runAgentChat({
           timeZoneName: 'short',
         });
         const timeString = formatter.format(now);
-        return `Current timezone: ${agent.timezone}. Current local time: ${timeString}. You MUST use this timezone for all date and time operations, especially when creating or reading calendar events.`;
+        return `Current timezone: ${effectiveTimezone}. Current local time: ${timeString}. You MUST use this timezone for all date and time operations, especially when creating or reading calendar events.`;
       })()
     : null;
 
