@@ -119,6 +119,43 @@ const MODEL_OPTIONS = [
   'google/gemini-2.5-flash',
 ];
 
+const TIMEZONE_OPTIONS = [
+  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+  { value: 'America/New_York', label: 'Eastern Time (US & Canada)' },
+  { value: 'America/Chicago', label: 'Central Time (US & Canada)' },
+  { value: 'America/Denver', label: 'Mountain Time (US & Canada)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)' },
+  { value: 'America/Anchorage', label: 'Alaska' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii' },
+  { value: 'America/Toronto', label: 'Toronto' },
+  { value: 'America/Vancouver', label: 'Vancouver' },
+  { value: 'America/Mexico_City', label: 'Mexico City' },
+  { value: 'America/Sao_Paulo', label: 'São Paulo' },
+  { value: 'America/Buenos_Aires', label: 'Buenos Aires' },
+  { value: 'Europe/London', label: 'London' },
+  { value: 'Europe/Paris', label: 'Paris' },
+  { value: 'Europe/Berlin', label: 'Berlin' },
+  { value: 'Europe/Amsterdam', label: 'Amsterdam' },
+  { value: 'Europe/Madrid', label: 'Madrid' },
+  { value: 'Europe/Rome', label: 'Rome' },
+  { value: 'Europe/Stockholm', label: 'Stockholm' },
+  { value: 'Europe/Warsaw', label: 'Warsaw' },
+  { value: 'Europe/Moscow', label: 'Moscow' },
+  { value: 'Europe/Istanbul', label: 'Istanbul' },
+  { value: 'Asia/Dubai', label: 'Dubai' },
+  { value: 'Asia/Kolkata', label: 'India (IST)' },
+  { value: 'Asia/Bangkok', label: 'Bangkok' },
+  { value: 'Asia/Singapore', label: 'Singapore' },
+  { value: 'Asia/Hong_Kong', label: 'Hong Kong' },
+  { value: 'Asia/Shanghai', label: 'China (CST)' },
+  { value: 'Asia/Tokyo', label: 'Tokyo' },
+  { value: 'Asia/Seoul', label: 'Seoul' },
+  { value: 'Australia/Sydney', label: 'Sydney' },
+  { value: 'Australia/Melbourne', label: 'Melbourne' },
+  { value: 'Australia/Perth', label: 'Perth' },
+  { value: 'Pacific/Auckland', label: 'Auckland' },
+];
+
 const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'googlecalendar'];
 
 function getStarterPromptFields(prompts: string[]) {
@@ -698,6 +735,7 @@ export default function AgentBuilderPage() {
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
   const [model, setModel] = useState('openai/gpt-4o-mini');
+  const [timezone, setTimezone] = useState('UTC');
   const [starterPromptFields, setStarterPromptFields] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -866,6 +904,7 @@ export default function AgentBuilderPage() {
     setDescription(loadedAgent.description);
     setInstructions(definition.config?.instructions ?? loadedAgent.instructions);
     setModel(definition.config?.model ?? loadedAgent.model);
+    setTimezone(definition.config?.timezone ?? loadedAgent.timezone ?? 'UTC');
     setStarterPromptFields(
       getStarterPromptFields(
         definition.config?.starterPrompts ?? loadedAgent.starter_prompts,
@@ -1017,6 +1056,7 @@ export default function AgentBuilderPage() {
       starterPrompts: starterPromptFields
         .map((item) => item.trim())
         .filter(Boolean),
+      timezone,
     },
   });
 
@@ -1039,6 +1079,7 @@ export default function AgentBuilderPage() {
             instructions,
             model,
             starter_prompts: definition.config.starterPrompts,
+            timezone,
           })
           .eq('id', agentId),
         supabase.from('agent_drafts').upsert(
@@ -1275,6 +1316,26 @@ export default function AgentBuilderPage() {
             />
             <p className="mt-2 text-xs text-on-surface-variant">
               Keep this focused on live chat behavior, knowledge use, and tool use.
+            </p>
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+              Timezone
+            </label>
+            <select
+              value={timezone}
+              onChange={(event) => setTimezone(event.target.value)}
+              onKeyDown={stopBuilderFieldKeyDown}
+              className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
+            >
+              {TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-on-surface-variant">
+              Used for calendar and time-based operations.
             </p>
           </div>
           <div>

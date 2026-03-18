@@ -131,6 +131,7 @@ export function buildInitialDefinition(templateId: string): BuilderDefinition {
       model: "openai/gpt-4o-mini",
       instructions: preset.instructions,
       starterPrompts: [...preset.starterPrompts],
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
   };
 }
@@ -147,5 +148,6 @@ export function buildAgentPayload(templateId: string, customName: string) {
     model: "openai/gpt-4o-mini",
     instructions: preset.instructions,
     starter_prompts: [...preset.starterPrompts],
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 }

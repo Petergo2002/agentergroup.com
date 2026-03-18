@@ -92,7 +92,7 @@ export interface AgentRuntimeInput {
   supabase: RuntimeSupabaseLike;
   agent: Pick<
     AgentRecord,
-    "id" | "workspace_id" | "name" | "model" | "instructions" | "created_by"
+    "id" | "workspace_id" | "name" | "model" | "instructions" | "created_by" | "timezone"
   >;
   input: string;
   history: RuntimeMessage[];
@@ -312,6 +312,10 @@ export async function runAgentChat({
     agent.id,
   );
 
+  const timezoneContext = agent.timezone
+    ? `Current timezone: ${agent.timezone}. Use this timezone for all date and time operations, especially when creating or reading calendar events.`
+    : null;
+
   const modelMessages: Array<Record<string, unknown>> = [
     {
       role: "system",
@@ -321,6 +325,13 @@ export async function runAgentChat({
     },
     ...mapDbMessagesToModel(history),
   ];
+
+  if (timezoneContext) {
+    modelMessages.splice(1, 0, {
+      role: "system",
+      content: timezoneContext,
+    });
+  }
 
   const toolGuidance = buildToolGuidance(connectedToolkits);
 

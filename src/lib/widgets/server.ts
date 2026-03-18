@@ -376,6 +376,7 @@ export function getWidgetRuntimeAgent(
     ...agent,
     model: config?.model ?? agent.model,
     instructions: config?.instructions ?? agent.instructions,
+    timezone: config?.timezone ?? agent.timezone ?? 'UTC',
   };
 }
 

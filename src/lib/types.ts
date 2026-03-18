@@ -61,6 +61,7 @@ export interface AgentRecord {
   model: string;
   instructions: string;
   starter_prompts: string[];
+  timezone: string;
   published_version_id: string | null;
   archived_at: string | null;
   archived_by: string | null;
@@ -652,6 +653,7 @@ export interface BuilderDefinition {
     model: string;
     instructions: string;
     starterPrompts: string[];
+    timezone: string;
   };
 }
 
