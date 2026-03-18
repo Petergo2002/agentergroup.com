@@ -626,7 +626,6 @@ export async function runAgentChat({
       const delta = chunk.choices?.[0]?.delta;
       if (delta?.content) {
         assistantContent += delta.content;
-        if (onToken) onToken(delta.content);
       }
     }
     (finalCompletion as Record<string, unknown>)["choices"] = [{ message: { role: "assistant", content: assistantContent } }];
