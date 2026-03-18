@@ -313,7 +313,21 @@ export async function runAgentChat({
   );
 
   const timezoneContext = agent.timezone
-    ? `Current timezone: ${agent.timezone}. Use this timezone for all date and time operations, especially when creating or reading calendar events.`
+    ? (() => {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: agent.timezone,
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZoneName: 'short',
+        });
+        const timeString = formatter.format(now);
+        return `Current timezone: ${agent.timezone}. Current local time: ${timeString}. You MUST use this timezone for all date and time operations, especially when creating or reading calendar events.`;
+      })()
     : null;
 
   const modelMessages: Array<Record<string, unknown>> = [
