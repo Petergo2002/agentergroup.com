@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronLeft,
@@ -943,10 +942,13 @@ export default function Widget({
             </AnimatePresence>
 
             {config.brand.logoUrl ? (
-              <img
+              {/* Brand logo - Vite widget, not a Next.js app */}
+              <img // eslint-disable-line jsx-a11y/img-redundant-alt
                 src={config.brand.logoUrl}
                 alt={config.brand.name}
                 className="w-8 h-8 rounded-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
             ) : (
               <WidgetMark className="w-8 h-8" />
