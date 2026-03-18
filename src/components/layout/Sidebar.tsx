@@ -44,11 +44,11 @@ export function Sidebar({
 
   return (
     <aside
-      className={`flex h-full flex-col border-r border-[#FF6B52]/30 bg-white text-on-surface ${
-        mobile ? "shadow-2xl shadow-[#0f1728]/12" : "sticky top-0 h-screen w-[17rem] shrink-0"
+      className={`flex h-full flex-col text-on-surface ${
+        mobile ? "bg-white shadow-2xl shadow-[#0f1728]/12" : "bg-transparent sticky top-0 h-screen w-[17rem] shrink-0"
       }`}
     >
-      <div className="border-b border-[#FF6B52]/14 px-6 py-5">
+      <div className="px-6 py-5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <WorkspaceSwitcher variant="sidebar-header" />
@@ -96,7 +96,7 @@ export function Sidebar({
         })}
       </nav>
 
-      <div className="mt-auto border-t border-[#FF6B52]/14 p-4">
+      <div className="mt-auto p-4">
         <div className="mb-5 flex items-center gap-3 px-2">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#FF6B52]/18 bg-[#FF6B52]/8 text-xs font-bold text-[#FF6B52] shadow-sm ring-4 ring-[#FF6B52]/6">
             {initials}
