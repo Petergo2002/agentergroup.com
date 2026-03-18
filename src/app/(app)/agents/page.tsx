@@ -321,49 +321,49 @@ export default function AgentsPage() {
             {filteredAgents.map((agent) => (
               <div
                 key={agent.id}
-                className="flex flex-col gap-5 rounded-[1.7rem] border border-transparent bg-white px-6 py-5 shadow-[0_2px_10px_rgb(0,0,0,0.04)] transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] md:flex-row md:items-center md:justify-between"
+                className="group flex flex-col gap-5 rounded-[1.5rem] bg-white px-6 py-5 shadow-[0_2px_12px_rgba(15,23,42,0.04)] transition-all hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)] md:flex-row md:items-center md:justify-between"
               >
                 {/* Left: Name and Description */}
-                <div className="min-w-0 flex-1 md:max-w-[30%]">
-                  <p className="truncate text-[15px] font-bold text-[#1E293B]">{agent.name}</p>
-                  <p className="mt-1 truncate text-sm text-[#94A3B8]">
+                <div className="min-w-0 flex-1 md:max-w-[32%]">
+                  <h3 className="truncate text-[15px] font-bold text-[#0F172A]">{agent.name}</h3>
+                  <p className="mt-1 truncate text-[13px] font-medium text-[#64748B]">
                     {agent.description || 'Architecting intelligence, one prompt at a time.'}
                   </p>
                 </div>
 
                 {/* Middle: Badges */}
-                <div className="flex flex-col items-center gap-2 md:flex-1 md:justify-center">
-                  <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
-                    <div className="flex h-8 items-center gap-1.5 rounded-[0.6rem] bg-[#F1F5F9] px-3.5 text-[#64748B]">
-                      <span className="material-symbols-outlined text-[15px]">
+                <div className="flex flex-col items-center gap-2.5 md:flex-[1.2] md:items-end md:pr-4">
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <div className="flex h-7 items-center gap-1.5 rounded-full bg-[#F1F5F9] px-3.5 text-[#64748B]">
+                      <span className="material-symbols-outlined text-[13px]">
                         psychology
                       </span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                      <span className="text-[10px] font-black uppercase tracking-widest">
                         {agent.model}
                       </span>
                     </div>
                     
-                    <div className="flex h-8 items-center gap-1.5 rounded-[0.6rem] bg-[#F1F5F9] px-3.5 text-[#64748B]">
-                      <span className="material-symbols-outlined text-[14px]">
+                    <div className="flex h-7 items-center gap-1.5 rounded-full bg-[#F1F5F9] px-3.5 text-[#64748B]">
+                      <span className="material-symbols-outlined text-[13px]">
                         chat_bubble
                       </span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                      <span className="text-[10px] font-black uppercase tracking-widest">
                         {agent.starter_prompts.length} Prompts
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex h-7 items-center gap-1.5 rounded-full bg-[#FFF0ED] px-3 text-[#FF6B52]">
+                  <div className="flex h-[22px] items-center gap-1.5 rounded-full bg-[#FFF0ED] px-2.5 text-[#FF6B52]">
                     <span className={`h-1.5 w-1.5 rounded-full ${agent.archived_at ? 'bg-on-surface-variant' : agent.status === 'active' ? 'bg-[#FF6B52] animate-pulse' : 'bg-[#FF6B52]/40'}`} />
-                    <span className="text-[9px] font-bold uppercase tracking-wider">
+                    <span className="text-[9px] font-bold uppercase tracking-widest">
                       {getAgentStateLabel(agent)}
                     </span>
                   </div>
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 md:flex-1">
-                  <div className="mr-2 text-xs font-medium text-[#94A3B8]">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-4 md:flex-none">
+                  <div className="text-[11px] font-semibold text-[#94A3B8]">
                     Updated {formatRelativeDate(agent.updated_at)}
                   </div>
                   
@@ -377,26 +377,26 @@ export default function AgentsPage() {
                       deletingAgentId === agent.id ||
                       (agent.status !== 'active' && !agent.published_version_id)
                     }
-                    className="flex h-8 items-center rounded-full bg-[#FFF0ED] p-0.5 text-[10px] font-bold tracking-wider transition-opacity disabled:opacity-50"
+                    className="flex h-7 items-center rounded-full bg-[#FFF0ED] p-0.5 text-[10px] font-bold tracking-widest transition-opacity disabled:opacity-50"
                   >
-                    <span className={`flex h-full items-center justify-center rounded-full px-3 ${agent.status !== 'active' ? 'text-[#FF6B52]/60' : 'text-[#FF6B52]/60'}`}>
+                    <span className={`flex h-full items-center justify-center rounded-full px-3 transition-colors ${agent.status !== 'active' ? 'bg-white text-[#FF6B52] shadow-[0_1px_3px_rgba(0,0,0,0.1)]' : 'text-[#FF6B52]/60'}`}>
                       OFF
                     </span>
-                    <span className={`flex h-full items-center justify-center rounded-full px-3 transition-colors ${agent.status === 'active' && !agent.archived_at ? 'bg-[#FF6B52] text-white shadow-sm' : 'text-[#FF6B52]/60'}`}>
+                    <span className={`flex h-full items-center justify-center rounded-full px-3 transition-colors ${agent.status === 'active' && !agent.archived_at ? 'bg-[#FF6B52] text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]' : 'text-[#FF6B52]/60'}`}>
                       ON
                     </span>
                   </button>
 
                   <Link
                     href={`/agents/${agent.id}/builder`}
-                    className="px-2 py-2 text-xs font-bold text-[#64748B] transition-colors hover:text-[#1E293B]"
+                    className="text-[12px] font-extrabold text-[#64748B] transition-colors hover:text-[#0F172A]"
                   >
                     Builder
                   </Link>
                   
                   <Link
                     href={`/agents/${agent.id}/preview`}
-                    className="flex h-8 items-center justify-center rounded-lg bg-[#0F1728] px-4 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                    className="flex h-[30px] items-center justify-center rounded-[8px] bg-[#0F172A] px-4 text-[12px] font-bold tracking-wide text-white transition-all hover:bg-[#1E293B]"
                   >
                     Preview
                   </Link>
@@ -417,7 +417,7 @@ export default function AgentsPage() {
                       !agent.archived_at ||
                       membership.role !== 'owner'
                     }
-                    buttonClassName="flex h-8 w-10 items-center justify-center rounded-lg border-[1.5px] border-[#2563EB] text-[#2563EB] transition-colors hover:bg-[#2563EB]/5 bg-white ml-2"
+                    buttonClassName="flex h-[30px] w-[30px] items-center justify-center rounded-[8px] border-[1.5px] border-[#2563EB] bg-white text-[#2563EB] transition-colors hover:bg-[#2563EB]/5"
                     iconClassName="material-symbols-outlined text-[18px]"
                   />
                 </div>
