@@ -56,7 +56,7 @@ export default function DashboardPage() {
 
       try {
         const response = await fetch("/api/dashboard/analytics?range=30d&limit=4", {
-          cache: "no-store",
+          next: { revalidate: 30 },
           signal: controller.signal,
         });
         const payload = await response.json().catch(() => null);

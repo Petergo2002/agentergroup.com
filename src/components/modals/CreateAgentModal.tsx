@@ -13,57 +13,25 @@ interface CreateAgentModalProps {
   onClose: () => void;
 }
 
-const TEMPLATES = [
-  {
-    id: 'support',
-    name: 'Customer Support',
-    description: 'Triage and resolve level 1 support tickets.',
-    icon: 'support_agent',
-    color: 'bg-emerald-50 text-emerald-600',
-  },
-  {
-    id: 'research',
-    name: 'Deep Researcher',
-    description: 'Crawl and synthesize data from multiple sources.',
-    icon: 'database',
-    color: 'bg-orange-50 text-orange-600',
-  },
-  {
-    id: 'marketing',
-    name: 'Content Creator',
-    description: 'Generate marketing copy and social media posts.',
-    icon: 'campaign',
-    color: 'bg-orange-50 text-orange-600',
-  },
-  {
-    id: 'custom',
-    name: 'Custom Agent',
-    description: 'Start from scratch with a blank canvas.',
-    icon: 'add_circle',
-    color: 'bg-orange-50 text-orange-600',
-  },
-];
-
 export const CreateAgentModal = ({ isOpen, onClose }: CreateAgentModalProps) => {
   const router = useRouter();
   const supabase = createClient();
   const { workspace, user } = useAppContext();
   const { showToast } = useToast();
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const handleCreate = async () => {
-    if (!selectedTemplate) {
-      showToast('Choose a template first.', 'info');
+    if (!name.trim()) {
+      showToast('Please enter an agent name.', 'info');
       return;
     }
 
     setIsSaving(true);
 
     try {
-      const agentPayload = buildAgentPayload(selectedTemplate, name);
-      const definition = buildInitialDefinition(selectedTemplate);
+      const agentPayload = buildAgentPayload('custom', name);
+      const definition = buildInitialDefinition('custom');
 
       const { data: agent, error: agentError } = await supabase
         .from('agents')
@@ -93,7 +61,6 @@ export const CreateAgentModal = ({ isOpen, onClose }: CreateAgentModalProps) => 
       showToast('Agent created.', 'success');
       onClose();
       setName('');
-      setSelectedTemplate(null);
       router.push(`/agents/${agent.id}/builder`);
       router.refresh();
     } catch (error) {
@@ -108,33 +75,6 @@ export const CreateAgentModal = ({ isOpen, onClose }: CreateAgentModalProps) => 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Agent">
       <div className="space-y-6">
-        <div>
-          <label className="text-xs font-bold text-secondary uppercase tracking-widest block mb-2">
-            Select Template
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            {TEMPLATES.map((template) => (
-              <button
-                key={template.id}
-                onClick={() => setSelectedTemplate(template.id)}
-                className={`p-4 rounded-xl border-2 text-left transition-all ${
-                  selectedTemplate === template.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-outline-variant/10 hover:border-outline-variant/30 hover:bg-surface-container-low/50'
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${template.color}`}>
-                  <span className="material-symbols-outlined">{template.icon}</span>
-                </div>
-                <p className="text-sm font-bold text-on-surface">{template.name}</p>
-                <p className="text-[10px] text-secondary mt-1 leading-tight">
-                  {template.description}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="space-y-4">
           <div>
             <label className="text-xs font-bold text-secondary uppercase tracking-widest block mb-2">
@@ -142,7 +82,7 @@ export const CreateAgentModal = ({ isOpen, onClose }: CreateAgentModalProps) => 
             </label>
             <input 
               type="text" 
-              placeholder="e.g. Support Bot v2"
+              placeholder="e.g. My Custom Agent"
               value={name}
               onChange={(event) => setName(event.target.value)}
               className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"

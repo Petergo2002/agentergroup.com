@@ -25,7 +25,7 @@ export default function ConnectionsPage() {
   const load = useCallback(async () => {
     try {
       const response = await fetch('/api/connections/toolkits', {
-        cache: 'no-store',
+        next: { revalidate: 30 },
       });
       const payload = await response.json();
 

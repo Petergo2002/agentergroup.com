@@ -608,9 +608,6 @@ export async function listDashboardConversations(
     .filter(Boolean) as DashboardAnalyticsConversationListItem[];
 
   const filteredRows = allRows
-    .filter((row) =>
-      input.appliedFilters.leadOnly ? row.hasLead : true,
-    )
     .filter((row) => matchesSearch(row, input.appliedFilters.search))
     .sort(compareConversationRows);
 

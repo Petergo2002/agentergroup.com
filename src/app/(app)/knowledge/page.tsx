@@ -82,7 +82,7 @@ export default function KnowledgePage() {
 
   const loadSources = useCallback(async () => {
     const response = await fetch("/api/knowledge/sources", {
-      cache: "no-store",
+      next: { revalidate: 30 },
     });
     const payload = await response.json();
 
@@ -109,7 +109,7 @@ export default function KnowledgePage() {
         }
 
         const response = await fetch(`/api/knowledge/drive/files?${query.toString()}`, {
-          cache: "no-store",
+          next: { revalidate: 30 },
         });
         const payload = await response.json();
 

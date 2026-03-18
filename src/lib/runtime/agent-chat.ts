@@ -61,6 +61,24 @@ interface ModelToolCall {
   };
 }
 
+/** Shape of a single chunk from an OpenRouter streaming response. */
+interface StreamChunkToolCallPart {
+  index: number;
+  id?: string;
+  function?: { name?: string; arguments?: string };
+}
+
+interface StreamChunkDelta {
+  content?: string;
+  tool_calls?: StreamChunkToolCallPart[];
+}
+
+interface StreamChunk {
+  id?: string;
+  model?: string;
+  choices?: Array<{ delta?: StreamChunkDelta }>;
+}
+
 interface AttachedConnectionRow {
   connection: {
     toolkit_slug: string;
@@ -406,12 +424,12 @@ export async function runAgentChat({
       messages: conversationMessages,
       tools: toolDefinitions,
       stream: true,
-    }) as AsyncGenerator<Record<string, unknown>, void, unknown>;
+    }) as AsyncGenerator<StreamChunk, void, unknown>;
 
     finalCompletion = { choices: [{ message: { role: "assistant", content: "", tool_calls: [] } }] };
     let hasToolCalls = false;
     let iterationContent = "";
-    const accumulatedToolCalls = new Map<number, any>();
+    const accumulatedToolCalls = new Map<number, { id: string; type: "function"; function: { name: string; arguments: string } }>();
 
     for await (const chunk of stream) {
       // Keep final completion mostly intact for metadata
@@ -432,15 +450,15 @@ export async function runAgentChat({
         for (const pt of delta.tool_calls) {
           if (!accumulatedToolCalls.has(pt.index)) {
             accumulatedToolCalls.set(pt.index, {
-              id: pt.id || "",
+              id: pt.id ?? "",
               type: "function",
               function: {
-                name: pt.function?.name || "",
-                arguments: pt.function?.arguments || ""
-              }
+                name: pt.function?.name ?? "",
+                arguments: pt.function?.arguments ?? "",
+              },
             });
           } else {
-            const existing = accumulatedToolCalls.get(pt.index)!;
+            const existing = accumulatedToolCalls.get(pt.index) as { id: string; function: { name: string; arguments: string } };
             if (pt.id) existing.id += pt.id;
             if (pt.function?.name) existing.function.name += pt.function.name;
             if (pt.function?.arguments) existing.function.arguments += pt.function.arguments;
@@ -506,13 +524,11 @@ export async function runAgentChat({
         {
           role: "system",
           content:
-            audience === "widget"
-              ? "Respond directly to the user in concise natural language based on the conversation and any completed tool work. If information is missing, ask the single best follow-up question. Do not call tools. Never mention internal processing, retries, empty responses, JSON, or code."
-              : "Respond directly to the user in concise natural language based on the conversation and any completed tool work. If information is missing, ask the single best follow-up question. Do not call tools. Never mention internal processing, retries, empty responses, JSON, or code.",
+            "Respond directly to the user in concise natural language based on the conversation and any completed tool work. If information is missing, ask the single best follow-up question. Do not call tools. Never mention internal processing, retries, empty responses, JSON, or code.",
         },
       ],
       stream: true,
-    }) as AsyncGenerator<Record<string, unknown>, void, unknown>;
+    }) as AsyncGenerator<StreamChunk, void, unknown>;
 
     finalCompletion = { choices: [{ message: { role: "assistant", content: "" } }] };
     assistantContent = "";

@@ -290,7 +290,6 @@ export interface DashboardAnalyticsAppliedFilters {
   range: DashboardAnalyticsRange;
   widgetId: string | null;
   agentId: string | null;
-  leadOnly: boolean;
   search: string;
 }
 

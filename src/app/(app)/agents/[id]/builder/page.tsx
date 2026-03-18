@@ -824,7 +824,7 @@ export default function AgentBuilderPage() {
         .select('*')
         .order('updated_at', { ascending: false }),
       fetch(`/api/agents/${agentId}/knowledge`, {
-        cache: 'no-store',
+        next: { revalidate: 30 },
       }).then((response) => response.json().then((payload) => ({ ok: response.ok, payload }))),
     ]);
 

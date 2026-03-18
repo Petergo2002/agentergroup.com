@@ -32,15 +32,25 @@ interface WidgetSelectBuilder<TData> {
   maybeSingle: () => Promise<WidgetQueryResult<TData>>;
 }
 
+// Represents a builder that has been ordered and supports .limit() to fetch rows.
+interface WidgetLimitSelectBuilder<TData> {
+  limit: (count: number) => Promise<WidgetQueryResult<TData>>;
+}
+
 interface WidgetOrderedSelectBuilder<TData> extends WidgetSelectBuilder<TData> {
   eq: (column: string, value: string) => WidgetOrderedSelectBuilder<TData>;
+  // order() returns a limit builder; TData[] means the result data is an array of TData.
   order: (
     column: string,
     options?: { ascending?: boolean },
-  ) => Promise<WidgetQueryResult<TData[]>>;
+  ) => WidgetLimitSelectBuilder<TData[]>;
 }
 
 interface WidgetInSelectBuilder<TData> {
+  in: (column: string, values: string[]) => Promise<WidgetQueryResult<TData[]>>;
+}
+
+interface WidgetOrderedInSelectBuilder<TData> extends WidgetOrderedSelectBuilder<TData> {
   in: (column: string, values: string[]) => Promise<WidgetQueryResult<TData[]>>;
 }
 
@@ -51,7 +61,7 @@ interface WidgetMutationBuilder<TData> extends PromiseLike<WidgetQueryResult<TDa
 }
 
 interface WidgetTableQuery {
-  select: <TData = unknown>(columns?: string) => WidgetSelectBuilder<TData>;
+  select: <TData = unknown>(columns?: string) => WidgetOrderedInSelectBuilder<TData>;
   upsert: (
     values: Record<string, unknown>,
     options: { onConflict: string },
@@ -97,9 +107,11 @@ async function loadWidgetAgentsWithAgents(
     .from("widget_agents")
     .select<WidgetAgentRecord>("*") as unknown as WidgetOrderedSelectBuilder<WidgetAgentRecord>;
 
+  // .order() returns WidgetLimitSelectBuilder, so we must call .limit() to get the Promise.
   const { data: widgetAgentRows, error: widgetAgentsError } = await widgetAgentsQuery
     .eq("widget_id", widgetId)
-    .order("sort_order", { ascending: true });
+    .order("sort_order", { ascending: true })
+    .limit(1000);
 
   if (widgetAgentsError) {
     throw new Error(widgetAgentsError.message);
@@ -254,6 +266,83 @@ export async function loadWidgetByPublicKey(
     widget: row,
     widgetAgents: await loadWidgetAgentsWithAgents(supabase, row.id),
   };
+}
+
+export async function loadAllWidgetsWithAgents(
+  supabase: WidgetAdminSupabase,
+  workspaceId: string,
+) {
+  const { data: widgetsData, error: widgetsError } = await (supabase
+    .from("widgets")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("updated_at", { ascending: false }) as unknown as Promise<{ data: WidgetRecord[] | null; error: { message: string } | null }>);
+
+  if (widgetsError) {
+    throw new Error(widgetsError.message);
+  }
+
+  if (!widgetsData || widgetsData.length === 0) {
+    return [];
+  }
+
+  const widgets = widgetsData;
+  const widgetIds = widgets.map((w) => w.id);
+
+  const { data: widgetAgentsData, error: widgetAgentsError } = await (supabase
+    .from("widget_agents")
+    .select("*")
+    .in("widget_id", widgetIds) as unknown as Promise<{ data: WidgetAgentRecord[] | null; error: { message: string } | null }>);
+
+  if (widgetAgentsError) {
+    throw new Error(widgetAgentsError.message);
+  }
+
+  const widgetAgentsByWidgetId = new Map<string, WidgetAgentRecord[]>();
+  for (const wa of widgetAgentsData ?? []) {
+    const existing = widgetAgentsByWidgetId.get(wa.widget_id) ?? [];
+    existing.push(wa);
+    widgetAgentsByWidgetId.set(wa.widget_id, existing);
+  }
+
+  const agentIds = Array.from(
+    new Set(
+      (widgetAgentsData ?? [])
+        .map((wa) => wa.agent_id)
+        .filter(Boolean) as string[],
+    ),
+  );
+
+  let agents: AgentRecord[] = [];
+  if (agentIds.length > 0) {
+    const { data: agentsData, error: agentsError } = await (supabase
+      .from("agents")
+      .select("*")
+      .in("id", agentIds) as unknown as Promise<{ data: AgentRecord[] | null; error: { message: string } | null }>);
+
+    if (agentsError) {
+      throw new Error(agentsError.message);
+    }
+
+    agents = agentsData ?? [];
+  }
+
+  const agentById = new Map(agents.map((a) => [a.id, a]));
+
+  return widgets.map((widget) => {
+    const widgetAgents = (widgetAgentsByWidgetId.get(widget.id) ?? [])
+      .map((wa) => {
+        const agent = agentById.get(wa.agent_id);
+        if (!agent) return null;
+        return { widgetAgent: wa, agent };
+      })
+      .filter(Boolean) as WidgetAgentWithAgent[];
+
+    return {
+      widget,
+      widgetAgents,
+    };
+  });
 }
 
 export async function getPublishedAgentVersion(
@@ -606,29 +695,22 @@ export async function loadOrderedWidgetSessionHistory(
   supabase: WidgetAdminSupabase,
   widgetSessionId: string,
 ) {
-  const table = supabase.from("widget_session_messages");
-  const selectBuilder = table.select("*").eq("widget_session_id", widgetSessionId);
-  const result = "order" in selectBuilder
-    ? await (selectBuilder as WidgetSelectBuilder<unknown[]> & {
-        order: (
-          column: string,
-          options: { ascending: boolean },
-        ) => WidgetSelectBuilder<unknown[]> & { limit: (count: number) => Promise<WidgetQueryResult<unknown[]>> };
-      }).order("created_at", { ascending: false }).limit(20)
-    : await selectBuilder.maybeSingle();
+  const orderedBuilder = supabase
+    .from("widget_session_messages")
+    .select<WidgetSessionMessageRecord>("*") as unknown as WidgetOrderedSelectBuilder<WidgetSessionMessageRecord>;
+  const result = await orderedBuilder
+    .eq("widget_session_id", widgetSessionId)
+    .order("created_at", { ascending: false })
+    .limit(20);
 
   if (result.error) {
     throw new Error(result.error.message);
   }
 
-  const rows = Array.isArray(result.data)
-    ? result.data
-    : result.data
-      ? [result.data]
-      : [];
-      
-  rows.reverse();    
-  return rows as WidgetSessionMessageRecord[];
+  // result.data is already WidgetSessionMessageRecord[] from the typed builder.
+  const rows = (result.data ?? []) as unknown as WidgetSessionMessageRecord[];
+  rows.reverse();
+  return rows;
 }
 
 export async function insertWidgetMessages(

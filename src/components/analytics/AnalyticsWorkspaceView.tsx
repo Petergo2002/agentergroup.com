@@ -24,10 +24,6 @@ interface DashboardAnalyticsState {
 const analyticsCardClassName =
   "rounded-[1.6rem] border border-outline-variant/35 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]";
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString();
-}
-
 function buildAnalyticsUrl(
   filters: DashboardAnalyticsAppliedFilters,
   cursor?: string | null,
@@ -41,10 +37,6 @@ function buildAnalyticsUrl(
 
   if (filters.agentId) {
     params.set("agentId", filters.agentId);
-  }
-
-  if (filters.leadOnly) {
-    params.set("leadOnly", "true");
   }
 
   if (filters.search.trim()) {
@@ -85,11 +77,6 @@ function ConversationRow({
             <span className="rounded-full border border-outline-variant/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant">
               {conversation.source}
             </span>
-            {conversation.hasLead ? (
-              <span className="rounded-full border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
-                Lead
-              </span>
-            ) : null}
           </div>
           <p className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-on-surface-variant/60">
             {conversation.agentLabel || conversation.agentName || "Unknown agent"}
@@ -110,11 +97,8 @@ function ConversationRow({
         {conversation.latestSnippet || "No customer-facing messages yet."}
       </p>
 
-      <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-on-surface-variant/60">
+      <div className="mt-3 text-[11px] text-on-surface-variant/60">
         <span className="font-medium">{conversation.userMessageCount} user messages</span>
-        {conversation.leadSummary?.email ? (
-          <span className="truncate">{conversation.leadSummary.email}</span>
-        ) : null}
       </div>
     </button>
   );
@@ -184,56 +168,6 @@ function ConversationDetail({
             </span>
           </div>
 
-          {detail.lead ? (
-            <div className="mt-6 rounded-[1.6rem] border border-outline-variant/10 bg-background px-5 py-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/60">
-                Lead
-              </p>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/60">
-                    Name
-                  </p>
-                  <p className="mt-2 text-sm text-on-surface">{detail.lead.name}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/60">
-                    Email
-                  </p>
-                  <p className="mt-2 break-all text-sm text-on-surface">
-                    {detail.lead.email}
-                  </p>
-                </div>
-                {detail.lead.phone ? (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/60">
-                      Phone
-                    </p>
-                    <p className="mt-2 text-sm text-on-surface">{detail.lead.phone}</p>
-                  </div>
-                ) : null}
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/60">
-                    Submitted
-                  </p>
-                  <p className="mt-2 text-sm text-on-surface">
-                    {formatDateTime(detail.lead.createdAt)}
-                  </p>
-                </div>
-                {detail.lead.message ? (
-                  <div className="sm:col-span-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/60">
-                      Note
-                    </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-on-surface">
-                      {detail.lead.message}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
           <div className="mt-6">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/60">
               Transcript
@@ -280,7 +214,6 @@ export function AnalyticsWorkspaceView() {
     range: "30d",
     widgetId: null,
     agentId: null,
-    leadOnly: false,
     search: "",
   });
   const deferredSearch = useDeferredValue(filters.search);
@@ -520,7 +453,6 @@ export function AnalyticsWorkspaceView() {
   const summaryCards = [
     ["Conversations", String(state.data?.overview.conversations ?? 0)],
     ["Messages", String(state.data?.overview.messages ?? 0)],
-    ["Leads", String(state.data?.overview.leads ?? 0)],
     ["Active Widgets", String(state.data?.overview.activeWidgets ?? 0)],
   ] as const;
   const supportCards = [
@@ -540,7 +472,7 @@ export function AnalyticsWorkspaceView() {
             Analytics
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
-            Review customer conversations, captured leads, and live widget activity across {workspace.name}.
+            Review customer conversations and live widget activity across {workspace.name}.
           </p>
         </div>
       </div>
@@ -578,10 +510,10 @@ export function AnalyticsWorkspaceView() {
             Filters
           </p>
           <p className="mt-2 text-sm text-on-surface-variant">
-            Narrow the inbox by time window, surface, specialist, or lead intent.
+            Narrow the inbox by time window, widget, or specialist.
           </p>
         </div>
-        <div className="grid gap-3 lg:grid-cols-[160px_1fr_1fr_1.15fr_auto]">
+        <div className="grid gap-3 lg:grid-cols-[160px_1fr_1fr]">
           <label className="space-y-2">
             <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/60">
               Range
@@ -660,26 +592,9 @@ export function AnalyticsWorkspaceView() {
                   search: event.target.value,
                 }))
               }
-              placeholder="Search widget, agent, lead"
+              placeholder="Search widget or agent"
               className="w-full rounded-2xl border border-outline-variant/15 bg-background px-4 py-3 text-sm text-on-surface outline-none"
             />
-          </label>
-
-          <label className="flex items-end">
-            <span className="flex w-full items-center justify-between rounded-2xl border border-outline-variant/15 bg-background px-4 py-3 text-sm text-on-surface">
-              <span>Leads only</span>
-              <input
-                type="checkbox"
-                checked={filters.leadOnly}
-                onChange={(event) =>
-                  setFilters((current) => ({
-                    ...current,
-                    leadOnly: event.target.checked,
-                  }))
-                }
-                className="h-4 w-4 rounded border-outline-variant/20"
-              />
-            </span>
           </label>
         </div>
       </section>
@@ -711,12 +626,12 @@ export function AnalyticsWorkspaceView() {
             ) : (state.data?.conversations.length ?? 0) === 0 ? (
               <div className="rounded-[1.6rem] border border-dashed border-outline-variant/15 bg-background px-5 py-10 text-center">
                 <p className="text-lg font-semibold text-on-surface">
-                  {filters.search || filters.leadOnly || filters.widgetId || filters.agentId
+                  {filters.search || filters.widgetId || filters.agentId
                     ? "No conversations match these filters."
                     : "No widget conversations yet."}
                 </p>
                 <p className="mt-2 text-sm leading-7 text-on-surface-variant">
-                  {filters.search || filters.leadOnly || filters.widgetId || filters.agentId
+                  {filters.search || filters.widgetId || filters.agentId
                     ? "Try clearing one or more filters to widen the result set."
                     : "Once customers start chatting through your widgets, their conversations will show up here."}
                 </p>

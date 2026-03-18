@@ -43,7 +43,9 @@ interface WidgetFormState {
   homeSubtitle: string;
   showBranding: boolean;
   privacyPolicyUrl: string;
-  allowedOrigins: string;
+  allowedOrigins: string[];
+  originInput: string;
+  originError: string | null;
 }
 
 interface AttachedAgentState {
@@ -116,7 +118,9 @@ function getInitialFormState(summary: WidgetDetailResponse): WidgetFormState {
     homeSubtitle: summary.widget.home_subtitle || '',
     showBranding: summary.widget.show_branding,
     privacyPolicyUrl: summary.widget.privacy_policy_url ?? '',
-    allowedOrigins: summary.widget.allowed_origins.join('\n'),
+    allowedOrigins: summary.widget.allowed_origins,
+    originInput: '',
+    originError: null,
   };
 }
 
@@ -157,10 +161,7 @@ function buildDraftPreviewPayload(
       homeSubtitle: form.homeSubtitle,
       showBranding: form.showBranding,
       privacyPolicyUrl: form.privacyPolicyUrl,
-      allowedOrigins: form.allowedOrigins
-        .split('\n')
-        .map((value) => value.trim())
-        .filter(Boolean),
+      allowedOrigins: form.allowedOrigins,
     },
     agents: attachedAgents.map((item, index) => ({
       agentId: item.agentId,
@@ -220,7 +221,7 @@ export default function WidgetDetailPage() {
 
     try {
       const response = await fetch(`/api/widgets/${widgetId}`, {
-        cache: 'no-store',
+        next: { revalidate: 30 },
       });
       const payload = await response.json().catch(() => null);
 
@@ -345,6 +346,35 @@ export default function WidgetDetailPage() {
     ]);
   };
 
+  const addOrigin = () => {
+    if (!form) return;
+    const input = form.originInput.trim();
+    if (!input) return;
+
+    try {
+      const parsed = new URL(input);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        setForm((current) => current ? { ...current, originError: 'URL must use http or https protocol' } : current);
+        return;
+      }
+
+      const origin = parsed.origin;
+      if (form.allowedOrigins.includes(origin)) {
+        setForm((current) => current ? { ...current, originError: 'This domain is already added', originInput: '' } : current);
+        return;
+      }
+
+      setForm((current) => current ? { ...current, allowedOrigins: [...current.allowedOrigins, origin], originInput: '', originError: null } : current);
+    } catch {
+      setForm((current) => current ? { ...current, originError: 'Please enter a valid URL (e.g., https://example.com)' } : current);
+    }
+  };
+
+  const removeOrigin = (index: number) => {
+    if (!form) return;
+    setForm((current) => current ? { ...current, allowedOrigins: current.allowedOrigins.filter((_, i) => i !== index) } : current);
+  };
+
   const moveAgent = (index: number, direction: -1 | 1) => {
     setAttachedAgents((current) => {
       const nextIndex = index + direction;
@@ -383,10 +413,7 @@ export default function WidgetDetailPage() {
           homeSubtitle: form.homeSubtitle || null,
           showBranding: form.showBranding,
           privacyPolicyUrl: form.privacyPolicyUrl,
-          allowedOrigins: form.allowedOrigins
-            .split('\n')
-            .map((value) => value.trim())
-            .filter(Boolean),
+          allowedOrigins: form.allowedOrigins,
         }),
       });
       const identityPayload = await identityResponse.json().catch(() => null);
@@ -821,13 +848,57 @@ export default function WidgetDetailPage() {
               </label>
               <label className="block space-y-2 md:col-span-2">
                 <span className={fieldLabelClassName}>Allowed Origins</span>
-                <textarea
-                  value={form.allowedOrigins}
-                  onChange={(event) => setForm((current) => current ? { ...current, allowedOrigins: event.target.value } : current)}
-                  rows={4}
-                  placeholder="https://example.com"
-                  className={`${inputClassName} min-h-[124px] resize-none`}
-                />
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={form.originInput}
+                      onChange={(event) => setForm((current) => current ? { ...current, originInput: event.target.value, originError: null } : current)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          addOrigin();
+                        }
+                      }}
+                      placeholder="Enter domain and press Enter (e.g., https://example.com)"
+                      className={`${inputClassName} flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={addOrigin}
+                      className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-on-primary transition-opacity hover:opacity-90"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {form.originError && (
+                    <p className="text-sm text-error">{form.originError}</p>
+                  )}
+                  {form.allowedOrigins.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {form.allowedOrigins.map((origin, index) => (
+                        <span
+                          key={index}
+                          className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-sm text-primary"
+                        >
+                          {origin}
+                          <button
+                            type="button"
+                            onClick={() => removeOrigin(index)}
+                            className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-primary/70 hover:bg-primary/20 hover:text-primary"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {form.allowedOrigins.length === 0 && !form.originError && (
+                    <p className="text-sm text-on-surface-variant/60">No domains added yet. Add domains to restrict where your widget can be embedded.</p>
+                  )}
+                </div>
               </label>
             </div>
           </div>

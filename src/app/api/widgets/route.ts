@@ -7,12 +7,14 @@ import {
   buildDefaultWidgetAgentInput,
   buildDefaultWidgetInput,
 } from "@/lib/widgets";
-import { buildWidgetSummary, loadWidgetById } from "@/lib/widgets/server";
+import { buildWidgetSummary, loadAllWidgetsWithAgents } from "@/lib/widgets/server";
 
 function buildWidgetSlug(name: string) {
   const base = slugify(name) || "widget";
   return `${base}-${Date.now().toString().slice(-6)}`;
 }
+
+export const revalidate = 30;
 
 export async function GET() {
   const supabase = await createClient();
@@ -25,25 +27,11 @@ export async function GET() {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  const { data, error } = await supabase
-    .from("widgets")
-    .select("id")
-    .eq("workspace_id", context.workspace.id)
-    .order("updated_at", { ascending: false });
 
-  if (error) {
-    return NextResponse.json(
-      { error: error.message || "Failed to load widgets." },
-      { status: 500 },
-    );
-  }
+  try {
+    const allWidgets = await loadAllWidgetsWithAgents(supabase as never, context.workspace.id);
 
-  const widgetIds = ((data ?? []) as Array<{ id: string }>).map((item) => item.id);
-  const widgets = await Promise.all(
-    widgetIds.map(async (widgetId) => {
-      const loaded = await loadWidgetById(supabase as never, widgetId);
-      if (!loaded) return null;
-
+    const widgets = allWidgets.map((loaded) => {
       const summary = buildWidgetSummary(loaded.widget, loaded.widgetAgents);
       return {
         id: summary.widget.id,
@@ -55,12 +43,17 @@ export async function GET() {
         needsRedeploy: summary.needsRedeploy,
         updatedAt: summary.widget.updated_at,
       };
-    }),
-  );
+    });
 
-  return NextResponse.json({
-    widgets: widgets.filter(Boolean),
-  });
+    return NextResponse.json({
+      widgets,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to load widgets." },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

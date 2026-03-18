@@ -48,7 +48,7 @@ export default function WidgetsPage() {
 
     const load = async () => {
       try {
-        const response = await fetch('/api/widgets', { cache: 'no-store' });
+        const response = await fetch('/api/widgets', { next: { revalidate: 30 } });
         const payload = await response.json().catch(() => null);
 
         if (!response.ok || !payload) {

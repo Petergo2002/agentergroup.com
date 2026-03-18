@@ -17,14 +17,12 @@ function parseRange(value: string | null): DashboardAnalyticsRange {
   return value === "7d" || value === "90d" ? value : "30d";
 }
 
-function parseBoolean(value: string | null) {
-  return value === "true";
-}
-
 function parseLimit(value: string | null) {
   const numeric = Number(value ?? "");
   return Number.isFinite(numeric) ? numeric : 25;
 }
+
+export const revalidate = 30;
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -44,7 +42,6 @@ export async function GET(request: NextRequest) {
       range: parseRange(searchParams.get("range")),
       widgetId: searchParams.get("widgetId")?.trim() || null,
       agentId: searchParams.get("agentId")?.trim() || null,
-      leadOnly: parseBoolean(searchParams.get("leadOnly")),
       search: searchParams.get("search")?.trim() || "",
     };
     const limit = parseLimit(searchParams.get("limit"));
