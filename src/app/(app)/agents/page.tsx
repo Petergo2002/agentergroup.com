@@ -313,15 +313,15 @@ export default function AgentsPage() {
         />
       </div>
 
-      <div className="overflow-hidden rounded-[1.8rem] border border-outline-variant/30 bg-surface-container-lowest shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-col gap-4">
         {isLoading ? (
-          <div className="space-y-3 p-6">
+          <div className="space-y-4">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-20 animate-pulse rounded-2xl bg-surface-container-low" />
+              <div key={index} className="h-24 animate-pulse rounded-[1.7rem] bg-surface-container-low" />
             ))}
           </div>
         ) : filteredAgents.length === 0 ? (
-          <div className="px-6 py-16 text-center">
+          <div className="rounded-[1.8rem] border border-outline-variant/30 bg-surface-container-lowest px-6 py-16 text-center shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
             <span className="material-symbols-outlined rounded-full bg-primary/5 p-4 text-3xl text-primary">
               hub
             </span>
@@ -334,104 +334,105 @@ export default function AgentsPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-outline-variant/10">
+          <div className="flex flex-col gap-4">
             {filteredAgents.map((agent) => (
               <div
                 key={agent.id}
-                className="px-8 py-7 transition-colors hover:bg-surface-container-low/45"
+                className="flex flex-col gap-5 rounded-[1.7rem] border border-outline-variant/20 bg-white px-6 py-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all hover:border-outline-variant/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] md:flex-row md:items-center md:justify-between"
               >
-                <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex min-w-0 flex-1 flex-col gap-4 xl:flex-row xl:items-center xl:gap-8">
-                    <div className="min-w-0 xl:min-w-[260px] xl:flex-[1.1]">
-                      <p className="truncate text-base font-semibold text-on-surface">{agent.name}</p>
-                      <p className="mt-1.5 max-w-xl line-clamp-2 text-sm leading-6 text-on-surface-variant">
-                        {agent.description || 'Architecting intelligence, one prompt at a time.'}
-                      </p>
-                    </div>
+                {/* Left: Name and Description */}
+                <div className="min-w-0 flex-1 md:max-w-[30%]">
+                  <p className="truncate text-[15px] font-bold text-on-surface">{agent.name}</p>
+                  <p className="mt-1 truncate text-sm text-on-surface-variant/80">
+                    {agent.description || 'Architecting intelligence, one prompt at a time.'}
+                  </p>
+                </div>
 
-                    <div className="flex flex-wrap items-center gap-2.5 xl:flex-[0.9]">
-                      <div className="flex items-center gap-2 rounded-full bg-background px-3.5 py-1.5 ring-1 ring-outline-variant/10">
-                        <span className="material-symbols-outlined text-base text-on-surface-variant/55">
-                          psychology
-                        </span>
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant/85">
-                          {agent.model}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 rounded-full bg-background px-3.5 py-1.5 ring-1 ring-outline-variant/10">
-                        <span className="material-symbols-outlined text-base text-on-surface-variant/55">
-                          chat_bubble
-                        </span>
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant/85">
-                          {agent.starter_prompts.length} Prompts
-                        </span>
-                      </div>
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] ${getAgentStateClasses(agent)}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${
-                          agent.archived_at
-                            ? 'bg-on-surface-variant'
-                            : agent.status === 'active'
-                              ? 'bg-primary animate-pulse'
-                              : 'bg-on-surface-variant/40'
-                        }`} />
-                        {getAgentStateLabel(agent)}
-                      </span>
-                      {!agent.published_version_id && !agent.archived_at ? (
-                        <span className="text-[11px] font-medium text-on-surface-variant">
-                          Publish first to turn on
-                        </span>
-                      ) : null}
-                    </div>
+                {/* Middle: Badges */}
+                <div className="flex shrink-0 flex-wrap items-center gap-2 md:flex-1 md:justify-center">
+                  <div className="flex h-8 items-center gap-1.5 rounded-full bg-surface-container px-3 text-on-surface-variant/80">
+                    <span className="material-symbols-outlined text-[15px]">
+                      psychology
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      {agent.model}
+                    </span>
+                  </div>
+                  
+                  <div className="flex h-8 items-center gap-1.5 rounded-full bg-surface-container px-3 text-on-surface-variant/80">
+                    <span className="material-symbols-outlined text-[14px]">
+                      chat_bubble
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      {agent.starter_prompts.length} Prompts
+                    </span>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5 xl:gap-3">
-                    <div className="text-xs font-medium text-on-surface-variant/60">
-                      Updated {formatRelativeDate(agent.updated_at)}
-                    </div>
-                    <StatusToggle
-                      checked={agent.status === 'active' && !agent.archived_at}
-                      onClick={() => void handleStatusToggle(agent)}
-                      disabled={
-                        Boolean(agent.archived_at) ||
-                        togglingAgentId === agent.id ||
-                        pendingAgentId === agent.id ||
-                        deletingAgentId === agent.id ||
-                        (agent.status !== 'active' && !agent.published_version_id)
-                      }
-                      label={`Toggle ${agent.name}`}
-                      activeLabel="On"
-                      inactiveLabel="Off"
-                    />
-                    <Link
-                      href={`/agents/${agent.id}/builder`}
-                      className="rounded-full px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-                    >
-                      Builder
-                    </Link>
-                    <Link
-                      href={`/agents/${agent.id}/preview`}
-                      className="rounded-full bg-on-surface px-4 py-2.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
-                    >
-                      Preview
-                    </Link>
-                    <EntityActionsMenu
-                      onArchiveToggle={() => void handleArchiveToggle(agent)}
-                      archiveLabel={agent.archived_at ? 'Restore' : 'Archive'}
-                      archiveDisabled={
-                        pendingAgentId === agent.id ||
-                        deletingAgentId === agent.id ||
-                        togglingAgentId === agent.id
-                      }
-                      onDelete={() => void handlePermanentDelete(agent)}
-                      deleteDisabled={
-                        deletingAgentId === agent.id ||
-                        pendingAgentId === agent.id ||
-                        togglingAgentId === agent.id ||
-                        !agent.archived_at ||
-                        membership.role !== 'owner'
-                      }
-                    />
+                  <div className="flex h-8 items-center gap-1.5 rounded-full bg-[#FF6B52]/10 px-3 text-[#FF6B52]">
+                    <span className={`h-1.5 w-1.5 rounded-full ${agent.archived_at ? 'bg-on-surface-variant' : agent.status === 'active' ? 'bg-[#FF6B52] animate-pulse' : 'bg-[#FF6B52]/40'}`} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      {getAgentStateLabel(agent)}
+                    </span>
                   </div>
+                </div>
+
+                {/* Right: Actions */}
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 md:flex-1">
+                  <div className="mr-2 text-xs font-medium text-on-surface-variant/60">
+                    Updated {formatRelativeDate(agent.updated_at)}
+                  </div>
+                  
+                  {/* Custom Toggle matching screenshot */}
+                  <button
+                    onClick={() => void handleStatusToggle(agent)}
+                    disabled={
+                      Boolean(agent.archived_at) ||
+                      togglingAgentId === agent.id ||
+                      pendingAgentId === agent.id ||
+                      deletingAgentId === agent.id ||
+                      (agent.status !== 'active' && !agent.published_version_id)
+                    }
+                    className="flex h-8 items-center rounded-full bg-[#FFF0ED] p-0.5 text-[10px] font-bold tracking-wider transition-opacity disabled:opacity-50"
+                  >
+                    <span className={`flex h-full items-center justify-center rounded-full px-3 ${agent.status !== 'active' ? 'text-on-surface-variant' : 'text-[#FF6B52]/60'}`}>
+                      OFF
+                    </span>
+                    <span className={`flex h-full items-center justify-center rounded-full px-3 transition-colors ${agent.status === 'active' && !agent.archived_at ? 'bg-[#FF6B52] text-white shadow-sm' : 'text-on-surface-variant'}`}>
+                      ON
+                    </span>
+                  </button>
+
+                  <Link
+                    href={`/agents/${agent.id}/builder`}
+                    className="rounded-full px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:text-on-surface"
+                  >
+                    Builder
+                  </Link>
+                  
+                  <Link
+                    href={`/agents/${agent.id}/preview`}
+                    className="h-8 rounded-xl bg-[#0F1728] px-4 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                  >
+                    Preview
+                  </Link>
+
+                  <EntityActionsMenu
+                    onArchiveToggle={() => void handleArchiveToggle(agent)}
+                    archiveLabel={agent.archived_at ? 'Restore' : 'Archive'}
+                    archiveDisabled={
+                      pendingAgentId === agent.id ||
+                      deletingAgentId === agent.id ||
+                      togglingAgentId === agent.id
+                    }
+                    onDelete={() => void handlePermanentDelete(agent)}
+                    deleteDisabled={
+                      deletingAgentId === agent.id ||
+                      pendingAgentId === agent.id ||
+                      togglingAgentId === agent.id ||
+                      !agent.archived_at ||
+                      membership.role !== 'owner'
+                    }
+                  />
                 </div>
               </div>
             ))}
