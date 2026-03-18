@@ -6,6 +6,8 @@ export interface SupportedIntegration {
   displayName: string;
   description: string;
   icon: string;
+  simpleIcon?: string;
+  simpleIconColor?: string;
   category: string;
   connectionPurpose: string;
   surface: IntegrationSurface;
@@ -19,6 +21,8 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     displayName: "Gmail",
     description: "Send emails during the current conversation.",
     icon: "mail",
+    simpleIcon: "siGmail",
+    simpleIconColor: "#EA4335",
     category: "Communication",
     connectionPurpose: "Used by agents to send emails during the current conversation.",
     surface: "chat",
@@ -30,6 +34,8 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     displayName: "Google Calendar",
     description: "Check availability and book meetings.",
     icon: "event",
+    simpleIcon: "siGooglecalendar",
+    simpleIconColor: "#4285F4",
     category: "Scheduling",
     connectionPurpose: "Used by agents to check availability and book meetings.",
     surface: "chat",
@@ -46,6 +52,8 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     displayName: "Google Drive",
     description: "Import selected files into the knowledge base.",
     icon: "cloud",
+    simpleIcon: "siGoogledrive",
+    simpleIconColor: "#4285F4",
     category: "Knowledge",
     connectionPurpose: "Used to import files into the knowledge base.",
     surface: "knowledge",

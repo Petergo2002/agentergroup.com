@@ -39,6 +39,8 @@ export async function GET() {
       displayName: toolkit.displayName,
       description: toolkit.connectionPurpose,
       icon: toolkit.icon,
+      simpleIcon: toolkit.simpleIcon,
+      simpleIconColor: toolkit.simpleIconColor,
       category: toolkit.category,
       surface: toolkit.surface,
       connection: connection ?? null,

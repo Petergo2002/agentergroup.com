@@ -3,12 +3,34 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/components/ui/ToastProvider';
 import type { ConnectionRecord } from '@/lib/types';
+import * as simpleIcons from 'simple-icons';
+
+function SimpleIcon({ iconKey, color, size = 24, className = '' }: { iconKey?: string; color?: string; size?: number; className?: string }) {
+  if (!iconKey) return null;
+  
+  const icon = (simpleIcons as Record<string, { path: string }>)[iconKey];
+  if (!icon?.path) return null;
+  
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill={color || "currentColor"}
+      className={className}
+      dangerouslySetInnerHTML={{ __html: `<path d="${icon.path}"/>` }}
+    />
+  );
+}
 
 interface ToolkitCard {
   slug: string;
   displayName: string;
   description: string;
   icon: string;
+  simpleIcon?: string;
+  simpleIconColor?: string;
   category: string;
   surface: string;
   status: string;
@@ -144,9 +166,17 @@ export default function ConnectionsPage() {
                   <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
                     toolkit.status === 'connected'
                       ? 'bg-success/10 text-success'
-                      : 'bg-surface-container text-primary'
+                      : 'bg-surface-container'
                   }`}>
-                    <span className="material-symbols-outlined text-2xl">{toolkit.icon}</span>
+                    {toolkit.simpleIcon ? (
+                      <SimpleIcon 
+                        iconKey={toolkit.simpleIcon} 
+                        color={toolkit.simpleIconColor}
+                        size={28} 
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-2xl">{toolkit.icon}</span>
+                    )}
                   </div>
                   <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
                     toolkit.status === 'connected'

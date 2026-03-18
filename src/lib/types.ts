@@ -620,6 +620,8 @@ export interface GmailBuilderNodeData extends BaseBuilderNodeData {
   kind: "gmail";
   integrationSlug: "gmail";
   connectionId: string | null;
+  simpleIcon?: string;
+  simpleIconColor?: string;
 }
 
 export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
@@ -627,6 +629,8 @@ export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
   integrationSlug: "googlecalendar";
   connectionId: string | null;
   timezone: string;
+  simpleIcon?: string;
+  simpleIconColor?: string;
 }
 
 export interface OutputBuilderNodeData extends BaseBuilderNodeData {

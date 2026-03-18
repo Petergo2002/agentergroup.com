@@ -36,6 +36,26 @@ import type {
   KnowledgeBuilderNodeData,
   KnowledgeSourceRecord,
 } from '@/lib/types';
+import * as simpleIcons from 'simple-icons';
+
+function SimpleIcon({ iconKey, color, size = 24, className = '' }: { iconKey?: string; color?: string; size?: number; className?: string }) {
+  if (!iconKey) return null;
+  
+  const icon = (simpleIcons as Record<string, { path: string }>)[iconKey];
+  if (!icon?.path) return null;
+  
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill={color || "currentColor"}
+      className={className}
+      dangerouslySetInnerHTML={{ __html: `<path d="${icon.path}"/>` }}
+    />
+  );
+}
 
 type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
@@ -197,8 +217,17 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
       </div>
       <div className="space-y-3 p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <span className="material-symbols-outlined text-base">{data.icon || 'smart_toy'}</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
+            {(data as { simpleIcon?: string }).simpleIcon ? (
+              <SimpleIcon 
+                iconKey={(data as { simpleIcon?: string }).simpleIcon} 
+                color={(data as { simpleIconColor?: string }).simpleIconColor}
+                size={22} 
+                className="text-primary"
+              />
+            ) : (
+              <span className="material-symbols-outlined text-base">{data.icon || 'smart_toy'}</span>
+            )}
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-on-surface">{data.label}</p>
@@ -402,6 +431,8 @@ function createGmailNode(
       label: 'Gmail',
       type: 'Tool',
       icon: 'mail',
+      simpleIcon: 'siGmail',
+      simpleIconColor: '#EA4335',
       description: 'Send emails during the current conversation.',
       status: 'idle',
       integrationSlug: 'gmail',
@@ -426,6 +457,8 @@ function createGoogleCalendarNode(
       label: 'Google Calendar',
       type: 'Tool',
       icon: 'calendar_month',
+      simpleIcon: 'siGooglecalendar',
+      simpleIconColor: '#4285F4',
       description: 'Check availability and book meetings.',
       status: 'idle',
       integrationSlug: 'googlecalendar',
@@ -1245,6 +1278,8 @@ export default function AgentBuilderPage() {
       displayName: integration?.displayName ?? kind,
       description: integration?.connectionPurpose ?? '',
       icon: integration?.icon ?? 'extension',
+      simpleIcon: integration?.simpleIcon,
+      simpleIconColor: integration?.simpleIconColor,
       isAdded,
       canAdd: connectedCount > 0 && !isAdded,
       stateLabel: isAdded ? 'Added' : connectedCount > 0 ? 'Connected' : 'Connect first',
@@ -1791,7 +1826,16 @@ export default function AgentBuilderPage() {
                   disabled={!option.canAdd}
                   className="flex w-full items-start gap-3 rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-left transition-colors hover:border-primary/30 hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <span className="material-symbols-outlined text-primary">{option.icon}</span>
+                  {option.simpleIcon ? (
+                    <SimpleIcon 
+                      iconKey={option.simpleIcon} 
+                      color={option.simpleIconColor}
+                      size={24} 
+                      className="text-primary"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-primary">{option.icon}</span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-semibold text-on-surface">{option.displayName}</p>
