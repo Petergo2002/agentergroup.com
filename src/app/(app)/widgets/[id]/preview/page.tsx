@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { getWidgetAppUrl } from "@/lib/env";
+import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -52,7 +52,7 @@ export default async function WidgetDraftPreviewPage({
         )}&preview=1&preview_source=widget_preview&preview_token=${encodeURIComponent(
           previewToken,
         )}&preview_revision=${encodeURIComponent(revision)}&parent_origin=${encodeURIComponent(
-          getWidgetAppUrl(),
+          getAppUrl(),
         )}`
       : null;
 

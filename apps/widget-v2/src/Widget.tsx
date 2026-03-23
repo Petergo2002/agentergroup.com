@@ -942,7 +942,10 @@ export default function Widget({
     );
   };
 
-  const sendMessage = async (text: string = input) => {
+  const sendMessage = async (
+    text: string = input,
+    options?: { skipConsentCheck?: boolean },
+  ) => {
     const activeLanguage = resolveWidgetLanguage(config);
     const activeAgent = resolveSelectedAgent(config, selectedWidgetAgentId);
     const activeEndChatPolicy =
@@ -965,7 +968,7 @@ export default function Widget({
       return;
     }
 
-    if (!hasConsent) {
+    if (!options?.skipConsentCheck && !hasConsent) {
       setPendingMessage(trimmedMessage);
       setConsentChecked(false);
       setShowConsentGate(true);
@@ -1233,7 +1236,7 @@ export default function Widget({
     setPendingMessage(null);
 
     if (queuedMessage) {
-      void sendMessage(queuedMessage);
+      void sendMessage(queuedMessage, { skipConsentCheck: true });
     }
   }, [pendingMessage, persistConsent, sendMessage]);
 
