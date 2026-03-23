@@ -60,8 +60,6 @@ const WIDGET_STATE_MESSAGE_TYPE = "ag:widget:state";
 const MIN_INTERIM_STREAM_RENDER_DELAY_MS = 250;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const PRESENCE_DEDUPE_MS = 1_500;
-const CONSENT_STORAGE_KEY_PREFIX = "ag:widget-consent:";
-
 type SessionPresenceEvent =
   | "widget_open"
   | "widget_close"
@@ -278,29 +276,6 @@ const WIDGET_DEFAULTS: Record<"sv" | "en", {
   },
 };
 
-const CONSENT_COPY = {
-  sv: {
-    title: "Innan vi börjar",
-    description:
-      "Vi använder denna chatt för att behandla dina meddelanden och de kontaktuppgifter du själv väljer att dela.",
-    checkbox:
-      "Jag förstår och godkänner behandlingen av mina chattmeddelanden enligt integritetspolicyn.",
-    continue: "Fortsätt till chatten",
-    cancel: "Inte nu",
-    privacy: "Integritetspolicy",
-  },
-  en: {
-    title: "Before we start",
-    description:
-      "We use this chat to process your messages and any contact details you choose to share.",
-    checkbox:
-      "I understand and agree to the processing of my chat messages according to the privacy policy.",
-    continue: "Continue to chat",
-    cancel: "Not now",
-    privacy: "Privacy policy",
-  },
-} as const;
-
 function getLocalizedDefault(
   value: string | null | undefined,
   key: keyof typeof WIDGET_DEFAULTS["en"],
@@ -422,10 +397,6 @@ async function readJsonError(response: Response, fallback: string) {
   throw error;
 }
 
-function getConsentStorageKey(widgetPublicKey: string) {
-  return `${CONSENT_STORAGE_KEY_PREFIX}${widgetPublicKey}`;
-}
-
 export default function Widget({
   widgetPublicKey,
   previewMode = false,
@@ -462,10 +433,6 @@ export default function Widget({
   const [previewRevisionKey, setPreviewRevisionKey] = useState(
     previewRevision || "0",
   );
-  const [hasConsent, setHasConsent] = useState(previewMode);
-  const [showConsentGate, setShowConsentGate] = useState(false);
-  const [consentChecked, setConsentChecked] = useState(false);
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const embeddedParentOrigin = isEmbedded
     ? resolveEmbeddedParentOrigin(parentOrigin)
     : null;
@@ -942,10 +909,7 @@ export default function Widget({
     );
   };
 
-  const sendMessage = async (
-    text: string = input,
-    options?: { skipConsentCheck?: boolean },
-  ) => {
+  const sendMessage = async (text: string = input) => {
     const activeLanguage = resolveWidgetLanguage(config);
     const activeAgent = resolveSelectedAgent(config, selectedWidgetAgentId);
     const activeEndChatPolicy =
@@ -965,13 +929,6 @@ export default function Widget({
       !widgetPublicKey ||
       !activeAgent
     ) {
-      return;
-    }
-
-    if (!options?.skipConsentCheck && !hasConsent) {
-      setPendingMessage(trimmedMessage);
-      setConsentChecked(false);
-      setShowConsentGate(true);
       return;
     }
 
@@ -1203,49 +1160,6 @@ export default function Widget({
     }
   }, [activeTab, config?.home.mode, selectedAgent]);
 
-  useEffect(() => {
-    if (previewMode || typeof window === "undefined") {
-      setHasConsent(true);
-      return;
-    }
-
-    const storedConsent = window.localStorage.getItem(
-      getConsentStorageKey(widgetPublicKey),
-    );
-    setHasConsent(storedConsent === "accepted");
-  }, [previewMode, widgetPublicKey]);
-
-  const persistConsent = useCallback(() => {
-    if (previewMode || typeof window === "undefined") {
-      setHasConsent(true);
-      return;
-    }
-
-    window.localStorage.setItem(
-      getConsentStorageKey(widgetPublicKey),
-      "accepted",
-    );
-    setHasConsent(true);
-  }, [previewMode, widgetPublicKey]);
-
-  const handleConsentContinue = useCallback(() => {
-    persistConsent();
-    setShowConsentGate(false);
-
-    const queuedMessage = pendingMessage;
-    setPendingMessage(null);
-
-    if (queuedMessage) {
-      void sendMessage(queuedMessage, { skipConsentCheck: true });
-    }
-  }, [pendingMessage, persistConsent, sendMessage]);
-
-  const handleConsentDismiss = useCallback(() => {
-    setShowConsentGate(false);
-    setConsentChecked(false);
-    setPendingMessage(null);
-  }, []);
-
   if (!config) {
     return (
       <div className="flex items-center justify-center h-screen bg-widget-bg text-widget-fg">
@@ -1262,7 +1176,6 @@ export default function Widget({
   const palette = deriveWidgetPalette(config.widget.primaryColor, themeMode);
   const rgb = hexToRgb(palette.primary);
   const primaryRgb = `${rgb.r}, ${rgb.g}, ${rgb.b}`;
-  const consentCopy = CONSENT_COPY[widgetLanguage];
   const privacyPolicyUrl = buildLocalizedPrivacyPolicyUrl(
     config.brand.privacyPolicyUrl,
     widgetLanguage,
@@ -1397,6 +1310,7 @@ export default function Widget({
               <MessagesTab
                 key="messages"
                 config={config}
+                privacyPolicyUrl={privacyPolicyUrl}
                 selectedAgent={selectedAgent}
                 messages={messages}
                 input={input}
@@ -1412,73 +1326,6 @@ export default function Widget({
             )}
           </AnimatePresence>
         </main>
-
-        <AnimatePresence>
-          {showConsentGate ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-30 flex items-end justify-center bg-black/28 px-4 pb-6 pt-20 backdrop-blur-[3px]"
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 16, scale: 0.98 }}
-                transition={{ duration: 0.18 }}
-                className="w-full max-w-md rounded-[28px] border border-black/10 bg-white p-6 text-[#171717] shadow-[0_24px_80px_rgba(15,23,42,0.16)]"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
-                  {config.brand.name}
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#171717]">
-                  {consentCopy.title}
-                </h2>
-                <p className="mt-3 text-sm leading-7 text-neutral-600">
-                  {consentCopy.description}
-                </p>
-                <label className="mt-5 flex items-start gap-3 rounded-2xl border border-black/10 bg-neutral-50 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-                  <input
-                    type="checkbox"
-                    checked={consentChecked}
-                    onChange={(event) => setConsentChecked(event.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-neutral-300 bg-white text-widget-primary focus:ring-widget-primary"
-                  />
-                  <span className="text-sm leading-7 text-neutral-800">
-                    {consentCopy.checkbox}
-                  </span>
-                </label>
-                {privacyPolicyUrl ? (
-                  <a
-                    href={privacyPolicyUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex text-sm font-medium text-widget-primary underline-offset-4 transition-opacity hover:opacity-80 hover:underline"
-                  >
-                    {consentCopy.privacy}
-                  </a>
-                ) : null}
-                <div className="mt-6 flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={handleConsentDismiss}
-                    className="rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-[#171717]"
-                  >
-                    {consentCopy.cancel}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!consentChecked}
-                    onClick={handleConsentContinue}
-                    className="rounded-xl bg-widget-primary px-4 py-2.5 text-sm font-semibold text-widget-primary-fg shadow-[0_12px_30px_rgba(255,92,0,0.22)] transition-all hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    {consentCopy.continue}
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
 
         <AnimatePresence>
           {selectedAgent &&

@@ -9,6 +9,7 @@ import { ChatView } from "./ChatView";
 
 export interface MessagesTabProps {
   config: WidgetConfig;
+  privacyPolicyUrl?: string | null;
   selectedAgent: WidgetAgentConfig;
   messages: Message[];
   input: string;
@@ -24,6 +25,7 @@ export interface MessagesTabProps {
 
 export function MessagesTab({
   config,
+  privacyPolicyUrl,
   selectedAgent,
   messages,
   input,
@@ -47,6 +49,7 @@ export function MessagesTab({
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ChatView
           config={config}
+          privacyPolicyUrl={privacyPolicyUrl}
           selectedAgent={selectedAgent}
           messages={messages}
           input={input}

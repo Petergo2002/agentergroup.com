@@ -20,9 +20,9 @@ const TRANSLATIONS = {
   en: {
     copy: "Copy",
     agentSubtext: "AI Agent",
-    privacyText: "By chatting, you agree to our ",
+    privacyText: "By sending a message, you acknowledge our ",
     privacyLink: "privacy policy",
-    automatedWarning: "Chat responses are generated automatically.",
+    automatedWarning: "Chat messages may be processed automatically.",
     completedBanner: "This chat has ended.",
     completedTimeout: "The chat ended after inactivity.",
     completedButton: "Start a new chat",
@@ -31,9 +31,9 @@ const TRANSLATIONS = {
   sv: {
     copy: "Kopiera",
     agentSubtext: "AI-Agent",
-    privacyText: "Genom att chatta godkänner du vår ",
+    privacyText: "När du skickar ett meddelande bekräftar du vår ",
     privacyLink: "integritetspolicy",
-    automatedWarning: "Chattsvar genereras automatiskt.",
+    automatedWarning: "Chattmeddelanden kan behandlas automatiskt.",
     completedBanner: "Den här chatten har avslutats.",
     completedTimeout: "Chatten avslutades efter inaktivitet.",
     completedButton: "Starta ny chatt",
@@ -237,6 +237,7 @@ function AgentMessageContent({
 
 interface ChatViewProps {
   config: WidgetConfig;
+  privacyPolicyUrl?: string | null;
   selectedAgent: WidgetAgentConfig;
   messages: Message[];
   input: string;
@@ -252,6 +253,7 @@ interface ChatViewProps {
 
 export function ChatView({
   config,
+  privacyPolicyUrl,
   selectedAgent,
   messages,
   input,
@@ -267,7 +269,6 @@ export function ChatView({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const privacyPolicyUrl = config.brand.privacyPolicyUrl;
   const t = TRANSLATIONS[config.widget.language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
 
   // Auto-scroll to bottom
@@ -452,7 +453,7 @@ export function ChatView({
 
           {(config.widget.showBranding ?? true) && (
             <div className="mt-3 text-center">
-              <p className="text-xs text-widget-muted">
+              <p className="mx-auto max-w-2xl text-xs leading-5 text-widget-muted">
                 {privacyPolicyUrl ? (
                   <>
                     {t.privacyText}
