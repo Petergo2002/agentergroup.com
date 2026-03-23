@@ -500,6 +500,8 @@ export interface WidgetRuntimeConfig {
     quickActions: WidgetQuickAction[];
     contactFormSettings: WidgetContactFormSettingsRecord;
     endChatPolicy: EndChatPolicy;
+    gmailRecipientPolicy: GmailRecipientPolicy;
+    googleCalendarSelection: GoogleCalendarSelection;
   }>;
 }
 
@@ -594,6 +596,21 @@ export interface EndChatPolicy {
   allowAssistantSuggestion: boolean;
 }
 
+export type GmailRecipientMode = "ai_decides" | "specific_email";
+
+export interface GmailRecipientPolicy {
+  mode: GmailRecipientMode;
+  specificEmail: string | null;
+}
+
+export interface GoogleCalendarSelection {
+  connectionId: string | null;
+  calendarId: string | null;
+  calendarLabel: string | null;
+  timezone: string | null;
+  includePrimaryCalendar: boolean;
+}
+
 export interface EndChatMetadata {
   suggested: boolean;
   sessionCompleted: boolean;
@@ -647,6 +664,8 @@ export interface GmailBuilderNodeData extends BaseBuilderNodeData {
   kind: "gmail";
   integrationSlug: "gmail";
   connectionId: string | null;
+  recipientMode: GmailRecipientMode;
+  recipientEmail: string | null;
   simpleIcon?: string;
   simpleIconColor?: string;
 }
@@ -655,7 +674,10 @@ export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
   kind: "googlecalendar";
   integrationSlug: "googlecalendar";
   connectionId: string | null;
-  timezone: string;
+  timezone: string | null;
+  calendarId: string | null;
+  calendarLabel: string | null;
+  includePrimaryCalendar: boolean;
   simpleIcon?: string;
   simpleIconColor?: string;
 }

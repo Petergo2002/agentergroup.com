@@ -1,5 +1,11 @@
 # Phase 3: Runtime, Reliability, Observability, and Scale
 
+Status note:
+
+- This document started as a phase-planning doc and should not be read as a fully current implementation spec.
+- The codebase now has delivered runtime traces, publish/rollback, widget conversation analytics, and auditability.
+- Approval-related tables and concepts still exist, but customer-facing chat does not currently pause on approval in the live runtime.
+
 ## Objective
 
 Turn the Phase 2 conversational product into a safer and more observable platform before adding heavier orchestration.
@@ -44,14 +50,14 @@ Implement:
 - Tool usage traces
 - Structured failure reasons
 - Better run status handling
-- Approval-required run states
+- Approval-required run states as scaffolding for future governed flows
 
 ### Reliability Controls
 
 Implement:
 
 - Guardrails for risky tools
-- Approval records for sensitive actions
+- Approval records for sensitive actions, even if approval gating is not yet active in customer-facing chat
 - Audit logging
 - Clear lifecycle events
 
@@ -83,7 +89,7 @@ Only after the core reliability work is stable:
 - Agent sharing
 - Team collaboration features
 - Usage billing
-- Internal analytics
+- Deeper internal analytics beyond the current widget conversation analytics surface
 
 ## Non-Goals
 
@@ -98,14 +104,14 @@ Do not prioritize:
 ## Deliverables
 
 - Structured logs and traces
-- Approval and safety controls
+- Approval scaffolding and safety controls
 - Agent publishing and rollback model
 - Archive and restore behavior
 
 ## Acceptance Criteria
 
 - Failed runs can be diagnosed through logs and trace data
-- Sensitive actions can require approval
+- Sensitive actions can be modeled for approval, even if live customer chat does not yet block on approval
 - Published agents have clear version history and rollback support
 - Agents can be archived and restored without losing history
 

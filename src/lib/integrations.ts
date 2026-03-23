@@ -41,6 +41,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     surface: "chat",
     allowedChatTools: [
       "GOOGLECALENDAR_CREATE_EVENT",
+      "GOOGLECALENDAR_QUICK_ADD",
       "GOOGLECALENDAR_GET_CURRENT_DATE_TIME",
       "GOOGLECALENDAR_FIND_FREE_SLOTS",
       "GOOGLECALENDAR_LIST_CALENDARS",

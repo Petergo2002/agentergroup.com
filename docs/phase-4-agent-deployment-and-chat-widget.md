@@ -1,5 +1,11 @@
 # Phase 4: Agent Deployment and Chat Widget
 
+Status note:
+
+- This document started as a phase-direction doc.
+- Parts of the product direction here are now historical.
+- Current implementation has moved widget management to `/widgets`, ships the widget runtime in this repo, supports multi-agent widgets, and uses a mixed deployment model where live chat is version-snapshotted but widget config remains live until redeployed.
+
 ## Objective
 
 Turn the current product into something that can actually be deployed and used by anyone who wants an agent on a website.
@@ -67,7 +73,7 @@ At the end of Phase 4, a user should be able to:
 1. create an agent
 2. configure it
 3. preview it
-4. open a widget tab inside the agent builder
+4. open widget management from the main product, optionally seeded from an agent context
 5. deploy that agent as a chat widget
 6. either:
    - embed it on a website
@@ -137,7 +143,7 @@ This keeps the experience centered around one agent object.
 
 ## 3. Widget Tab Responsibilities
 
-The widget tab should become the place where deployment is configured.
+The widget management surface should be the place where deployment is configured.
 
 It should handle:
 
@@ -148,19 +154,16 @@ It should handle:
 - hosted widget link
 - basic widget identity settings
 
-The first version should stay simple.
+The first version did stay simple, but the current implementation now supports multi-agent widgets through `widget_agents`.
 
-It only needs enough to make one agent deployable.
+## 4. Widget Runtime Integration
 
-## 4. External Widget Repo Integration
+The current implementation no longer treats the widget runtime as an external repo dependency.
 
-There is already a separate repo for the widget.
+This repo now contains both:
 
-This phase should use that repo instead of rebuilding the widget layer here.
-
-This repo should become the control plane.
-
-The widget repo should remain the delivery surface.
+- the internal control plane
+- the hosted and embeddable widget runtime in `apps/widget-v2`
 
 ### This repo should own:
 
@@ -169,14 +172,11 @@ The widget repo should remain the delivery surface.
 - publish/deploy controls
 - embed instructions
 - hosted link generation logic or hosted link metadata
-
-### The widget repo should own:
-
 - rendered chat widget UI
 - embed runtime
 - hosted widget frontend experience
 
-That separation is correct and should stay.
+The responsibility split is now internal-to-the-monorepo rather than split across two repos.
 
 ## 5. Supported Deployment Modes
 
@@ -199,7 +199,7 @@ The intended user flow should now be:
 1. Create agent
 2. Configure instructions, knowledge, and tools
 3. Preview and test
-4. Open widget tab
+4. Open widget management in `/widgets` (often seeded from an agent context)
 5. Publish or confirm publish state
 6. Generate widget deployment
 7. Choose:
@@ -214,13 +214,19 @@ Deployment should be attached to a real agent state.
 
 For this phase, the simplest correct rule is:
 
-- widget deployment uses the current published version of the agent
+- live widget chat uses the published version snapshot stored into each deployed `widget_agent`
 
 That avoids confusion.
 
 The widget should not silently run some random draft state.
 
-So the widget tab should make publish state obvious:
+Important current nuance:
+
+- chat execution is version-snapshotted at deploy time
+- widget branding, access settings, and other config still come from current widget rows
+- redeploy is therefore required when config drifts from the last deployment event
+
+So the widget management surface should make publish state obvious:
 
 - not published
 - published
@@ -242,9 +248,9 @@ This keeps the architecture useful while broadening the product positioning.
 
 ## 9. What This Phase Must Include
 
-- widget tab inside the agent flow
-- connection between agent and widget deployment
-- use of the external widget repo
+- widget management surface in the product
+- connection between agents and widget deployment
+- in-repo widget runtime
 - embedded install path
 - hosted widget link path
 - publish-to-deploy relationship
@@ -294,11 +300,15 @@ That is much closer to a Shopify-style platform model.
 - hosted widget link
 - embed snippet or install instructions
 - published version linkage
+- preview drafting and preview access tokens
+- hosted access toggle
+- multi-agent widget configuration
 
-### Repo integration
+### Runtime integration
 
-- fetch and integrate the external widget repo
-- define the config handoff between this app and the widget runtime
+- keep the widget runtime in `apps/widget-v2`
+- define the config and access-token handoff between the Next.js app and the widget runtime
+- support bootstrap, config, chat, lead, event, and session-complete flows
 
 ### Product clarity
 
@@ -310,9 +320,9 @@ That is much closer to a Shopify-style platform model.
 
 Phase 4 is complete when:
 
-- the user can open a widget tab from an agent
-- the widget tab is clearly tied to that agent
-- the widget can be deployed using the external widget repo
+- the user can manage widgets from the main product
+- widget management can still be seeded from an agent context
+- the widget can be deployed using the in-repo widget runtime
 - the user can either embed the widget or use a hosted link
 - deployment uses the published agent state, not a hidden draft
 - the whole flow feels like one product journey: build, preview, deploy

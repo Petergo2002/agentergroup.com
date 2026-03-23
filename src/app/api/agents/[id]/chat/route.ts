@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
+import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
+import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import { createClient } from "@/lib/supabase/server";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import {
@@ -70,18 +72,16 @@ export async function POST(
     .eq("agent_id", agentId)
     .single();
 
-  let calendarTimezone: string | null = null;
-  if (draft?.definition?.nodes) {
-    const calendarNode = draft.definition.nodes.find(
-      (node: { data: { kind: string } }) => node.data?.kind === 'googlecalendar'
-    );
-    if (calendarNode?.data?.timezone) {
-      calendarTimezone = calendarNode.data.timezone;
-    }
-  }
   const endChatPolicy = extractEndChatPolicyFromDefinition(
     draft?.definition ?? null,
   );
+  const gmailRecipientPolicy = extractGmailRecipientPolicyFromDefinition(
+    draft?.definition ?? null,
+  );
+  const googleCalendarSelection = extractGoogleCalendarSelectionFromDefinition(
+    draft?.definition ?? null,
+  );
+  const calendarTimezone = googleCalendarSelection.timezone;
 
   let threadId = providedThreadId;
 
@@ -224,7 +224,9 @@ export async function POST(
       audience: "preview",
       knowledgeAccessToken: session?.access_token ?? null,
       calendarTimezone,
+      googleCalendarSelection,
       endChatPolicy,
+      gmailRecipientPolicy,
     });
 
     await completeRunStep(

@@ -1,8 +1,12 @@
 import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
 import { buildDisabledEndChatPolicy } from "@/lib/end-chat";
+import { buildDefaultGmailRecipientPolicy } from "@/lib/gmail";
+import { buildDefaultGoogleCalendarSelection } from "@/lib/google-calendar";
 import type {
   AgentRecord,
   EndChatPolicy,
+  GmailRecipientPolicy,
+  GoogleCalendarSelection,
   WidgetDraftPreviewInput,
   WidgetAgentRecord,
   WidgetContactFormSettingsRecord,
@@ -194,6 +198,8 @@ export function buildWidgetRuntimeConfig(
   options?: {
     preview?: boolean;
     endChatPoliciesByAgentId?: Map<string, EndChatPolicy>;
+    gmailRecipientPoliciesByAgentId?: Map<string, GmailRecipientPolicy>;
+    googleCalendarSelectionsByAgentId?: Map<string, GoogleCalendarSelection>;
   },
 ): WidgetRuntimeConfig {
   const orderedAgents = [...widgetAgents].sort(
@@ -238,6 +244,12 @@ export function buildWidgetRuntimeConfig(
       endChatPolicy:
         options?.endChatPoliciesByAgentId?.get(agent.id) ??
         buildDisabledEndChatPolicy(),
+      gmailRecipientPolicy:
+        options?.gmailRecipientPoliciesByAgentId?.get(agent.id) ??
+        buildDefaultGmailRecipientPolicy(),
+      googleCalendarSelection:
+        options?.googleCalendarSelectionsByAgentId?.get(agent.id) ??
+        buildDefaultGoogleCalendarSelection(),
     })),
   };
 }
@@ -248,6 +260,8 @@ export function buildWidgetRuntimeConfigFromDraft(
   options?: {
     preview?: boolean;
     endChatPoliciesByAgentId?: Map<string, EndChatPolicy>;
+    gmailRecipientPoliciesByAgentId?: Map<string, GmailRecipientPolicy>;
+    googleCalendarSelectionsByAgentId?: Map<string, GoogleCalendarSelection>;
   },
 ): WidgetRuntimeConfig {
   const orderedAgents = [...draft.agents].sort(
@@ -290,6 +304,12 @@ export function buildWidgetRuntimeConfigFromDraft(
       endChatPolicy:
         options?.endChatPoliciesByAgentId?.get(agent.agentId) ??
         buildDisabledEndChatPolicy(),
+      gmailRecipientPolicy:
+        options?.gmailRecipientPoliciesByAgentId?.get(agent.agentId) ??
+        buildDefaultGmailRecipientPolicy(),
+      googleCalendarSelection:
+        options?.googleCalendarSelectionsByAgentId?.get(agent.agentId) ??
+        buildDefaultGoogleCalendarSelection(),
     })),
   };
 }

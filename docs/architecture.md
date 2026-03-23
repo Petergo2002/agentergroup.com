@@ -104,9 +104,13 @@ Important implementation docs:
 - `src/app/layout.tsx`
 - `src/app/(app)/layout.tsx`
 - `src/app/(app)/dashboard/page.tsx`
+- `src/app/(app)/analytics/page.tsx`
 - `src/app/(app)/agents/page.tsx`
 - `src/app/(app)/agents/[id]/builder/page.tsx`
 - `src/app/(app)/agents/[id]/preview/page.tsx`
+- `src/app/(app)/widgets/page.tsx`
+- `src/app/(app)/widgets/[id]/page.tsx`
+- `src/app/(app)/widgets/[id]/preview/page.tsx`
 - `src/app/(app)/connections/page.tsx`
 - `src/app/(app)/knowledge/page.tsx`
 - `src/app/(app)/settings/page.tsx`
@@ -121,13 +125,29 @@ Important implementation docs:
 - `src/app/api/agents/[id]/knowledge/route.ts`
 - `src/app/api/agents/[id]/archive/route.ts`
 - `src/app/api/agents/[id]/rollback/route.ts`
+- `src/app/api/agents/[id]/widget/route.ts`
 - `src/app/api/connections/toolkits/route.ts`
 - `src/app/api/connections/authorize/route.ts`
+- `src/app/api/connections/googlecalendar/calendars/route.ts`
 - `src/app/api/knowledge/sources/route.ts`
 - `src/app/api/knowledge/sources/[id]/route.ts`
 - `src/app/api/knowledge/sources/[id]/process/route.ts`
 - `src/app/api/knowledge/drive/files/route.ts`
 - `src/app/api/knowledge/drive/import/route.ts`
+- `src/app/api/widgets/route.ts`
+- `src/app/api/widgets/[id]/route.ts`
+- `src/app/api/widgets/[id]/agents/route.ts`
+- `src/app/api/widgets/[id]/deploy/route.ts`
+- `src/app/api/widgets/[id]/preview/route.ts`
+- `src/app/api/widgets/[id]/status/route.ts`
+- `src/app/api/public/widgets/[widgetPublicKey]/bootstrap/route.ts`
+- `src/app/api/public/widgets/[widgetPublicKey]/config/route.ts`
+- `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
+- `src/app/api/public/widgets/[widgetPublicKey]/complete/route.ts`
+- `src/app/api/public/widgets/[widgetPublicKey]/events/route.ts`
+- `src/app/api/public/widgets/[widgetPublicKey]/leads/route.ts`
+- `src/app/api/dashboard/analytics/route.ts`
+- `src/app/api/dashboard/analytics/conversations/[widgetSessionId]/route.ts`
 
 ### Core libraries
 
@@ -138,9 +158,15 @@ Important implementation docs:
 - `src/lib/openrouter.ts`
 - `src/lib/composio.ts`
 - `src/lib/integrations.ts`
+- `src/lib/google-calendar.ts`
 - `src/lib/knowledge.ts`
 - `src/lib/runtime/observability.ts`
+- `src/lib/runtime/agent-chat.ts`
 - `src/lib/agents/defaults.ts`
+- `src/lib/widgets.ts`
+- `src/lib/widgets/server.ts`
+- `src/lib/dashboard/analytics.ts`
+- `src/lib/end-chat.ts`
 - `src/lib/types.ts`
 
 ### Supabase
@@ -149,9 +175,23 @@ Important implementation docs:
 - `supabase/migrations/20260314_phase_3_runtime_controls.sql`
 - `supabase/migrations/20260314_phase_4_knowledge_base.sql`
 - `supabase/migrations/20260314_phase_4_storage_and_advisor_cleanup.sql`
+- `supabase/migrations/20260314_phase_4_widget_deployments.sql`
+- `supabase/migrations/20260315_phase_5_widgets_multi_agent.sql`
+- `supabase/migrations/20260315_phase_5_1_widget_preview_drafts.sql`
+- `supabase/migrations/20260315_phase_5_2_widget_agent_quick_prompts.sql`
+- `supabase/migrations/20260315_phase_5_3_widget_assets.sql`
+- `supabase/migrations/20260319_widget_hosted_access.sql`
+- `supabase/migrations/20260320_end_chat_sessions.sql`
 - `supabase/functions/process-knowledge-source/index.ts`
 - `supabase/functions/search-knowledge/index.ts`
 - `supabase/functions/_shared/knowledge.ts`
+
+### Widget runtime app
+
+- `apps/widget-v2/src/main.tsx`
+- `apps/widget-v2/src/Widget.tsx`
+- `apps/widget-v2/src/lib/api.ts`
+- `apps/widget-v2/public/loader.js`
 
 ## App Routing and Shell
 
@@ -191,6 +231,12 @@ Important exception:
 - `/agents/[id]/builder` intentionally renders without the global sidebar and topbar
 - the builder route still keeps app context and providers
 - this gives the editor a focused full-screen layout without breaking shared state
+
+Additional note:
+
+- widget management now lives under `/widgets`
+- the legacy `/agents/[id]/widget` surface only redirects users into the widgets area
+- analytics lives at `/analytics` as a workspace-level operations surface for widget conversations
 
 ### Workspace shell behavior
 
@@ -376,6 +422,33 @@ Purpose:
 - `agent_knowledge_sources`: which sources are attached to which agent
 - `match_agent_knowledge_chunks`: similarity search scoped to one agent and workspace
 
+### 5. Widget deployment and customer conversations
+
+- `widgets`
+- `widget_agents`
+- `widget_preview_drafts`
+- `widget_sessions`
+- `widget_session_messages`
+- `widget_leads`
+
+Purpose:
+
+- `widgets`: customer-facing widget identity, theme, deployment state, and hosted/embed settings
+- `widget_agents`: the ordered set of attached agents plus the snapshotted published version id used at deploy time
+- `widget_preview_drafts`: short-lived preview payload snapshots for internal operator preview
+- `widget_sessions`: one customer session per widget and session id, including source and completion status
+- `widget_session_messages`: persisted user, assistant, and tool messages for widget conversations
+- `widget_leads`: lead captures submitted through widgets
+
+Important current behavior:
+
+- live widget chat is bound to `widget_agents.published_version_id`, not the current mutable `agents` row
+- widget branding and surface configuration still come from the current `widgets` and `widget_agents` rows
+- deploy status is therefore mixed:
+  - chat execution is version-snapshotted
+  - visual/config metadata remains live and can drift until redeployed
+- `needs_redeploy` is an operator signal used by the app UI, not a hard runtime freeze
+
 ## Row-Level Security
 
 RLS is enabled broadly across the application schema.
@@ -416,6 +489,7 @@ Current builder node kinds:
 - `trigger`
 - `agent`
 - `knowledge`
+- `endchat`
 - `gmail`
 - `googlecalendar`
 - `output`
@@ -428,6 +502,7 @@ Current canvas rules:
 - fixed core `Agent`
 - fixed `Output`
 - optional singleton `Knowledge`
+- optional singleton `End Chat`
 - optional singleton `Gmail`
 - optional singleton `Google Calendar`
 - no generic tool node
@@ -475,9 +550,30 @@ Owns knowledge source attachment:
 - ready sources can be attached
 - non-ready sources remain visible but disabled
 
+#### End Chat
+
+Owns conversational completion policy:
+
+- inactivity timeout seconds
+- whether the assistant can suggest ending the conversation
+
+Important note:
+
+- `endchat` is a control node, not an external integration
+- preview uses it to expose inactivity timeout behavior and assistant completion suggestions
+- widget runtime uses it to drive session-completion metadata and completion APIs
+
 #### Gmail
 
-Owns one selected Gmail connection.
+Owns one selected Gmail connection plus a per-node recipient policy.
+
+Current builder/runtime policy:
+
+- the node stores one selected connection
+- the node also stores whether Gmail should send to:
+  - an AI-chosen recipient from conversation context
+  - one hidden fixed internal email
+- when a fixed internal email is configured, runtime enforces that recipient server-side and does not trust the model-selected recipient
 
 Live tool capability is locked to:
 
@@ -485,11 +581,22 @@ Live tool capability is locked to:
 
 #### Google Calendar
 
-Owns one selected Google Calendar connection.
+Owns one selected Google Calendar connection plus a per-node booking calendar selection.
+
+Current builder/runtime policy:
+
+- the node stores one selected connection
+- the node can also store one selected target calendar as `calendarId`
+- the node stores the resolved timezone from the selected booking calendar
+- if no explicit booking calendar is selected, the node uses the primary calendar and its resolved timezone when available
+- the builder fetches available calendars from the selected connected account through an internal route
+- runtime enforces the selected calendar on booking and availability tool calls instead of relying only on prompting
+- runtime also injects the resolved calendar timezone into calendar tool calls instead of relying only on prompt guidance
 
 Live tool capability is locked to:
 
 - `GOOGLECALENDAR_CREATE_EVENT`
+- `GOOGLECALENDAR_QUICK_ADD`
 - `GOOGLECALENDAR_GET_CURRENT_DATE_TIME`
 - `GOOGLECALENDAR_FIND_FREE_SLOTS`
 - `GOOGLECALENDAR_LIST_CALENDARS`
@@ -510,8 +617,9 @@ Saving the builder updates multiple layers:
 
 Important current behavior:
 
-- `Preview` now saves before navigating to preview
-- this avoids stale runtime state when a user changes instructions or attached tools and immediately tests the agent
+- `Preview` does not implicitly save when the user changes tabs
+- preview/runtime reads the last saved draft and current durable attachments
+- unsaved builder changes remain browser-local until the user saves or publishes
 
 ## Preview Architecture
 
@@ -639,6 +747,128 @@ Each run creates step-level observability via:
 
 The preview screen uses this data for inspection and debugging.
 
+### End-chat behavior
+
+The runtime also supports a conversational completion policy derived from the builder definition.
+
+Current behavior:
+
+- the preview/authenticated chat route inspects the saved draft definition for the `endchat` node
+- the same saved draft definition is also inspected for Gmail recipient policy and Google Calendar calendar selection
+- assistant completion is surfaced through runtime metadata produced by an internal pseudo-tool flow
+- preview inactivity timeout behavior is coordinated by the preview UI, not by the authenticated chat route itself
+- widget conversations use dedicated session completion handling through the public widget runtime
+
+This means end-chat is shared product behavior, but not enforced by one single route in exactly the same way across preview and widget chat.
+
+## Widget Deployment and Public Runtime
+
+The widget system is now a first-class part of this repo.
+
+The product surface is split into:
+
+- internal widget management UI under `/widgets`
+- a public runtime delivered by `apps/widget-v2`
+- public widget APIs hosted by this Next.js app under `/api/public/widgets/[widgetPublicKey]/*`
+
+### Internal widget management
+
+The authenticated app owns:
+
+- widget list and detail screens
+- deployment status and redeploy logic
+- attached-agent ordering and configuration
+- hosted access toggle
+- preview drafting and preview URLs
+- embed snippet and hosted-link operator surfaces
+
+Important current behavior:
+
+- widget management is no longer centered inside `/agents/[id]/builder`
+- the legacy agent-widget route redirects into `/widgets?agent=...`
+- a widget can attach multiple agents and can require a specific `widgetAgentId` at runtime when more than one is attached
+
+### Public runtime contract
+
+The public runtime uses these endpoints:
+
+- `GET /api/public/widgets/[widgetPublicKey]/bootstrap`
+- `GET /api/public/widgets/[widgetPublicKey]/config`
+- `POST /api/public/widgets/[widgetPublicKey]/chat`
+- `POST /api/public/widgets/[widgetPublicKey]/complete`
+- `POST /api/public/widgets/[widgetPublicKey]/events`
+- `POST /api/public/widgets/[widgetPublicKey]/leads`
+
+### Access and security model
+
+The public widget runtime does not trust the browser by default.
+
+Current behavior:
+
+- bootstrap validates whether the request is hosted or embedded
+- hosted mode is allowed only when `widget.hosted_enabled` is true
+- embedded mode requires an allowed origin match
+- bootstrap returns a signed widget access token for subsequent runtime requests
+- preview mode uses a different signed preview token flow
+
+Important token rules:
+
+- widget access tokens are short-lived
+- preview tokens are short-lived
+- both currently use a 15 minute TTL
+
+### Deployment model
+
+Current deployment behavior is intentionally mixed:
+
+- live widget chat executes against the `published_version_id` snapshotted into each `widget_agent`
+- public config and branding still come from the current `widgets` and `widget_agents` rows
+- `needs_redeploy` is used to tell operators when the current widget config has drifted from the last deployment event
+
+This is not a fully immutable deployment model, but it prevents live widget chat from silently running an unpublished agent version.
+
+### Preview model
+
+Widget preview uses:
+
+- draft preview payloads
+- persisted preview-draft rows
+- signed preview tokens
+
+Preview requests can resolve runtime config without deploying the widget publicly.
+
+### Widget session lifecycle
+
+The public runtime persists customer interaction through:
+
+- `widget_sessions`
+- `widget_session_messages`
+- `widget_leads`
+
+Current behavior:
+
+- chat requests create or update widget sessions
+- user, assistant, and tool messages are persisted
+- lead submissions are stored against the active widget session where possible
+- session completion can happen through explicit public completion calls, including inactivity-timeout completion
+
+## Analytics Architecture
+
+Analytics is a workspace-level operations surface focused on widget conversations.
+
+Main surfaces:
+
+- `/analytics`
+- `GET /api/dashboard/analytics`
+- `GET /api/dashboard/analytics/conversations/[widgetSessionId]`
+
+Current behavior:
+
+- analytics is built from widget session, message, lead, and failure data
+- the primary UI is split between a chat/inbox view and a KPI overview view
+- analytics excludes preview sessions and focuses on customer-facing widget traffic
+- assistant `debugTrace` metadata is exposed in conversation detail for operator debugging
+
 ## OpenRouter Integration
 
 OpenRouter integration lives in:
@@ -690,6 +920,7 @@ This is intentionally narrow. Unsupported marketplace-style integrations are not
   - `GMAIL_SEND_EMAIL`
 - Google Calendar
   - `GOOGLECALENDAR_CREATE_EVENT`
+  - `GOOGLECALENDAR_QUICK_ADD`
   - `GOOGLECALENDAR_GET_CURRENT_DATE_TIME`
   - `GOOGLECALENDAR_FIND_FREE_SLOTS`
   - `GOOGLECALENDAR_LIST_CALENDARS`
@@ -712,6 +943,34 @@ Important operational detail:
 - it is not durable across deploys or cold starts
 
 This is acceptable for the current MVP, but it is an important scaling constraint for future infrastructure work.
+
+### Toolkit versioning
+
+The current Composio SDK requires explicit toolkit versions for manual `tools.execute(...)` calls.
+
+This matters because the app uses two different Composio patterns:
+
+- session-backed tool routing for live agent and widget chat
+- direct manual tool execution for utility surfaces such as:
+  - Google Calendar list loading in the builder
+  - Google Drive file listing
+  - Google Drive metadata and download helpers
+
+To keep this stable, the app configures toolkit versions centrally when the Composio client is created in `src/lib/composio.ts`.
+
+Current defaults are defined for:
+
+- `gmail`
+- `googlecalendar`
+- `googledrive`
+
+These defaults can be overridden with environment variables:
+
+- `COMPOSIO_TOOLKIT_VERSION_GMAIL`
+- `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
+- `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
+
+The app does not pass toolkit versions ad hoc on each manual execution call.
 
 ### Connection sync
 
@@ -739,6 +998,8 @@ This allows the app to:
 
 - `src/app/api/connections/toolkits/route.ts`
 - `src/app/api/connections/authorize/route.ts`
+- `src/app/api/connections/disconnect/route.ts`
+- `src/app/api/connections/googlecalendar/calendars/route.ts`
 
 ### Current behavior
 
@@ -763,9 +1024,25 @@ Current flow:
 1. user chooses one of the supported integrations
 2. backend validates the integration slug against the catalog
 3. backend asks Composio for an authorization session
-4. backend upserts a `connections` row as pending
+4. backend creates a Composio managed auth config, links the connected account flow, and upserts a `connections` row as pending
 5. user completes external provider auth
 6. app later syncs the connected account into `connections`
+
+### Google Calendar selector flow
+
+The Google Calendar node in the builder supports choosing a specific booking calendar per node.
+
+Current flow:
+
+1. the builder selects a connected Google Calendar account
+2. the builder calls `GET /api/connections/googlecalendar/calendars`
+3. the route performs a best-effort connection sync from Composio
+4. the route resolves the Composio connected account id from the stored connection row
+5. the route executes `GOOGLECALENDAR_LIST_CALENDARS`
+6. the returned calendars populate the node-level booking-calendar selector and expose each calendar's timezone when available
+7. the selected booking calendar becomes the source of truth for Google Calendar scheduling timezone
+
+This flow depends on the centralized Composio toolkit-version configuration described above.
 
 ## Knowledge Base Architecture
 
@@ -951,6 +1228,8 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/agents/[id]/knowledge` | Replace knowledge attachments |
 | `POST /api/agents/[id]/archive` | Archive an agent |
 | `POST /api/agents/[id]/rollback` | Roll back to a prior version |
+| `GET /api/agents/[id]/widget` | Legacy moved response pointing callers to `/widgets?agent=...` |
+| `POST /api/agents/[id]/widget` | Legacy moved response pointing callers to `/widgets?agent=...` |
 
 ### Connection APIs
 
@@ -958,6 +1237,7 @@ After import, the source behaves like any other workspace knowledge source.
 | --- | --- |
 | `GET /api/connections/toolkits` | Return supported integrations and merged connection status |
 | `POST /api/connections/authorize` | Start Composio authorization for one allowed integration |
+| `GET /api/connections/googlecalendar/calendars` | List selectable calendars for one connected Google Calendar account in the builder |
 
 ### Workspace APIs
 
@@ -979,6 +1259,38 @@ After import, the source behaves like any other workspace knowledge source.
 | `GET /api/knowledge/drive/files` | List importable Google Drive files |
 | `POST /api/knowledge/drive/import` | Import a supported Drive file into the knowledge base |
 
+### Widget management APIs
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/widgets` | List widgets for the active workspace |
+| `POST /api/widgets` | Create a new widget, optionally seeded from an agent context |
+| `GET /api/widgets/[id]` | Load widget detail, attached agents, runtime summary, and available agents |
+| `PATCH /api/widgets/[id]` | Update widget identity, theming, access, and settings |
+| `DELETE /api/widgets/[id]` | Permanently delete a widget |
+| `POST /api/widgets/[id]/agents` | Replace the widget's attached agents and their ordering/config |
+| `POST /api/widgets/[id]/deploy` | Deploy the widget and snapshot attached published agent versions |
+| `POST /api/widgets/[id]/status` | Toggle deployment state between `draft` and `deployed` |
+| `POST /api/widgets/[id]/preview` | Create/update a preview draft and return preview access data |
+
+### Public widget runtime APIs
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/public/widgets/[widgetPublicKey]/bootstrap` | Validate runtime access, return config bootstrap, and issue widget access token |
+| `GET /api/public/widgets/[widgetPublicKey]/config` | Return current public widget runtime config |
+| `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a public widget chat message |
+| `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout |
+| `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events |
+| `POST /api/public/widgets/[widgetPublicKey]/leads` | Persist a lead submission from the widget |
+
+### Analytics APIs
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/dashboard/analytics` | Return workspace analytics overview, filters, and paginated conversation inbox data |
+| `GET /api/dashboard/analytics/conversations/[widgetSessionId]` | Return one widget conversation detail transcript, lead info, and debug metadata |
+
 ## Environment Variables
 
 The core environment contract is:
@@ -988,12 +1300,20 @@ The core environment contract is:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_WIDGET_APP_URL`
 
 ### Server-only
 
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL`
 - `COMPOSIO_API_KEY`
+- `COMPOSIO_TOOLKIT_VERSION_GMAIL`
+- `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
+- `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `WIDGET_APP_URL`
+- `WIDGET_ACCESS_SECRET`
+- `WIDGET_PREVIEW_SECRET`
 
 ### Supabase Edge Functions
 
@@ -1049,9 +1369,17 @@ Drive is intentionally excluded from live chat tool execution.
 
 The current session cache uses in-memory storage in the Next.js process. This is fine for MVP but should be revisited if multi-instance or high-scale deployment becomes a priority.
 
-### 4. Runtime reads current agent state
+### 4. Runtime uses two state models today
 
-The runtime primarily uses the current `agents` record plus current attachment tables. Version snapshots exist, but execution is not yet a strict immutable published-runtime model.
+Authenticated preview/chat primarily uses the current `agents` record plus current attachment tables.
+
+Live widget chat is different:
+
+- deploy snapshots `published_version_id` into `widget_agents`
+- public widget chat resolves the selected agent from that published version snapshot
+- widget branding and config still come from current widget rows
+
+So runtime is not one single immutable model yet, but widgets are already more version-bound than authenticated preview chat.
 
 ### 5. Approval schema exists but customer-facing approvals are disabled
 

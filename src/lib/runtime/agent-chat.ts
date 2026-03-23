@@ -4,6 +4,10 @@ import {
   buildDisabledEndChatPolicy,
   buildEndChatMetadata,
 } from "@/lib/end-chat";
+import {
+  buildDefaultGmailRecipientPolicy,
+  normalizeGmailRecipientEmail,
+} from "@/lib/gmail";
 import { getSupportedIntegration } from "@/lib/integrations";
 import {
   buildKnowledgeContext,
@@ -17,6 +21,8 @@ import type {
   AgentRecord,
   EndChatMetadata,
   EndChatPolicy,
+  GmailRecipientPolicy,
+  GoogleCalendarSelection,
   KnowledgeMatchRecord,
 } from "@/lib/types";
 
@@ -110,7 +116,9 @@ export interface AgentRuntimeInput {
   knowledgeAccessToken?: string | null;
   widgetPublicKey?: string | null;
   calendarTimezone?: string | null;
+  googleCalendarSelection?: GoogleCalendarSelection | null;
   endChatPolicy?: EndChatPolicy | null;
+  gmailRecipientPolicy?: GmailRecipientPolicy | null;
 }
 
 export interface AgentRuntimeResult {
@@ -189,7 +197,11 @@ function mapDbMessagesToModel(messages: RuntimeMessage[]) {
     });
 }
 
-function buildToolGuidance(toolkitSlugs: string[]) {
+function buildToolGuidance(
+  toolkitSlugs: string[],
+  gmailRecipientPolicy: GmailRecipientPolicy,
+  googleCalendarSelection: GoogleCalendarSelection | null,
+) {
   const availableIntegrations = Array.from(new Set(toolkitSlugs))
     .map((toolkitSlug) => getSupportedIntegration(toolkitSlug))
     .filter(
@@ -207,14 +219,62 @@ function buildToolGuidance(toolkitSlugs: string[]) {
     .map((integration) => integration.displayName)
     .join(", ");
 
-  return [
+  const guidance = [
     `Available connected tools: ${toolNames}.`,
     "If the user asks for an action that matches an available tool, prefer using the tool or asking a short follow-up question for missing details.",
     "Do not claim you lack the ability to do something if an attached tool can handle it.",
     "For meeting booking or calendar availability, use Google Calendar when it is attached.",
     "For email sending, use Gmail when it is attached.",
     "After using tools, answer the user in natural language with the outcome. Never return raw JSON, code, or tool payloads to the user.",
-  ].join(" ");
+  ];
+
+  if (toolkitSlugs.includes("gmail")) {
+    if (
+      gmailRecipientPolicy.mode === "specific_email" &&
+      normalizeGmailRecipientEmail(gmailRecipientPolicy.specificEmail)
+    ) {
+      guidance.push(
+        "For Gmail, every email is an internal notification to a fixed hidden recipient configured by the workspace.",
+      );
+      guidance.push(
+        "Never choose a different recipient and never reveal the actual internal email address to the user.",
+      );
+      guidance.push(
+        "Describe the outcome as notifying the team, owner, or internal staff.",
+      );
+    } else {
+      guidance.push(
+        "For Gmail, choose the recipient based on the conversation, the user's request, and the agent instructions.",
+      );
+      guidance.push(
+        "If those do not make the intended recipient clear enough, ask one concise follow-up question before sending.",
+      );
+    }
+  }
+
+  if (toolkitSlugs.includes("googlecalendar")) {
+    const calendarLabel = googleCalendarSelection?.calendarLabel?.trim();
+    const resolvedCalendarTimezone = googleCalendarSelection?.timezone?.trim();
+    guidance.push(
+      googleCalendarSelection?.calendarId
+        ? googleCalendarSelection.includePrimaryCalendar
+        ? calendarLabel
+            ? `For Google Calendar scheduling, use the configured calendar "${calendarLabel}" and mirror bookings to the primary calendar as well.`
+            : "For Google Calendar scheduling, use the configured calendar and mirror bookings to the primary calendar as well."
+        : calendarLabel
+          ? `For Google Calendar scheduling, use the configured calendar "${calendarLabel}" only for availability checks and bookings.`
+          : "For Google Calendar scheduling, use the configured calendar only for availability checks and bookings."
+        : "For Google Calendar scheduling, use the primary calendar unless a different booking calendar is configured.",
+    );
+
+    if (resolvedCalendarTimezone) {
+      guidance.push(
+        `For Google Calendar scheduling, treat ${resolvedCalendarTimezone} as the calendar timezone for availability checks and event creation.`,
+      );
+    }
+  }
+
+  return guidance.join(" ");
 }
 
 function buildEndChatGuidance(policy: EndChatPolicy) {
@@ -362,7 +422,9 @@ export async function runAgentChat({
   knowledgeAccessToken,
   widgetPublicKey,
   calendarTimezone,
+  googleCalendarSelection,
   endChatPolicy,
+  gmailRecipientPolicy,
   onToken,
   onStatus,
 }: AgentRuntimeInput & {
@@ -374,6 +436,18 @@ export async function runAgentChat({
     agent.id,
   );
   const effectiveEndChatPolicy = endChatPolicy ?? buildDisabledEndChatPolicy();
+  const effectiveGmailRecipientPolicy: GmailRecipientPolicy =
+    gmailRecipientPolicy ?? buildDefaultGmailRecipientPolicy();
+  const enabledToolkits = connectedToolkits.filter((toolkitSlug) => {
+    if (toolkitSlug !== "gmail") {
+      return true;
+    }
+
+    return (
+      effectiveGmailRecipientPolicy.mode !== "specific_email" ||
+      Boolean(normalizeGmailRecipientEmail(effectiveGmailRecipientPolicy.specificEmail))
+    );
+  });
 
   const effectiveTimezone = calendarTimezone ?? agent.timezone ?? 'UTC';
   
@@ -412,7 +486,11 @@ export async function runAgentChat({
     });
   }
 
-  const toolGuidance = buildToolGuidance(connectedToolkits);
+  const toolGuidance = buildToolGuidance(
+    enabledToolkits,
+    effectiveGmailRecipientPolicy,
+    googleCalendarSelection ?? null,
+  );
   const endChatGuidance = buildEndChatGuidance(effectiveEndChatPolicy);
 
   if (toolGuidance) {
@@ -461,7 +539,7 @@ export async function runAgentChat({
     }
   }
 
-  const tools = await getWrappedTools(toolUserId, connectedToolkits);
+  const tools = await getWrappedTools(toolUserId, enabledToolkits);
   const toolDefinitions = [
     ...(tools as unknown as Array<Record<string, unknown>>),
     ...(effectiveEndChatPolicy.enabled &&
@@ -644,6 +722,10 @@ export async function runAgentChat({
         const toolCallResult = await handleChatToolCalls(
           toolUserId,
           externalCompletion,
+          {
+            gmailRecipientPolicy: effectiveGmailRecipientPolicy,
+            googleCalendarSelection: googleCalendarSelection ?? null,
+          },
         );
         const { results, sessionWasRecreated } = toolCallResult as unknown as {
           results: ToolMessage[];
@@ -790,7 +872,7 @@ export async function runAgentChat({
     finalCompletion,
     toolMessages,
     knowledgeMatches,
-    connectedToolkits,
+    connectedToolkits: enabledToolkits,
     debugTrace,
     endChat,
   };

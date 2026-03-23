@@ -22,6 +22,8 @@ import { useToast } from '@/components/ui/ToastProvider';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { buildInitialDefinition } from '@/lib/agents/defaults';
 import { DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS } from '@/lib/end-chat';
+import { normalizeGmailRecipientEmail } from '@/lib/gmail';
+import type { GoogleCalendarListItem } from '@/lib/google-calendar';
 import { getSupportedIntegration, isChatIntegrationSlug } from '@/lib/integrations';
 import { getKnowledgeStatusTone, isReadyKnowledgeSource } from '@/lib/knowledge';
 import { formatRelativeDate } from '@/lib/utils';
@@ -201,8 +203,8 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
 
   return (
     <div
-      className={`w-56 rounded-2xl border-2 bg-surface-container-lowest shadow-lg transition-all ${
-        selected ? 'border-primary ring-8 ring-primary/5' : 'border-outline-variant/10'
+      className={`w-56 rounded-2xl bg-surface-container-lowest shadow-lg transition-all ${
+        selected ? 'ring-8 ring-primary/5 shadow-xl' : 'shadow-lg'
       }`}
     >
       <Handle
@@ -211,10 +213,10 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
         className="!h-3 !w-3 !-left-[7px] !border-2 !border-surface-container-lowest !bg-primary"
       />
       <div
-        className={`flex items-center justify-between rounded-t-[1rem] border-b px-3 py-2 ${
+        className={`flex items-center justify-between rounded-t-[1rem] px-3 py-2 ${
           selected
-            ? 'border-primary/10 bg-primary/5'
-            : 'border-outline-variant/10 bg-surface-container'
+            ? 'bg-primary/5'
+            : 'bg-surface-container'
         }`}
       >
         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/70">
@@ -444,7 +446,7 @@ function createKnowledgeNode(
 function createGmailNode(
   position = DEFAULT_POSITIONS.gmail,
   connectionId: string | null = null,
-  data?: Partial<BuilderNodeData>,
+  data?: Partial<GmailBuilderNodeData>,
 ): BuilderFlowNode {
   return {
     id: 'gmail',
@@ -461,6 +463,8 @@ function createGmailNode(
       status: 'idle',
       integrationSlug: 'gmail',
       connectionId,
+      recipientMode: 'ai_decides',
+      recipientEmail: null,
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -469,8 +473,8 @@ function createGmailNode(
 function createGoogleCalendarNode(
   position = DEFAULT_POSITIONS.googlecalendar,
   connectionId: string | null = null,
-  timezone: string = 'UTC',
-  data?: Partial<BuilderNodeData>,
+  timezone: string | null = null,
+  data?: Partial<GoogleCalendarBuilderNodeData>,
 ): BuilderFlowNode {
   return {
     id: 'googlecalendar',
@@ -488,6 +492,9 @@ function createGoogleCalendarNode(
       integrationSlug: 'googlecalendar',
       connectionId,
       timezone,
+      calendarId: null,
+      calendarLabel: null,
+      includePrimaryCalendar: false,
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -673,19 +680,51 @@ function normalizeDefinition(
 
   if (gmailNode || gmailConnectionId) {
     normalizedNodes.push(
-      createGmailNode(gmailNode?.position ?? DEFAULT_POSITIONS.gmail, gmailConnectionId),
+      createGmailNode(
+        gmailNode?.position ?? DEFAULT_POSITIONS.gmail,
+        gmailConnectionId,
+        gmailNode && gmailNode.data.kind === 'gmail'
+          ? {
+              recipientMode:
+                gmailNode.data.recipientMode === 'specific_email'
+                  ? 'specific_email'
+                  : 'ai_decides',
+              recipientEmail:
+                typeof gmailNode.data.recipientEmail === 'string'
+                  ? gmailNode.data.recipientEmail
+                  : null,
+            }
+          : undefined,
+      ),
     );
   }
 
   if (calendarNode || googleCalendarConnectionId) {
     const calendarTimezone = calendarNode && isToolNodeData(calendarNode.data) 
       ? (calendarNode.data as GoogleCalendarBuilderNodeData).timezone 
-      : 'UTC';
+      : null;
     normalizedNodes.push(
       createGoogleCalendarNode(
         calendarNode?.position ?? DEFAULT_POSITIONS.googlecalendar,
         googleCalendarConnectionId,
         calendarTimezone,
+        calendarNode && calendarNode.data.kind === 'googlecalendar'
+          ? {
+              timezone:
+                typeof calendarNode.data.timezone === 'string'
+                  ? calendarNode.data.timezone
+                  : null,
+              calendarId:
+                typeof calendarNode.data.calendarId === 'string'
+                  ? calendarNode.data.calendarId
+                  : null,
+              calendarLabel:
+                typeof calendarNode.data.calendarLabel === 'string'
+                  ? calendarNode.data.calendarLabel
+                  : null,
+              includePrimaryCalendar: calendarNode.data.includePrimaryCalendar === true,
+            }
+          : undefined,
       ),
     );
   }
@@ -854,6 +893,12 @@ export default function AgentBuilderPage() {
   const [connections, setConnections] = useState<ConnectionRecord[]>([]);
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceRecord[]>([]);
   const [versions, setVersions] = useState<AgentVersionRecord[]>([]);
+  const [calendarOptionsByConnectionId, setCalendarOptionsByConnectionId] = useState<
+    Record<string, GoogleCalendarListItem[]>
+  >({});
+  const [calendarOptionsStatusByConnectionId, setCalendarOptionsStatusByConnectionId] = useState<
+    Record<string, 'idle' | 'loading' | 'ready' | 'error'>
+  >({});
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
@@ -872,6 +917,16 @@ export default function AgentBuilderPage() {
 
   const canUndo = pastStates.length > 0;
   const canRedo = futureStates.length > 0;
+  const resolveCalendarOption = useCallback(
+    (items: GoogleCalendarListItem[], calendarId: string | null) => {
+      if (calendarId) {
+        return items.find((calendar) => calendar.id === calendarId) ?? null;
+      }
+
+      return items.find((calendar) => calendar.primary) ?? null;
+    },
+    [],
+  );
   const stopBuilderFieldKeyDown = (
     event: ReactKeyboardEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
@@ -1086,6 +1141,105 @@ export default function AgentBuilderPage() {
     setEdges(buildEdges(nodes));
   }, [nodes]);
 
+  const selectedGoogleCalendarConnectionId =
+    selectedNode?.data.kind === 'googlecalendar' ? selectedNode.data.connectionId : null;
+
+  useEffect(() => {
+    if (!selectedGoogleCalendarConnectionId || selectedNode?.data.kind !== 'googlecalendar') {
+      return;
+    }
+
+    const selectedCalendarNode = selectedNode.data as GoogleCalendarBuilderNodeData;
+    const connectionId = selectedGoogleCalendarConnectionId;
+    if (!connectionId) {
+      return;
+    }
+
+    const currentStatus = calendarOptionsStatusByConnectionId[connectionId];
+    if (currentStatus === 'ready' || currentStatus === 'loading') {
+      return;
+    }
+
+    let isMounted = true;
+    setCalendarOptionsStatusByConnectionId((current) => ({
+      ...current,
+      [connectionId]: 'loading',
+    }));
+
+    const loadCalendars = async () => {
+      try {
+        const response = await fetch(
+          `/api/connections/googlecalendar/calendars?connectionId=${encodeURIComponent(
+            connectionId,
+          )}`,
+          {
+            cache: 'no-store',
+          },
+        );
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? 'Failed to load Google calendars.');
+        }
+
+        if (!isMounted) {
+          return;
+        }
+
+        const calendars = Array.isArray(payload.calendars)
+          ? (payload.calendars as GoogleCalendarListItem[])
+          : [];
+        const selectedCalendar = resolveCalendarOption(
+          calendars,
+          selectedCalendarNode.calendarId,
+        );
+
+        setCalendarOptionsByConnectionId((current) => ({
+          ...current,
+          [connectionId]: calendars,
+        }));
+        setCalendarOptionsStatusByConnectionId((current) => ({
+          ...current,
+          [connectionId]: 'ready',
+        }));
+
+        const nextTimezone = selectedCalendar?.timezone ?? null;
+        const nextCalendarLabel = selectedCalendarNode.calendarId
+          ? selectedCalendar?.summary ?? null
+          : null;
+
+        if (
+          selectedCalendarNode.timezone !== nextTimezone ||
+          selectedCalendarNode.calendarLabel !== nextCalendarLabel
+        ) {
+          updateGoogleCalendarSettings(selectedNode.id, {
+            timezone: nextTimezone,
+            calendarLabel: nextCalendarLabel,
+          });
+        }
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setCalendarOptionsStatusByConnectionId((current) => ({
+          ...current,
+          [connectionId]: 'error',
+        }));
+        showToast(
+          error instanceof Error ? error.message : 'Failed to load Google calendars.',
+          'error',
+        );
+      }
+    };
+
+    void loadCalendars();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [resolveCalendarOption, selectedGoogleCalendarConnectionId, selectedNode, showToast]);
+
   useEffect(() => {
     if (nodes.length === 0) {
       return;
@@ -1165,11 +1319,67 @@ export default function AgentBuilderPage() {
         return node;
       }
 
+      if (node.data.kind === 'googlecalendar') {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            connectionId,
+            timezone: null,
+            calendarId: null,
+            calendarLabel: null,
+          },
+        };
+      }
+
       return {
         ...node,
         data: {
           ...node.data,
           connectionId,
+        },
+      };
+    });
+  };
+
+  const updateGoogleCalendarSettings = (
+    nodeId: string,
+    updates: Partial<
+      Pick<
+        GoogleCalendarBuilderNodeData,
+        'timezone' | 'calendarId' | 'calendarLabel' | 'includePrimaryCalendar'
+      >
+    >,
+  ) => {
+    updateNode(nodeId, (node) => {
+      if (node.data.kind !== 'googlecalendar') {
+        return node;
+      }
+
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          ...updates,
+        },
+      };
+    });
+  };
+
+  const updateGmailRecipientSettings = (
+    nodeId: string,
+    updates: Partial<Pick<GmailBuilderNodeData, 'recipientMode' | 'recipientEmail'>>,
+  ) => {
+    updateNode(nodeId, (node) => {
+      if (node.data.kind !== 'gmail') {
+        return node;
+      }
+
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          ...updates,
         },
       };
     });
@@ -1449,8 +1659,8 @@ export default function AgentBuilderPage() {
               value={instructions}
               onChange={(event) => setInstructions(event.target.value)}
               onKeyDown={stopBuilderFieldKeyDown}
-              rows={6}
-              className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
+              rows={10}
+              className="min-h-[260px] w-full resize-y rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-sm leading-6 outline-none"
             />
             <p className="mt-2 text-xs text-on-surface-variant">
               Keep this focused on live chat behavior, knowledge use, and tool use.
@@ -1591,10 +1801,35 @@ export default function AgentBuilderPage() {
       const hasConnectedOptions = selectableConnections.some(
         (connection) => connection.status === 'connected',
       );
+      const gmailRecipientEmail =
+        toolNode.data.kind === 'gmail' ? toolNode.data.recipientEmail ?? '' : '';
+      const selectedCalendarConnectionId =
+        toolNode.data.kind === 'googlecalendar' ? toolNode.data.connectionId : null;
+      const calendarOptions = selectedCalendarConnectionId
+        ? calendarOptionsByConnectionId[selectedCalendarConnectionId] ?? []
+        : [];
+      const resolvedCalendar =
+        toolNode.data.kind === 'googlecalendar'
+          ? resolveCalendarOption(
+              calendarOptions,
+              (toolNode.data as GoogleCalendarBuilderNodeData).calendarId,
+            )
+          : null;
+      const resolvedCalendarTimezone =
+        toolNode.data.kind === 'googlecalendar'
+          ? resolvedCalendar?.timezone ?? (toolNode.data as GoogleCalendarBuilderNodeData).timezone
+          : null;
+      const calendarOptionsStatus = selectedCalendarConnectionId
+        ? calendarOptionsStatusByConnectionId[selectedCalendarConnectionId] ?? 'idle'
+        : 'idle';
+      const hasValidSpecificRecipient =
+        toolNode.data.kind === 'gmail' &&
+        toolNode.data.recipientMode === 'specific_email' &&
+        Boolean(normalizeGmailRecipientEmail(toolNode.data.recipientEmail));
       const lockedActions =
         toolNode.data.kind === 'gmail'
           ? ['Send Email']
-          : ['Create Event', 'Get Current Date Time', 'Find Free Slots', 'List Calendars'];
+          : ['Create Event', 'Quick Add', 'Get Current Date Time', 'Find Free Slots', 'List Calendars'];
 
       return (
         <div className="space-y-5">
@@ -1640,6 +1875,60 @@ export default function AgentBuilderPage() {
               </div>
             </div>
           )}
+          {toolNode.data.kind === 'gmail' && (
+            <div className="space-y-3">
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                  Send Email To
+                </label>
+                <select
+                  value={toolNode.data.recipientMode}
+                  onChange={(event) =>
+                    updateGmailRecipientSettings(toolNode.id, {
+                      recipientMode:
+                        event.target.value === 'specific_email'
+                          ? 'specific_email'
+                          : 'ai_decides',
+                    })
+                  }
+                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
+                >
+                  <option value="ai_decides">AI decides</option>
+                  <option value="specific_email">Specific email</option>
+                </select>
+              </div>
+              <p className="text-sm leading-6 text-on-surface-variant">
+                {toolNode.data.recipientMode === 'specific_email'
+                  ? 'Send every Gmail message to one fixed internal address. The assistant should describe this as notifying the team without revealing the actual email.'
+                  : 'Let the assistant choose who to email based on the conversation and the agent instructions.'}
+              </p>
+              {toolNode.data.recipientMode === 'specific_email' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                      Specific Email
+                    </label>
+                    <input
+                      type="email"
+                      value={gmailRecipientEmail}
+                      onChange={(event) =>
+                        updateGmailRecipientSettings(toolNode.id, {
+                          recipientEmail: event.target.value || null,
+                        })
+                      }
+                      placeholder="owner@company.com"
+                      className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
+                    />
+                  </div>
+                  {!hasValidSpecificRecipient ? (
+                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-sm text-on-surface-variant">
+                      Add a valid internal email address. Until then, Gmail stays unavailable in runtime for this node.
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-2">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
               Allowed Actions
@@ -1656,39 +1945,80 @@ export default function AgentBuilderPage() {
             </div>
           </div>
           {toolNode.data.kind === 'googlecalendar' && (
-            <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                Timezone
-              </label>
-              <select
-                value={(toolNode.data as GoogleCalendarBuilderNodeData).timezone ?? 'UTC'}
-                onChange={(event) => {
-                  const newTimezone = event.target.value;
-                  setNodes((currentNodes) =>
-                    currentNodes.map((node) =>
-                      node.id === toolNode.id
-                        ? {
-                            ...node,
-                            data: {
-                              ...node.data,
-                              timezone: newTimezone,
-                            },
-                          }
-                        : node,
-                    ),
-                  );
-                }}
-                className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-              >
-                {TIMEZONE_OPTIONS.map((tz) => (
-                  <option key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-on-surface-variant">
-                Used for calendar events and time operations.
-              </p>
+            <div className="space-y-5">
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                  Booking Calendar
+                </label>
+                <select
+                  value={(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ?? ''}
+                  onChange={(event) => {
+                    const nextCalendarId = event.target.value || null;
+                    const selectedCalendar = resolveCalendarOption(calendarOptions, nextCalendarId);
+                    updateGoogleCalendarSettings(toolNode.id, {
+                      calendarId: nextCalendarId,
+                      calendarLabel: nextCalendarId ? selectedCalendar?.summary ?? null : null,
+                      timezone: selectedCalendar?.timezone ?? null,
+                    });
+                  }}
+                  onKeyDown={stopBuilderFieldKeyDown}
+                  disabled={!selectedCalendarConnectionId || calendarOptionsStatus === 'loading'}
+                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">Primary calendar</option>
+                  {calendarOptions.map((calendar) => (
+                    <option key={calendar.id} value={calendar.id}>
+                      {calendar.primary ? `${calendar.summary} (Primary)` : calendar.summary}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-on-surface-variant">
+                  {calendarOptionsStatus === 'loading'
+                    ? 'Loading calendars from the selected Google account...'
+                    : calendarOptionsStatus === 'error'
+                      ? 'Could not load calendars from this account right now.'
+                      : 'Choose which calendar the agent should check and book against. Leave blank to use the primary calendar.'}
+                </p>
+              </div>
+              {(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ? (
+                <label className="flex items-start gap-3 rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
+                  <input
+                    type="checkbox"
+                    checked={(toolNode.data as GoogleCalendarBuilderNodeData).includePrimaryCalendar}
+                    onChange={(event) => {
+                      updateGoogleCalendarSettings(toolNode.id, {
+                        includePrimaryCalendar: event.target.checked,
+                      });
+                    }}
+                    onKeyDown={stopBuilderFieldKeyDown}
+                    className="mt-1 h-4 w-4 rounded border-outline-variant/30 text-primary focus:ring-primary"
+                  />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-semibold text-on-surface">
+                      Also book on primary calendar
+                    </span>
+                    <span className="block text-xs leading-5 text-on-surface-variant">
+                      When enabled, the assistant will mirror bookings to the account&apos;s primary
+                      calendar in addition to the selected booking calendar.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
+              <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                  Booking Timezone
+                </p>
+                <p className="mt-2 text-sm font-semibold text-on-surface">
+                  {resolvedCalendarTimezone ?? timezone}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+                  {resolvedCalendarTimezone
+                    ? resolvedCalendar?.primary && !(toolNode.data as GoogleCalendarBuilderNodeData).calendarId
+                      ? 'Automatically resolved from the primary Google Calendar.'
+                      : 'Automatically resolved from the selected booking calendar.'
+                    : 'Falls back to the core agent timezone until the booking calendar exposes its own timezone.'}
+                </p>
+              </div>
             </div>
           )}
           <button
@@ -1952,9 +2282,9 @@ export default function AgentBuilderPage() {
           </ReactFlow>
         </section>
 
-        <aside className="overflow-y-auto border-l border-outline-variant/10 bg-surface-container-lowest p-5">
+        <aside className="overflow-y-auto bg-surface-container-lowest p-5">
           {selectedNode ? (
-            <div className="rounded-[1.75rem] border border-outline-variant/10 bg-surface-container p-5">
+            <div className="p-5">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <span className="material-symbols-outlined text-lg">{selectedNode.data.icon}</span>

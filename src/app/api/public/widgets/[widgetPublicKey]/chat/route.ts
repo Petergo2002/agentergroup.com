@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
+import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
+import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -272,17 +274,16 @@ export async function POST(
       ? previewRuntimeAgent?.endChatPolicy ??
         extractEndChatPolicyFromDefinition(publishedVersion?.definition)
       : extractEndChatPolicyFromDefinition(publishedVersion?.definition);
+    const gmailRecipientPolicy = preview.isPreview
+      ? previewRuntimeAgent?.gmailRecipientPolicy ??
+        extractGmailRecipientPolicyFromDefinition(publishedVersion?.definition)
+      : extractGmailRecipientPolicyFromDefinition(publishedVersion?.definition);
+    const googleCalendarSelection = preview.isPreview
+      ? previewRuntimeAgent?.googleCalendarSelection ??
+        extractGoogleCalendarSelectionFromDefinition(publishedVersion?.definition)
+      : extractGoogleCalendarSelectionFromDefinition(publishedVersion?.definition);
 
-    let calendarTimezone: string | null = null;
-    if (publishedVersion?.definition?.nodes) {
-      const nodes = publishedVersion.definition.nodes as Array<{ data?: { kind?: string; timezone?: string } }>;
-      const calendarNode = nodes.find(
-        (node) => node.data?.kind === 'googlecalendar'
-      );
-      if (calendarNode?.data?.timezone) {
-        calendarTimezone = calendarNode.data.timezone;
-      }
-    }
+    const calendarTimezone = googleCalendarSelection.timezone;
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -308,7 +309,9 @@ export async function POST(
             audience: "widget",
             widgetPublicKey: loaded.widget.widget_public_key,
             calendarTimezone,
+            googleCalendarSelection,
             endChatPolicy,
+            gmailRecipientPolicy,
             onToken: (() => {
               let cumulativeContent = "";
               return (token: string) => {

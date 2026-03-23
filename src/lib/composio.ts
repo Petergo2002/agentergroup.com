@@ -1,7 +1,13 @@
 import { Composio } from "@composio/core";
 import type OpenAI from "openai";
 import { hasComposioEnv } from "@/lib/env";
-import type { DriveImportFileRecord } from "@/lib/types";
+import { normalizeGmailRecipientEmail } from "@/lib/gmail";
+import { extractGoogleCalendarListItems } from "@/lib/google-calendar";
+import type {
+  DriveImportFileRecord,
+  GmailRecipientPolicy,
+  GoogleCalendarSelection,
+} from "@/lib/types";
 import {
   getDriveImportMimeTypes,
   getAllowedChatToolsForToolkits,
@@ -55,6 +61,18 @@ interface MCPSessionInfo {
   url: string;
   headers: Record<string, string>;
 }
+
+const GMAIL_SEND_EMAIL_TOOL = "GMAIL_SEND_EMAIL";
+const GOOGLE_CALENDAR_CREATE_EVENT_TOOL = "GOOGLECALENDAR_CREATE_EVENT";
+const GOOGLE_CALENDAR_QUICK_ADD_TOOL = "GOOGLECALENDAR_QUICK_ADD";
+const GOOGLE_CALENDAR_FIND_FREE_SLOTS_TOOL = "GOOGLECALENDAR_FIND_FREE_SLOTS";
+const GOOGLE_CALENDAR_FREE_BUSY_QUERY_TOOL = "GOOGLECALENDAR_FREE_BUSY_QUERY";
+
+const DEFAULT_COMPOSIO_TOOLKIT_VERSIONS = {
+  gmail: process.env.COMPOSIO_TOOLKIT_VERSION_GMAIL ?? "20260307_00",
+  googlecalendar: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR ?? "20260309_00",
+  googledrive: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE ?? "20260309_00",
+} as const;
 
 const SESSION_TTL_MS = 1000 * 60 * 30;
 const toolRouterSessionCache = new Map<string, ToolRouterSessionRef>();
@@ -208,6 +226,7 @@ export function createComposioClient() {
   if (!composioClient) {
     composioClient = new Composio({
       apiKey: process.env.COMPOSIO_API_KEY,
+      toolkitVersions: DEFAULT_COMPOSIO_TOOLKIT_VERSIONS,
     });
   }
 
@@ -372,14 +391,37 @@ export async function createConnectionRequest(userId: string, toolkitSlug: strin
   }
 
   const session = await getComposioSession(userId);
-  
-  const request = await composio.connectedAccounts.link(userId, toolkitSlug);
+  const authConfig = await composio.authConfigs.create(toolkitSlug, {
+    name: `${integration.displayName} Managed Auth`,
+    type: "use_composio_managed_auth",
+  });
+  const authConfigId =
+    authConfig && typeof authConfig === "object" && "id" in authConfig
+      ? String(authConfig.id)
+      : null;
+
+  if (!authConfigId) {
+    throw new Error("Failed to create a Composio auth config.");
+  }
+
+  const request = await composio.connectedAccounts.link(userId, authConfigId);
 
   return {
     id: request.id,
+    authConfigId,
     redirectUrl: request.redirectUrl,
     session,
   };
+}
+
+export async function deleteConnectedAccount(connectedAccountId: string) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  return composio.connectedAccounts.delete(connectedAccountId);
 }
 
 export async function getWrappedTools(userId: string, toolkitSlugs: string[]) {
@@ -412,6 +454,10 @@ export async function getWrappedTools(userId: string, toolkitSlugs: string[]) {
 export async function handleChatToolCalls(
   userId: string,
   chatCompletion: OpenAI.Chat.ChatCompletion,
+  options?: {
+    gmailRecipientPolicy?: GmailRecipientPolicy | null;
+    googleCalendarSelection?: GoogleCalendarSelection | null;
+  },
 ) {
   const composio = createComposioClient();
 
@@ -432,18 +478,28 @@ export async function handleChatToolCalls(
     return [];
   }
 
+    const patchedCompletion = applyGmailRecipientPolicyToCompletion(
+      applyGoogleCalendarSelectionToCompletion(
+        chatCompletion,
+        options?.googleCalendarSelection ?? null,
+      ),
+      options?.gmailRecipientPolicy ?? null,
+    );
     let sessionToUse = session;
     let sessionWasRecreated = false;
 
     // Retry once if we get a serverless cache miss error from Composio.
     try {
-      const results = await composio.provider.handleToolCalls(userId, chatCompletion);
+      const results = await composio.provider.handleToolCalls(userId, patchedCompletion);
       
       if (results && results.length > 0) {
         console.log("[Composio] Tool call results:", results.length);
       }
       
-      return { results, sessionWasRecreated };
+      return {
+        results: sanitizeGmailToolMessages(results, options?.gmailRecipientPolicy ?? null),
+        sessionWasRecreated,
+      };
     } catch (error) {
       if (error && typeof error === "object" && "message" in error) {
         // Look for typical missing session / unauthorized errors from Composio
@@ -460,8 +516,14 @@ export async function handleChatToolCalls(
             console.log("[Composio] Session recreated successfully.");
             
             // Retry handling tool calls with the new session
-            const retryResults = await composio.provider.handleToolCalls(userId, chatCompletion);
-            return { results: retryResults, sessionWasRecreated };
+            const retryResults = await composio.provider.handleToolCalls(userId, patchedCompletion);
+            return {
+              results: sanitizeGmailToolMessages(
+                retryResults,
+                options?.gmailRecipientPolicy ?? null,
+              ),
+              sessionWasRecreated,
+            };
           }
         }
       }
@@ -472,10 +534,421 @@ export async function handleChatToolCalls(
     }
 }
 
+function applyGoogleCalendarSelectionToCompletion(
+  chatCompletion: OpenAI.Chat.ChatCompletion,
+  googleCalendarSelection: GoogleCalendarSelection | null,
+) {
+  const selectedCalendarId = googleCalendarSelection?.calendarId ?? "primary";
+  const selectedCalendarTimezone = pickString(googleCalendarSelection?.timezone);
+
+  if (!googleCalendarSelection) {
+    return chatCompletion;
+  }
+
+  const message = chatCompletion.choices[0]?.message;
+  if (!message || !Array.isArray(message.tool_calls)) {
+    return chatCompletion;
+  }
+
+  const includePrimaryCalendar =
+    googleCalendarSelection.includePrimaryCalendar &&
+    Boolean(googleCalendarSelection.calendarId) &&
+    selectedCalendarId !== "primary";
+  const availabilityItems = includePrimaryCalendar
+    ? [selectedCalendarId, "primary"]
+    : [selectedCalendarId];
+
+  function getLocalParts(date: Date, timeZone: string) {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    });
+
+    const parts = formatter.formatToParts(date);
+    const map = Object.fromEntries(
+      parts
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value]),
+    ) as Record<string, string>;
+
+    return {
+      year: Number(map.year),
+      month: Number(map.month),
+      day: Number(map.day),
+      hour: Number(map.hour),
+      minute: Number(map.minute),
+      second: Number(map.second),
+    };
+  }
+
+  function getOffsetMinutes(date: Date, timeZone: string) {
+    const parts = getLocalParts(date, timeZone);
+    const localAsUtc = Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+    );
+
+    return Math.round((localAsUtc - date.getTime()) / 60000);
+  }
+
+  function formatOffset(offsetMinutes: number) {
+    const sign = offsetMinutes >= 0 ? "+" : "-";
+    const absoluteMinutes = Math.abs(offsetMinutes);
+    const hours = String(Math.floor(absoluteMinutes / 60)).padStart(2, "0");
+    const minutes = String(absoluteMinutes % 60).padStart(2, "0");
+    return `${sign}${hours}:${minutes}`;
+  }
+
+  function hasExplicitOffset(value: string) {
+    return /(?:Z|[+-]\d{2}:\d{2})$/.test(value);
+  }
+
+  function localDateTimeToOffsetIso(value: string, timeZone: string) {
+    const match = value.match(
+      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/,
+    );
+
+    if (!match) {
+      return value;
+    }
+
+    const [, year, month, day, hour, minute, second = "00"] = match;
+    const targetAsUtc = Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second),
+    );
+
+    let candidate = new Date(targetAsUtc);
+
+    for (let iteration = 0; iteration < 2; iteration += 1) {
+      const parts = getLocalParts(candidate, timeZone);
+      const candidateAsUtc = Date.UTC(
+        parts.year,
+        parts.month - 1,
+        parts.day,
+        parts.hour,
+        parts.minute,
+        parts.second,
+      );
+      const diffMs = targetAsUtc - candidateAsUtc;
+
+      if (diffMs === 0) {
+        break;
+      }
+
+      candidate = new Date(candidate.getTime() + diffMs);
+    }
+
+    return `${year}-${month}-${day}T${hour}:${minute}:${second}${formatOffset(
+      getOffsetMinutes(candidate, timeZone),
+    )}`;
+  }
+
+  function withCalendarTimezone(arguments_: Record<string, unknown>) {
+    if (!selectedCalendarTimezone) {
+      return arguments_;
+    }
+
+    const nextArguments = { ...arguments_ };
+
+    if (
+      typeof nextArguments.start_datetime === "string" &&
+      !hasExplicitOffset(nextArguments.start_datetime)
+    ) {
+      nextArguments.start_datetime = localDateTimeToOffsetIso(
+        nextArguments.start_datetime,
+        selectedCalendarTimezone,
+      );
+    }
+
+    if (
+      typeof nextArguments.end_datetime === "string" &&
+      !hasExplicitOffset(nextArguments.end_datetime)
+    ) {
+      nextArguments.end_datetime = localDateTimeToOffsetIso(
+        nextArguments.end_datetime,
+        selectedCalendarTimezone,
+      );
+    }
+
+    if (
+      typeof nextArguments.time_min === "string" &&
+      !hasExplicitOffset(nextArguments.time_min)
+    ) {
+      nextArguments.time_min = localDateTimeToOffsetIso(
+        nextArguments.time_min,
+        selectedCalendarTimezone,
+      );
+    }
+
+    if (
+      typeof nextArguments.time_max === "string" &&
+      !hasExplicitOffset(nextArguments.time_max)
+    ) {
+      nextArguments.time_max = localDateTimeToOffsetIso(
+        nextArguments.time_max,
+        selectedCalendarTimezone,
+      );
+    }
+
+    nextArguments.timezone = selectedCalendarTimezone;
+    return nextArguments;
+  }
+
+  const patchedToolCalls = message.tool_calls.flatMap((toolCall) => {
+    if (toolCall.type !== "function") {
+      return [toolCall];
+    }
+
+    const rawArguments = toolCall.function.arguments ?? "";
+    if (!rawArguments.trim()) {
+      return [toolCall];
+    }
+
+    try {
+      const parsed = JSON.parse(rawArguments) as Record<string, unknown>;
+      let nextToolCalls: typeof message.tool_calls | null = null;
+
+      if (toolCall.function.name === GOOGLE_CALENDAR_CREATE_EVENT_TOOL) {
+        const selectedCalendarArguments = withCalendarTimezone({
+          ...parsed,
+          calendar_id: selectedCalendarId,
+        });
+        const selectedCalendarCall = {
+          ...toolCall,
+          function: {
+            ...toolCall.function,
+            arguments: JSON.stringify(selectedCalendarArguments),
+          },
+        };
+
+        nextToolCalls = includePrimaryCalendar
+          ? [
+              selectedCalendarCall,
+              {
+                ...toolCall,
+                id: `${toolCall.id}_primary`,
+                function: {
+                  ...toolCall.function,
+                  arguments: JSON.stringify(
+                    withCalendarTimezone({
+                      ...parsed,
+                      calendar_id: "primary",
+                    }),
+                  ),
+                },
+              },
+            ]
+          : [selectedCalendarCall];
+      }
+
+      if (toolCall.function.name === GOOGLE_CALENDAR_QUICK_ADD_TOOL) {
+        const selectedCalendarCall = {
+          ...toolCall,
+          function: {
+            ...toolCall.function,
+            arguments: JSON.stringify(
+              withCalendarTimezone({
+                ...parsed,
+                calendar_id: selectedCalendarId,
+              }),
+            ),
+          },
+        };
+
+        nextToolCalls = includePrimaryCalendar
+          ? [
+              selectedCalendarCall,
+              {
+                ...toolCall,
+                id: `${toolCall.id}_primary`,
+                function: {
+                  ...toolCall.function,
+                  arguments: JSON.stringify(
+                    withCalendarTimezone({
+                      ...parsed,
+                      calendar_id: "primary",
+                    }),
+                  ),
+                },
+              },
+            ]
+          : [selectedCalendarCall];
+      }
+
+      if (toolCall.function.name === GOOGLE_CALENDAR_FIND_FREE_SLOTS_TOOL) {
+        nextToolCalls = [
+          {
+            ...toolCall,
+            function: {
+              ...toolCall.function,
+              arguments: JSON.stringify(
+                withCalendarTimezone({
+                  ...parsed,
+                  items: availabilityItems,
+                }),
+              ),
+            },
+          },
+        ];
+      }
+
+      if (toolCall.function.name === GOOGLE_CALENDAR_FREE_BUSY_QUERY_TOOL) {
+        nextToolCalls = [
+          {
+            ...toolCall,
+            function: {
+              ...toolCall.function,
+              arguments: JSON.stringify(
+                withCalendarTimezone({
+                  ...parsed,
+                  items: availabilityItems,
+                }),
+              ),
+            },
+          },
+        ];
+      }
+
+      if (!nextToolCalls) {
+        return [toolCall];
+      }
+
+      return nextToolCalls;
+    } catch {
+      return [toolCall];
+    }
+  });
+
+  return {
+    ...chatCompletion,
+    choices: chatCompletion.choices.map((choice, index) =>
+      index === 0
+        ? {
+            ...choice,
+            message: {
+              ...message,
+              tool_calls: patchedToolCalls,
+            },
+          }
+        : choice,
+    ),
+  };
+}
+
+function applyGmailRecipientPolicyToCompletion(
+  chatCompletion: OpenAI.Chat.ChatCompletion,
+  gmailRecipientPolicy: GmailRecipientPolicy | null,
+) {
+  if (
+    gmailRecipientPolicy?.mode !== "specific_email" ||
+    !normalizeGmailRecipientEmail(gmailRecipientPolicy.specificEmail)
+  ) {
+    return chatCompletion;
+  }
+
+  const message = chatCompletion.choices[0]?.message;
+  if (!message || !Array.isArray(message.tool_calls)) {
+    return chatCompletion;
+  }
+
+  const specificEmail = normalizeGmailRecipientEmail(gmailRecipientPolicy.specificEmail);
+  if (!specificEmail) {
+    return chatCompletion;
+  }
+
+  const patchedToolCalls = message.tool_calls.map((toolCall) => {
+    if (
+      toolCall.type !== "function" ||
+      toolCall.function.name !== GMAIL_SEND_EMAIL_TOOL
+    ) {
+      return toolCall;
+    }
+
+    const rawArguments = toolCall.function.arguments ?? "";
+    if (!rawArguments.trim()) {
+      return toolCall;
+    }
+
+    try {
+      const parsed = JSON.parse(rawArguments) as Record<string, unknown>;
+      const nextArguments: Record<string, unknown> = {
+        ...parsed,
+        recipient_email: specificEmail,
+      };
+
+      delete nextArguments.cc;
+      delete nextArguments.bcc;
+      delete nextArguments.extra_recipients;
+
+      return {
+        ...toolCall,
+        function: {
+          ...toolCall.function,
+          arguments: JSON.stringify(nextArguments),
+        },
+      };
+    } catch {
+      return toolCall;
+    }
+  });
+
+  return {
+    ...chatCompletion,
+    choices: chatCompletion.choices.map((choice, index) =>
+      index === 0
+        ? {
+            ...choice,
+            message: {
+              ...message,
+              tool_calls: patchedToolCalls,
+            },
+          }
+        : choice,
+    ),
+  };
+}
+
+function sanitizeGmailToolMessages(
+  messages: OpenAI.Chat.ChatCompletionToolMessageParam[] | Array<Record<string, unknown>>,
+  gmailRecipientPolicy: GmailRecipientPolicy | null,
+) {
+  if (
+    gmailRecipientPolicy?.mode !== "specific_email" ||
+    !normalizeGmailRecipientEmail(gmailRecipientPolicy.specificEmail)
+  ) {
+    return messages;
+  }
+
+  return messages.map((message) =>
+    ("name" in message && message.name === GMAIL_SEND_EMAIL_TOOL)
+      ? {
+          ...message,
+          content: "Internal notification email sent successfully.",
+        }
+      : message,
+  );
+}
+
 export async function executeToolCall(
   userId: string,
   toolName: string,
   arguments_: Record<string, unknown>,
+  options?: { connectedAccountId?: string | null },
 ) {
   const composio = createComposioClient();
 
@@ -486,13 +959,32 @@ export async function executeToolCall(
   const result = await composio.tools.execute(toolName, {
     userId,
     arguments: arguments_,
-  });
+    ...(options?.connectedAccountId
+      ? { connectedAccountId: options.connectedAccountId }
+      : {}),
+  } as Record<string, unknown>);
 
   if (!result.successful) {
     throw new Error(result.error ?? `Failed to execute tool: ${toolName}`);
   }
 
   return result.data;
+}
+
+export async function listGoogleCalendars(
+  userId: string,
+  connectedAccountId?: string | null,
+) {
+  const result = await executeToolCall(
+    userId,
+    "GOOGLECALENDAR_LIST_CALENDARS",
+    {},
+    {
+      connectedAccountId,
+    },
+  );
+
+  return extractGoogleCalendarListItems(result);
 }
 
 export async function listDriveImportFiles(

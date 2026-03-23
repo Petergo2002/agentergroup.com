@@ -41,10 +41,13 @@ export async function POST(request: NextRequest) {
         account_label: "default",
         toolkit_data: connectionRequest.session
           ? {
+              authConfigId: connectionRequest.authConfigId,
               toolRouterSessionId: connectionRequest.session.sessionId,
               toolRouterSessionUrl: connectionRequest.session.mcp.url,
             }
-          : {},
+          : {
+              authConfigId: connectionRequest.authConfigId,
+            },
         created_by: user.id,
       },
       {

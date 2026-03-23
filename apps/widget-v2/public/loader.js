@@ -109,9 +109,11 @@
   let domReadyListener = null;
   let keydownListener = null;
   let viewportListener = null;
+  let focusListener = null;
   let touchBlockListener = null;
   let previewOverrideMessage = null;
   let bootstrapPayload = null;
+  let previousFocusedElement = null;
   const scrollLockState = {
     active: false,
     scrollY: 0,
@@ -440,6 +442,26 @@
     return window.matchMedia("(max-width: 768px)").matches;
   }
 
+  function focusWidgetSurface() {
+    if (!isOpen) return;
+
+    window.requestAnimationFrame(() => {
+      if (iframe && typeof iframe.focus === "function") {
+        iframe.focus();
+        if (document.activeElement === iframe) {
+          return;
+        }
+      }
+
+      const iframeContainer = container?.querySelector(
+        ".ag-widget-iframe-container",
+      );
+      if (iframeContainer && typeof iframeContainer.focus === "function") {
+        iframeContainer.focus();
+      }
+    });
+  }
+
   function lockBackgroundScroll() {
     if (scrollLockState.active || !shouldLockBackgroundScroll()) return;
 
@@ -728,6 +750,13 @@
         width: 52px;
         height: 52px;
       }
+
+      .ag-widget-bubble.open {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: scale(0.92);
+      }
     }
   `;
 
@@ -838,6 +867,9 @@
     const iframeContainer = document.createElement("div");
     iframeContainer.className = "ag-widget-iframe-container";
     iframeContainer.setAttribute("aria-hidden", "true");
+    iframeContainer.setAttribute("role", "dialog");
+    iframeContainer.setAttribute("aria-modal", "true");
+    iframeContainer.setAttribute("tabindex", "-1");
 
     // Create iframe
     iframe = document.createElement("iframe");
@@ -861,6 +893,7 @@
     bubble.className = "ag-widget-bubble";
     const brandName = bootstrapPayload?.config?.brand?.name || "Agent";
     const logoUrl = bootstrapPayload?.config?.brand?.logoUrl;
+    iframeContainer.setAttribute("aria-label", `${brandName} chat`);
 
     const contentHtml = `
       <div class="ag-widget-bubble-content">
@@ -900,17 +933,32 @@
     }
 
     if (isOpen) {
+      previousFocusedElement =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
       iframeContainer.classList.add("open");
       iframeContainer.setAttribute("aria-hidden", "false");
       bubble.classList.add("open");
       bubble.setAttribute("aria-label", "Stäng chatt");
       lockBackgroundScroll();
+      focusWidgetSurface();
     } else {
       iframeContainer.classList.remove("open");
       iframeContainer.setAttribute("aria-hidden", "true");
       bubble.classList.remove("open");
       bubble.setAttribute("aria-label", "Öppna chatt");
       unlockBackgroundScroll();
+      if (
+        previousFocusedElement &&
+        document.contains(previousFocusedElement) &&
+        typeof previousFocusedElement.focus === "function"
+      ) {
+        previousFocusedElement.focus();
+      } else if (bubble && typeof bubble.focus === "function") {
+        bubble.focus();
+      }
+      previousFocusedElement = null;
     }
 
     postWidgetStateToIframe();
@@ -932,6 +980,10 @@
     if (viewportListener) {
       window.removeEventListener("resize", viewportListener);
       viewportListener = null;
+    }
+    if (focusListener) {
+      document.removeEventListener("focusin", focusListener, true);
+      focusListener = null;
     }
 
     if (container) {
@@ -1013,6 +1065,16 @@
     }
   };
   window.addEventListener("keydown", keydownListener);
+
+  focusListener = (event) => {
+    if (!isOpen || !container) return;
+    const target = event.target;
+    if (target && container.contains(target)) {
+      return;
+    }
+    focusWidgetSurface();
+  };
+  document.addEventListener("focusin", focusListener, true);
 
   viewportListener = () => {
     if (!isOpen) {

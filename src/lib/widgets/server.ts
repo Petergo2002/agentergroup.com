@@ -1,12 +1,16 @@
 import type { NextRequest } from "next/server";
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
+import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
+import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import type {
   AgentRecord,
   AgentVersionRecord,
   BuilderDefinition,
   ConversationEndReason,
   EndChatPolicy,
+  GmailRecipientPolicy,
+  GoogleCalendarSelection,
   WidgetDraftPreviewInput,
   WidgetAgentRecord,
   WidgetLeadRecord,
@@ -706,6 +710,36 @@ async function buildStoredEndChatPoliciesByAgentId(
   return policiesByAgentId;
 }
 
+async function buildStoredGmailRecipientPoliciesByAgentId(
+  supabase: WidgetAdminSupabase,
+  widgetAgents: WidgetAgentWithAgent[],
+) {
+  const versionIds = Array.from(
+    new Set(
+      widgetAgents
+        .map(({ widgetAgent }) => widgetAgent.published_version_id)
+        .filter(Boolean) as string[],
+    ),
+  );
+  const definitionsByVersionId = await loadAgentVersionDefinitionsById(
+    supabase,
+    versionIds,
+  );
+  const policiesByAgentId = new Map<string, GmailRecipientPolicy>();
+
+  for (const { widgetAgent, agent } of widgetAgents) {
+    const definition = widgetAgent.published_version_id
+      ? definitionsByVersionId.get(widgetAgent.published_version_id)
+      : null;
+    policiesByAgentId.set(
+      agent.id,
+      extractGmailRecipientPolicyFromDefinition(definition),
+    );
+  }
+
+  return policiesByAgentId;
+}
+
 async function buildDraftEndChatPoliciesByAgentId(
   supabase: WidgetAdminSupabase,
   draft: WidgetDraftPreviewInput,
@@ -727,6 +761,78 @@ async function buildDraftEndChatPoliciesByAgentId(
   return policiesByAgentId;
 }
 
+async function buildDraftGmailRecipientPoliciesByAgentId(
+  supabase: WidgetAdminSupabase,
+  draft: WidgetDraftPreviewInput,
+) {
+  const agentIds = Array.from(new Set(draft.agents.map((agent) => agent.agentId)));
+  const definitionsByAgentId = await loadAgentDraftDefinitionsByAgentId(
+    supabase,
+    agentIds,
+  );
+  const policiesByAgentId = new Map<string, GmailRecipientPolicy>();
+
+  for (const agentId of agentIds) {
+    policiesByAgentId.set(
+      agentId,
+      extractGmailRecipientPolicyFromDefinition(definitionsByAgentId.get(agentId)),
+    );
+  }
+
+  return policiesByAgentId;
+}
+
+async function buildStoredGoogleCalendarSelectionsByAgentId(
+  supabase: WidgetAdminSupabase,
+  widgetAgents: WidgetAgentWithAgent[],
+) {
+  const versionIds = Array.from(
+    new Set(
+      widgetAgents
+        .map(({ widgetAgent }) => widgetAgent.published_version_id)
+        .filter(Boolean) as string[],
+    ),
+  );
+  const definitionsByVersionId = await loadAgentVersionDefinitionsById(
+    supabase,
+    versionIds,
+  );
+  const selectionsByAgentId = new Map<string, GoogleCalendarSelection>();
+
+  for (const { widgetAgent, agent } of widgetAgents) {
+    const definition = widgetAgent.published_version_id
+      ? definitionsByVersionId.get(widgetAgent.published_version_id)
+      : null;
+    selectionsByAgentId.set(
+      agent.id,
+      extractGoogleCalendarSelectionFromDefinition(definition),
+    );
+  }
+
+  return selectionsByAgentId;
+}
+
+async function buildDraftGoogleCalendarSelectionsByAgentId(
+  supabase: WidgetAdminSupabase,
+  draft: WidgetDraftPreviewInput,
+) {
+  const agentIds = Array.from(new Set(draft.agents.map((agent) => agent.agentId)));
+  const definitionsByAgentId = await loadAgentDraftDefinitionsByAgentId(
+    supabase,
+    agentIds,
+  );
+  const selectionsByAgentId = new Map<string, GoogleCalendarSelection>();
+
+  for (const agentId of agentIds) {
+    selectionsByAgentId.set(
+      agentId,
+      extractGoogleCalendarSelectionFromDefinition(definitionsByAgentId.get(agentId)),
+    );
+  }
+
+  return selectionsByAgentId;
+}
+
 export async function buildStoredWidgetRuntimeConfig(
   supabase: WidgetAdminSupabase,
   widget: WidgetRecord,
@@ -737,10 +843,16 @@ export async function buildStoredWidgetRuntimeConfig(
     supabase,
     widgetAgents,
   );
+  const gmailRecipientPoliciesByAgentId =
+    await buildStoredGmailRecipientPoliciesByAgentId(supabase, widgetAgents);
+  const googleCalendarSelectionsByAgentId =
+    await buildStoredGoogleCalendarSelectionsByAgentId(supabase, widgetAgents);
 
   return buildWidgetRuntimeConfig(widget, widgetAgents, {
     preview: options?.preview,
     endChatPoliciesByAgentId,
+    gmailRecipientPoliciesByAgentId,
+    googleCalendarSelectionsByAgentId,
   });
 }
 
@@ -754,10 +866,16 @@ export async function buildDraftWidgetRuntimeConfig(
     supabase,
     draft,
   );
+  const gmailRecipientPoliciesByAgentId =
+    await buildDraftGmailRecipientPoliciesByAgentId(supabase, draft);
+  const googleCalendarSelectionsByAgentId =
+    await buildDraftGoogleCalendarSelectionsByAgentId(supabase, draft);
 
   return buildWidgetRuntimeConfigFromDraft(widget, draft, {
     preview: options?.preview,
     endChatPoliciesByAgentId,
+    gmailRecipientPoliciesByAgentId,
+    googleCalendarSelectionsByAgentId,
   });
 }
 

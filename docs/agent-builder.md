@@ -137,7 +137,15 @@ Important current behavior:
 - only chat-surface integrations are shown in the builder
 - the selectable connection is stored on the node as `connectionId`
 - the actual durable mapping is synced to `agent_connections`
-- Google Calendar also exposes a per-node timezone
+- Gmail also exposes a per-node recipient policy:
+  - `ai_decides`
+  - `specific_email`
+- when Gmail uses `specific_email`, the node stores the hidden fixed recipient on the draft definition and runtime enforces it server-side
+- Google Calendar exposes one selected booking calendar and resolves the booking timezone from that calendar
+- the builder loads selectable Google Calendars from the connected Composio account through `/api/connections/googlecalendar/calendars`
+- the selected Google Calendar is stored on the node as `calendarId` plus `calendarLabel`
+- the Google Calendar node also stores the resolved calendar timezone returned by the selected booking calendar
+- the calendar-list route is backed by a manual `GOOGLECALENDAR_LIST_CALENDARS` Composio tool execution, so the app must define Composio toolkit versions centrally for Google Calendar to keep the selector stable
 
 ### End Chat inspector
 
@@ -150,8 +158,9 @@ Important current behavior:
 
 - `endchat` is a control/config node, not a live external integration
 - the assistant may only suggest completion
-- the backend is authoritative for actually closing widget sessions
-- preview and widget runtimes use this node to expose session-completed behavior
+- widget session completion is handled by the backend runtime and public completion endpoints
+- preview inactivity timeout behavior is coordinated by the preview UI
+- preview and widget runtimes both use this node to expose session-completed behavior, but not through one identical enforcement path
 
 Allowed actions are currently informational and hardcoded:
 
@@ -159,6 +168,7 @@ Allowed actions are currently informational and hardcoded:
   - `Send Email`
 - Google Calendar:
   - `Create Event`
+  - `Quick Add`
   - `Get Current Date Time`
   - `Find Free Slots`
   - `List Calendars`
@@ -296,6 +306,12 @@ Preview chat uses:
 - `/api/agents/[id]/chat`
 - `runAgentChat(...)` in `src/lib/runtime/agent-chat.ts`
 
+Important implication:
+
+- preview does not auto-save on tab navigation
+- preview reflects the last saved draft and current durable attachments
+- unsaved builder edits stay local until the user explicitly saves or publishes
+
 ### What builder choices affect at runtime
 
 The runtime reads tool and knowledge availability from durable attachment tables:
@@ -309,7 +325,12 @@ The runtime reads core agent settings from the `agents` table:
 - instructions
 - timezone
 
-The preview chat route also inspects the current draft definition to extract the Google Calendar node timezone override.
+The preview chat route also inspects the saved draft definition to extract:
+
+- the Google Calendar node resolved booking timezone
+- the Google Calendar selected booking calendar
+- the Gmail recipient policy
+- the `endchat` policy
 
 ### Widgets and published agents
 
@@ -319,6 +340,10 @@ Current deployment behavior:
 
 - a widget cannot deploy if any attached agent has no `published_version_id`
 - widget deployment snapshots each widget-agent mapping with the agent's published version id
+- widget runtime also reads builder-derived policies from the published definition, including:
+  - Gmail recipient policy
+  - Google Calendar selected booking calendar
+  - `endchat` policy
 
 So the builder affects widgets in two stages:
 
@@ -389,9 +414,47 @@ Current supported node data types in `src/lib/types.ts`:
 - `TriggerBuilderNodeData`
 - `AgentBuilderNodeData`
 - `KnowledgeBuilderNodeData`
+- `EndChatBuilderNodeData`
 - `GmailBuilderNodeData`
 - `GoogleCalendarBuilderNodeData`
 - `OutputBuilderNodeData`
+
+Important current tool-node fields:
+
+- `GmailBuilderNodeData`
+  - `connectionId`
+  - `recipientMode`
+  - `recipientEmail`
+- `GoogleCalendarBuilderNodeData`
+  - `connectionId`
+  - `timezone`
+  - `calendarId`
+  - `calendarLabel`
+  - `includePrimaryCalendar`
+
+### Composio toolkit versions
+
+The app uses two different Composio execution models:
+
+- session-backed chat tool execution for runtime chat
+- manual `composio.tools.execute(...)` calls for utility workflows such as:
+  - listing Google Calendars for the builder
+  - Drive file listing and metadata lookup
+
+Important operational detail:
+
+- manual tool execution requires explicit toolkit versions in the current Composio SDK
+- the app therefore sets toolkit versions centrally when the Composio client is created in `src/lib/composio.ts`
+- current defaults are defined for:
+  - Gmail
+  - Google Calendar
+  - Google Drive
+- these can be overridden via environment variables:
+  - `COMPOSIO_TOOLKIT_VERSION_GMAIL`
+  - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
+  - `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
+
+This is why Google Calendar's booking-calendar selector and Google Drive import utilities do not pass per-request versions manually.
 
 If a new node type is added, these types must be extended first.
 

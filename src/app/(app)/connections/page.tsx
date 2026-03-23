@@ -43,6 +43,7 @@ export default function ConnectionsPage() {
   const [connections, setConnections] = useState<ConnectionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [disconnectingConnectionId, setDisconnectingConnectionId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +95,35 @@ export default function ConnectionsPage() {
       const message =
         error instanceof Error ? error.message : 'Failed to start the connection flow.';
       showToast(message, 'error');
+    }
+  };
+
+  const handleDisconnect = async (connectionId: string) => {
+    setDisconnectingConnectionId(connectionId);
+
+    try {
+      const response = await fetch('/api/connections/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ connectionId }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? 'Failed to disconnect the account.');
+      }
+
+      showToast('Account disconnected.', 'success');
+      setIsSyncing(true);
+      await load();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to disconnect the account.';
+      showToast(message, 'error');
+    } finally {
+      setDisconnectingConnectionId(null);
     }
   };
 
@@ -201,12 +231,25 @@ export default function ConnectionsPage() {
                       ? `Last sync ${new Date(toolkit.connection.last_synced_at).toLocaleString()}`
                       : 'No sync yet'}
                   </div>
-                  <button
-                    onClick={() => handleConnect(toolkit.slug)}
-                    className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface"
-                  >
-                    {toolkit.status === 'connected' ? 'Reconnect' : 'Connect'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {toolkit.connection && toolkit.status === 'connected' ? (
+                      <button
+                        onClick={() => handleDisconnect(toolkit.connection!.id)}
+                        disabled={disconnectingConnectionId === toolkit.connection.id}
+                        className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {disconnectingConnectionId === toolkit.connection.id
+                          ? 'Disconnecting...'
+                          : 'Disconnect'}
+                      </button>
+                    ) : null}
+                    <button
+                      onClick={() => handleConnect(toolkit.slug)}
+                      className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface"
+                    >
+                      {toolkit.status === 'connected' ? 'Reconnect' : 'Connect'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

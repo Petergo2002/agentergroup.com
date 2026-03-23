@@ -1183,7 +1183,13 @@ export default function Widget({
         />
       )}
 
-      <div className="relative z-10 flex flex-col h-full">
+      <div
+        className={`relative z-10 flex h-full flex-col ${
+          widgetContext === "hosted"
+            ? "md:mx-auto md:w-full md:max-w-[460px]"
+            : ""
+        }`}
+      >
         <header className="relative flex items-center justify-between px-6 pt-12 pb-4 shrink-0">
           <div className="flex items-center gap-2">
             <AnimatePresence mode="wait">
