@@ -97,6 +97,10 @@ export function getDefaultContactFormSettings(): WidgetContactFormSettingsRecord
   };
 }
 
+export function buildPrivacyPolicyUrl() {
+  return new URL("/privacy-policy", getAppUrl()).toString();
+}
+
 export function buildDefaultWidgetInput(
   workspace: WorkspaceRecord,
   input?: { name?: string; slug?: string },
@@ -116,7 +120,7 @@ export function buildDefaultWidgetInput(
     home_subtitle: null,
     hosted_enabled: true,
     show_branding: true,
-    privacy_policy_url: `${getAppUrl()}/privacy-policy`,
+    privacy_policy_url: buildPrivacyPolicyUrl(),
     allowed_origins: [] as string[],
   };
 }

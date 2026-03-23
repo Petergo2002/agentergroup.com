@@ -114,6 +114,9 @@ Important implementation docs:
 - `src/app/(app)/connections/page.tsx`
 - `src/app/(app)/knowledge/page.tsx`
 - `src/app/(app)/settings/page.tsx`
+- `src/app/privacy-policy/page.tsx`
+- `src/app/subprocessors/page.tsx`
+- `src/app/data-processing/page.tsx`
 - `src/app/login/page.tsx`
 - `src/app/login/actions.ts`
 
@@ -121,6 +124,10 @@ Important implementation docs:
 
 - `src/app/api/workspaces/route.ts`
 - `src/app/api/workspaces/active/route.ts`
+- `src/app/api/workspaces/[id]/privacy/dsar/lookup/route.ts`
+- `src/app/api/workspaces/[id]/privacy/dsar/export/route.ts`
+- `src/app/api/workspaces/[id]/privacy/dsar/delete/route.ts`
+- `src/app/api/internal/privacy/retention/route.ts`
 - `src/app/api/agents/[id]/chat/route.ts`
 - `src/app/api/agents/[id]/knowledge/route.ts`
 - `src/app/api/agents/[id]/archive/route.ts`
@@ -166,6 +173,7 @@ Important implementation docs:
 - `src/lib/widgets.ts`
 - `src/lib/widgets/server.ts`
 - `src/lib/dashboard/analytics.ts`
+- `src/lib/privacy.ts`
 - `src/lib/end-chat.ts`
 - `src/lib/types.ts`
 
@@ -182,6 +190,7 @@ Important implementation docs:
 - `supabase/migrations/20260315_phase_5_3_widget_assets.sql`
 - `supabase/migrations/20260319_widget_hosted_access.sql`
 - `supabase/migrations/20260320_end_chat_sessions.sql`
+- `supabase/migrations/20260323_phase_7_privacy_retention_indexes.sql`
 - `supabase/functions/process-knowledge-source/index.ts`
 - `supabase/functions/search-knowledge/index.ts`
 - `supabase/functions/_shared/knowledge.ts`
@@ -810,6 +819,9 @@ Current behavior:
 - embedded mode requires an allowed origin match
 - bootstrap returns a signed widget access token for subsequent runtime requests
 - preview mode uses a different signed preview token flow
+- the widget runtime shows a lightweight first-message consent gate before the first real chat turn and links it to the public `/privacy-policy` route
+- consent is currently remembered client-side per widget public key so returning visitors are not blocked on every new session
+- widget session/activity data, widget messages, and widget leads are currently covered by a 180 day retention policy enforced by an internal purge route
 
 Important token rules:
 
@@ -889,11 +901,14 @@ It sends:
 - `messages`
 - `tools` when tools are available
 - `tool_choice: "auto"` when tools are present
+- `provider.data_collection = "deny"` by default on every request
+- `provider.zdr = true` by default on every request unless explicitly disabled via env
 
 Important note:
 
 - OpenRouter is currently the only LLM transport layer
 - the model can be configured per agent, but the transport path is centralized
+- request-level privacy enforcement now lives in code, not only in OpenRouter dashboard settings
 
 ## Composio Architecture
 
@@ -1247,6 +1262,15 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/workspaces` | Create a new owner workspace and make it active |
 | `POST /api/workspaces/active` | Switch the active workspace for the current session |
 | `DELETE /api/workspaces/[id]` | Permanently delete an owned workspace, verify the delete actually happened, and move the active cookie to another workspace |
+| `POST /api/workspaces/[id]/privacy/dsar/lookup` | Owner-only subject-data preview for public widget records |
+| `POST /api/workspaces/[id]/privacy/dsar/export` | Owner-only JSON export for public widget subject data |
+| `POST /api/workspaces/[id]/privacy/dsar/delete` | Owner-only subject-data deletion for public widget records |
+
+### Internal privacy APIs
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/internal/privacy/retention` | Secret-protected retention purge for expired widget sessions, messages, and leads |
 
 ### Knowledge APIs
 
@@ -1306,6 +1330,8 @@ The core environment contract is:
 
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL`
+- `OPENROUTER_DATA_COLLECTION`
+- `OPENROUTER_REQUIRE_ZDR`
 - `COMPOSIO_API_KEY`
 - `COMPOSIO_TOOLKIT_VERSION_GMAIL`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
@@ -1314,6 +1340,7 @@ The core environment contract is:
 - `WIDGET_APP_URL`
 - `WIDGET_ACCESS_SECRET`
 - `WIDGET_PREVIEW_SECRET`
+- `GDPR_RETENTION_CRON_SECRET`
 
 ### Supabase Edge Functions
 

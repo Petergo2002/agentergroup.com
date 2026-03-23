@@ -1,4 +1,8 @@
-import { getOpenRouterModel, hasOpenRouterEnv } from "@/lib/env";
+import {
+  getOpenRouterModel,
+  getOpenRouterProviderPreferences,
+  hasOpenRouterEnv,
+} from "@/lib/env";
 
 interface OpenRouterChatOptions {
   model?: string;
@@ -30,6 +34,7 @@ export async function createOpenRouterChatCompletion({
       messages,
       tools: tools.length > 0 ? tools : undefined,
       tool_choice: tools.length > 0 ? "auto" : undefined,
+      provider: getOpenRouterProviderPreferences(),
       stream,
     }),
   });

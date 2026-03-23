@@ -6,6 +6,14 @@ function requireEnv(value: string | undefined, name: string): string {
   return value;
 }
 
+function parseBooleanEnv(value: string | undefined, fallback: boolean) {
+  if (value === undefined) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
 export function getSupabaseEnv() {
   return {
     url: requireEnv(
@@ -45,6 +53,24 @@ export function hasOpenRouterEnv() {
   return Boolean(process.env.OPENROUTER_API_KEY);
 }
 
+export interface OpenRouterProviderPreferences {
+  data_collection: "allow" | "deny";
+  zdr?: boolean;
+}
+
+export function getOpenRouterProviderPreferences(): OpenRouterProviderPreferences {
+  const dataCollection =
+    process.env.OPENROUTER_DATA_COLLECTION?.trim().toLowerCase() === "allow"
+      ? "allow"
+      : "deny";
+  const requireZdr = parseBooleanEnv(process.env.OPENROUTER_REQUIRE_ZDR, true);
+
+  return {
+    data_collection: dataCollection,
+    ...(requireZdr ? { zdr: true } : {}),
+  };
+}
+
 export function hasComposioEnv() {
   return Boolean(process.env.COMPOSIO_API_KEY);
 }
@@ -59,4 +85,15 @@ export function getWidgetAppUrl() {
     process.env.WIDGET_APP_URL ??
     "http://localhost:5173"
   );
+}
+
+export function getGdprRetentionCronSecret() {
+  return requireEnv(
+    process.env.GDPR_RETENTION_CRON_SECRET,
+    "GDPR_RETENTION_CRON_SECRET",
+  );
+}
+
+export function hasGdprRetentionCronSecret() {
+  return Boolean(process.env.GDPR_RETENTION_CRON_SECRET);
 }

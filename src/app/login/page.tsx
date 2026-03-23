@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Image from "next/image";
 import { hasSupabaseEnv } from "@/lib/env";
 import { login, signup } from "@/app/login/actions";
@@ -38,6 +39,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 {`NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 OPENROUTER_API_KEY=
+OPENROUTER_DATA_COLLECTION=deny
+OPENROUTER_REQUIRE_ZDR=true
 COMPOSIO_API_KEY=`}
           </pre>
         </div>
@@ -180,7 +183,18 @@ COMPOSIO_API_KEY=`}
           </form>
 
           <p className="text-[11px] text-center text-on-surface-variant leading-relaxed opacity-60 px-4">
-            Build your future with Agentergroup. By signing in, you agree to our Terms of Service and Privacy Policy.
+            Build your future with Agentergroup. By signing in, you agree to our{" "}
+            <span className="underline-offset-4 hover:text-on-surface">
+              Terms of Service
+            </span>{" "}
+            and{" "}
+            <Link
+              href="/privacy-policy"
+              className="underline underline-offset-4 transition-colors hover:text-on-surface"
+            >
+              Privacy Policy
+            </Link>
+            .
           </p>
         </div>
       </section>
