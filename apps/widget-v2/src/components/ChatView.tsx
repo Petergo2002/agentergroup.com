@@ -315,9 +315,9 @@ export function ChatView({
       {/* Messages Area */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 widget-scroll touch-pan-y"
+        className="flex-1 overflow-y-auto px-4 py-6 widget-scroll touch-pan-y md:px-10 md:py-8 lg:px-14"
       >
-        <div className="space-y-6 max-w-3xl mx-auto pb-4">
+        <div className="mx-auto max-w-4xl space-y-6 pb-4">
           {messages.map((msg, idx) => (
             <motion.div
               key={idx}
@@ -399,8 +399,8 @@ export function ChatView({
       </div>
 
       {/* Chat Input */}
-      <div className="shrink-0 px-6 pb-6 pt-2 bg-transparent peer group">
-        <div className="max-w-3xl mx-auto relative">
+      <div className="shrink-0 bg-transparent px-6 pb-6 pt-2 peer group md:px-10 lg:px-14">
+        <div className="relative mx-auto max-w-4xl">
           {isConversationCompleted && (
             <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-widget-border bg-widget-card px-4 py-3 text-sm text-widget-fg">
               <div>

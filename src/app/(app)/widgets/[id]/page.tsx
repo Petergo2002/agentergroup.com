@@ -383,7 +383,10 @@ export default function WidgetDetailPage() {
     });
   };
 
-  const persistWidget = async () => {
+  const persistWidget = async (options?: {
+    showSuccessToast?: boolean;
+    reloadAfterSave?: boolean;
+  }) => {
     if (!form) return;
 
     setIsSaving(true);
@@ -444,13 +447,21 @@ export default function WidgetDetailPage() {
         throw new Error(agentsPayload?.error || 'Failed to save attached agents.');
       }
 
-      await loadWidget();
-      showToast('Widget saved.', 'success');
+      if (options?.reloadAfterSave ?? true) {
+        await loadWidget();
+      }
+
+      if (options?.showSuccessToast ?? true) {
+        showToast('Widget saved.', 'success');
+      }
+
+      return true;
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : 'Failed to save widget.',
         'error',
       );
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -460,6 +471,15 @@ export default function WidgetDetailPage() {
     setIsUpdatingDeployment(true);
 
     try {
+      const saved = await persistWidget({
+        showSuccessToast: false,
+        reloadAfterSave: false,
+      });
+
+      if (!saved) {
+        return;
+      }
+
       const response = await fetch(`/api/widgets/${widgetId}/status`, {
         method: 'POST',
         headers: {
@@ -629,7 +649,7 @@ export default function WidgetDetailPage() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => void persistWidget()}
-            disabled={isSaving}
+            disabled={isSaving || isUpdatingDeployment}
             className={secondaryButtonClassName}
           >
             {isSaving ? 'Saving...' : 'Save draft'}
@@ -637,7 +657,7 @@ export default function WidgetDetailPage() {
           {isDeployed ? (
             <button
               onClick={() => void updateWidgetDeployment('draft')}
-              disabled={isUpdatingDeployment}
+              disabled={isUpdatingDeployment || isSaving}
               className={secondaryButtonClassName}
             >
               {isUpdatingDeployment ? 'Updating...' : 'Un deploy'}
@@ -645,7 +665,7 @@ export default function WidgetDetailPage() {
           ) : null}
           <button
             onClick={() => void updateWidgetDeployment('deployed')}
-            disabled={isUpdatingDeployment}
+            disabled={isUpdatingDeployment || isSaving}
             className={primaryButtonClassName}
           >
             {isUpdatingDeployment ? 'Updating...' : deployActionLabel}

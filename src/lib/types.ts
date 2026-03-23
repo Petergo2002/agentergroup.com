@@ -461,6 +461,17 @@ export interface DashboardAnalyticsResponse {
   };
 }
 
+export interface DashboardSummaryResponse {
+  recentConversations: DashboardAnalyticsConversationListItem[];
+  agents: AgentRecord[];
+  workspaceSummary: {
+    totalWidgets: number;
+    liveWidgets: number;
+    connectedApps: number;
+    knowledgeSources: number;
+  };
+}
+
 /** A single debug event captured during one agent turn. Stored in message metadata. */
 export interface DebugEvent {
   /** Event type */

@@ -126,6 +126,29 @@ function resolveEmbeddedParentOrigin(parentOrigin?: string): string | null {
   return normalizeOriginValue(document.referrer);
 }
 
+function buildLocalizedPrivacyPolicyUrl(
+  value: string | null | undefined,
+  language: "sv" | "en",
+): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    const base =
+      typeof window !== "undefined" ? window.location.href : "https://agentergroup.com";
+    const parsed = new URL(trimmed, base);
+
+    if (parsed.pathname === "/privacy-policy") {
+      parsed.searchParams.set("lang", language);
+    }
+
+    return parsed.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
 function parsePreviewOverrideMessage(
   data: unknown,
 ): WidgetPreviewOverride | null {
@@ -1162,25 +1185,6 @@ export default function Widget({
     }
   };
 
-  const handleConsentContinue = useCallback(() => {
-    persistConsent();
-    setShowConsentGate(false);
-
-    const queuedMessage = pendingMessage;
-    setPendingMessage(null);
-
-    if (queuedMessage) {
-      void sendMessage(queuedMessage);
-    }
-  }, [pendingMessage, persistConsent, sendMessage]);
-
-  const handleConsentDismiss = useCallback(() => {
-    setShowConsentGate(false);
-    setConsentChecked(false);
-    setPendingMessage(null);
-  }, []);
-
-
   const widgetLanguage = config ? resolveWidgetLanguage(config) : "en";
   const isChooserMode =
     config?.home.mode === "chooser" && selectedAgent === null;
@@ -1221,6 +1225,24 @@ export default function Widget({
     setHasConsent(true);
   }, [previewMode, widgetPublicKey]);
 
+  const handleConsentContinue = useCallback(() => {
+    persistConsent();
+    setShowConsentGate(false);
+
+    const queuedMessage = pendingMessage;
+    setPendingMessage(null);
+
+    if (queuedMessage) {
+      void sendMessage(queuedMessage);
+    }
+  }, [pendingMessage, persistConsent, sendMessage]);
+
+  const handleConsentDismiss = useCallback(() => {
+    setShowConsentGate(false);
+    setConsentChecked(false);
+    setPendingMessage(null);
+  }, []);
+
   if (!config) {
     return (
       <div className="flex items-center justify-center h-screen bg-widget-bg text-widget-fg">
@@ -1238,7 +1260,10 @@ export default function Widget({
   const rgb = hexToRgb(palette.primary);
   const primaryRgb = `${rgb.r}, ${rgb.g}, ${rgb.b}`;
   const consentCopy = CONSENT_COPY[widgetLanguage];
-  const privacyPolicyUrl = config.brand.privacyPolicyUrl;
+  const privacyPolicyUrl = buildLocalizedPrivacyPolicyUrl(
+    config.brand.privacyPolicyUrl,
+    widgetLanguage,
+  );
 
   return (
     <div
@@ -1270,12 +1295,10 @@ export default function Widget({
 
       <div
         className={`relative z-10 flex h-full flex-col ${
-          widgetContext === "hosted"
-            ? "md:mx-auto md:w-full md:max-w-[460px]"
-            : ""
+          widgetContext === "hosted" ? "w-full" : ""
         }`}
       >
-        <header className="relative flex items-center justify-between px-6 pt-12 pb-4 shrink-0">
+        <header className="relative flex items-center justify-between px-6 pb-4 pt-12 shrink-0 md:px-10 lg:px-14">
           <div className="flex items-center gap-2">
             <AnimatePresence mode="wait">
               {((activeTab === "messages" && selectedAgent) ||
@@ -1393,32 +1416,32 @@ export default function Widget({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 z-30 flex items-end justify-center bg-black/45 px-4 pb-6 pt-20 backdrop-blur-sm"
+              className="absolute inset-0 z-30 flex items-end justify-center bg-black/28 px-4 pb-6 pt-20 backdrop-blur-[3px]"
             >
               <motion.div
                 initial={{ opacity: 0, y: 16, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 16, scale: 0.98 }}
                 transition={{ duration: 0.18 }}
-                className="w-full max-w-md rounded-[28px] border border-white/10 bg-widget-card/95 p-6 shadow-2xl"
+                className="w-full max-w-md rounded-[28px] border border-black/10 bg-white p-6 text-[#171717] shadow-[0_24px_80px_rgba(15,23,42,0.16)]"
               >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-widget-muted">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
                   {config.brand.name}
                 </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-widget-fg">
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#171717]">
                   {consentCopy.title}
                 </h2>
-                <p className="mt-3 text-sm leading-6 text-widget-muted">
+                <p className="mt-3 text-sm leading-7 text-neutral-600">
                   {consentCopy.description}
                 </p>
-                <label className="mt-5 flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <label className="mt-5 flex items-start gap-3 rounded-2xl border border-black/10 bg-neutral-50 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                   <input
                     type="checkbox"
                     checked={consentChecked}
                     onChange={(event) => setConsentChecked(event.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-white/20 bg-transparent text-widget-primary focus:ring-widget-primary"
+                    className="mt-1 h-4 w-4 rounded border-neutral-300 bg-white text-widget-primary focus:ring-widget-primary"
                   />
-                  <span className="text-sm leading-6 text-widget-fg/90">
+                  <span className="text-sm leading-7 text-neutral-800">
                     {consentCopy.checkbox}
                   </span>
                 </label>
@@ -1427,7 +1450,7 @@ export default function Widget({
                     href={privacyPolicyUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-4 inline-flex text-sm font-medium text-widget-primary transition-opacity hover:opacity-80"
+                    className="mt-4 inline-flex text-sm font-medium text-widget-primary underline-offset-4 transition-opacity hover:opacity-80 hover:underline"
                   >
                     {consentCopy.privacy}
                   </a>
@@ -1436,7 +1459,7 @@ export default function Widget({
                   <button
                     type="button"
                     onClick={handleConsentDismiss}
-                    className="rounded-xl px-4 py-2.5 text-sm font-medium text-widget-muted transition-colors hover:text-widget-fg"
+                    className="rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-[#171717]"
                   >
                     {consentCopy.cancel}
                   </button>
@@ -1444,7 +1467,7 @@ export default function Widget({
                     type="button"
                     disabled={!consentChecked}
                     onClick={handleConsentContinue}
-                    className="rounded-xl bg-widget-primary px-4 py-2.5 text-sm font-semibold text-widget-primary-fg shadow-btn-glow transition-all disabled:cursor-not-allowed disabled:opacity-45"
+                    className="rounded-xl bg-widget-primary px-4 py-2.5 text-sm font-semibold text-widget-primary-fg shadow-[0_12px_30px_rgba(255,92,0,0.22)] transition-all hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {consentCopy.continue}
                   </button>

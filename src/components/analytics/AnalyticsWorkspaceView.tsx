@@ -42,6 +42,7 @@ interface DashboardAnalyticsState {
   data: DashboardAnalyticsResponse | null;
   selectedWidgetSessionId: string | null;
   selectedConversation: DashboardConversationDetailResponse | null;
+  detailCache: Record<string, DashboardConversationDetailResponse>;
 }
 
 const railItemClassName =
@@ -856,6 +857,7 @@ export function AnalyticsWorkspaceView() {
     data: null,
     selectedWidgetSessionId: null,
     selectedConversation: null,
+    detailCache: {},
   });
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
 
@@ -904,6 +906,7 @@ export function AnalyticsWorkspaceView() {
           data: null,
           selectedWidgetSessionId: null,
           selectedConversation: null,
+          detailCache: {},
         }));
       }
     };
@@ -950,6 +953,21 @@ export function AnalyticsWorkspaceView() {
     const controller = new AbortController();
 
     const loadDetail = async () => {
+      const sessionId = state.selectedWidgetSessionId;
+      if (!sessionId) {
+        return;
+      }
+
+      const cachedDetail = state.detailCache[sessionId];
+      if (cachedDetail) {
+        setState((current) => ({
+          ...current,
+          isDetailLoading: false,
+          selectedConversation: cachedDetail,
+        }));
+        return;
+      }
+
       setState((current) => ({
         ...current,
         isDetailLoading: true,
@@ -962,7 +980,7 @@ export function AnalyticsWorkspaceView() {
 
       try {
         const response = await fetch(
-          `/api/dashboard/analytics/conversations/${state.selectedWidgetSessionId}`,
+          `/api/dashboard/analytics/conversations/${sessionId}`,
           {
             cache: "no-store",
             signal: controller.signal,
@@ -982,6 +1000,10 @@ export function AnalyticsWorkspaceView() {
           ...current,
           isDetailLoading: false,
           selectedConversation: payload as DashboardConversationDetailResponse,
+          detailCache: {
+            ...current.detailCache,
+            [sessionId]: payload as DashboardConversationDetailResponse,
+          },
         }));
       } catch (error) {
         if (controller.signal.aborted || !isMounted) {

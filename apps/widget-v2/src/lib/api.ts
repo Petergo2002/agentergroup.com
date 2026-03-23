@@ -85,7 +85,7 @@ export async function getWidgetBootstrap(
 ) {
   const response = await fetch(buildWidgetUrl(widgetPublicKey, "/bootstrap"), {
     headers: buildWidgetHeaders(context, { includeContentType: false }),
-    cache: "no-store",
+    cache: context.previewToken ? "no-store" : "default",
   });
 
   if (!response.ok) {
@@ -101,7 +101,7 @@ export async function getWidgetConfig(
 ) {
   const response = await fetch(buildWidgetUrl(widgetPublicKey, "/config"), {
     headers: buildWidgetHeaders(context, { includeContentType: false }),
-    cache: "no-store",
+    cache: context.previewToken ? "no-store" : "default",
   });
 
   if (!response.ok) {

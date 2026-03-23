@@ -114,6 +114,8 @@ Important implementation docs:
 - `src/app/(app)/connections/page.tsx`
 - `src/app/(app)/knowledge/page.tsx`
 - `src/app/(app)/settings/page.tsx`
+- `src/app/(app)/settings/subprocessors/page.tsx`
+- `src/app/(app)/settings/data-processing/page.tsx`
 - `src/app/privacy-policy/page.tsx`
 - `src/app/subprocessors/page.tsx`
 - `src/app/data-processing/page.tsx`

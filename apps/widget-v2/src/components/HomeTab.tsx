@@ -48,9 +48,9 @@ export function HomeTab({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.25 }}
-        className="absolute inset-0 overflow-y-auto px-6 pb-12 pt-10 widget-scroll"
+        className="absolute inset-0 overflow-y-auto px-6 pb-12 pt-10 widget-scroll md:px-10 lg:px-14"
       >
-        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center">
+        <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center">
           <div className="mx-auto max-w-xl text-center">
             <h1 className="text-4xl font-bold tracking-tight text-widget-fg">
               {config.home.title}
@@ -107,9 +107,9 @@ export function HomeTab({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.25 }}
-      className="absolute inset-0 flex flex-col items-center overflow-y-auto px-6 pb-24 pt-16 widget-scroll md:justify-center md:pt-8 lg:pt-10"
+      className="absolute inset-0 flex flex-col items-center overflow-y-auto px-6 pb-24 pt-16 widget-scroll md:px-10 md:justify-center md:pt-8 lg:px-14 lg:pt-10"
     >
-      <div className="flex w-full max-w-2xl flex-col items-center text-center">
+      <div className="flex w-full max-w-4xl flex-col items-center text-center">
         <div className="mb-8 flex flex-col items-center">
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-widget-muted">
             {selectedAgent.label}

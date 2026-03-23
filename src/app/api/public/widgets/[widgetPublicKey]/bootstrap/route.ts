@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  buildWidgetBootstrapHeaders,
   buildStoredWidgetRuntimeConfig,
   buildWidgetAccessPayload,
   buildWidgetCorsHeaders,
@@ -67,7 +68,7 @@ export async function GET(
           accessToken: null,
           source: "preview",
         },
-        { headers: buildWidgetCorsHeaders(request) },
+        { headers: buildWidgetBootstrapHeaders(request, { preview: true }) },
       );
     }
 
@@ -106,7 +107,7 @@ export async function GET(
         accessToken,
         source: access.source,
       },
-      { headers: buildWidgetCorsHeaders(request) },
+      { headers: buildWidgetBootstrapHeaders(request) },
     );
   } catch (error) {
     return buildErrorResponse(

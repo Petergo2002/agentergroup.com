@@ -15,10 +15,11 @@ Current scope:
 - public widget conversations
 - public widget leads
 - public widget session/activity data
-- public legal pages:
+- public privacy policy:
   - `/privacy-policy`
-  - `/subprocessors`
-  - `/data-processing`
+- signed-in customer compliance pages:
+  - `/settings/subprocessors`
+  - `/settings/data-processing`
 - owner-only privacy handling inside workspace settings
 - internal retention purge route
 
@@ -41,7 +42,7 @@ Current primary subprocessors:
 - Composio
   - connected account authentication and tool execution
 
-Public references are published on `/subprocessors`.
+Customer-facing compliance references are published inside the signed-in app on `/settings/subprocessors`.
 
 ## Current Retention Policy
 

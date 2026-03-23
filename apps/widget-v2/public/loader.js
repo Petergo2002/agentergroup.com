@@ -408,7 +408,7 @@
   async function fetchBootstrap() {
     const bootstrapUrl = `${apiBaseUrl}/api/public/widgets/${encodeURIComponent(
       widgetPublicKey,
-    )}/bootstrap?_ts=${Date.now()}`;
+    )}/bootstrap${previewEnabled ? `?_ts=${Date.now()}` : ""}`;
     const headers = {};
 
     if (previewEnabled && previewToken) {
@@ -421,7 +421,7 @@
 
     const response = await fetch(bootstrapUrl, {
       headers,
-      cache: "no-store",
+      cache: previewEnabled ? "no-store" : "default",
     });
 
     if (!response.ok) {

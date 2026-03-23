@@ -5,21 +5,12 @@ import { useEffect, useState } from "react";
 import { useModals } from "@/components/ui/ModalProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAppContext } from "@/components/app/AppContext";
-import { createClient } from "@/lib/supabase/client";
 import { formatRelativeDate } from "@/lib/utils";
-import type { AgentRecord, DashboardAnalyticsResponse } from "@/lib/types";
+import type { AgentRecord, DashboardSummaryResponse } from "@/lib/types";
 
-interface DashboardOverviewState {
+interface DashboardState {
   isLoading: boolean;
-  data: DashboardAnalyticsResponse | null;
-}
-
-interface WorkspaceSummaryState {
-  isLoading: boolean;
-  totalWidgets: number;
-  liveWidgets: number;
-  connectedApps: number;
-  knowledgeSources: number;
+  data: DashboardSummaryResponse | null;
 }
 
 const summaryCardClassName =
@@ -28,23 +19,13 @@ const summaryCardClassName =
 
 
 export default function DashboardPage() {
-  const supabase = createClient();
   const { workspace } = useAppContext();
   const { openCreateAgent } = useModals();
   const { showToast } = useToast();
-  const [state, setState] = useState<DashboardOverviewState>({
+  const [state, setState] = useState<DashboardState>({
     isLoading: true,
     data: null,
   });
-  const [workspaceSummary, setWorkspaceSummary] = useState<WorkspaceSummaryState>({
-    isLoading: true,
-    totalWidgets: 0,
-    liveWidgets: 0,
-    connectedApps: 0,
-    knowledgeSources: 0,
-  });
-  const [agents, setAgents] = useState<AgentRecord[]>([]);
-  const [isAgentsLoading, setIsAgentsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -54,7 +35,7 @@ export default function DashboardPage() {
       setState({ isLoading: true, data: null });
 
       try {
-        const response = await fetch("/api/dashboard/analytics?range=30d&limit=4", {
+        const response = await fetch("/api/dashboard/summary", {
           next: { revalidate: 30 },
           signal: controller.signal,
         });
@@ -70,7 +51,7 @@ export default function DashboardPage() {
 
         setState({
           isLoading: false,
-          data: payload as DashboardAnalyticsResponse,
+          data: payload as DashboardSummaryResponse,
         });
       } catch (error) {
         if (controller.signal.aborted || !isMounted) {
@@ -97,139 +78,14 @@ export default function DashboardPage() {
       controller.abort();
     };
   }, [showToast]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadAgents = async () => {
-      setIsAgentsLoading(true);
-
-      try {
-        const { data, error } = await supabase
-          .from("agents")
-          .select("*")
-          .eq("workspace_id", workspace.id)
-          .order("updated_at", { ascending: false });
-
-        if (error) {
-          throw error;
-        }
-
-        if (!isMounted) {
-          return;
-        }
-
-        setAgents((data ?? []) as AgentRecord[]);
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        showToast(
-          error instanceof Error ? error.message : "Failed to load agents.",
-          "error",
-        );
-      } finally {
-        if (isMounted) {
-          setIsAgentsLoading(false);
-        }
-      }
-    };
-
-    void loadAgents();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [showToast, supabase, workspace.id]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadWorkspaceSummary = async () => {
-      setWorkspaceSummary((current) => ({
-        ...current,
-        isLoading: true,
-      }));
-
-      try {
-        const [
-          widgetsResult,
-          liveWidgetsResult,
-          connectedAppsResult,
-          knowledgeSourcesResult,
-        ] = await Promise.all([
-          supabase
-            .from("widgets")
-            .select("id", { count: "exact", head: true })
-            .eq("workspace_id", workspace.id),
-          supabase
-            .from("widgets")
-            .select("id", { count: "exact", head: true })
-            .eq("workspace_id", workspace.id)
-            .eq("status", "deployed"),
-          supabase
-            .from("connections")
-            .select("id", { count: "exact", head: true })
-            .eq("workspace_id", workspace.id)
-            .eq("status", "connected"),
-          supabase
-            .from("knowledge_sources")
-            .select("id", { count: "exact", head: true })
-            .eq("workspace_id", workspace.id),
-        ]);
-
-        const errors = [
-          widgetsResult.error,
-          liveWidgetsResult.error,
-          connectedAppsResult.error,
-          knowledgeSourcesResult.error,
-        ].filter(Boolean);
-
-        if (errors.length > 0) {
-          throw errors[0];
-        }
-
-        if (!isMounted) {
-          return;
-        }
-
-        setWorkspaceSummary({
-          isLoading: false,
-          totalWidgets: widgetsResult.count ?? 0,
-          liveWidgets: liveWidgetsResult.count ?? 0,
-          connectedApps: connectedAppsResult.count ?? 0,
-          knowledgeSources: knowledgeSourcesResult.count ?? 0,
-        });
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        showToast(
-          error instanceof Error
-            ? error.message
-            : "Failed to load workspace summary.",
-          "error",
-        );
-        setWorkspaceSummary({
-          isLoading: false,
-          totalWidgets: 0,
-          liveWidgets: 0,
-          connectedApps: 0,
-          knowledgeSources: 0,
-        });
-      }
-    };
-
-    void loadWorkspaceSummary();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [showToast, supabase, workspace.id]);
-
-  const recentConversations = state.data?.conversations ?? [];
+  const agents: AgentRecord[] = state.data?.agents ?? [];
+  const recentConversations = state.data?.recentConversations ?? [];
+  const workspaceSummary = state.data?.workspaceSummary ?? {
+    totalWidgets: 0,
+    liveWidgets: 0,
+    connectedApps: 0,
+    knowledgeSources: 0,
+  };
   const activeAgents = agents.filter(
     (agent) => !agent.archived_at && agent.status === "active",
   ).length;
@@ -303,7 +159,7 @@ export default function DashboardPage() {
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {state.isLoading || isAgentsLoading || workspaceSummary.isLoading
+        {state.isLoading
           ? Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
@@ -401,7 +257,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-5 space-y-3">
-            {isAgentsLoading ? (
+            {state.isLoading ? (
               Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}

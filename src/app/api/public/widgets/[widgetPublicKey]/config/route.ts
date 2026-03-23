@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  buildWidgetBootstrapHeaders,
   buildStoredWidgetRuntimeConfig,
   buildWidgetCorsHeaders,
   loadWidgetByPublicKey,
@@ -69,7 +70,11 @@ export async function GET(
             preview: preview.isPreview,
           },
         )),
-      { headers: buildWidgetCorsHeaders(request) },
+      {
+        headers: buildWidgetBootstrapHeaders(request, {
+          preview: preview.isPreview,
+        }),
+      },
     );
   } catch (error) {
     return NextResponse.json(

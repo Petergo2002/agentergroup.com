@@ -13,7 +13,7 @@
   --color-surface-container-high: #e7ebf0;
   --color-on-primary: #ffffff;
   --color-surface-dim: #e2e7ec;
-  --color-surface-container-low: #f7f8fb;
+  --color-surface-container-low: #ffffff;
   --color-surface-bright: #fbfcfe;
   --color-on-surface-variant: #667085;
   --color-surface-container: #eef2f6;
@@ -38,13 +38,13 @@
   --color-on-surface: #0f1728;
   --color-tertiary-container: #697386;
   --color-primary-fixed: #ffe3d4;
-  --color-surface: #f7f8fb;
+  --color-surface: #ffffff;
   --color-on-tertiary-fixed-variant: #404758;
   --color-error: #ba1a1a;
   --color-error-container: #ffdad6;
   --color-outline: #98a2b3;
   --color-on-tertiary: #ffffff;
-  --color-background: #f3f5f8;
+  --color-background: #ffffff;
   --color-primary-container: #ffd6c2;
   --color-tertiary: #4f5c73;
   --color-secondary: #475467;
@@ -78,7 +78,7 @@
   .app-shell-gradient {
     background:
       radial-gradient(circle at top left, rgba(242, 107, 47, 0.08), transparent 28%),
-      linear-gradient(180deg, #f7f8fb 0%, #edf1f5 100%);
+      linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
   }
 }
 
@@ -91,7 +91,7 @@ body {
   font-family: var(--font-inter), sans-serif;
   background:
     radial-gradient(circle at top left, rgba(242, 107, 47, 0.06), transparent 24%),
-    linear-gradient(180deg, #f7f8fb 0%, #eef2f6 100%);
+    linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
   color: var(--color-on-surface);
 }
 

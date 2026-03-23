@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -15,7 +16,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAppContext } from "@/components/app/AppContext";
-import { WorkspaceSwitcher } from "@/components/layout/WorkspaceSwitcher";
 
 interface SidebarProps {
   mobile?: boolean;
@@ -29,7 +29,7 @@ export function Sidebar({
   userEmail,
 }: SidebarProps) {
   const pathname = usePathname();
-  const { membership } = useAppContext();
+  const { profile, membership, workspace } = useAppContext();
   const initials = (userEmail ?? "AG").slice(0, 2).toUpperCase();
 
   const navItems = [
@@ -45,18 +45,36 @@ export function Sidebar({
   return (
     <aside
       className={`flex h-full flex-col text-on-surface ${
-        mobile ? "bg-white shadow-2xl shadow-[#0f1728]/12" : "bg-transparent sticky top-0 h-screen w-[17rem] shrink-0"
+        mobile
+          ? "bg-white shadow-2xl shadow-[#0f1728]/12"
+          : "sticky top-0 h-screen w-[17rem] shrink-0 border-r border-outline-variant/20 bg-white"
       }`}
     >
       <div className="px-6 py-5">
-        <div className="flex items-center justify-between gap-3">
+        <div className="relative">
           <div className="min-w-0 flex-1">
-            <WorkspaceSwitcher variant="sidebar-header" />
+            <div className="flex flex-col items-start gap-3 py-2 pl-1 pr-10">
+              <Image
+                src="/2.png"
+                alt="Agentergroup"
+                width={58}
+                height={58}
+                className="shrink-0 object-contain"
+              />
+              <div className="min-w-0">
+                <div className="text-[18px] font-semibold tracking-tight text-on-surface">
+                  Agentergroup
+                </div>
+                <div className="mt-1 text-[13px] font-medium text-on-surface-variant/75">
+                  {profile.full_name?.trim() || workspace.name}
+                </div>
+              </div>
+            </div>
           </div>
           {mobile ? (
             <button
               aria-label="Close sidebar"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+              className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
               onClick={onNavigate}
             >
               <X className="h-4.5 w-4.5" strokeWidth={2} />

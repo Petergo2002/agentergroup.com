@@ -396,17 +396,13 @@ export default function SettingsPage() {
                       Privacy policy
                     </a>
                     <a
-                      href="/subprocessors"
-                      target="_blank"
-                      rel="noreferrer"
+                      href="/settings/subprocessors"
                       className="rounded-full border border-outline-variant/15 bg-background px-3 py-1.5 text-on-surface-variant transition-colors hover:text-on-surface"
                     >
                       Subprocessors
                     </a>
                     <a
-                      href="/data-processing"
-                      target="_blank"
-                      rel="noreferrer"
+                      href="/settings/data-processing"
                       className="rounded-full border border-outline-variant/15 bg-background px-3 py-1.5 text-on-surface-variant transition-colors hover:text-on-surface"
                     >
                       Data processing
