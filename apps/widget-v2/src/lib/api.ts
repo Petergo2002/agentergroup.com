@@ -1,10 +1,7 @@
-import type { WidgetConfig } from "../types";
-
-type WidgetContextHeader = "embedded" | "hosted";
+import type { WidgetBootstrapResponse, WidgetConfig } from "../types";
 
 export interface WidgetRequestContext {
-  widgetContext: WidgetContextHeader;
-  parentOrigin?: string | null;
+  accessToken?: string | null;
   previewToken?: string;
   previewSource?: string;
   previewRevision?: string;
@@ -46,10 +43,8 @@ function buildWidgetHeaders(
     headers["Content-Type"] = "application/json";
   }
 
-  headers["x-ag-widget-context"] = context.widgetContext;
-
-  if (context.parentOrigin) {
-    headers["x-ag-parent-origin"] = context.parentOrigin;
+  if (context.accessToken) {
+    headers["x-ag-widget-access-token"] = context.accessToken;
   }
 
   if (context.previewToken) {
@@ -82,6 +77,22 @@ async function parseError(response: Response) {
 
 function buildWidgetUrl(widgetPublicKey: string, path: string) {
   return `${getApiBase()}/api/public/widgets/${encodeURIComponent(widgetPublicKey)}${path}`;
+}
+
+export async function getWidgetBootstrap(
+  widgetPublicKey: string,
+  context: WidgetRequestContext,
+) {
+  const response = await fetch(buildWidgetUrl(widgetPublicKey, "/bootstrap"), {
+    headers: buildWidgetHeaders(context, { includeContentType: false }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    await parseError(response);
+  }
+
+  return (await response.json()) as WidgetBootstrapResponse;
 }
 
 export async function getWidgetConfig(
@@ -117,6 +128,31 @@ export async function sendWidgetMessage(
     headers: buildWidgetHeaders(context),
     body: JSON.stringify(body),
   });
+}
+
+export async function completeWidgetSession(
+  widgetPublicKey: string,
+  body: {
+    sessionId: string;
+    reason: "inactivity_timeout";
+  },
+  context: WidgetRequestContext,
+) {
+  const response = await fetch(buildWidgetUrl(widgetPublicKey, "/complete"), {
+    method: "POST",
+    headers: buildWidgetHeaders(context),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    await parseError(response);
+  }
+
+  return (await response.json()) as {
+    ok: boolean;
+    sessionCompleted: boolean;
+    endReason: "assistant_suggestion" | "inactivity_timeout" | null;
+  };
 }
 
 

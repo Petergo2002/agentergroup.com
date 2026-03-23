@@ -20,7 +20,8 @@ import { MessagesTab } from "./components/MessagesTab";
 import { WidgetMark } from "./components/WidgetMark";
 import { useSession } from "./hooks/useSession";
 import {
-  getWidgetConfig,
+  completeWidgetSession as requestWidgetSessionCompletion,
+  getWidgetBootstrap,
   sendWidgetEvent,
   sendWidgetMessage,
   type WidgetRequestContext,
@@ -34,7 +35,9 @@ import { deriveWidgetPalette, hexToRgb } from "./theme";
 import type {
   Message,
   WidgetAgentConfig,
+  WidgetBootstrapResponse,
   WidgetConfig,
+  WidgetEndChatReason,
   WidgetPreviewOverride,
 } from "./types";
 
@@ -50,6 +53,8 @@ interface WidgetProps {
 const PREVIEW_MESSAGE_TYPE = "ag:widget-preview:update-config";
 const PREVIEW_RESET_MESSAGE_TYPE = "ag:widget-preview:reset-chat";
 const PREVIEW_REQUEST_MESSAGE_TYPE = "ag:widget-preview:request-config";
+const BOOTSTRAP_MESSAGE_TYPE = "ag:widget-bootstrap";
+const BOOTSTRAP_REQUEST_MESSAGE_TYPE = "ag:widget-bootstrap:request";
 const WIDGET_CLOSE_REQUEST_MESSAGE_TYPE = "ag:widget:close-request";
 const WIDGET_STATE_MESSAGE_TYPE = "ag:widget:state";
 const MIN_INTERIM_STREAM_RENDER_DELAY_MS = 250;
@@ -63,12 +68,16 @@ type SessionPresenceEvent =
   | "page_visible"
   | "page_unload"
   | "heartbeat";
-type WidgetContextHeader = "embedded" | "hosted";
 
 interface WidgetStateMessagePayload {
   type: typeof WIDGET_STATE_MESSAGE_TYPE;
   isOpen: boolean;
   at?: number;
+}
+
+interface WidgetBootstrapMessagePayload {
+  type: typeof BOOTSTRAP_MESSAGE_TYPE;
+  payload: WidgetBootstrapResponse;
 }
 
 interface WidgetPreviewResetPayload {
@@ -203,6 +212,20 @@ function parsePreviewResetMessage(
   };
 }
 
+function parseWidgetBootstrapMessage(
+  data: unknown,
+): WidgetBootstrapMessagePayload | null {
+  if (!isObjectRecord(data)) return null;
+  if (data.type !== BOOTSTRAP_MESSAGE_TYPE) return null;
+  if (!isObjectRecord(data.payload)) return null;
+  if (!isObjectRecord(data.payload.config)) return null;
+
+  return {
+    type: BOOTSTRAP_MESSAGE_TYPE,
+    payload: data.payload as WidgetBootstrapResponse,
+  };
+}
+
 
 
 const WIDGET_DEFAULTS: Record<"sv" | "en", {
@@ -264,12 +287,25 @@ function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
               typeof agent.icon === "string" && agent.icon.trim()
                 ? agent.icon.trim()
                 : null,
-            interactionMode: "chat",
+            interactionMode:
+              agent.interactionMode === "contact_form"
+                ? "contact_form"
+                : "chat",
             greeting: getLocalizedDefault(agent.greeting, "greeting", language),
             placeholder: getLocalizedDefault(agent.placeholder, "placeholder", language),
             quickActions: Array.isArray(agent.quickActions)
               ? agent.quickActions
               : [],
+            endChatPolicy: {
+              enabled: Boolean(agent.endChatPolicy?.enabled),
+              inactivityTimeoutSeconds:
+                typeof agent.endChatPolicy?.inactivityTimeoutSeconds === "number" &&
+                agent.endChatPolicy.inactivityTimeoutSeconds > 0
+                  ? Math.round(agent.endChatPolicy.inactivityTimeoutSeconds)
+                  : null,
+              allowAssistantSuggestion:
+                agent.endChatPolicy?.allowAssistantSuggestion !== false,
+            },
           } satisfies WidgetAgentConfig;
         })
         .filter(Boolean) as WidgetAgentConfig[]
@@ -330,9 +366,13 @@ function resolveSelectedAgent(
 
 async function readJsonError(response: Response, fallback: string) {
   const payload = await response.json().catch(() => null);
-  throw new Error(
+  const error = new Error(
     typeof payload?.error === "string" ? payload.error : fallback,
-  );
+  ) as Error & { code?: string };
+  if (typeof payload?.code === "string") {
+    error.code = payload.code;
+  }
+  throw error;
 }
 
 export default function Widget({
@@ -343,6 +383,8 @@ export default function Widget({
   previewToken,
   previewRevision,
 }: WidgetProps) {
+  const isEmbedded =
+    typeof window !== "undefined" && window.parent !== window;
   const [config, setConfig] = useState<WidgetConfig | null>(null);
   const [selectedWidgetAgentId, setSelectedWidgetAgentId] = useState<string | null>(
     null,
@@ -355,43 +397,50 @@ export default function Widget({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"home" | "messages">("home");
   const [hasUnread, setHasUnread] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [widgetContext, setWidgetContext] =
+    useState<WidgetBootstrapResponse["source"]>(
+      previewMode ? "preview" : "hosted",
+    );
+  const [isConversationCompleted, setIsConversationCompleted] = useState(false);
+  const [conversationEndReason, setConversationEndReason] =
+    useState<WidgetEndChatReason | null>(null);
   const [isWidgetOpen, setIsWidgetOpen] = useState(() =>
     typeof window !== "undefined" ? window.parent === window : true,
   );
   const [previewRevisionKey, setPreviewRevisionKey] = useState(
     previewRevision || "0",
   );
-  const widgetContext: WidgetContextHeader =
-    typeof window !== "undefined" && window.parent !== window
-      ? "embedded"
-      : "hosted";
-  const embeddedParentOrigin =
-    widgetContext === "embedded"
-      ? resolveEmbeddedParentOrigin(parentOrigin)
-      : null;
+  const embeddedParentOrigin = isEmbedded
+    ? resolveEmbeddedParentOrigin(parentOrigin)
+    : null;
   const { sessionId, reset: resetWidgetSession } = useSession(widgetPublicKey, {
     persist: !previewMode,
   });
   const sessionEventDedupRef = useRef<Record<string, number>>({});
   const previousWidgetOpenRef = useRef<boolean | null>(null);
+  const inactivityTimerRef = useRef<number | null>(null);
 
-  const requestContext = useMemo<WidgetRequestContext>(
+  const bootstrapContext = useMemo<WidgetRequestContext>(
     () => ({
-      widgetContext,
-      parentOrigin: embeddedParentOrigin,
       previewToken: previewMode ? previewToken : undefined,
       previewSource:
         previewMode ? previewSource || "widget_preview" : undefined,
       previewRevision: previewMode ? previewRevisionKey : undefined,
     }),
     [
-      embeddedParentOrigin,
       previewMode,
       previewRevisionKey,
       previewSource,
       previewToken,
-      widgetContext,
     ],
+  );
+  const requestContext = useMemo<WidgetRequestContext>(
+    () => ({
+      ...bootstrapContext,
+      accessToken,
+    }),
+    [accessToken, bootstrapContext],
   );
 
   const selectedAgent = useMemo(
@@ -399,17 +448,86 @@ export default function Widget({
     [config, selectedWidgetAgentId],
   );
 
+  const applyBootstrapPayload = useCallback((payload: WidgetBootstrapResponse) => {
+    setConfig(normalizeWidgetConfig(payload.config));
+    setAccessToken(payload.accessToken ?? null);
+    setWidgetContext(payload.source);
+    setError(null);
+  }, []);
+
+  const clearInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current !== null) {
+      window.clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+  }, []);
+
+  const markConversationCompleted = useCallback(
+    (reason: WidgetEndChatReason | null) => {
+      clearInactivityTimer();
+      setIsConversationCompleted(true);
+      setConversationEndReason(reason);
+    },
+    [clearInactivityTimer],
+  );
+
+  const armInactivityTimer = useCallback(
+    (timeoutSeconds: number | null | undefined) => {
+      clearInactivityTimer();
+
+      if (!timeoutSeconds || timeoutSeconds <= 0) {
+        return;
+      }
+
+      inactivityTimerRef.current = window.setTimeout(() => {
+        void requestWidgetSessionCompletion(
+          widgetPublicKey,
+          {
+            sessionId,
+            reason: "inactivity_timeout",
+          },
+          requestContext,
+        )
+          .then((payload) => {
+            if (payload.sessionCompleted) {
+              markConversationCompleted(
+                payload.endReason === "inactivity_timeout"
+                  ? "inactivity_timeout"
+                  : payload.endReason === "assistant_suggestion"
+                  ? "assistant_suggestion"
+                  : null,
+              );
+            }
+          })
+          .catch((nextError) => {
+            console.error("Failed to complete inactive chat:", nextError);
+          });
+      }, timeoutSeconds * 1000);
+    },
+    [
+      clearInactivityTimer,
+      markConversationCompleted,
+      requestContext,
+      sessionId,
+      widgetPublicKey,
+    ],
+  );
+
   const resetConversation = useCallback(
     (nextPreviewRevision?: string | number) => {
+      clearInactivityTimer();
       resetWidgetSession();
       setMessages([]);
       setHasStarted(false);
       setInput("");
       setIsLoading(false);
       setIsStreaming(false);
+      setIsConversationCompleted(false);
+      setConversationEndReason(null);
       setHasUnread(false);
       setActiveTab("home");
       setError(null);
+      setAccessToken(null);
       setSelectedWidgetAgentId(
         config?.home.mode === "single_auto" ? config.agents[0]?.widgetAgentId ?? null : null,
       );
@@ -422,7 +540,7 @@ export default function Widget({
           : fallbackRevision,
       );
     },
-    [config, previewMode, resetWidgetSession],
+    [clearInactivityTimer, config, previewMode, resetWidgetSession],
   );
 
   useEffect(() => {
@@ -453,6 +571,7 @@ export default function Widget({
       },
     ) => {
       if (!widgetPublicKey || !sessionId) return;
+      if (!requestContext.accessToken && !requestContext.previewToken) return;
 
       const dedupeKey = options?.dedupeKey || event;
       const dedupeWindowMs = options?.dedupeMs ?? 0;
@@ -514,20 +633,21 @@ export default function Widget({
       return;
     }
 
+    if (isEmbedded) {
+      return;
+    }
+
     let cancelled = false;
 
-    async function fetchConfig() {
+    async function fetchBootstrap() {
       try {
-        const nextConfig = normalizeWidgetConfig(
-          await getWidgetConfig(widgetPublicKey, requestContext),
-        );
+        const payload = await getWidgetBootstrap(widgetPublicKey, bootstrapContext);
         if (!cancelled) {
-          setConfig(nextConfig);
-          setError(null);
+          applyBootstrapPayload(payload);
         }
       } catch (nextError) {
         if (!cancelled) {
-          console.error("Failed to fetch widget config:", nextError);
+          console.error("Failed to bootstrap widget:", nextError);
           setError(
             nextError instanceof Error
               ? nextError.message
@@ -537,12 +657,49 @@ export default function Widget({
       }
     }
 
-    void fetchConfig();
+    void fetchBootstrap();
 
     return () => {
       cancelled = true;
     };
-  }, [requestContext, widgetPublicKey]);
+  }, [applyBootstrapPayload, bootstrapContext, isEmbedded, widgetPublicKey]);
+
+  useEffect(() => {
+    if (!widgetPublicKey || !isEmbedded) {
+      return;
+    }
+
+    const handleBootstrapMessage = (event: MessageEvent) => {
+      if (window.parent === window) return;
+      if (event.source !== window.parent) return;
+      if (!embeddedParentOrigin || event.origin !== embeddedParentOrigin) {
+        return;
+      }
+
+      const bootstrap = parseWidgetBootstrapMessage(event.data);
+      if (!bootstrap) return;
+      applyBootstrapPayload(bootstrap.payload);
+    };
+
+    window.addEventListener("message", handleBootstrapMessage);
+
+    if (window.parent !== window && embeddedParentOrigin) {
+      window.parent.postMessage(
+        { type: BOOTSTRAP_REQUEST_MESSAGE_TYPE },
+        embeddedParentOrigin,
+      );
+    }
+
+    return () => {
+      window.removeEventListener("message", handleBootstrapMessage);
+    };
+  }, [
+    applyBootstrapPayload,
+    embeddedParentOrigin,
+    isEmbedded,
+    previewRevisionKey,
+    widgetPublicKey,
+  ]);
 
   useEffect(() => {
     if (!config) return;
@@ -647,6 +804,22 @@ export default function Widget({
   }, [sendSessionEvent]);
 
   useEffect(() => {
+    return () => {
+      clearInactivityTimer();
+    };
+  }, [clearInactivityTimer]);
+
+  useEffect(() => {
+    clearInactivityTimer();
+  }, [clearInactivityTimer, selectedWidgetAgentId, sessionId]);
+
+  useEffect(() => {
+    if (isConversationCompleted) {
+      clearInactivityTimer();
+    }
+  }, [clearInactivityTimer, isConversationCompleted]);
+
+  useEffect(() => {
     if (!previewMode) return;
 
     const handlePreviewMessage = (event: MessageEvent) => {
@@ -717,15 +890,26 @@ export default function Widget({
   const sendMessage = async (text: string = input) => {
     const activeLanguage = resolveWidgetLanguage(config);
     const activeAgent = resolveSelectedAgent(config, selectedWidgetAgentId);
+    const activeEndChatPolicy =
+      activeAgent?.interactionMode === "chat"
+        ? activeAgent.endChatPolicy
+        : null;
 
     if (!text.trim()) {
       return;
     }
 
-    if (isLoading || isStreaming || !widgetPublicKey || !activeAgent) {
+    if (
+      isConversationCompleted ||
+      isLoading ||
+      isStreaming ||
+      !widgetPublicKey ||
+      !activeAgent
+    ) {
       return;
     }
 
+    clearInactivityTimer();
     if (!hasStarted) setHasStarted(true);
     setActiveTab("messages");
 
@@ -768,6 +952,9 @@ export default function Widget({
       let latestRendered = "";
       let pendingRender: number | null = null;
       let streamDone = false;
+      let streamError: Error | null = null;
+      let streamCompleted = false;
+      let streamEndReason: WidgetEndChatReason | null = null;
       const streamStartedAt = Date.now();
       let hasRevealedInterimContent = false;
 
@@ -832,6 +1019,20 @@ export default function Widget({
         }
         try {
           const parsed = JSON.parse(data);
+          if (typeof parsed?.error === "string") {
+            streamError = new Error(parsed.error);
+            streamDone = true;
+            return;
+          }
+          if (parsed?.sessionCompleted === true) {
+            streamCompleted = true;
+            streamEndReason =
+              parsed.endReason === "assistant_suggestion" ||
+              parsed.endReason === "inactivity_timeout"
+                ? parsed.endReason
+                : null;
+            markConversationCompleted(streamEndReason);
+          }
           if (typeof parsed?.content === "string") {
             fullText = parsed.content;
             scheduleRenderedFlush();
@@ -858,6 +1059,9 @@ export default function Widget({
             }
           }
 
+          if (streamError) {
+            throw streamError;
+          }
           if (streamDone) break;
           separatorIndex = sseBuffer.indexOf("\n\n");
         }
@@ -872,22 +1076,46 @@ export default function Widget({
         }
       }
 
+      if (streamError) {
+        throw streamError;
+      }
+
       flushRendered(true);
       updateAssistantMessage(
         fullText || "Sorry, something went wrong. Please try again.",
         false,
       );
       setIsStreaming(false);
+
+      if (
+        !streamCompleted &&
+        activeEndChatPolicy?.enabled &&
+        activeEndChatPolicy.inactivityTimeoutSeconds
+      ) {
+        armInactivityTimer(activeEndChatPolicy.inactivityTimeoutSeconds);
+      } else if (streamCompleted) {
+        setConversationEndReason(streamEndReason);
+      }
     } catch (nextError) {
       console.error("Chat error:", nextError);
-      setMessages((previous) =>
-        applyStreamFailureToMessages(
-          previous,
-          nextError instanceof Error
-            ? nextError.message
-            : "Sorry, something went wrong. Please try again.",
-        ),
-      );
+      const isSessionCompletedError =
+        nextError instanceof Error &&
+        "code" in nextError &&
+        (nextError as Error & { code?: string }).code === "SESSION_COMPLETED";
+
+      if (isSessionCompletedError) {
+        markConversationCompleted(null);
+        setIsStreaming(false);
+      } else {
+        setMessages((previous) =>
+          applyStreamFailureToMessages(
+            previous,
+            nextError instanceof Error
+              ? nextError.message
+              : "Sorry, something went wrong. Please try again.",
+          ),
+        );
+      }
       setIsStreaming(false);
     } finally {
       setIsLoading(false);
@@ -982,7 +1210,9 @@ export default function Widget({
             </AnimatePresence>
 
             {config.brand.logoUrl ? (
-              <img // eslint-disable-line jsx-a11y/img-redundant-alt
+              // The widget app is built with Vite, so `next/image` is not available here.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
                 src={config.brand.logoUrl}
                 alt={config.brand.name}
                 className="w-8 h-8 rounded-full object-cover"
@@ -1057,6 +1287,9 @@ export default function Widget({
                 isLoading={isLoading}
                 isStreaming={isStreaming}
                 hasStarted={hasStarted}
+                isConversationCompleted={isConversationCompleted}
+                endReason={conversationEndReason}
+                onStartNewChat={() => resetConversation()}
                 sendMessage={sendMessage}
               />
             )}

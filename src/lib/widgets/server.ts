@@ -1,8 +1,12 @@
 import type { NextRequest } from "next/server";
+import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
 import type {
   AgentRecord,
   AgentVersionRecord,
+  BuilderDefinition,
+  ConversationEndReason,
+  EndChatPolicy,
   WidgetDraftPreviewInput,
   WidgetAgentRecord,
   WidgetLeadRecord,
@@ -79,6 +83,16 @@ interface WidgetPreviewDraftRow extends WidgetPreviewDraftRecord {
   payload: WidgetDraftPreviewInput;
 }
 
+interface AgentDraftDefinitionRow {
+  agent_id: string;
+  definition: BuilderDefinition | null;
+}
+
+interface AgentVersionDefinitionRow {
+  id: string;
+  definition: BuilderDefinition | null;
+}
+
 export interface WidgetPreviewTokenPayload {
   widgetPublicKey: string;
   widgetId: string;
@@ -89,6 +103,15 @@ export interface WidgetPreviewTokenPayload {
   issuedAt: number;
 }
 
+export interface WidgetAccessTokenPayload {
+  widgetPublicKey: string;
+  widgetId: string;
+  source: "embedded" | "hosted";
+  allowedOrigin: string | null;
+  issuedAt: number;
+  expiresAt: number;
+}
+
 export interface RuntimeWidgetAgentSelection {
   widgetAgentId: string;
   persistedWidgetAgentId: string | null;
@@ -97,6 +120,7 @@ export interface RuntimeWidgetAgentSelection {
 }
 
 const WIDGET_PREVIEW_TTL_MS = 15 * 60 * 1000;
+const WIDGET_ACCESS_TTL_MS = 15 * 60 * 1000;
 const DEPLOY_TIMESTAMP_SKEW_MS = 2000;
 
 async function loadWidgetAgentsWithAgents(
@@ -167,23 +191,86 @@ export function getRequestOrigin(request: NextRequest) {
   );
 }
 
-export function getWidgetRequestSource(request: NextRequest) {
-  if (request.headers.get("x-ag-preview-token")) {
-    return "preview" as const;
-  }
-
-  const contextHeader = request.headers.get("x-ag-widget-context");
-
-  if (contextHeader === "embedded") {
-    return "embedded" as const;
-  }
-
-  return "hosted" as const;
+function getWidgetHostedOrigin() {
+  return normalizeAllowedOrigin(getWidgetAppUrl());
 }
 
-export function getRequestedParentOrigin(request: NextRequest) {
-  const headerValue = request.headers.get("x-ag-parent-origin");
-  return normalizeAllowedOrigin(headerValue) ?? getRequestOrigin(request);
+function getSignedTokenSecret(
+  envValue: string | undefined,
+  fallbackValue: string,
+) {
+  if (typeof envValue === "string" && envValue.trim()) {
+    return envValue.trim();
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return fallbackValue;
+  }
+
+  return null;
+}
+
+function decodeBase64Json<T>(value: string) {
+  try {
+    return JSON.parse(atob(value)) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function signSignedToken(payload: object, secret: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(JSON.stringify(payload));
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, data);
+  const body = btoa(JSON.stringify(payload));
+  const mac = btoa(String.fromCharCode(...new Uint8Array(signature)));
+  return `${body}.${mac}`;
+}
+
+async function verifySignedToken<T>(token: string | null, secret: string) {
+  if (!token) {
+    return null;
+  }
+
+  const [encodedPayload, encodedMac] = token.split(".");
+
+  if (!encodedPayload || !encodedMac) {
+    return null;
+  }
+
+  const payload = decodeBase64Json<T>(encodedPayload);
+
+  if (!payload) {
+    return null;
+  }
+
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"],
+  );
+  const macBytes = Uint8Array.from(atob(encodedMac), (char) =>
+    char.charCodeAt(0),
+  );
+  const payloadJson = atob(encodedPayload);
+  const isValid = await crypto.subtle.verify(
+    "HMAC",
+    key,
+    macBytes,
+    encoder.encode(payloadJson),
+  );
+
+  return isValid ? payload : null;
 }
 
 export function buildWidgetCorsHeaders(request: NextRequest) {
@@ -193,29 +280,184 @@ export function buildWidgetCorsHeaders(request: NextRequest) {
     "Access-Control-Allow-Origin": origin ?? "*",
     "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
     "Access-Control-Allow-Headers":
-      "Content-Type,x-ag-widget-context,x-ag-parent-origin,x-ag-preview-token,x-ag-preview-source,x-ag-preview-revision",
+      "Content-Type,x-ag-widget-access-token,x-ag-preview-token,x-ag-preview-source,x-ag-preview-revision,x-ag-widget-context,x-ag-parent-origin",
     "Access-Control-Allow-Credentials": "true",
     Vary: "Origin",
   };
 }
 
-export function isAllowedWidgetOrigin(
+export function getWidgetAccessTokenSecret() {
+  return getSignedTokenSecret(
+    process.env.WIDGET_ACCESS_SECRET,
+    "local-widget-access-secret",
+  );
+}
+
+export function getPreviewTokenSecret() {
+  return getSignedTokenSecret(
+    process.env.WIDGET_PREVIEW_SECRET,
+    "local-widget-preview-secret",
+  );
+}
+
+export async function signWidgetAccessToken(payload: WidgetAccessTokenPayload) {
+  const secret = getWidgetAccessTokenSecret();
+
+  if (!secret) {
+    throw new Error(
+      "WIDGET_ACCESS_SECRET is missing. Set it in production to enable widget runtime access tokens.",
+    );
+  }
+
+  return signSignedToken(payload, secret);
+}
+
+export async function verifyWidgetAccessToken(
+  token: string | null,
+  expectedWidgetPublicKey: string,
+) {
+  const secret = getWidgetAccessTokenSecret();
+
+  if (!secret) {
+    return null;
+  }
+
+  const payload = await verifySignedToken<WidgetAccessTokenPayload>(token, secret);
+
+  if (!payload) {
+    return null;
+  }
+
+  if (
+    payload.widgetPublicKey !== expectedWidgetPublicKey ||
+    typeof payload.widgetId !== "string" ||
+    (payload.source !== "embedded" && payload.source !== "hosted") ||
+    typeof payload.issuedAt !== "number" ||
+    typeof payload.expiresAt !== "number" ||
+    payload.expiresAt <= Date.now()
+  ) {
+    return null;
+  }
+
+  if (
+    payload.allowedOrigin !== null &&
+    normalizeAllowedOrigin(payload.allowedOrigin) !== payload.allowedOrigin
+  ) {
+    return null;
+  }
+
+  return payload;
+}
+
+export function resolveWidgetBootstrapAccess(
   widget: WidgetRecord,
   request: NextRequest,
 ) {
-  const source = getWidgetRequestSource(request);
+  const requestOrigin = getRequestOrigin(request);
+  const hostedOrigin = getWidgetHostedOrigin();
 
-  if (source !== "embedded") {
-    return true;
+  if (requestOrigin && hostedOrigin && requestOrigin === hostedOrigin) {
+    if (!widget.hosted_enabled) {
+      return {
+        ok: false as const,
+        status: 403,
+        error: "Hosted widget access is disabled.",
+        code: "HOSTED_WIDGET_DISABLED",
+      };
+    }
+
+    return {
+      ok: true as const,
+      source: "hosted" as const,
+      allowedOrigin: null,
+      origin: requestOrigin,
+    };
   }
 
-  const requestedOrigin = getRequestedParentOrigin(request);
+  const allowedOrigins = normalizeAllowedOrigins(widget.allowed_origins);
 
-  if (!requestedOrigin) {
-    return false;
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    return {
+      ok: true as const,
+      source: "embedded" as const,
+      allowedOrigin: requestOrigin,
+      origin: requestOrigin,
+    };
   }
 
-  return normalizeAllowedOrigins(widget.allowed_origins).includes(requestedOrigin);
+  return {
+    ok: false as const,
+    status: 403,
+    error: requestOrigin ? "Domain is not allowed." : "Request origin is missing.",
+    code: requestOrigin ? "WIDGET_DOMAIN_NOT_ALLOWED" : "WIDGET_ORIGIN_REQUIRED",
+  };
+}
+
+export async function resolveWidgetRuntimeAccess(args: {
+  request: NextRequest;
+  widget: WidgetRecord;
+  preview: {
+    isPreview: boolean;
+    previewPayload: WidgetPreviewTokenPayload | null;
+  };
+}) {
+  const { request, widget, preview } = args;
+
+  if (preview.isPreview && preview.previewPayload) {
+    return {
+      ok: true as const,
+      source: "preview" as const,
+      origin: getRequestOrigin(request),
+    };
+  }
+
+  const accessToken = await verifyWidgetAccessToken(
+    request.headers.get("x-ag-widget-access-token"),
+    widget.widget_public_key,
+  );
+
+  if (!accessToken || accessToken.widgetId !== widget.id) {
+    return {
+      ok: false as const,
+      status: 401,
+      error: "Missing or invalid widget access token.",
+      code: "WIDGET_ACCESS_TOKEN_INVALID",
+    };
+  }
+
+  if (accessToken.source === "hosted") {
+    if (!widget.hosted_enabled) {
+      return {
+        ok: false as const,
+        status: 403,
+        error: "Hosted widget access is disabled.",
+        code: "HOSTED_WIDGET_DISABLED",
+      };
+    }
+
+    return {
+      ok: true as const,
+      source: "hosted" as const,
+      origin: getWidgetHostedOrigin(),
+    };
+  }
+
+  const allowedOrigins = normalizeAllowedOrigins(widget.allowed_origins);
+
+  if (!accessToken.allowedOrigin || !allowedOrigins.includes(accessToken.allowedOrigin)) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Domain is not allowed.",
+      code: "WIDGET_DOMAIN_NOT_ALLOWED",
+    };
+  }
+
+  return {
+    ok: true as const,
+    source: "embedded" as const,
+    origin: accessToken.allowedOrigin,
+  };
 }
 
 export async function loadWidgetById(
@@ -378,6 +620,145 @@ export function getWidgetRuntimeAgent(
     instructions: config?.instructions ?? agent.instructions,
     timezone: config?.timezone ?? agent.timezone ?? 'UTC',
   };
+}
+
+async function loadAgentDraftDefinitionsByAgentId(
+  supabase: WidgetAdminSupabase,
+  agentIds: string[],
+) {
+  if (agentIds.length === 0) {
+    return new Map<string, BuilderDefinition>();
+  }
+
+  const { data, error } = await (supabase
+    .from("agent_drafts")
+    .select("agent_id, definition")
+    .in("agent_id", agentIds) as unknown as Promise<{
+    data: AgentDraftDefinitionRow[] | null;
+    error: { message: string } | null;
+  }>);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return new Map(
+    ((data ?? []) as AgentDraftDefinitionRow[])
+      .filter((row) => row.definition)
+      .map((row) => [row.agent_id, row.definition as BuilderDefinition]),
+  );
+}
+
+async function loadAgentVersionDefinitionsById(
+  supabase: WidgetAdminSupabase,
+  versionIds: string[],
+) {
+  if (versionIds.length === 0) {
+    return new Map<string, BuilderDefinition>();
+  }
+
+  const { data, error } = await (supabase
+    .from("agent_versions")
+    .select("id, definition")
+    .in("id", versionIds) as unknown as Promise<{
+    data: AgentVersionDefinitionRow[] | null;
+    error: { message: string } | null;
+  }>);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return new Map(
+    ((data ?? []) as AgentVersionDefinitionRow[])
+      .filter((row) => row.definition)
+      .map((row) => [row.id, row.definition as BuilderDefinition]),
+  );
+}
+
+async function buildStoredEndChatPoliciesByAgentId(
+  supabase: WidgetAdminSupabase,
+  widgetAgents: WidgetAgentWithAgent[],
+) {
+  const versionIds = Array.from(
+    new Set(
+      widgetAgents
+        .map(({ widgetAgent }) => widgetAgent.published_version_id)
+        .filter(Boolean) as string[],
+    ),
+  );
+  const definitionsByVersionId = await loadAgentVersionDefinitionsById(
+    supabase,
+    versionIds,
+  );
+  const policiesByAgentId = new Map<string, EndChatPolicy>();
+
+  for (const { widgetAgent, agent } of widgetAgents) {
+    const definition = widgetAgent.published_version_id
+      ? definitionsByVersionId.get(widgetAgent.published_version_id)
+      : null;
+    policiesByAgentId.set(
+      agent.id,
+      extractEndChatPolicyFromDefinition(definition),
+    );
+  }
+
+  return policiesByAgentId;
+}
+
+async function buildDraftEndChatPoliciesByAgentId(
+  supabase: WidgetAdminSupabase,
+  draft: WidgetDraftPreviewInput,
+) {
+  const agentIds = Array.from(new Set(draft.agents.map((agent) => agent.agentId)));
+  const definitionsByAgentId = await loadAgentDraftDefinitionsByAgentId(
+    supabase,
+    agentIds,
+  );
+  const policiesByAgentId = new Map<string, EndChatPolicy>();
+
+  for (const agentId of agentIds) {
+    policiesByAgentId.set(
+      agentId,
+      extractEndChatPolicyFromDefinition(definitionsByAgentId.get(agentId)),
+    );
+  }
+
+  return policiesByAgentId;
+}
+
+export async function buildStoredWidgetRuntimeConfig(
+  supabase: WidgetAdminSupabase,
+  widget: WidgetRecord,
+  widgetAgents: WidgetAgentWithAgent[],
+  options?: { preview?: boolean },
+) {
+  const endChatPoliciesByAgentId = await buildStoredEndChatPoliciesByAgentId(
+    supabase,
+    widgetAgents,
+  );
+
+  return buildWidgetRuntimeConfig(widget, widgetAgents, {
+    preview: options?.preview,
+    endChatPoliciesByAgentId,
+  });
+}
+
+export async function buildDraftWidgetRuntimeConfig(
+  supabase: WidgetAdminSupabase,
+  widget: WidgetRecord,
+  draft: WidgetDraftPreviewInput,
+  options?: { preview?: boolean },
+) {
+  const endChatPoliciesByAgentId = await buildDraftEndChatPoliciesByAgentId(
+    supabase,
+    draft,
+  );
+
+  return buildWidgetRuntimeConfigFromDraft(widget, draft, {
+    preview: options?.preview,
+    endChatPoliciesByAgentId,
+  });
 }
 
 export function getWidgetNeedsRedeploy(
@@ -555,15 +936,17 @@ export async function resolveWidgetPreviewContext(
     requestedRevision,
   );
 
+  const runtimeConfig = previewDraft
+    ? await buildDraftWidgetRuntimeConfig(supabase, widget, previewDraft.payload, {
+        preview: true,
+      })
+    : null;
+
   return {
     isPreview: true,
     previewPayload,
     previewDraft,
-    runtimeConfig: previewDraft
-      ? buildWidgetRuntimeConfigFromDraft(widget, previewDraft.payload, {
-          preview: true,
-        })
-      : null,
+    runtimeConfig,
   };
 }
 
@@ -621,6 +1004,11 @@ export async function upsertWidgetSession(
     origin?: string | null;
     activeWidgetAgentId?: string | null;
     activeAgentId?: string | null;
+    status?: WidgetSessionRecord["status"];
+    endedAt?: string | null;
+    endReason?: ConversationEndReason | null;
+    lastUserMessageAt?: string | null;
+    lastAssistantMessageAt?: string | null;
   },
 ) {
   const timestamp = new Date().toISOString();
@@ -642,6 +1030,26 @@ export async function upsertWidgetSession(
     payload.active_agent_id = input.activeAgentId;
   }
 
+  if (input.status !== undefined) {
+    payload.status = input.status;
+  }
+
+  if (input.endedAt !== undefined) {
+    payload.ended_at = input.endedAt;
+  }
+
+  if (input.endReason !== undefined) {
+    payload.end_reason = input.endReason;
+  }
+
+  if (input.lastUserMessageAt !== undefined) {
+    payload.last_user_message_at = input.lastUserMessageAt;
+  }
+
+  if (input.lastAssistantMessageAt !== undefined) {
+    payload.last_assistant_message_at = input.lastAssistantMessageAt;
+  }
+
   const { data, error } = await supabase
     .from("widget_sessions")
     .upsert(payload, { onConflict: "widget_id,session_id" })
@@ -653,6 +1061,46 @@ export async function upsertWidgetSession(
   }
 
   return data as WidgetSessionRecord;
+}
+
+export async function completeWidgetSession(
+  supabase: WidgetAdminSupabase,
+  input: {
+    session: WidgetSessionRecord;
+    reason: ConversationEndReason;
+    completedAt?: string;
+    lastAssistantMessageAt?: string | null;
+  },
+) {
+  if (input.session.status === "completed") {
+    return input.session;
+  }
+
+  const completedAt = input.completedAt ?? new Date().toISOString();
+
+  return upsertWidgetSession(supabase, {
+    widgetId: input.session.widget_id,
+    sessionId: input.session.session_id,
+    source: input.session.source,
+    pageUrl: input.session.page_url,
+    referrer: input.session.referrer,
+    origin: input.session.origin,
+    activeWidgetAgentId: input.session.active_widget_agent_id,
+    activeAgentId: input.session.active_agent_id,
+    status: "completed",
+    endedAt: completedAt,
+    endReason: input.reason,
+    lastAssistantMessageAt:
+      input.lastAssistantMessageAt ?? input.session.last_assistant_message_at,
+  });
+}
+
+export async function handleConversationCompleted(_input: {
+  widget: WidgetRecord;
+  session: WidgetSessionRecord;
+  reason: ConversationEndReason;
+}) {
+  // Future after-chat actions will attach here.
 }
 
 export async function loadWidgetSession(
@@ -766,21 +1214,6 @@ export async function insertWidgetLead(
   return data as WidgetLeadRecord;
 }
 
-export function getPreviewTokenSecret() {
-  const configuredSecret =
-    process.env.WIDGET_PREVIEW_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (configuredSecret) {
-    return configuredSecret;
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    return "local-widget-preview-secret";
-  }
-
-  return null;
-}
-
 export async function signWidgetPreviewToken(payload: Record<string, unknown>) {
   const secret = getPreviewTokenSecret();
 
@@ -790,19 +1223,7 @@ export async function signWidgetPreviewToken(payload: Record<string, unknown>) {
     );
   }
 
-  const encoder = new TextEncoder();
-  const data = encoder.encode(JSON.stringify(payload));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, data);
-  const body = btoa(JSON.stringify(payload));
-  const mac = btoa(String.fromCharCode(...new Uint8Array(signature)));
-  return `${body}.${mac}`;
+  return signSignedToken(payload, secret);
 }
 
 export async function verifyWidgetPreviewToken(
@@ -819,19 +1240,9 @@ export async function verifyWidgetPreviewToken(
     return false;
   }
 
-  const [encodedPayload, encodedMac] = token.split(".");
+  const payload = await verifySignedToken<WidgetPreviewTokenPayload>(token, secret);
 
-  if (!encodedPayload || !encodedMac) {
-    return null;
-  }
-
-  let payloadJson: string;
-  let payload: WidgetPreviewTokenPayload;
-
-  try {
-    payloadJson = atob(encodedPayload);
-    payload = JSON.parse(payloadJson) as WidgetPreviewTokenPayload;
-  } catch {
+  if (!payload) {
     return null;
   }
 
@@ -847,24 +1258,7 @@ export async function verifyWidgetPreviewToken(
     return null;
   }
 
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"],
-  );
-
-  const macBytes = Uint8Array.from(atob(encodedMac), (char) => char.charCodeAt(0));
-  const isValid = await crypto.subtle.verify(
-    "HMAC",
-    key,
-    macBytes,
-    encoder.encode(payloadJson),
-  );
-
-  return isValid ? payload : null;
+  return payload;
 }
 
 export function buildWidgetPreviewPayload(input: {
@@ -889,4 +1283,24 @@ export function buildWidgetPreviewPayload(input: {
     issuedAt,
     expiresAt,
   };
+}
+
+export function buildWidgetAccessPayload(input: {
+  widgetPublicKey: string;
+  widgetId: string;
+  source: "embedded" | "hosted";
+  allowedOrigin: string | null;
+  expiresInMs?: number;
+}) {
+  const issuedAt = Date.now();
+  const expiresAt = issuedAt + (input.expiresInMs ?? WIDGET_ACCESS_TTL_MS);
+
+  return {
+    widgetPublicKey: input.widgetPublicKey,
+    widgetId: input.widgetId,
+    source: input.source,
+    allowedOrigin: input.allowedOrigin,
+    issuedAt,
+    expiresAt,
+  } satisfies WidgetAccessTokenPayload;
 }

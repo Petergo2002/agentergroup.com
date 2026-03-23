@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildWidgetCorsHeaders,
+  completeWidgetSession,
+  handleConversationCompleted,
   loadWidgetByPublicKey,
+  loadWidgetSession,
   resolveWidgetPreviewContext,
   resolveWidgetRuntimeAccess,
   type WidgetAdminSupabase,
-  upsertWidgetSession,
 } from "@/lib/widgets/server";
 
 function buildErrorResponse(
@@ -69,31 +71,59 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
     const sessionId = String(body.sessionId ?? "").trim();
-    const pageUrl = String(body.pageUrl ?? "").trim() || null;
-    const referrer = String(body.referrer ?? "").trim() || null;
+    const reason = String(body.reason ?? "").trim();
 
     if (!sessionId) {
       return buildErrorResponse(request, 400, "sessionId is required.");
     }
 
-    await upsertWidgetSession(supabase, {
-      widgetId: loaded.widget.id,
-      sessionId,
-      source: access.source,
-      pageUrl,
-      referrer,
-      origin: access.origin,
+    if (reason !== "inactivity_timeout") {
+      return buildErrorResponse(
+        request,
+        400,
+        "Unsupported completion reason.",
+        "INVALID_END_REASON",
+      );
+    }
+
+    const session = await loadWidgetSession(supabase, loaded.widget.id, sessionId);
+
+    if (!session) {
+      return buildErrorResponse(
+        request,
+        404,
+        "Session not found.",
+        "SESSION_NOT_FOUND",
+      );
+    }
+
+    const wasCompleted = session.status === "completed";
+    const completedSession = await completeWidgetSession(supabase, {
+      session,
+      reason: "inactivity_timeout",
     });
 
+    if (!wasCompleted) {
+      await handleConversationCompleted({
+        widget: loaded.widget,
+        session: completedSession,
+        reason: "inactivity_timeout",
+      });
+    }
+
     return NextResponse.json(
-      { ok: true },
+      {
+        ok: true,
+        sessionCompleted: true,
+        endReason: completedSession.end_reason,
+      },
       { headers: buildWidgetCorsHeaders(request) },
     );
   } catch (error) {
     return buildErrorResponse(
       request,
       500,
-      error instanceof Error ? error.message : "Failed to record widget event.",
+      error instanceof Error ? error.message : "Failed to complete chat session.",
     );
   }
 }

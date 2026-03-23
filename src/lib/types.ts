@@ -180,6 +180,7 @@ export interface WidgetDeploymentRecord {
   language: string;
   home_title: string | null;
   home_subtitle: string | null;
+  hosted_enabled: boolean;
   greeting: string;
   placeholder: string;
   show_branding: boolean;
@@ -209,6 +210,7 @@ export interface WidgetRecord {
   language: string;
   home_title: string | null;
   home_subtitle: string | null;
+  hosted_enabled: boolean;
   show_branding: boolean;
   privacy_policy_url: string | null;
   allowed_origins: string[];
@@ -241,11 +243,16 @@ export interface WidgetSessionRecord {
   widget_id: string;
   session_id: string;
   source: "embedded" | "hosted" | "preview";
+  status: "active" | "completed";
   page_url: string | null;
   referrer: string | null;
   origin: string | null;
   active_widget_agent_id: string | null;
   active_agent_id: string | null;
+  ended_at: string | null;
+  end_reason: ConversationEndReason | null;
+  last_user_message_at: string | null;
+  last_assistant_message_at: string | null;
   first_seen_at: string;
   last_seen_at: string;
 }
@@ -492,6 +499,7 @@ export interface WidgetRuntimeConfig {
     placeholder: string;
     quickActions: WidgetQuickAction[];
     contactFormSettings: WidgetContactFormSettingsRecord;
+    endChatPolicy: EndChatPolicy;
   }>;
 }
 
@@ -576,12 +584,31 @@ export interface AuditLogRecord {
   created_at: string;
 }
 
+export type ConversationEndReason =
+  | "assistant_suggestion"
+  | "inactivity_timeout";
+
+export interface EndChatPolicy {
+  enabled: boolean;
+  inactivityTimeoutSeconds: number | null;
+  allowAssistantSuggestion: boolean;
+}
+
+export interface EndChatMetadata {
+  suggested: boolean;
+  sessionCompleted: boolean;
+  reason: ConversationEndReason | null;
+  source: "assistant" | "system";
+  summary?: string | null;
+}
+
 export type BuilderNodeKind =
   | "trigger"
   | "agent"
   | "knowledge"
   | "gmail"
   | "googlecalendar"
+  | "endchat"
   | "output";
 
 export type BuilderNodeStatus = "active" | "idle" | "error";
@@ -633,6 +660,12 @@ export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
   simpleIconColor?: string;
 }
 
+export interface EndChatBuilderNodeData extends BaseBuilderNodeData {
+  kind: "endchat";
+  inactivityTimeoutSeconds: number | null;
+  allowAssistantSuggestion: boolean;
+}
+
 export interface OutputBuilderNodeData extends BaseBuilderNodeData {
   kind: "output";
   locked: true;
@@ -644,6 +677,7 @@ export type BuilderNodeData =
   | KnowledgeBuilderNodeData
   | GmailBuilderNodeData
   | GoogleCalendarBuilderNodeData
+  | EndChatBuilderNodeData
   | OutputBuilderNodeData;
 
 export interface BuilderDefinition {

@@ -1,6 +1,8 @@
 import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
+import { buildDisabledEndChatPolicy } from "@/lib/end-chat";
 import type {
   AgentRecord,
+  EndChatPolicy,
   WidgetDraftPreviewInput,
   WidgetAgentRecord,
   WidgetContactFormSettingsRecord,
@@ -108,6 +110,7 @@ export function buildDefaultWidgetInput(
     language: "en",
     home_title: null,
     home_subtitle: null,
+    hosted_enabled: true,
     show_branding: true,
     privacy_policy_url: `${getAppUrl()}/privacy-policy`,
     allowed_origins: [] as string[],
@@ -188,7 +191,10 @@ function normalizeContactFormSettings(value: unknown) {
 export function buildWidgetRuntimeConfig(
   widget: WidgetRecord,
   widgetAgents: WidgetAgentWithAgent[],
-  options?: { preview?: boolean },
+  options?: {
+    preview?: boolean;
+    endChatPoliciesByAgentId?: Map<string, EndChatPolicy>;
+  },
 ): WidgetRuntimeConfig {
   const orderedAgents = [...widgetAgents].sort(
     (left, right) => left.widgetAgent.sort_order - right.widgetAgent.sort_order,
@@ -229,6 +235,9 @@ export function buildWidgetRuntimeConfig(
       contactFormSettings: normalizeContactFormSettings(
         widgetAgent.contact_form_settings,
       ),
+      endChatPolicy:
+        options?.endChatPoliciesByAgentId?.get(agent.id) ??
+        buildDisabledEndChatPolicy(),
     })),
   };
 }
@@ -236,7 +245,10 @@ export function buildWidgetRuntimeConfig(
 export function buildWidgetRuntimeConfigFromDraft(
   widget: WidgetRecord,
   draft: WidgetDraftPreviewInput,
-  options?: { preview?: boolean },
+  options?: {
+    preview?: boolean;
+    endChatPoliciesByAgentId?: Map<string, EndChatPolicy>;
+  },
 ): WidgetRuntimeConfig {
   const orderedAgents = [...draft.agents].sort(
     (left, right) => left.sortOrder - right.sortOrder,
@@ -275,6 +287,9 @@ export function buildWidgetRuntimeConfigFromDraft(
       placeholder: agent.placeholder.trim() || getPlaceholderDefault(draft.widget.language || "en"),
       quickActions: normalizeQuickActions(agent.quickActions, []),
       contactFormSettings: normalizeContactFormSettings(agent.contactFormSettings),
+      endChatPolicy:
+        options?.endChatPoliciesByAgentId?.get(agent.agentId) ??
+        buildDisabledEndChatPolicy(),
     })),
   };
 }

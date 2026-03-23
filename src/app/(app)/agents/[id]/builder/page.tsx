@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/ToastProvider';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { buildInitialDefinition } from '@/lib/agents/defaults';
+import { DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS } from '@/lib/end-chat';
 import { getSupportedIntegration, isChatIntegrationSlug } from '@/lib/integrations';
 import { getKnowledgeStatusTone, isReadyKnowledgeSource } from '@/lib/knowledge';
 import { formatRelativeDate } from '@/lib/utils';
@@ -31,6 +32,7 @@ import type {
   BuilderNodeData,
   BuilderNodeKind,
   ConnectionRecord,
+  EndChatBuilderNodeData,
   GmailBuilderNodeData,
   GoogleCalendarBuilderNodeData,
   KnowledgeBuilderNodeData,
@@ -61,7 +63,7 @@ type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
 type ToolNodeKind = 'gmail' | 'googlecalendar';
 type ToolNodeData = GmailBuilderNodeData | GoogleCalendarBuilderNodeData;
-type LibraryItemKey = 'knowledge' | 'tools' | 'agent' | 'output';
+type LibraryItemKey = 'knowledge' | 'tools' | 'endchat' | 'agent' | 'output';
 
 interface NodeLibraryItem {
   key: LibraryItemKey;
@@ -101,6 +103,7 @@ const DEFAULT_POSITIONS: Record<BuilderNodeKind, { x: number; y: number }> = {
   gmail: { x: 610, y: 220 },
   googlecalendar: { x: 610, y: 360 },
   output: { x: 930, y: 150 },
+  endchat: { x: 1210, y: 150 },
 };
 
 const NODE_LIBRARY: NodeLibraryItem[] = [
@@ -122,6 +125,12 @@ const NODE_LIBRARY: NodeLibraryItem[] = [
     label: 'Connected Tools',
     icon: 'build',
     description: 'Pick Gmail or Google Calendar for live in-chat actions.',
+  },
+  {
+    key: 'endchat',
+    label: 'End Chat',
+    icon: 'stop_circle',
+    description: 'Define when the backend should close the conversation.',
   },
   {
     key: 'output',
@@ -283,6 +292,10 @@ function isKnowledgeNodeData(data: BuilderNodeData): data is KnowledgeBuilderNod
   return data.kind === 'knowledge';
 }
 
+function isEndChatNodeData(data: BuilderNodeData): data is EndChatBuilderNodeData {
+  return data.kind === 'endchat';
+}
+
 function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
   return (
     value === 'trigger' ||
@@ -290,6 +303,7 @@ function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
     value === 'knowledge' ||
     value === 'gmail' ||
     value === 'googlecalendar' ||
+    value === 'endchat' ||
     value === 'output'
   );
 }
@@ -302,6 +316,7 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
   const hasKnowledge = nodes.some((node) => node.data.kind === 'knowledge');
   const hasGmail = nodes.some((node) => node.data.kind === 'gmail');
   const hasCalendar = nodes.some((node) => node.data.kind === 'googlecalendar');
+  const hasEndChat = nodes.some((node) => node.data.kind === 'endchat');
 
   const edges: BuilderFlowEdge[] = [
     {
@@ -342,6 +357,15 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
       id: 'e-agent-googlecalendar',
       source: FIXED_NODE_IDS.agent,
       target: 'googlecalendar',
+      style: DEFAULT_EDGE_STYLE,
+    });
+  }
+
+  if (hasEndChat) {
+    edges.push({
+      id: 'e-response-endchat',
+      source: FIXED_NODE_IDS.output,
+      target: 'endchat',
       style: DEFAULT_EDGE_STYLE,
     });
   }
@@ -491,6 +515,28 @@ function createOutputNode(
   };
 }
 
+function createEndChatNode(
+  position = DEFAULT_POSITIONS.endchat,
+  data?: Partial<EndChatBuilderNodeData>,
+): BuilderFlowNode {
+  return {
+    id: 'endchat',
+    type: 'agentNode',
+    position,
+    data: {
+      kind: 'endchat',
+      label: 'End Chat',
+      type: 'Control',
+      icon: 'stop_circle',
+      description: 'Closes the session when end conditions are met.',
+      status: 'idle',
+      inactivityTimeoutSeconds: DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS,
+      allowAssistantSuggestion: true,
+      ...(data ?? {}),
+    } as BuilderNodeData,
+  };
+}
+
 function inferNodeKind(node: BuilderFlowNode) {
   const data = (node.data ?? {}) as Record<string, unknown>;
   const rawKind = data.kind;
@@ -524,6 +570,10 @@ function inferNodeKind(node: BuilderFlowNode) {
 
   if (label === 'assistant response' || type === 'output') {
     return 'output';
+  }
+
+  if (label === 'end chat' || type === 'control') {
+    return 'endchat';
   }
 
   if (label === 'connected tools' || type === 'tools' || type === 'tooling') {
@@ -593,6 +643,7 @@ function normalizeDefinition(
 
   const gmailNode = nodesByKind.get('gmail');
   const calendarNode = nodesByKind.get('googlecalendar');
+  const endChatNode = nodesByKind.get('endchat');
   const gmailConnectionId = pickPreferredConnectionId(
     connections,
     attachedConnectionIds,
@@ -642,6 +693,20 @@ function normalizeDefinition(
   normalizedNodes.push(
     createOutputNode(nodesByKind.get('output')?.position ?? DEFAULT_POSITIONS.output),
   );
+
+  if (endChatNode && isEndChatNodeData(endChatNode.data)) {
+    normalizedNodes.push(
+      createEndChatNode(
+        endChatNode.position ?? DEFAULT_POSITIONS.endchat,
+        {
+          inactivityTimeoutSeconds:
+            endChatNode.data.inactivityTimeoutSeconds ?? null,
+          allowAssistantSuggestion:
+            endChatNode.data.allowAssistantSuggestion ?? true,
+        },
+      ),
+    );
+  }
 
   const requiresToolReview =
     hasLegacyToolsNode &&
@@ -699,6 +764,25 @@ function enrichNodeForDisplay(
         ...node.data,
         badgeText,
         badgeTone,
+      },
+    };
+  }
+
+  if (isEndChatNodeData(node.data)) {
+    const timeoutLabel =
+      typeof node.data.inactivityTimeoutSeconds === 'number'
+        ? `${node.data.inactivityTimeoutSeconds}s timeout`
+        : 'No inactivity timeout';
+    const suggestionLabel = node.data.allowAssistantSuggestion
+      ? 'AI can suggest end'
+      : 'System-only ending';
+
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        badgeText: `${timeoutLabel} • ${suggestionLabel}`,
+        badgeTone: 'success',
       },
     };
   }
@@ -1024,6 +1108,18 @@ export default function AgentBuilderPage() {
     setSelectedNodeId(node.id);
   };
 
+  const handleAddEndChatNode = () => {
+    if (nodes.some((node) => node.data.kind === 'endchat')) {
+      showToast('End Chat is already on the canvas.', 'error');
+      return;
+    }
+
+    saveToHistory();
+    const node = createEndChatNode();
+    setNodes((currentNodes) => [...currentNodes, node]);
+    setSelectedNodeId(node.id);
+  };
+
   const handleAddToolNode = (kind: ToolNodeKind) => {
     if (nodes.some((node) => node.data.kind === kind)) {
       showToast(`${getSupportedIntegration(kind)?.displayName ?? 'This tool'} is already on the canvas.`, 'error');
@@ -1266,6 +1362,7 @@ export default function AgentBuilderPage() {
 
   const knowledgeNode = selectedNode?.data.kind === 'knowledge' ? selectedNode : null;
   const toolNode = selectedNode && isToolNodeData(selectedNode.data) ? selectedNode : null;
+  const endChatNode = selectedNode && isEndChatNodeData(selectedNode.data) ? selectedNode : null;
   const toolOptions = TOOL_NODE_KINDS.map((kind) => {
     const integration = getSupportedIntegration(kind);
     const connectedCount = connections.filter(
@@ -1604,6 +1701,80 @@ export default function AgentBuilderPage() {
       );
     }
 
+    if (endChatNode && isEndChatNodeData(endChatNode.data)) {
+      const timeoutValue =
+        typeof endChatNode.data.inactivityTimeoutSeconds === 'number'
+          ? String(endChatNode.data.inactivityTimeoutSeconds)
+          : '';
+
+      return (
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-on-surface-variant">
+            Control when the backend should mark the conversation completed.
+          </p>
+          <label className="flex items-start gap-3 rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
+            <input
+              type="checkbox"
+              checked={endChatNode.data.allowAssistantSuggestion}
+              onChange={(event) =>
+                updateNode(endChatNode.id, (node) => ({
+                  ...node,
+                  data: {
+                    ...node.data,
+                    allowAssistantSuggestion: event.target.checked,
+                  },
+                }))
+              }
+              className="mt-1"
+            />
+            <div>
+              <p className="text-sm font-semibold text-on-surface">
+                Assistant may suggest ending
+              </p>
+              <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+                The model can suggest completion, but the backend still owns the final close.
+              </p>
+            </div>
+          </label>
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+              Inactivity Timeout (seconds)
+            </label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={timeoutValue}
+              onChange={(event) => {
+                const rawValue = event.target.value.trim();
+                updateNode(endChatNode.id, (node) => ({
+                  ...node,
+                  data: {
+                    ...node.data,
+                    inactivityTimeoutSeconds: rawValue
+                      ? Math.max(1, Math.round(Number(rawValue) || 0))
+                      : null,
+                  },
+                }));
+              }}
+              onKeyDown={stopBuilderFieldKeyDown}
+              placeholder="120"
+              className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
+            />
+            <p className="mt-2 text-xs text-on-surface-variant">
+              Leave empty to disable inactivity-based ending.
+            </p>
+          </div>
+          <button
+            onClick={() => removeOptionalNode('endchat')}
+            className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+          >
+            Remove Node
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         <p className="text-sm leading-6 text-on-surface-variant">
@@ -1708,8 +1879,11 @@ export default function AgentBuilderPage() {
                   const isKnowledgeAdded =
                     item.key === 'knowledge' &&
                     nodes.some((node) => node.data.kind === 'knowledge');
+                  const isEndChatAdded =
+                    item.key === 'endchat' &&
+                    nodes.some((node) => node.data.kind === 'endchat');
                   const isFixed = item.fixed;
-                  const isDisabled = isKnowledgeAdded || isFixed;
+                  const isDisabled = isKnowledgeAdded || isEndChatAdded || isFixed;
 
                   return (
                     <button
@@ -1717,6 +1891,8 @@ export default function AgentBuilderPage() {
                       onClick={() =>
                         item.key === 'knowledge'
                           ? handleAddKnowledgeNode()
+                          : item.key === 'endchat'
+                          ? handleAddEndChatNode()
                           : item.key === 'tools'
                           ? setIsToolPickerOpen(true)
                           : undefined
@@ -1740,7 +1916,7 @@ export default function AgentBuilderPage() {
                             <span className="rounded-full bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                               Fixed
                             </span>
-                          ) : isKnowledgeAdded ? (
+                          ) : isKnowledgeAdded || isEndChatAdded ? (
                             <span className="rounded-full bg-background px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                               Added
                             </span>

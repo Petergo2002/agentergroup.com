@@ -4,13 +4,11 @@ import {
   buildDraftWidgetRuntimeAgents,
   buildWidgetCorsHeaders,
   buildStoredWidgetRuntimeAgents,
-  getRequestedParentOrigin,
-  getWidgetRequestSource,
   insertWidgetLead,
-  isAllowedWidgetOrigin,
   loadWidgetByPublicKey,
   loadWidgetSession,
   resolveWidgetPreviewContext,
+  resolveWidgetRuntimeAccess,
   type RuntimeWidgetAgentSelection,
   type WidgetAdminSupabase,
   upsertWidgetSession,
@@ -137,11 +135,22 @@ export async function POST(
       request,
     );
 
-    if (!preview.isPreview && !isAllowedWidgetOrigin(loaded.widget, request)) {
-      return buildErrorResponse(request, 403, "Domain is not allowed.");
+    const access = await resolveWidgetRuntimeAccess({
+      request,
+      widget: loaded.widget,
+      preview,
+    });
+
+    if (!access.ok) {
+      return buildErrorResponse(
+        request,
+        access.status,
+        access.error,
+        access.code,
+      );
     }
 
-    if (!preview.isPreview && loaded.widget.status !== "deployed") {
+    if (access.source !== "preview" && loaded.widget.status !== "deployed") {
       return buildErrorResponse(request, 404, "Widget is not deployed.");
     }
 
@@ -193,10 +202,10 @@ export async function POST(
     const widgetSession = await upsertWidgetSession(supabase, {
       widgetId: loaded.widget.id,
       sessionId,
-      source: getWidgetRequestSource(request),
+      source: access.source,
       pageUrl: null,
       referrer: null,
-      origin: getRequestedParentOrigin(request),
+      origin: access.origin,
       activeWidgetAgentId: selected!.persistedWidgetAgentId,
       activeAgentId: selected!.agent.id,
     });

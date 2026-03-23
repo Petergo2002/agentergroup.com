@@ -1,5 +1,9 @@
 import type OpenAI from "openai";
 import { getWrappedTools, handleChatToolCalls } from "@/lib/composio";
+import {
+  buildDisabledEndChatPolicy,
+  buildEndChatMetadata,
+} from "@/lib/end-chat";
 import { getSupportedIntegration } from "@/lib/integrations";
 import {
   buildKnowledgeContext,
@@ -9,7 +13,12 @@ import {
 } from "@/lib/knowledge";
 import { createOpenRouterChatCompletion } from "@/lib/openrouter";
 import { getSupabaseEnv, getSupabaseServiceRoleKey } from "@/lib/env";
-import type { AgentRecord, KnowledgeMatchRecord } from "@/lib/types";
+import type {
+  AgentRecord,
+  EndChatMetadata,
+  EndChatPolicy,
+  KnowledgeMatchRecord,
+} from "@/lib/types";
 
 interface RuntimeSelectQueryResult {
   data?: unknown[] | null;
@@ -101,6 +110,7 @@ export interface AgentRuntimeInput {
   knowledgeAccessToken?: string | null;
   widgetPublicKey?: string | null;
   calendarTimezone?: string | null;
+  endChatPolicy?: EndChatPolicy | null;
 }
 
 export interface AgentRuntimeResult {
@@ -111,6 +121,7 @@ export interface AgentRuntimeResult {
   knowledgeMatches: KnowledgeMatchRecord[];
   connectedToolkits: string[];
   debugTrace?: import("@/lib/types").DebugTrace;
+  endChat: EndChatMetadata | null;
 }
 
 const MAX_TOOL_ITERATIONS = 6;
@@ -120,6 +131,26 @@ const OMITTED_ASSISTANT_HISTORY_MESSAGES = new Set([
   "The model returned an empty response.",
   "This is rarely an acceptable response and a retry should be issued.",
 ]);
+const INTERNAL_END_CHAT_TOOL_NAME = "suggest_end_chat";
+const INTERNAL_END_CHAT_TOOL_DEFINITION = {
+  type: "function",
+  function: {
+    name: INTERNAL_END_CHAT_TOOL_NAME,
+    description:
+      "Suggest that the current conversation should be marked complete.",
+    parameters: {
+      type: "object",
+      properties: {
+        summary: {
+          type: "string",
+          description:
+            "Short internal reason explaining why the conversation is complete.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+} satisfies Record<string, unknown>;
 
 
 
@@ -184,6 +215,34 @@ function buildToolGuidance(toolkitSlugs: string[]) {
     "For email sending, use Gmail when it is attached.",
     "After using tools, answer the user in natural language with the outcome. Never return raw JSON, code, or tool payloads to the user.",
   ].join(" ");
+}
+
+function buildEndChatGuidance(policy: EndChatPolicy) {
+  if (!policy.enabled || !policy.allowAssistantSuggestion) {
+    return null;
+  }
+
+  return [
+    `An internal tool named ${INTERNAL_END_CHAT_TOOL_NAME} is available.`,
+    "Use it only when the conversation is clearly complete, such as after a goodbye or when the user's goal has been fully resolved.",
+    "Do not use it when more clarification, follow-up, or work is still needed.",
+    "After using it, send a short natural closing message without mentioning tools or internal state.",
+  ].join(" ");
+}
+
+function parseInternalToolArguments(rawArguments: string) {
+  if (!rawArguments.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawArguments);
+    return parsed && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 async function loadRuntimeContext(
@@ -303,6 +362,7 @@ export async function runAgentChat({
   knowledgeAccessToken,
   widgetPublicKey,
   calendarTimezone,
+  endChatPolicy,
   onToken,
   onStatus,
 }: AgentRuntimeInput & {
@@ -313,6 +373,7 @@ export async function runAgentChat({
     supabase,
     agent.id,
   );
+  const effectiveEndChatPolicy = endChatPolicy ?? buildDisabledEndChatPolicy();
 
   const effectiveTimezone = calendarTimezone ?? agent.timezone ?? 'UTC';
   
@@ -352,11 +413,19 @@ export async function runAgentChat({
   }
 
   const toolGuidance = buildToolGuidance(connectedToolkits);
+  const endChatGuidance = buildEndChatGuidance(effectiveEndChatPolicy);
 
   if (toolGuidance) {
     modelMessages.splice(1, 0, {
       role: "system",
       content: toolGuidance,
+    });
+  }
+
+  if (endChatGuidance) {
+    modelMessages.splice(1, 0, {
+      role: "system",
+      content: endChatGuidance,
     });
   }
 
@@ -393,12 +462,19 @@ export async function runAgentChat({
   }
 
   const tools = await getWrappedTools(toolUserId, connectedToolkits);
-  const toolDefinitions = tools as unknown as Array<Record<string, unknown>>;
+  const toolDefinitions = [
+    ...(tools as unknown as Array<Record<string, unknown>>),
+    ...(effectiveEndChatPolicy.enabled &&
+    effectiveEndChatPolicy.allowAssistantSuggestion
+      ? [INTERNAL_END_CHAT_TOOL_DEFINITION]
+      : []),
+  ];
   const conversationMessages = [...modelMessages];
   const toolMessages: ToolMessage[] = [];
   let finalCompletion: Record<string, unknown> | null = null;
   let finalAssistantMessage: Record<string, unknown> | null = null;
   let assistantContent = "";
+  let endChat: EndChatMetadata | null = null;
 
   const debugEvents: import("@/lib/types").DebugEvent[] = [];
   const startTimeMs = Date.now();
@@ -514,57 +590,105 @@ export async function runAgentChat({
       });
     }
 
-    let iterationToolMessages: ToolMessage[] = [];
+    const internalToolCalls = toolCallsArray.filter(
+      (toolCall) => toolCall.function.name === INTERNAL_END_CHAT_TOOL_NAME,
+    );
+    const externalToolCalls = toolCallsArray.filter(
+      (toolCall) => toolCall.function.name !== INTERNAL_END_CHAT_TOOL_NAME,
+    );
+    const internalToolMessages: ToolMessage[] = [];
+    let externalToolMessages: ToolMessage[] = [];
+
+    if (internalToolCalls.length > 0 && !endChat) {
+      const parsedArgs = parseInternalToolArguments(
+        internalToolCalls[0]?.function.arguments ?? "",
+      );
+      const summary =
+        typeof parsedArgs?.summary === "string" && parsedArgs.summary.trim()
+          ? parsedArgs.summary.trim()
+          : null;
+
+      endChat = buildEndChatMetadata({
+        suggested: true,
+        sessionCompleted: true,
+        reason: "assistant_suggestion",
+        source: "assistant",
+        summary,
+      });
+    }
+
+    for (const toolCall of internalToolCalls) {
+      internalToolMessages.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        name: toolCall.function.name,
+        content:
+          "The conversation has been marked complete. Write a brief natural closing message to the user.",
+      });
+    }
 
     try {
-      // We updated handleChatToolCalls in composio.ts to return { results, sessionWasRecreated }
-      const toolCallResult = await handleChatToolCalls(
-        toolUserId,
-        finalCompletion as unknown as OpenAI.Chat.ChatCompletion,
-      );
-      
-      const { results, sessionWasRecreated } = toolCallResult as unknown as { results: ToolMessage[], sessionWasRecreated: boolean };
-      
-      if (sessionWasRecreated) {
-        debugEvents.push({
-          type: "session_miss",
-          ts: Date.now() - startTimeMs,
-          error: "Composio session cache missed. Recreated session successfully.",
-          iterationIndex: iteration
-        });
-      }
+      if (externalToolCalls.length > 0) {
+        const externalCompletion = {
+          ...(finalCompletion ?? {}),
+          choices: [
+            {
+              message: {
+                ...(assistantMessage as Record<string, unknown>),
+                tool_calls: externalToolCalls,
+              },
+            },
+          ],
+        } as OpenAI.Chat.ChatCompletion;
 
-      if (!results || results.length === 0) {
-        debugEvents.push({
-          type: "tool_empty_result",
-          ts: Date.now() - startTimeMs,
-          error: "Composio returned 0 results for the tool calls. Synthesizing empty results.",
-          iterationIndex: iteration
-        });
-        
-        // Fix for Bug 1: Synthesize empty results so LLM doesn't crash on next turn
-        iterationToolMessages = toolCallsArray.map((tc) => ({
-          role: "tool",
-          tool_call_id: tc.id,
-          name: tc.function.name,
-          content: `Tool executed, but no result was returned.`,
-        }));
-      } else {
-        iterationToolMessages = results;
-        
-        // Log tool results
-        for (const msg of iterationToolMessages) {
-          let abbrResult = msg.content;
-          if (typeof abbrResult === "string" && abbrResult.length > 300) {
-            abbrResult = abbrResult.substring(0, 300) + "...";
-          }
+        const toolCallResult = await handleChatToolCalls(
+          toolUserId,
+          externalCompletion,
+        );
+        const { results, sessionWasRecreated } = toolCallResult as unknown as {
+          results: ToolMessage[];
+          sessionWasRecreated: boolean;
+        };
+
+        if (sessionWasRecreated) {
           debugEvents.push({
-            type: "tool_result",
+            type: "session_miss",
             ts: Date.now() - startTimeMs,
-            name: String(msg.name ?? "unknown"),
-            result: abbrResult,
+            error: "Composio session cache missed. Recreated session successfully.",
             iterationIndex: iteration
           });
+        }
+
+        if (!results || results.length === 0) {
+          debugEvents.push({
+            type: "tool_empty_result",
+            ts: Date.now() - startTimeMs,
+            error: "Composio returned 0 results for the tool calls. Synthesizing empty results.",
+            iterationIndex: iteration
+          });
+
+          externalToolMessages = externalToolCalls.map((toolCall) => ({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            name: toolCall.function.name,
+            content: "Tool executed, but no result was returned.",
+          }));
+        } else {
+          externalToolMessages = results;
+
+          for (const msg of externalToolMessages) {
+            let abbrResult = msg.content;
+            if (typeof abbrResult === "string" && abbrResult.length > 300) {
+              abbrResult = abbrResult.substring(0, 300) + "...";
+            }
+            debugEvents.push({
+              type: "tool_result",
+              ts: Date.now() - startTimeMs,
+              name: String(msg.name ?? "unknown"),
+              result: abbrResult,
+              iterationIndex: iteration
+            });
+          }
         }
       }
     } catch (toolError) {
@@ -579,21 +703,24 @@ export async function runAgentChat({
       debugEvents.push({
         type: "tool_error",
         ts: Date.now() - startTimeMs,
-        name: toolCallsArray.map(tc => tc.function.name).join(","),
+        name: externalToolCalls.map(tc => tc.function.name).join(","),
         error: errorMessage,
         iterationIndex: iteration
       });
 
-      // If the tool crashes, feed the error back to the LLM so it can respond gracefully
-      iterationToolMessages = toolCallsArray.map((tc) => ({
+      externalToolMessages = externalToolCalls.map((toolCall) => ({
         role: "tool",
-        tool_call_id: tc.id,
-        name: tc.function.name,
+        tool_call_id: toolCall.id,
+        name: toolCall.function.name,
         content: `Error executing tool: ${errorMessage}`,
       }));
     }
 
-    toolMessages.push(...iterationToolMessages);
+    const iterationToolMessages = [
+      ...internalToolMessages,
+      ...externalToolMessages,
+    ];
+    toolMessages.push(...externalToolMessages);
     conversationMessages.push(assistantMessage, ...iterationToolMessages);
   }
 
@@ -658,11 +785,13 @@ export async function runAgentChat({
       ...(finalAssistantMessage ?? {}),
       knowledgeMatches: getKnowledgeCitationSummary(knowledgeMatches),
       debugTrace,
+      ...(endChat ? { endChat } : {}),
     },
     finalCompletion,
     toolMessages,
     knowledgeMatches,
     connectedToolkits,
     debugTrace,
+    endChat,
   };
 }

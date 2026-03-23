@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildWidgetRuntimeConfig } from "@/lib/widgets";
 import {
+  buildStoredWidgetRuntimeConfig,
   buildWidgetCorsHeaders,
-  isAllowedWidgetOrigin,
   loadWidgetByPublicKey,
   resolveWidgetPreviewContext,
+  resolveWidgetRuntimeAccess,
   type WidgetAdminSupabase,
 } from "@/lib/widgets/server";
 
@@ -39,14 +39,20 @@ export async function GET(
       request,
     );
 
-    if (!preview.isPreview && !isAllowedWidgetOrigin(loaded.widget, request)) {
+    const access = await resolveWidgetRuntimeAccess({
+      request,
+      widget: loaded.widget,
+      preview,
+    });
+
+    if (!access.ok) {
       return NextResponse.json(
-        { error: "Domain is not allowed." },
-        { status: 403, headers: buildWidgetCorsHeaders(request) },
+        access.code ? { error: access.error, code: access.code } : { error: access.error },
+        { status: access.status, headers: buildWidgetCorsHeaders(request) },
       );
     }
 
-    if (!preview.isPreview && loaded.widget.status !== "deployed") {
+    if (access.source !== "preview" && loaded.widget.status !== "deployed") {
       return NextResponse.json(
         { error: "Widget is not deployed.", code: "WIDGET_NOT_DEPLOYED" },
         { status: 404, headers: buildWidgetCorsHeaders(request) },
@@ -55,9 +61,14 @@ export async function GET(
 
     return NextResponse.json(
       preview.runtimeConfig ??
-        buildWidgetRuntimeConfig(loaded.widget, loaded.widgetAgents, {
-          preview: preview.isPreview,
-        }),
+        (await buildStoredWidgetRuntimeConfig(
+          supabase,
+          loaded.widget,
+          loaded.widgetAgents,
+          {
+            preview: preview.isPreview,
+          },
+        )),
       { headers: buildWidgetCorsHeaders(request) },
     );
   } catch (error) {

@@ -6,11 +6,13 @@ import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { useToast } from '@/components/ui/ToastProvider';
+import { extractEndChatPolicyFromDefinition } from '@/lib/end-chat';
 import { isChatIntegrationSlug } from '@/lib/integrations';
 import { getKnowledgeStatusTone } from '@/lib/knowledge';
 import type {
   AgentRecord,
   ConnectionRecord,
+  EndChatPolicy,
   KnowledgeMatchRecord,
   KnowledgeSourceRecord,
   MessageRecord,
@@ -56,9 +58,26 @@ export default function AgentPreviewPage() {
   const [runSteps, setRunSteps] = useState<RunStepRecord[]>([]);
   const [runApprovals, setRunApprovals] = useState<RunApprovalRecord[]>([]);
   const [draftMessage, setDraftMessage] = useState('');
+  const [completedThreadIds, setCompletedThreadIds] = useState<string[]>([]);
+  const [endChatPolicy, setEndChatPolicy] = useState<EndChatPolicy>({
+    enabled: false,
+    inactivityTimeoutSeconds: null,
+    allowAssistantSuggestion: false,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const visibleMessages = messages.filter((message) => message.role !== 'tool');
+  const isActiveThreadCompleted = activeThreadId
+    ? completedThreadIds.includes(activeThreadId)
+    : false;
+  const [previewInactivityTimerId, setPreviewInactivityTimerId] = useState<number | null>(null);
+
+  const clearPreviewInactivityTimer = useCallback(() => {
+    if (previewInactivityTimerId !== null) {
+      window.clearTimeout(previewInactivityTimerId);
+      setPreviewInactivityTimerId(null);
+    }
+  }, [previewInactivityTimerId]);
 
   const loadMessages = useCallback(async (threadId: string) => {
     const { data, error } = await supabase
@@ -92,9 +111,11 @@ export default function AgentPreviewPage() {
 
     setThreads((current) => [data as ThreadRecord, ...current]);
     setActiveThreadId(data.id);
+    setCompletedThreadIds((current) => current.filter((id) => id !== data.id));
+    clearPreviewInactivityTimer();
     setMessages([]);
     return data.id;
-  }, [agentId, supabase, user.id, workspace.id]);
+  }, [agentId, clearPreviewInactivityTimer, supabase, user.id, workspace.id]);
 
   const loadRunDetails = useCallback(async (runId: string | null) => {
     if (!runId) {
@@ -134,7 +155,7 @@ export default function AgentPreviewPage() {
 
     const load = async () => {
       try {
-        const [agentResult, threadResult, runResult, connectionResult, knowledgeResult] = await Promise.all([
+        const [agentResult, threadResult, runResult, connectionResult, knowledgeResult, draftResult] = await Promise.all([
           supabase.from('agents').select('*').eq('id', agentId).single(),
           supabase
             .from('chat_threads')
@@ -155,6 +176,11 @@ export default function AgentPreviewPage() {
             .from('agent_knowledge_sources')
             .select('source:knowledge_sources(*)')
             .eq('agent_id', agentId),
+          supabase
+            .from('agent_drafts')
+            .select('definition')
+            .eq('agent_id', agentId)
+            .maybeSingle(),
         ]);
 
         if (agentResult.error) {
@@ -196,6 +222,9 @@ export default function AgentPreviewPage() {
             )
             .filter(Boolean) as KnowledgeSourceRecord[],
         );
+        setEndChatPolicy(
+          extractEndChatPolicyFromDefinition(draftResult.data?.definition ?? null),
+        );
         setActiveThreadId(firstThreadId);
         await loadMessages(firstThreadId);
         await loadRunDetails(runRows[0]?.id ?? null);
@@ -219,12 +248,24 @@ export default function AgentPreviewPage() {
     };
   }, [agentId, createThread, loadMessages, loadRunDetails, showToast, supabase]);
 
+  useEffect(() => {
+    return () => {
+      clearPreviewInactivityTimer();
+    };
+  }, [clearPreviewInactivityTimer]);
+
   const handleSendMessage = async (value: string) => {
     const content = value.trim();
 
     if (!content) {
       return;
     }
+
+    if (isActiveThreadCompleted) {
+      return;
+    }
+
+    clearPreviewInactivityTimer();
 
     setIsSubmitting(true);
     const optimisticMessage: MessageRecord = {
@@ -261,6 +302,26 @@ export default function AgentPreviewPage() {
       }
 
       setActiveThreadId(payload.threadId);
+      if (payload.sessionCompleted) {
+        setCompletedThreadIds((current) =>
+          current.includes(payload.threadId)
+            ? current
+            : [...current, payload.threadId],
+        );
+      } else if (
+        endChatPolicy.enabled &&
+        endChatPolicy.inactivityTimeoutSeconds &&
+        payload.threadId
+      ) {
+        const timerId = window.setTimeout(() => {
+          setCompletedThreadIds((current) =>
+            current.includes(payload.threadId)
+              ? current
+              : [...current, payload.threadId],
+          );
+        }, endChatPolicy.inactivityTimeoutSeconds * 1000);
+        setPreviewInactivityTimerId(timerId);
+      }
       await Promise.all([
         loadMessages(payload.threadId),
         supabase
@@ -369,16 +430,23 @@ export default function AgentPreviewPage() {
                   setDraftMessage(prompt);
                   void handleSendMessage(prompt);
                 }}
+                disabled={isSubmitting || isActiveThreadCompleted}
                 className="rounded-full border border-outline-variant/15 px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low"
               >
                 {prompt}
               </button>
             ))}
           </div>
+          {isActiveThreadCompleted ? (
+            <div className="mb-3 rounded-[1.5rem] border border-outline-variant/10 bg-surface-container px-4 py-3 text-sm text-on-surface-variant">
+              This session has ended. Start a new session to continue.
+            </div>
+          ) : null}
           <div className="flex items-center gap-3 rounded-[1.75rem] border border-outline-variant/10 bg-surface-container px-3 py-3 ring-primary/20 focus-within:ring-2">
             <input
               value={draftMessage}
               onChange={(event) => setDraftMessage(event.target.value)}
+              disabled={isActiveThreadCompleted}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault();
@@ -386,11 +454,15 @@ export default function AgentPreviewPage() {
                 }
               }}
               className="flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-on-surface-variant/50"
-              placeholder="Send a real message through the runtime..."
+              placeholder={
+                isActiveThreadCompleted
+                  ? 'Start a new session to continue...'
+                  : 'Send a real message through the runtime...'
+              }
             />
             <button
               onClick={() => void handleSendMessage(draftMessage)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isActiveThreadCompleted}
               className="signature-gradient rounded-2xl px-4 py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
             >
               {isSubmitting ? 'Running...' : 'Send'}

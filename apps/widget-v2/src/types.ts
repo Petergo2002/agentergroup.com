@@ -1,10 +1,19 @@
 export type WidgetLanguage = "sv" | "en";
 export type WidgetTheme = "dark" | "light";
+export type WidgetEndChatReason =
+  | "assistant_suggestion"
+  | "inactivity_timeout";
 
 export interface WidgetQuickAction {
   label: string;
   prompt: string;
   icon?: string | null;
+}
+
+export interface WidgetEndChatPolicy {
+  enabled: boolean;
+  inactivityTimeoutSeconds: number | null;
+  allowAssistantSuggestion: boolean;
 }
 
 export interface WidgetAgentConfig {
@@ -13,10 +22,11 @@ export interface WidgetAgentConfig {
   label: string;
   description: string;
   icon?: string | null;
-  interactionMode: "chat";
+  interactionMode: "chat" | "contact_form";
   greeting: string;
   placeholder: string;
   quickActions: WidgetQuickAction[];
+  endChatPolicy: WidgetEndChatPolicy;
 }
 
 export interface WidgetConfig {
@@ -42,6 +52,12 @@ export interface WidgetConfig {
     subtitle: string | null;
   };
   agents: WidgetAgentConfig[];
+}
+
+export interface WidgetBootstrapResponse {
+  config: WidgetConfig;
+  accessToken: string | null;
+  source: "embedded" | "hosted" | "preview";
 }
 
 export interface WidgetPreviewOverride {

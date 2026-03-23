@@ -1,5 +1,10 @@
 import { motion } from "framer-motion";
-import type { Message, WidgetAgentConfig, WidgetConfig } from "../types";
+import type {
+  Message,
+  WidgetAgentConfig,
+  WidgetConfig,
+  WidgetEndChatReason,
+} from "../types";
 import { ChatView } from "./ChatView";
 
 export interface MessagesTabProps {
@@ -11,6 +16,9 @@ export interface MessagesTabProps {
   isLoading: boolean;
   isStreaming: boolean;
   hasStarted: boolean;
+  isConversationCompleted: boolean;
+  endReason: WidgetEndChatReason | null;
+  onStartNewChat: () => void;
   sendMessage: (text?: string) => Promise<void>;
 }
 
@@ -23,6 +31,9 @@ export function MessagesTab({
   isLoading,
   isStreaming,
   hasStarted,
+  isConversationCompleted,
+  endReason,
+  onStartNewChat,
   sendMessage,
 }: MessagesTabProps) {
   return (
@@ -43,6 +54,9 @@ export function MessagesTab({
           isLoading={isLoading}
           isStreaming={isStreaming}
           hasStarted={hasStarted}
+          isConversationCompleted={isConversationCompleted}
+          endReason={endReason}
+          onStartNewChat={onStartNewChat}
           sendMessage={sendMessage}
         />
       </div>

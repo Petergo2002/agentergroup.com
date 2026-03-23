@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { createClient } from "@/lib/supabase/server";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import {
@@ -78,6 +79,9 @@ export async function POST(
       calendarTimezone = calendarNode.data.timezone;
     }
   }
+  const endChatPolicy = extractEndChatPolicyFromDefinition(
+    draft?.definition ?? null,
+  );
 
   let threadId = providedThreadId;
 
@@ -220,6 +224,7 @@ export async function POST(
       audience: "preview",
       knowledgeAccessToken: session?.access_token ?? null,
       calendarTimezone,
+      endChatPolicy,
     });
 
     await completeRunStep(
@@ -321,6 +326,8 @@ export async function POST(
       runId: run.id,
       message: assistantMessage as PersistedAssistantMessage,
       toolMessages: result.toolMessages,
+      sessionCompleted: Boolean(result.endChat?.sessionCompleted),
+      endReason: result.endChat?.reason ?? null,
     });
   } catch (error) {
     const message =

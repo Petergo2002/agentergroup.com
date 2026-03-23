@@ -75,7 +75,7 @@ export async function POST(
   const nextValues =
     status === "deployed"
       ? { status, deployed_at: new Date().toISOString() }
-      : { status };
+      : { status, deployed_at: null };
 
   const { error: updateError } = await supabase
     .from("widgets")

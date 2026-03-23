@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  buildStoredWidgetRuntimeConfig,
+  buildWidgetAccessPayload,
   buildWidgetCorsHeaders,
   loadWidgetByPublicKey,
+  resolveWidgetBootstrapAccess,
   resolveWidgetPreviewContext,
-  resolveWidgetRuntimeAccess,
+  signWidgetAccessToken,
   type WidgetAdminSupabase,
-  upsertWidgetSession,
 } from "@/lib/widgets/server";
 
 function buildErrorResponse(
@@ -28,7 +30,7 @@ export async function OPTIONS(request: NextRequest) {
   });
 }
 
-export async function POST(
+export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ widgetPublicKey: string }> },
 ) {
@@ -47,12 +49,38 @@ export async function POST(
       loaded.widget,
       request,
     );
+    const config =
+      preview.runtimeConfig ??
+      await buildStoredWidgetRuntimeConfig(
+        supabase,
+        loaded.widget,
+        loaded.widgetAgents,
+        {
+        preview: preview.isPreview,
+        },
+      );
 
-    const access = await resolveWidgetRuntimeAccess({
-      request,
-      widget: loaded.widget,
-      preview,
-    });
+    if (preview.isPreview) {
+      return NextResponse.json(
+        {
+          config,
+          accessToken: null,
+          source: "preview",
+        },
+        { headers: buildWidgetCorsHeaders(request) },
+      );
+    }
+
+    if (loaded.widget.status !== "deployed") {
+      return buildErrorResponse(
+        request,
+        404,
+        "Widget is not deployed.",
+        "WIDGET_NOT_DEPLOYED",
+      );
+    }
+
+    const access = resolveWidgetBootstrapAccess(loaded.widget, request);
 
     if (!access.ok) {
       return buildErrorResponse(
@@ -63,37 +91,28 @@ export async function POST(
       );
     }
 
-    if (access.source !== "preview" && loaded.widget.status !== "deployed") {
-      return buildErrorResponse(request, 404, "Widget is not deployed.");
-    }
-
-    const body = await request.json().catch(() => ({}));
-    const sessionId = String(body.sessionId ?? "").trim();
-    const pageUrl = String(body.pageUrl ?? "").trim() || null;
-    const referrer = String(body.referrer ?? "").trim() || null;
-
-    if (!sessionId) {
-      return buildErrorResponse(request, 400, "sessionId is required.");
-    }
-
-    await upsertWidgetSession(supabase, {
-      widgetId: loaded.widget.id,
-      sessionId,
-      source: access.source,
-      pageUrl,
-      referrer,
-      origin: access.origin,
-    });
+    const accessToken = await signWidgetAccessToken(
+      buildWidgetAccessPayload({
+        widgetPublicKey: loaded.widget.widget_public_key,
+        widgetId: loaded.widget.id,
+        source: access.source,
+        allowedOrigin: access.allowedOrigin,
+      }),
+    );
 
     return NextResponse.json(
-      { ok: true },
+      {
+        config,
+        accessToken,
+        source: access.source,
+      },
       { headers: buildWidgetCorsHeaders(request) },
     );
   } catch (error) {
     return buildErrorResponse(
       request,
       500,
-      error instanceof Error ? error.message : "Failed to record widget event.",
+      error instanceof Error ? error.message : "Failed to bootstrap widget.",
     );
   }
 }

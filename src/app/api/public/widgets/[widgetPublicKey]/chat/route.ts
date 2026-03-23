@@ -1,20 +1,21 @@
 import { NextRequest } from "next/server";
+import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildDraftWidgetRuntimeAgents,
   buildWidgetCorsHeaders,
   buildStoredWidgetRuntimeAgents,
+  completeWidgetSession,
   getPublishedAgentVersion,
-  getRequestedParentOrigin,
-  getWidgetRequestSource,
   getWidgetRuntimeAgent,
+  handleConversationCompleted,
   insertWidgetMessages,
-  isAllowedWidgetOrigin,
   loadOrderedWidgetSessionHistory,
   loadWidgetByPublicKey,
   loadWidgetSession,
   resolveWidgetPreviewContext,
+  resolveWidgetRuntimeAccess,
   type RuntimeWidgetAgentSelection,
   type WidgetAdminSupabase,
   upsertWidgetSession,
@@ -145,11 +146,22 @@ export async function POST(
       request,
     );
 
-    if (!preview.isPreview && !isAllowedWidgetOrigin(loaded.widget, request)) {
-      return buildErrorResponse(request, 403, "Domain is not allowed.");
+    const access = await resolveWidgetRuntimeAccess({
+      request,
+      widget: loaded.widget,
+      preview,
+    });
+
+    if (!access.ok) {
+      return buildErrorResponse(
+        request,
+        access.status,
+        access.error,
+        access.code,
+      );
     }
 
-    if (!preview.isPreview && loaded.widget.status !== "deployed") {
+    if (access.source !== "preview" && loaded.widget.status !== "deployed") {
       return buildErrorResponse(request, 404, "Widget is not deployed.");
     }
 
@@ -173,6 +185,16 @@ export async function POST(
       loaded.widget.id,
       sessionId,
     );
+
+    if (existingSession?.status === "completed") {
+      return buildErrorResponse(
+        request,
+        409,
+        "This chat has already ended. Start a new chat to continue.",
+        "SESSION_COMPLETED",
+      );
+    }
+
     const runtimeWidgetAgents = preview.previewDraft
       ? await buildDraftWidgetRuntimeAgents(
           supabase,
@@ -197,15 +219,17 @@ export async function POST(
     }
 
     const selected = selection.selected;
+    const userMessageTimestamp = new Date().toISOString();
     const widgetSession = await upsertWidgetSession(supabase, {
       widgetId: loaded.widget.id,
       sessionId,
-      source: getWidgetRequestSource(request),
+      source: access.source,
       pageUrl,
       referrer,
-      origin: getRequestedParentOrigin(request),
+      origin: access.origin,
       activeWidgetAgentId: selected!.persistedWidgetAgentId,
       activeAgentId: selected!.agent.id,
+      lastUserMessageAt: userMessageTimestamp,
     });
 
     await insertWidgetMessages(supabase, {
@@ -241,6 +265,13 @@ export async function POST(
       selectedVersionId,
     );
     const runtimeAgent = getWidgetRuntimeAgent(selected!.agent, publishedVersion);
+    const previewRuntimeAgent = preview.runtimeConfig?.agents.find(
+      (agentConfig) => agentConfig.agentId === selected!.agent.id,
+    );
+    const endChatPolicy = preview.isPreview
+      ? previewRuntimeAgent?.endChatPolicy ??
+        extractEndChatPolicyFromDefinition(publishedVersion?.definition)
+      : extractEndChatPolicyFromDefinition(publishedVersion?.definition);
 
     let calendarTimezone: string | null = null;
     if (publishedVersion?.definition?.nodes) {
@@ -277,6 +308,7 @@ export async function POST(
             audience: "widget",
             widgetPublicKey: loaded.widget.widget_public_key,
             calendarTimezone,
+            endChatPolicy,
             onToken: (() => {
               let cumulativeContent = "";
               return (token: string) => {
@@ -293,6 +325,7 @@ export async function POST(
               controller.enqueue(encoder.encode(sseChunk({ status: statusMessage })));
             }
           });
+          const assistantMessageTimestamp = new Date().toISOString();
 
           await insertWidgetMessages(supabase, {
             widgetSessionId: widgetSession.id,
@@ -316,10 +349,50 @@ export async function POST(
             ],
           });
 
+          let completedSession = await upsertWidgetSession(supabase, {
+            widgetId: loaded.widget.id,
+            sessionId,
+            source: widgetSession.source,
+            pageUrl: widgetSession.page_url,
+            referrer: widgetSession.referrer,
+            origin: widgetSession.origin,
+            activeWidgetAgentId: widgetSession.active_widget_agent_id,
+            activeAgentId: widgetSession.active_agent_id,
+            lastAssistantMessageAt: assistantMessageTimestamp,
+          });
+
+          if (result.endChat?.sessionCompleted) {
+            completedSession = await completeWidgetSession(supabase, {
+              session: completedSession,
+              reason: result.endChat.reason ?? "assistant_suggestion",
+              completedAt: assistantMessageTimestamp,
+              lastAssistantMessageAt: assistantMessageTimestamp,
+            });
+            await handleConversationCompleted({
+              widget: loaded.widget,
+              session: completedSession,
+              reason: completedSession.end_reason ?? "assistant_suggestion",
+            });
+            controller.enqueue(
+              new TextEncoder().encode(
+                sseChunk({
+                  sessionCompleted: true,
+                  endReason: completedSession.end_reason,
+                }),
+              ),
+            );
+          }
+
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } catch (error) {
           console.error("Stream generation error:", error);
-          controller.enqueue(new TextEncoder().encode(sseChunk({ error: "Stream error occurred." })));
+          const message =
+            error instanceof Error ? error.message : "Stream error occurred.";
+          controller.enqueue(
+            new TextEncoder().encode(
+              sseChunk({ error: message, terminal: true }),
+            ),
+          );
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } finally {
           controller.close();

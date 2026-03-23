@@ -22,7 +22,6 @@ Deno.serve(async (request) => {
   const workspaceId = String(body.workspaceId ?? "").trim();
   const agentId = String(body.agentId ?? "").trim();
   const query = String(body.query ?? "").trim();
-  const widgetPublicKey = String(body.widgetPublicKey ?? "").trim();
   const matchThreshold = Number(body.matchThreshold ?? 0.7);
   const matchCount = Math.min(Number(body.matchCount ?? 8), 20);
   const internalAuthorization =
@@ -34,36 +33,7 @@ Deno.serve(async (request) => {
     internalAuthorization;
 
   const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
-  let isWidgetScopedRequest = false;
-
-  if (!isInternalRequest && widgetPublicKey && agentId) {
-    const { data: widgetAgent, error: widgetAgentError } = await adminClient
-      .from("widget_agents")
-      .select("id, widget:widgets!inner(id, workspace_id, status, widget_public_key)")
-      .eq("agent_id", agentId)
-      .eq("widgets.widget_public_key", widgetPublicKey)
-      .maybeSingle();
-
-    if (widgetAgentError) {
-      return json({ error: widgetAgentError.message }, 500);
-    }
-
-    const resolvedWidget = widgetAgent?.widget;
-    if (
-      widgetAgent &&
-      resolvedWidget &&
-      typeof resolvedWidget === "object" &&
-      resolvedWidget !== null &&
-      "workspace_id" in resolvedWidget &&
-      "status" in resolvedWidget &&
-      resolvedWidget.workspace_id === workspaceId &&
-      (resolvedWidget.status === "deployed" || resolvedWidget.status === "draft")
-    ) {
-      isWidgetScopedRequest = true;
-    }
-  }
-
-  if (!authHeader && !isInternalRequest && !isWidgetScopedRequest) {
+  if (!authHeader && !isInternalRequest) {
     return json({ error: "Missing Authorization header." }, 401);
   }
 
@@ -77,7 +47,7 @@ Deno.serve(async (request) => {
     },
   });
 
-  if (!isInternalRequest && !isWidgetScopedRequest) {
+  if (!isInternalRequest) {
     const {
       data: { user },
       error: userError,
@@ -97,7 +67,7 @@ Deno.serve(async (request) => {
     normalize: true,
   });
 
-  const result = await (isInternalRequest || isWidgetScopedRequest ? adminClient : supabase).rpc(
+  const result = await (isInternalRequest ? adminClient : supabase).rpc(
     "match_agent_knowledge_chunks",
     {
       input_workspace_id: workspaceId,

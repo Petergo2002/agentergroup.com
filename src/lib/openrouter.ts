@@ -78,12 +78,38 @@ export async function* streamOpenRouterResponse(response: Response) {
           if (data === "[DONE]") {
             return;
           }
+          let parsed: Record<string, unknown>;
           try {
-            const parsed = JSON.parse(data);
-            yield parsed;
+            const candidate: unknown = JSON.parse(data);
+            if (!candidate || typeof candidate !== "object") {
+              continue;
+            }
+            parsed = candidate as Record<string, unknown>;
           } catch {
             // Ignore incomplete or unparseable chunks
+            continue;
           }
+
+          const parsedError =
+            parsed.error && typeof parsed.error === "object"
+              ? (parsed.error as { message?: unknown })
+              : null;
+          const parsedChoices = parsed.choices;
+          const streamErrorMessage =
+            typeof parsed.error === "string"
+              ? parsed.error
+              : typeof parsedError?.message === "string"
+                ? parsedError.message
+                : typeof parsed.message === "string" &&
+                    !Array.isArray(parsedChoices)
+                  ? parsed.message
+                  : null;
+
+          if (streamErrorMessage) {
+            throw new Error(streamErrorMessage);
+          }
+
+          yield parsed;
         }
       }
     }

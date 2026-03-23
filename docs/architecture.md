@@ -94,6 +94,11 @@ Browser (Next.js App Router UI)
 
 ## Repository Structure
 
+Important implementation docs:
+
+- `docs/agent-builder.md`
+- `docs/architecture.md`
+
 ### Core app routes
 
 - `src/app/layout.tsx`

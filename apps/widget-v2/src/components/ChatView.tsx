@@ -1,7 +1,12 @@
 import { motion } from "framer-motion";
 import { Copy, Send } from "lucide-react";
 import { Fragment, useEffect, useRef } from "react";
-import type { Message, WidgetAgentConfig, WidgetConfig } from "../types";
+import type {
+  Message,
+  WidgetAgentConfig,
+  WidgetConfig,
+  WidgetEndChatReason,
+} from "../types";
 import { WidgetMark } from "./WidgetMark";
 
 // Typing cursor component - Gemini style
@@ -18,6 +23,10 @@ const TRANSLATIONS = {
     privacyText: "By chatting, you agree to our ",
     privacyLink: "privacy policy",
     automatedWarning: "Chat responses are generated automatically.",
+    completedBanner: "This chat has ended.",
+    completedTimeout: "The chat ended after inactivity.",
+    completedButton: "Start a new chat",
+    completedPlaceholder: "Start a new chat to continue",
   },
   sv: {
     copy: "Kopiera",
@@ -25,6 +34,10 @@ const TRANSLATIONS = {
     privacyText: "Genom att chatta godkänner du vår ",
     privacyLink: "integritetspolicy",
     automatedWarning: "Chattsvar genereras automatiskt.",
+    completedBanner: "Den här chatten har avslutats.",
+    completedTimeout: "Chatten avslutades efter inaktivitet.",
+    completedButton: "Starta ny chatt",
+    completedPlaceholder: "Starta en ny chatt för att fortsätta",
   },
 };
 
@@ -231,6 +244,9 @@ interface ChatViewProps {
   isLoading: boolean;
   isStreaming: boolean;
   hasStarted: boolean;
+  isConversationCompleted: boolean;
+  endReason: WidgetEndChatReason | null;
+  onStartNewChat: () => void;
   sendMessage: (text?: string) => Promise<void>;
 }
 
@@ -243,6 +259,9 @@ export function ChatView({
   isLoading,
   isStreaming,
   hasStarted,
+  isConversationCompleted,
+  endReason,
+  onStartNewChat,
   sendMessage,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -270,6 +289,10 @@ export function ChatView({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (isConversationCompleted) {
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -378,6 +401,23 @@ export function ChatView({
       {/* Chat Input */}
       <div className="shrink-0 px-6 pb-6 pt-2 bg-transparent peer group">
         <div className="max-w-3xl mx-auto relative">
+          {isConversationCompleted && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-widget-border bg-widget-card px-4 py-3 text-sm text-widget-fg">
+              <div>
+                <p className="font-medium">
+                  {endReason === "inactivity_timeout"
+                    ? t.completedTimeout
+                    : t.completedBanner}
+                </p>
+              </div>
+              <button
+                onClick={onStartNewChat}
+                className="rounded-xl bg-widget-primary px-3 py-2 text-xs font-semibold text-widget-primary-fg transition-opacity hover:opacity-90"
+              >
+                {t.completedButton}
+              </button>
+            </div>
+          )}
           <div className="relative flex items-center bg-white/[0.03] border border-white/10 rounded-2xl px-1.5 focus-within:border-widget-primary/40 transition-all shadow-lg">
             <input
               ref={inputRef}
@@ -386,14 +426,24 @@ export function ChatView({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyPress}
               onFocus={handleInputFocus}
-              placeholder={selectedAgent.placeholder}
+              placeholder={
+                isConversationCompleted
+                  ? t.completedPlaceholder
+                  : selectedAgent.placeholder
+              }
+              disabled={isConversationCompleted}
               className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-widget-fg placeholder:text-widget-muted py-3.5 min-h-12 text-base px-3 widget-chat-input"
               inputMode="text"
               enterKeyHint="send"
             />
             <button
               onClick={() => sendMessage()}
-              disabled={!input.trim() || isLoading || isStreaming}
+              disabled={
+                isConversationCompleted ||
+                !input.trim() ||
+                isLoading ||
+                isStreaming
+              }
               className="p-2.5 rounded-xl bg-widget-primary text-widget-primary-fg hover:opacity-90 disabled:bg-widget-border disabled:text-widget-muted disabled:cursor-not-allowed transition-all shrink-0"
             >
               <Send className="w-4 h-4" />

@@ -25,6 +25,8 @@
   const PREVIEW_UPDATE_MESSAGE_TYPE = "ag:widget-preview:update-config";
   const PREVIEW_RESET_MESSAGE_TYPE = "ag:widget-preview:reset-chat";
   const PREVIEW_REQUEST_MESSAGE_TYPE = "ag:widget-preview:request-config";
+  const BOOTSTRAP_MESSAGE_TYPE = "ag:widget-bootstrap";
+  const BOOTSTRAP_REQUEST_MESSAGE_TYPE = "ag:widget-bootstrap:request";
   const WIDGET_CLOSE_REQUEST_MESSAGE_TYPE = "ag:widget:close-request";
   const previousInstance = window[GLOBAL_INSTANCE_KEY];
   if (previousInstance && typeof previousInstance.destroy === "function") {
@@ -109,6 +111,7 @@
   let viewportListener = null;
   let touchBlockListener = null;
   let previewOverrideMessage = null;
+  let bootstrapPayload = null;
   const scrollLockState = {
     active: false,
     scrollY: 0,
@@ -298,6 +301,12 @@
     return { type: WIDGET_CLOSE_REQUEST_MESSAGE_TYPE };
   }
 
+  function parseBootstrapRequestMessage(data) {
+    if (!isObjectRecord(data)) return null;
+    if (data.type !== BOOTSTRAP_REQUEST_MESSAGE_TYPE) return null;
+    return { type: BOOTSTRAP_REQUEST_MESSAGE_TYPE };
+  }
+
   function postWidgetStateToIframe() {
     if (!iframe || !iframe.contentWindow) return;
 
@@ -309,6 +318,28 @@
       },
       widgetBaseUrl,
     );
+  }
+
+  function postBootstrapToIframe() {
+    if (!iframe || !iframe.contentWindow || !bootstrapPayload) return;
+
+    iframe.contentWindow.postMessage(
+      {
+        type: BOOTSTRAP_MESSAGE_TYPE,
+        payload: bootstrapPayload,
+      },
+      widgetBaseUrl,
+    );
+  }
+
+  function escapeHtml(unsafe) {
+    return (unsafe || "")
+      .toString()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 
   function applyPreviewBubbleTheme(message) {
@@ -323,26 +354,85 @@
         ? payload.widget
         : null;
 
-    if (!widgetSettings) return;
+    if (widgetSettings) {
+      const nextPrimaryColor = normalizeHexColor(
+        widgetSettings.primaryColor,
+        initialPrimaryColor,
+      );
+      const themeMode = widgetSettings.theme === "light" ? "light" : "dark";
+      const preferredTextColor = themeMode === "light" ? "#171717" : "#f5f5f5";
+      const nextBubbleTextColor = pickReadableTextColor(
+        nextPrimaryColor,
+        preferredTextColor,
+      );
 
-    const nextPrimaryColor = normalizeHexColor(
-      widgetSettings.primaryColor,
-      initialPrimaryColor,
-    );
-    const themeMode = widgetSettings.theme === "light" ? "light" : "dark";
-    const preferredTextColor = themeMode === "light" ? "#171717" : "#f5f5f5";
-    const nextBubbleTextColor = pickReadableTextColor(
-      nextPrimaryColor,
-      preferredTextColor,
-    );
+      container.style.setProperty("--ag-widget-primary", nextPrimaryColor);
+      container.style.setProperty(
+        "--ag-widget-primary-fg",
+        nextBubbleTextColor,
+      );
+    }
 
-    container.style.setProperty("--ag-widget-primary", nextPrimaryColor);
-    container.style.setProperty("--ag-widget-primary-fg", nextBubbleTextColor);
+    const brandSettings =
+      payload?.brand && typeof payload.brand === "object"
+        ? payload.brand
+        : null;
+    if (brandSettings) {
+      if (typeof brandSettings.name === "string") {
+        const textEl = container.querySelector(".ag-widget-bubble-text");
+        if (textEl) textEl.textContent = brandSettings.name || "Agent";
+      }
+      if (typeof brandSettings.logoUrl !== "undefined") {
+        const logoIconEl = container.querySelector(
+          ".ag-widget-bubble-logo-icon",
+        );
+        if (logoIconEl) {
+          if (brandSettings.logoUrl) {
+            logoIconEl.innerHTML =
+              '<img src="' + escapeHtml(brandSettings.logoUrl) + '" alt="" />';
+          } else {
+            logoIconEl.innerHTML = chatIconSvg;
+          }
+        }
+      }
+    }
   }
 
   function forwardMessageToIframe(message) {
     if (!iframe || !iframe.contentWindow) return;
     iframe.contentWindow.postMessage(message, widgetBaseUrl);
+  }
+
+  async function fetchBootstrap() {
+    const bootstrapUrl = `${apiBaseUrl}/api/public/widgets/${encodeURIComponent(
+      widgetPublicKey,
+    )}/bootstrap?_ts=${Date.now()}`;
+    const headers = {};
+
+    if (previewEnabled && previewToken) {
+      headers["x-ag-preview-token"] = previewToken;
+      headers["x-ag-preview-source"] = previewSource;
+      if (previewRevision) {
+        headers["x-ag-preview-revision"] = previewRevision;
+      }
+    }
+
+    const response = await fetch(bootstrapUrl, {
+      headers,
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(
+        typeof payload?.error === "string"
+          ? payload.error
+          : "Failed to bootstrap widget.",
+      );
+    }
+
+    bootstrapPayload = await response.json();
+    return bootstrapPayload;
   }
 
   function shouldLockBackgroundScroll() {
@@ -428,8 +518,10 @@
       position: fixed;
       bottom: 20px;
       right: 20px;
-      width: 56px;
       height: 56px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-end;
       z-index: 999999;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --ag-widget-primary: #ff5c00;
@@ -448,32 +540,97 @@
     }
 
     .ag-widget-bubble {
-      width: 56px;
       height: 56px;
-      border-radius: 50%;
+      min-width: 56px;
+      max-width: 360px;
+      border-radius: 28px;
       background: var(--ag-widget-primary);
-      box-shadow:
-        0 12px 30px rgba(0, 0, 0, 0.25),
-        0 2px 8px rgba(0, 0, 0, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      color: var(--ag-widget-primary-fg);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
       cursor: pointer;
       display: flex;
       align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
+      padding: 0 20px 0 8px;
+      transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
       border: none;
       outline: none;
+      overflow: hidden;
+      font-family: inherit;
+      white-space: nowrap;
     }
 
     .ag-widget-bubble:hover {
-      transform: scale(1.1);
-      box-shadow:
-        0 16px 40px rgba(0, 0, 0, 0.3),
-        0 3px 10px rgba(0, 0, 0, 0.25),
-        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
     }
 
-    .ag-widget-bubble svg {
+    .ag-widget-bubble.open {
+      padding: 0;
+      width: 56px;
+      max-width: 56px;
+      border-radius: 50%;
+      justify-content: center;
+    }
+
+    .ag-widget-bubble-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: opacity 0.2s ease, transform 0.3s ease;
+    }
+
+    .ag-widget-bubble.open .ag-widget-bubble-content {
+      opacity: 0;
+      transform: scale(0.8);
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .ag-widget-bubble-close {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: scale(0.8) rotate(-45deg);
+      transition: all 0.3s ease;
+    }
+
+    .ag-widget-bubble.open .ag-widget-bubble-close {
+      opacity: 1;
+      transform: scale(1) rotate(0);
+    }
+
+    .ag-widget-bubble-logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .ag-widget-bubble-logo-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .ag-widget-bubble-logo-icon svg {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: var(--ag-widget-primary-fg);
+      stroke-width: 1.5;
+    }
+
+    .ag-widget-bubble-close svg {
       width: 26px;
       height: 26px;
       fill: none;
@@ -483,16 +640,18 @@
       stroke-linejoin: round;
     }
 
-    .ag-widget-bubble.open svg:first-child {
-      display: none;
+    .ag-widget-bubble-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--ag-widget-primary-fg);
+      opacity: 0.3;
     }
 
-    .ag-widget-bubble.open svg:last-child {
-      display: block;
-    }
-
-    .ag-widget-bubble:not(.open) svg:last-child {
-      display: none;
+    .ag-widget-bubble-text {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      padding-right: 4px;
     }
 
     .ag-widget-iframe-container {
@@ -606,34 +765,15 @@
     return params.toString();
   }
 
-  async function applyWidgetTheme() {
+  function applyWidgetTheme() {
     try {
-      const runtimeParams = buildRuntimeParams();
-      const cacheBustParam = `_ts=${Date.now()}`;
-      const configUrl = `${apiBaseUrl}/api/public/widgets/${encodeURIComponent(
-        widgetPublicKey,
-      )}/config?${runtimeParams ? `${runtimeParams}&` : ""}${cacheBustParam}`;
-      const headers = {
-        "x-ag-widget-context": "embedded",
-      };
-      if (parentOrigin) {
-        headers["x-ag-parent-origin"] = parentOrigin;
-      }
-      if (previewEnabled && previewToken) {
-        headers["x-ag-preview-token"] = previewToken;
-        headers["x-ag-preview-source"] = previewSource;
-        if (previewRevision) {
-          headers["x-ag-preview-revision"] = previewRevision;
-        }
-      }
-      const response = await fetch(configUrl, {
-        headers,
-        cache: "no-store",
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      const primaryColor = normalizeHexColor(data?.widget?.primaryColor, "#ff5c00");
-      const themeMode = data?.widget?.theme || "dark";
+      const config = bootstrapPayload?.config;
+      if (!config?.widget) return;
+      const primaryColor = normalizeHexColor(
+        config.widget.primaryColor,
+        "#ff5c00",
+      );
+      const themeMode = config.widget.theme || "dark";
       const textColor = themeMode === "light" ? "#171717" : "#f5f5f5";
       const bubbleTextColor = pickReadableTextColor(primaryColor, textColor);
       if (container && primaryColor) {
@@ -652,7 +792,14 @@
   }
 
   // Initialize the widget
-  function init() {
+  async function init() {
+    try {
+      await fetchBootstrap();
+    } catch (error) {
+      console.error("[AgenterGroup Widget] Bootstrap failed", error);
+      return;
+    }
+
     // Remove stale artifacts from older/duplicate loader instances
     document.querySelectorAll(".ag-widget-container").forEach((node) => {
       node.remove();
@@ -702,6 +849,7 @@
     iframe.allow = "microphone; clipboard-write; clipboard-read";
     iframe.addEventListener("load", () => {
       postWidgetStateToIframe();
+      postBootstrapToIframe();
       if (previewOverrideMessage) {
         forwardMessageToIframe(previewOverrideMessage);
       }
@@ -711,7 +859,22 @@
     // Create bubble button
     bubble = document.createElement("button");
     bubble.className = "ag-widget-bubble";
-    bubble.innerHTML = chatIconSvg + closeIconSvg;
+    const brandName = bootstrapPayload?.config?.brand?.name || "Agent";
+    const logoUrl = bootstrapPayload?.config?.brand?.logoUrl;
+
+    const contentHtml = `
+      <div class="ag-widget-bubble-content">
+        <div class="ag-widget-bubble-logo-icon">
+          ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="" />` : chatIconSvg}
+        </div>
+        <div class="ag-widget-bubble-divider"></div>
+        <span class="ag-widget-bubble-text">${escapeHtml(brandName)}</span>
+      </div>
+      <div class="ag-widget-bubble-close">
+        ${closeIconSvg}
+      </div>
+    `;
+    bubble.innerHTML = contentHtml;
     bubble.setAttribute("aria-label", "Öppna chatt");
     bubble.onclick = toggleWidget;
 
@@ -720,7 +883,7 @@
     container.appendChild(bubble);
     document.body.appendChild(container);
 
-    void applyWidgetTheme();
+    applyWidgetTheme();
   }
 
   // Toggle widget open/close
@@ -789,18 +952,26 @@
   // Wait for DOM to be ready
   if (document.readyState === "loading") {
     domReadyListener = () => {
-      init();
+      void init();
       domReadyListener = null;
     };
     document.addEventListener("DOMContentLoaded", domReadyListener);
   } else {
-    init();
+    void init();
   }
 
   // Listen for messages from iframe
   messageListener = (event) => {
     if (isTrustedIframeMessage(event) && parseCloseRequestMessage(event.data)) {
       if (isOpen) toggleWidget();
+      return;
+    }
+
+    if (
+      isTrustedIframeMessage(event) &&
+      parseBootstrapRequestMessage(event.data)
+    ) {
+      postBootstrapToIframe();
       return;
     }
 
