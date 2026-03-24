@@ -14,6 +14,18 @@ export type WidgetPalette = {
   muted: string;
   primary: string;
   primaryFg: string;
+  accentStrong: string;
+  accentStrongFg: string;
+  accentSoft: string;
+  stateHover: string;
+  stateSelected: string;
+  stateSelectedBorder: string;
+  stateSelectedText: string;
+  stateSelectedIcon: string;
+  focusRing: string;
+  inputSurface: string;
+  inputSurfaceHover: string;
+  inputBorderFocus: string;
   primaryGlow: string;
   isDark: boolean;
 };
@@ -75,6 +87,12 @@ function mixColors(base: string, overlay: string, amount: number): string {
   });
 }
 
+function toAlpha(hex: string, alpha: number): string {
+  const safeAlpha = Math.max(0, Math.min(1, alpha));
+  const rgb = hexToRgb(hex);
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${safeAlpha})`;
+}
+
 function srgbToLinear(channel: number): number {
   const normalized = channel / 255;
   return normalized <= 0.03928
@@ -109,6 +127,14 @@ function pickReadableTextColorOnPrimary(primary: string): string {
   return whiteContrast >= blackContrast ? white : black;
 }
 
+function deriveNeutralSurface(
+  bg: string,
+  fg: string,
+  amount: number,
+): string {
+  return mixColors(bg, fg, amount);
+}
+
 const DARK_PALETTE = {
   /* Premium deep dark - no harsh whites or gradients */
   bg: "#060606",
@@ -135,9 +161,47 @@ export function deriveWidgetPalette(
   themeMode: WidgetThemeMode,
 ): WidgetPalette {
   const primary = normalizeHexColor(brandColor, "#c4571f");
-  const primaryFg = pickReadableTextColorOnPrimary(primary);
   const isDark = themeMode === "dark";
   const base = isDark ? DARK_PALETTE : LIGHT_PALETTE;
+  const primaryContrastOnBg = contrastRatio(primary, base.bg);
+  const canUsePrimaryAsAccent = primaryContrastOnBg >= (isDark ? 2.2 : 2.35);
+  const canUsePrimaryAsStateTint = primaryContrastOnBg >= (isDark ? 1.45 : 1.7);
+
+  const accentStrong = canUsePrimaryAsAccent
+    ? primary
+    : mixColors(base.fg, primary, isDark ? 0.24 : 0.08);
+  const accentStrongFg = pickReadableTextColorOnPrimary(accentStrong);
+
+  const neutralHover = deriveNeutralSurface(base.bg, base.fg, isDark ? 0.08 : 0.045);
+  const neutralSelected = deriveNeutralSurface(base.bg, base.fg, isDark ? 0.12 : 0.075);
+  const neutralSelectedBorder = deriveNeutralSurface(
+    base.bg,
+    base.fg,
+    isDark ? 0.2 : 0.12,
+  );
+
+  const accentSoft = canUsePrimaryAsStateTint
+    ? mixColors(base.bg, accentStrong, isDark ? 0.16 : 0.1)
+    : neutralSelected;
+  const stateHover = canUsePrimaryAsStateTint
+    ? mixColors(base.bg, accentStrong, isDark ? 0.1 : 0.055)
+    : neutralHover;
+  const stateSelected = canUsePrimaryAsStateTint
+    ? mixColors(base.bg, accentStrong, isDark ? 0.18 : 0.11)
+    : neutralSelected;
+  const stateSelectedBorder = canUsePrimaryAsStateTint
+    ? mixColors(base.bg, accentStrong, isDark ? 0.28 : 0.2)
+    : neutralSelectedBorder;
+  const inputSurface = deriveNeutralSurface(base.bg, base.fg, isDark ? 0.05 : 0.02);
+  const inputSurfaceHover = canUsePrimaryAsStateTint
+    ? mixColors(base.bg, accentStrong, isDark ? 0.1 : 0.045)
+    : deriveNeutralSurface(base.bg, base.fg, isDark ? 0.08 : 0.04);
+  const inputBorderFocus = canUsePrimaryAsAccent
+    ? mixColors(base.bg, accentStrong, isDark ? 0.36 : 0.24)
+    : neutralSelectedBorder;
+  const focusRing = canUsePrimaryAsAccent
+    ? toAlpha(accentStrong, isDark ? 0.26 : 0.18)
+    : toAlpha(base.fg, isDark ? 0.18 : 0.1);
 
   return {
     bg: base.bg,
@@ -148,8 +212,20 @@ export function deriveWidgetPalette(
     border: base.border,
     muted: base.muted,
     primary,
-    primaryFg,
-    primaryGlow: `${primary}30`,
+    primaryFg: pickReadableTextColorOnPrimary(primary),
+    accentStrong,
+    accentStrongFg,
+    accentSoft,
+    stateHover,
+    stateSelected,
+    stateSelectedBorder,
+    stateSelectedText: accentStrong,
+    stateSelectedIcon: accentStrong,
+    focusRing,
+    inputSurface,
+    inputSurfaceHover,
+    inputBorderFocus,
+    primaryGlow: toAlpha(accentStrong, 0.25),
     isDark,
   };
 }

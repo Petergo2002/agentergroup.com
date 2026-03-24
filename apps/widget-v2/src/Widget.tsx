@@ -1174,7 +1174,7 @@ export default function Widget({
 
   const themeMode = config.widget.theme === "light" ? "light" : "dark";
   const palette = deriveWidgetPalette(config.widget.primaryColor, themeMode);
-  const rgb = hexToRgb(palette.primary);
+  const rgb = hexToRgb(palette.accentStrong);
   const primaryRgb = `${rgb.r}, ${rgb.g}, ${rgb.b}`;
   const privacyPolicyUrl = buildLocalizedPrivacyPolicyUrl(
     config.brand.privacyPolicyUrl,
@@ -1192,10 +1192,21 @@ export default function Widget({
           "--widget-fg": palette.fg,
           "--widget-card": palette.card,
           "--widget-border": palette.border,
-          "--widget-primary": palette.primary,
+          "--widget-brand-primary": palette.primary,
+          "--widget-primary": palette.accentStrong,
           "--widget-primary-rgb": primaryRgb,
-          "--widget-primary-fg": palette.primaryFg,
+          "--widget-primary-fg": palette.accentStrongFg,
           "--widget-muted": palette.muted,
+          "--widget-accent-soft": palette.accentSoft,
+          "--widget-state-hover": palette.stateHover,
+          "--widget-state-selected": palette.stateSelected,
+          "--widget-state-selected-border": palette.stateSelectedBorder,
+          "--widget-state-selected-text": palette.stateSelectedText,
+          "--widget-state-selected-icon": palette.stateSelectedIcon,
+          "--widget-focus-ring": palette.focusRing,
+          "--widget-input-surface": palette.inputSurface,
+          "--widget-input-surface-hover": palette.inputSurfaceHover,
+          "--widget-input-border-focus": palette.inputBorderFocus,
           color: palette.fg,
           height: "calc(var(--widget-vh, 1vh) * 100)",
           minHeight: "100dvh",
@@ -1231,7 +1242,7 @@ export default function Widget({
                       setSelectedWidgetAgentId(null);
                     }
                   }}
-                  className="mr-1 p-1 text-widget-muted hover:text-widget-fg transition-colors"
+                  className="widget-icon-button mr-1 p-1"
                   aria-label={navLabelHome}
                 >
                   <ChevronLeft className="w-6 h-6" />
@@ -1280,7 +1291,7 @@ export default function Widget({
             {hasStarted && (
               <button
                 onClick={() => resetConversation()}
-                className="text-widget-muted hover:text-widget-fg transition-colors p-2"
+                className="widget-icon-button p-2"
                 aria-label={newChatLabel}
                 title={newChatLabel}
               >
@@ -1290,7 +1301,7 @@ export default function Widget({
             {isEmbedded ? (
               <button
                 onClick={handleClose}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-widget-border bg-widget-card/90 text-widget-fg shadow-sm transition-colors hover:border-widget-primary/30 hover:text-widget-fg"
+                className="widget-icon-button widget-icon-button-outlined flex h-10 w-10 items-center justify-center rounded-full shadow-sm"
                 aria-label={widgetLanguage === "sv" ? "Stäng" : "Close"}
               >
                 <X className="h-5 w-5" />
@@ -1349,7 +1360,7 @@ export default function Widget({
                 <motion.div
                   layoutId="nav-indicator"
                   className="absolute bottom-0 w-10 h-0.5 blur-sm opacity-70"
-                  style={{ backgroundColor: palette.primary }}
+                  style={{ backgroundColor: palette.stateSelectedIcon }}
                   animate={{
                     left: activeTab === "home" ? "25%" : "75%",
                     translateX: "-50%",
@@ -1359,11 +1370,17 @@ export default function Widget({
 
                 <button
                   onClick={() => setActiveTab("home")}
-                  className={`flex flex-col items-center justify-center gap-0.5 w-1/2 h-full transition-colors relative z-10 ${
+                  data-active={activeTab === "home" ? "true" : "false"}
+                  className="widget-nav-button relative z-10 flex h-full w-1/2 flex-col items-center justify-center gap-0.5"
+                  style={
                     activeTab === "home"
-                      ? "text-widget-primary"
-                      : "text-widget-muted hover:text-widget-fg"
-                  }`}
+                      ? {
+                          backgroundColor: palette.stateSelected,
+                          color: palette.stateSelectedText,
+                          boxShadow: `inset 0 0 0 1px ${palette.stateSelectedBorder}`,
+                        }
+                      : undefined
+                  }
                 >
                   <Home className="w-5 h-5" />
                   <span className="text-[11px] font-medium">
@@ -1373,11 +1390,17 @@ export default function Widget({
 
                 <button
                   onClick={() => setActiveTab("messages")}
-                  className={`flex flex-col items-center justify-center gap-0.5 w-1/2 h-full transition-colors relative z-10 ${
+                  data-active={activeTab === "messages" ? "true" : "false"}
+                  className="widget-nav-button relative z-10 flex h-full w-1/2 flex-col items-center justify-center gap-0.5"
+                  style={
                     activeTab === "messages"
-                      ? "text-widget-primary"
-                      : "text-widget-muted hover:text-widget-fg"
-                  }`}
+                      ? {
+                          backgroundColor: palette.stateSelected,
+                          color: palette.stateSelectedText,
+                          boxShadow: `inset 0 0 0 1px ${palette.stateSelectedBorder}`,
+                        }
+                      : undefined
+                  }
                 >
                   <div className="relative">
                     <MessageSquare className="w-5 h-5" />

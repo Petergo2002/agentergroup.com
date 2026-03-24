@@ -54,7 +54,7 @@ function MessageActions({
     <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
       <button
         onClick={onCopy}
-        className="p-1.5 rounded-lg hover:bg-widget-fg/10 text-widget-muted hover:text-widget-fg transition-colors"
+        className="widget-icon-button p-1.5 rounded-lg"
         title={t.copy}
       >
         <Copy className="w-3.5 h-3.5" />
@@ -328,7 +328,7 @@ export function ChatView({
             >
               {msg.role === "user" ? (
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] px-4 py-3 rounded-2xl rounded-tr-sm bg-widget-primary text-widget-primary-fg shadow-btn-glow">
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-widget-primary px-4 py-3 text-widget-primary-fg shadow-btn-glow">
                     <p className="text-sm leading-relaxed whitespace-pre-wrap break-words font-medium">
                       {msg.content}
                     </p>
@@ -419,7 +419,7 @@ export function ChatView({
               </button>
             </div>
           )}
-          <div className="relative flex items-center bg-white/[0.03] border border-white/10 rounded-2xl px-1.5 focus-within:border-widget-primary/40 transition-all shadow-lg">
+          <div className="widget-input-shell relative flex items-center rounded-2xl px-1.5 shadow-lg">
             <input
               ref={inputRef}
               type="text"

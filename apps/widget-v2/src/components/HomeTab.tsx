@@ -73,7 +73,7 @@ export function HomeTab({
                   <button
                     key={agent.widgetAgentId}
                     onClick={() => onSelectAgent(agent.widgetAgentId)}
-                    className="group rounded-[28px] border border-white/10 bg-white/[0.04] p-5 text-left transition-all hover:border-white/20 hover:bg-white/[0.06]"
+                    className="widget-surface-button group rounded-[28px] p-5 text-left"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <h2 className="text-lg font-semibold text-widget-fg">
@@ -142,7 +142,7 @@ export function HomeTab({
               type="text"
               name="message"
               placeholder={selectedAgent.placeholder || "How can we help?"}
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.05] py-3.5 pl-5 pr-14 text-base font-medium text-widget-fg shadow-inner placeholder:text-widget-fg/40 transition-all focus:border-widget-primary/50 focus:outline-none focus:ring-2 focus:ring-widget-primary/50"
+              className="widget-input-shell w-full rounded-2xl py-3.5 pl-5 pr-14 text-base font-medium text-widget-fg shadow-inner placeholder:text-widget-fg/40"
             />
             <button
               type="submit"
@@ -171,7 +171,7 @@ export function HomeTab({
               <button
                 key={`${action.label}-${index}`}
                 onClick={() => handleQuickAction(action.prompt)}
-                className="group relative flex w-full max-w-[34rem] items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/[0.03] px-5 py-3 text-widget-fg transition-all hover:bg-white/[0.08]"
+                className="widget-surface-button group relative flex w-full max-w-[34rem] items-center justify-center overflow-hidden rounded-full px-5 py-3 text-widget-fg"
               >
                 <span className="text-center text-sm font-semibold leading-6">
                   {action.label}
