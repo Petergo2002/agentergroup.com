@@ -680,10 +680,10 @@
       position: absolute;
       bottom: 76px;
       right: 0;
-      width: 380px;
+      width: 440px;
       height: 680px;
       max-height: 85vh;
-      max-width: calc(100vw - 40px);
+      max-width: calc(100vw - 48px);
       border-radius: 18px;
       overflow: hidden;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
@@ -711,7 +711,7 @@
 
     @media (max-width: 900px) {
       .ag-widget-iframe-container {
-        width: 320px;
+        width: 380px;
         height: 560px;
         max-height: calc(100vh - 100px);
       }
@@ -719,7 +719,7 @@
 
     @media (max-width: 680px) {
       .ag-widget-iframe-container {
-        width: 300px;
+        width: 340px;
         height: 520px;
         max-height: calc(100vh - 96px);
       }

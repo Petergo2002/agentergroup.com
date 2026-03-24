@@ -1254,9 +1254,17 @@ export default function Widget({
             )}
           </div>
 
-          <div className="absolute inset-x-0 top-[3.75rem] flex justify-center pointer-events-none select-none z-0">
+          <div
+            className={`absolute inset-x-0 top-[3.75rem] flex justify-center pointer-events-none select-none z-0 ${
+              activeTab === "messages" ? "px-28" : "px-20"
+            }`}
+          >
             <span
-              className="text-widget-fg opacity-40 text-xs font-semibold tracking-[0.25em] uppercase"
+              className={`block max-w-full truncate text-center font-semibold uppercase text-widget-fg opacity-45 ${
+                activeTab === "messages"
+                  ? "text-[9px] tracking-[0.12em] sm:text-[10px] sm:tracking-[0.14em]"
+                  : "text-[10px] tracking-[0.16em] sm:text-[11px] sm:tracking-[0.18em]"
+              }`}
               style={{
                 textShadow:
                   themeMode === "dark"

@@ -111,7 +111,7 @@ export function HomeTab({
     >
       <div className="flex w-full max-w-4xl flex-col items-center text-center">
         <div className="mb-8 flex flex-col items-center">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-widget-muted">
+          <p className="mb-3 max-w-full truncate px-4 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-widget-muted sm:text-[11px] sm:tracking-[0.18em]">
             {selectedAgent.label}
           </p>
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-widget-fg">
