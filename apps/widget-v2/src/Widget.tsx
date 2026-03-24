@@ -1279,13 +1279,13 @@ export default function Widget({
                 <RotateCcw className="w-5 h-5" />
               </button>
             )}
-            {widgetContext === "embedded" ? (
+            {isEmbedded ? (
               <button
                 onClick={handleClose}
-                className="text-widget-muted hover:text-widget-fg transition-colors p-2"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-widget-border bg-widget-card/90 text-widget-fg shadow-sm transition-colors hover:border-widget-primary/30 hover:text-widget-fg"
                 aria-label={widgetLanguage === "sv" ? "Stäng" : "Close"}
               >
-                <X className="w-6 h-6" />
+                <X className="h-5 w-5" />
               </button>
             ) : null}
           </div>
