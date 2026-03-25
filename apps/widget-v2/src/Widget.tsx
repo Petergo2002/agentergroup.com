@@ -365,8 +365,10 @@ function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
       language: config.widget?.language ?? detectBrowserLanguage(),
       theme: config.widget?.theme === "light" ? "light" : "dark",
       primaryColor: config.widget?.primaryColor || "#ff5c00",
-      backgroundColor: config.widget?.backgroundColor || "#0a0a0a",
-      textColor: config.widget?.textColor || "#f5f5f5",
+      secondaryColor:
+        config.widget?.secondaryColor ||
+        config.widget?.primaryColor ||
+        "#ff5c00",
       showBranding: config.widget?.showBranding ?? true,
     },
     home: {
@@ -1350,7 +1352,11 @@ export default function Widget({
   }
 
   const themeMode = config.widget.theme === "light" ? "light" : "dark";
-  const palette = deriveWidgetPalette(config.widget.primaryColor, themeMode);
+  const palette = deriveWidgetPalette(
+    config.widget.primaryColor,
+    config.widget.secondaryColor,
+    themeMode,
+  );
   const rgb = hexToRgb(palette.accentStrong);
   const primaryRgb = `${rgb.r}, ${rgb.g}, ${rgb.b}`;
   const privacyPolicyUrl = buildLocalizedPrivacyPolicyUrl(

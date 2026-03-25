@@ -174,6 +174,7 @@ export interface WidgetDeploymentRecord {
   brand_name: string;
   logo_url: string | null;
   primary_color: string;
+  secondary_color: string;
   background_color: string;
   text_color: string;
   theme: "dark" | "light";
@@ -204,6 +205,7 @@ export interface WidgetRecord {
   brand_name: string;
   logo_url: string | null;
   primary_color: string;
+  secondary_color: string;
   background_color: string;
   text_color: string;
   theme: "dark" | "light";
@@ -573,8 +575,9 @@ export interface WidgetDraftPreviewInput {
     brandName: string;
     logoUrl: string;
     primaryColor: string;
-    backgroundColor: string;
-    textColor: string;
+    secondaryColor: string;
+    backgroundColor?: string;
+    textColor?: string;
     theme: "dark" | "light";
     language: string;
     homeTitle: string | null;
@@ -609,8 +612,9 @@ export interface WidgetRuntimeConfig {
   widget: {
     theme: "dark" | "light";
     primaryColor: string;
-    backgroundColor: string;
-    textColor: string;
+    secondaryColor: string;
+    backgroundColor?: string;
+    textColor?: string;
     language: string;
     showBranding: boolean;
   };

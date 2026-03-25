@@ -100,6 +100,11 @@ export async function PATCH(
     brand_name: parseString(body.brandName) ?? loaded.widget.brand_name,
     logo_url: parseString(body.logoUrl),
     primary_color: parseString(body.primaryColor) ?? loaded.widget.primary_color,
+    secondary_color:
+      parseString(body.secondaryColor) ??
+      parseString(body.backgroundColor) ??
+      loaded.widget.secondary_color ??
+      loaded.widget.primary_color,
     background_color:
       parseString(body.backgroundColor) ?? loaded.widget.background_color,
     text_color: parseString(body.textColor) ?? loaded.widget.text_color,

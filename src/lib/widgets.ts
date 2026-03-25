@@ -17,6 +17,7 @@ import type {
 } from "@/lib/types";
 
 export const WIDGET_DEFAULT_PRIMARY_COLOR = "#ff5c00";
+export const WIDGET_DEFAULT_SECONDARY_COLOR = WIDGET_DEFAULT_PRIMARY_COLOR;
 export const WIDGET_DEFAULT_BACKGROUND_COLOR = "#0a0a0a";
 export const WIDGET_DEFAULT_TEXT_COLOR = "#f5f5f5";
 export const WIDGET_DEFAULT_GREETING = "Hi! How can I help you today?";
@@ -112,6 +113,7 @@ export function buildDefaultWidgetInput(
     brand_name: getDefaultWidgetBrandName(workspace),
     logo_url: null,
     primary_color: WIDGET_DEFAULT_PRIMARY_COLOR,
+    secondary_color: WIDGET_DEFAULT_SECONDARY_COLOR,
     background_color: WIDGET_DEFAULT_BACKGROUND_COLOR,
     text_color: WIDGET_DEFAULT_TEXT_COLOR,
     theme: "dark" as const,
@@ -222,6 +224,7 @@ export function buildWidgetRuntimeConfig(
     widget: {
       theme: widget.theme,
       primaryColor: widget.primary_color,
+      secondaryColor: widget.secondary_color,
       backgroundColor: widget.background_color,
       textColor: widget.text_color,
       language: widget.language,
@@ -284,6 +287,7 @@ export function buildWidgetRuntimeConfigFromDraft(
     widget: {
       theme: draft.widget.theme,
       primaryColor: draft.widget.primaryColor,
+      secondaryColor: draft.widget.secondaryColor || draft.widget.primaryColor,
       backgroundColor: draft.widget.backgroundColor,
       textColor: draft.widget.textColor,
       language: draft.widget.language || "en",

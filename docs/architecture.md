@@ -193,6 +193,9 @@ Important implementation docs:
 - `supabase/migrations/20260319_widget_hosted_access.sql`
 - `supabase/migrations/20260320_end_chat_sessions.sql`
 - `supabase/migrations/20260323_phase_7_privacy_retention_indexes.sql`
+- `supabase/migrations/20260325_widget_session_turn_locks.sql`
+- `supabase/migrations/20260325_widget_session_turn_locks_fix_status_ambiguity.sql`
+- `supabase/migrations/20260325_widget_session_turn_locks_fix_active_turn_ambiguity.sql`
 - `supabase/functions/process-knowledge-source/index.ts`
 - `supabase/functions/search-knowledge/index.ts`
 - `supabase/functions/_shared/knowledge.ts`
@@ -447,7 +450,7 @@ Purpose:
 - `widgets`: customer-facing widget identity, theme, deployment state, and hosted/embed settings
 - `widget_agents`: the ordered set of attached agents plus the snapshotted published version id used at deploy time
 - `widget_preview_drafts`: short-lived preview payload snapshots for internal operator preview
-- `widget_sessions`: one customer session per widget and session id, including source and completion status
+- `widget_sessions`: one customer session per widget and session id, including source, completion status, and active-turn lock metadata
 - `widget_session_messages`: persisted user, assistant, and tool messages for widget conversations
 - `widget_leads`: lead captures submitted through widgets
 
@@ -817,9 +820,13 @@ The public widget runtime does not trust the browser by default.
 Current behavior:
 
 - bootstrap validates whether the request is hosted or embedded
+- bootstrap responses are returned with `Cache-Control: no-store`
 - hosted mode is allowed only when `widget.hosted_enabled` is true
 - embedded mode requires an allowed origin match
+- runtime endpoints only allow widget-runtime origins, not arbitrary reflected request origins
 - bootstrap returns a signed widget access token for subsequent runtime requests
+- hosted and embedded widget clients both retry one bootstrap refresh automatically on `WIDGET_ACCESS_TOKEN_INVALID`
+- widget appearance is configured through theme mode plus primary and secondary accent colors; base surfaces/text are derived in the runtime
 - preview mode uses a different signed preview token flow
 - the widget runtime shows a lightweight first-message consent gate before the first real chat turn and links it to the public `/privacy-policy` route
 - consent is currently remembered client-side per widget public key so returning visitors are not blocked on every new session
@@ -827,7 +834,7 @@ Current behavior:
 
 Important token rules:
 
-- widget access tokens are short-lived
+- widget access tokens are short-lived and the runtime refreshes them once on expiry
 - preview tokens are short-lived
 - both currently use a 15 minute TTL
 
@@ -862,6 +869,9 @@ The public runtime persists customer interaction through:
 Current behavior:
 
 - chat requests create or update widget sessions
+- widget sessions store `active_turn_request_id` and `active_turn_started_at` to serialize live turns
+- public chat acquires a per-session turn lock before running agent/tool work
+- overlapping turns for the same session are rejected with `409 SESSION_BUSY` instead of being queued
 - user, assistant, and tool messages are persisted
 - lead submissions are stored against the active widget session where possible
 - session completion can happen through explicit public completion calls, including inactivity-timeout completion
@@ -1305,8 +1315,8 @@ After import, the source behaves like any other workspace knowledge source.
 | --- | --- |
 | `GET /api/public/widgets/[widgetPublicKey]/bootstrap` | Validate runtime access, return config bootstrap, and issue widget access token |
 | `GET /api/public/widgets/[widgetPublicKey]/config` | Return current public widget runtime config |
-| `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a public widget chat message |
-| `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout |
+| `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a public widget chat message and reject overlapping same-session turns with `409 SESSION_BUSY` |
+| `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout, and refuse completion while a live turn is active |
 | `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events |
 | `POST /api/public/widgets/[widgetPublicKey]/leads` | Persist a lead submission from the widget |
 
@@ -1484,6 +1494,9 @@ When making major changes, verify all of the following:
 6. Knowledge retrieval stays agent-scoped and workspace-scoped
 7. Run and step observability still reflect the actual runtime path
 8. RLS policies still match the intended workspace boundaries
+9. Hosted and embedded widget bootstrap still respect the intended origin split
+10. Public widget chat still enforces one active turn per session with `SESSION_BUSY` on overlap
+11. Widget runtime changes still pass the load-test harness before shipping
 
 ## Source Files Worth Reading First
 
@@ -1499,6 +1512,10 @@ For a new engineer joining this codebase, these are the most important files to 
 8. `supabase/functions/search-knowledge/index.ts`
 9. `src/app/(app)/agents/[id]/builder/page.tsx`
 10. `src/app/(app)/agents/[id]/preview/page.tsx`
+11. `src/lib/widgets/server.ts`
+12. `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
+13. `apps/widget-v2/src/Widget.tsx`
+14. `scripts/widget-load-test.mjs`
 
 ## Summary
 

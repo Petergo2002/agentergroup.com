@@ -7,7 +7,7 @@ A full-stack SaaS platform for building, deploying, and embedding AI agents into
 ## What It Does
 
 - **Build AI Agents** — Create and configure agents with custom instructions, models, and published versions.
-- **Widget System** — Embed an AI chat widget on any website via a lightweight embeddable script (`widget-v2`).
+- **Widget System** — Deploy the same AI chat widget as either a hosted runtime or an embeddable script (`widget-v2`).
 - **Live Preview** — Preview widget changes in real time with signed preview tokens and draft payloads.
 - **Connections** — Integrate third-party tools via Composio (e.g. Gmail, Notion, GitHub).
 - **Knowledge Base** — Attach knowledge sources to agents for contextual retrieval.
@@ -61,6 +61,7 @@ A full-stack SaaS platform for building, deploying, and embedding AI agents into
 │   │   ├── types.ts            # Shared TypeScript types (DB row shapes)
 │   │   └── widgets.ts          # Widget config builders & helpers
 │   └── supabase/               # Supabase migrations
+├── scripts/                    # Utility scripts such as widget load testing
 └── apps/
     └── widget-v2/              # Embeddable chat widget (standalone React build)
 ```
@@ -91,6 +92,7 @@ cp .env.example .env.local
 | `OPENROUTER_MODEL` | Default model (e.g. `openai/gpt-4o-mini`) |
 | `COMPOSIO_API_KEY` | Composio API key for tool integrations |
 | `NEXT_PUBLIC_APP_URL` | App base URL (e.g. `http://localhost:3000`) |
+| `NEXT_PUBLIC_WIDGET_APP_URL` | Hosted widget app URL (defaults to `http://localhost:5173` locally) |
 
 ### 3. Run the development server
 
@@ -115,6 +117,7 @@ npm run start         # Start production server
 npm run lint          # ESLint
 npm run widget:dev    # Start widget-v2 dev server
 npm run widget:build  # Build widget-v2 for production
+npm run widget:load-test -- --help  # Load-test the public widget runtime
 ```
 
 ---
@@ -129,6 +132,8 @@ npm run widget:build  # Build widget-v2 for production
 | `/agents` | Agents list |
 | `/agents/[id]/builder` | Agent flow builder |
 | `/agents/[id]/preview` | Live agent chat preview |
+| `/widgets` | Widget list and deployment management |
+| `/analytics` | Widget conversation analytics and operations |
 | `/connections` | Third-party tool connections |
 | `/settings` | Workspace settings |
 
@@ -140,12 +145,21 @@ The `widget-v2` app compiles to a self-contained script. To embed on any site:
 
 ```html
 <script src="https://widget.agentergroup.com/loader.js"
-  data-widget-key="YOUR_WIDGET_PUBLIC_KEY"
+  data-widget="YOUR_WIDGET_PUBLIC_KEY"
   async>
 </script>
 ```
 
 The widget communicates with the platform via the public API routes under `/api/public/widgets/`.
+
+## Widget Runtime Notes
+
+- Bootstrap issues a short-lived signed widget access token. The current TTL is 15 minutes.
+- Widget appearance is now driven by `theme`, `primaryColor`, and `secondaryColor`. Base surfaces and text are derived automatically.
+- Hosted and embedded widget clients both retry one bootstrap refresh automatically when the runtime token expires.
+- Public widget chat allows one active turn per session at a time. Overlapping sends for the same session return `409 SESSION_BUSY`.
+- The widget runtime has a dedicated load-test harness in `scripts/widget-load-test.mjs`.
+- For local hosted-widget testing, keep the widget origin aligned with `NEXT_PUBLIC_WIDGET_APP_URL`. With repo defaults that means `http://localhost:5173`, not `http://127.0.0.1:5173`.
 
 ---
 

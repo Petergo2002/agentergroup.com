@@ -42,8 +42,9 @@ export interface WidgetConfig {
     language?: WidgetLanguage;
     theme: WidgetTheme;
     primaryColor: string;
-    backgroundColor: string;
-    textColor: string;
+    secondaryColor?: string;
+    backgroundColor?: string;
+    textColor?: string;
     showBranding: boolean;
   };
   home: {

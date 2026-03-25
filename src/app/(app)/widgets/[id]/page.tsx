@@ -35,8 +35,7 @@ interface WidgetFormState {
   brandName: string;
   logoUrl: string;
   primaryColor: string;
-  backgroundColor: string;
-  textColor: string;
+  secondaryColor: string;
   theme: 'dark' | 'light';
   language: string;
   homeTitle: string;
@@ -115,8 +114,7 @@ function getInitialFormState(summary: WidgetDetailResponse): WidgetFormState {
     brandName: summary.widget.brand_name,
     logoUrl: summary.widget.logo_url ?? '',
     primaryColor: summary.widget.primary_color,
-    backgroundColor: summary.widget.background_color,
-    textColor: summary.widget.text_color,
+    secondaryColor: summary.widget.secondary_color || summary.widget.primary_color,
     theme: summary.widget.theme,
     language: summary.widget.language || 'en',
     homeTitle: summary.widget.home_title || '',
@@ -159,8 +157,7 @@ function buildDraftPreviewPayload(
       brandName: form.brandName,
       logoUrl: form.logoUrl,
       primaryColor: form.primaryColor,
-      backgroundColor: form.backgroundColor,
-      textColor: form.textColor,
+      secondaryColor: form.secondaryColor,
       theme: form.theme,
       language: form.language,
       homeTitle: form.homeTitle,
@@ -191,6 +188,19 @@ function getWidgetStateLabel(summary: WidgetDetailResponse) {
   }
 
   return summary.widget.status === 'deployed' ? 'Live' : 'Draft';
+}
+
+function updatePrimaryColorState(
+  current: WidgetFormState,
+  nextPrimaryColor: string,
+): WidgetFormState {
+  const shouldMirrorSecondary = current.secondaryColor === current.primaryColor;
+
+  return {
+    ...current,
+    primaryColor: nextPrimaryColor,
+    secondaryColor: shouldMirrorSecondary ? nextPrimaryColor : current.secondaryColor,
+  };
 }
 
 export default function WidgetDetailPage() {
@@ -401,8 +411,7 @@ export default function WidgetDetailPage() {
             brandName: form.brandName,
             logoUrl: form.logoUrl,
             primaryColor: form.primaryColor,
-            backgroundColor: form.backgroundColor,
-            textColor: form.textColor,
+            secondaryColor: form.secondaryColor,
             theme: form.theme,
             language: form.language,
             homeTitle: form.homeTitle || null,
@@ -762,65 +771,63 @@ export default function WidgetDetailPage() {
           <section>
             <div className="mb-3.5">
               <h2 className={sectionTitleClassName}>Appearance</h2>
-              <p className={sectionDescClassName}>Customize the visual theme and colors.</p>
+              <p className={sectionDescClassName}>Keep styling simple: primary drives strong actions, secondary drives hover and soft interaction states.</p>
             </div>
             <div className={`${surfaceClassName} p-5 sm:p-6 space-y-5`}>
-              <div className="grid gap-5 sm:grid-cols-3">
-                <label className="block space-y-1.5">
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
+                <label className="block space-y-2">
                   <span className={fieldLabelClassName}>Primary Color</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
                       value={form.primaryColor}
-                      onChange={(event) => setForm((current) => current ? { ...current, primaryColor: event.target.value } : current)}
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? updatePrimaryColorState(current, event.target.value)
+                            : current,
+                        )
+                      }
                       className="h-9 w-14 cursor-pointer rounded bg-transparent p-0 border-0"
                     />
                     <input
                       type="text"
                       value={form.primaryColor.toUpperCase()}
-                      onChange={(event) => setForm((current) => current ? { ...current, primaryColor: event.target.value } : current)}
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? updatePrimaryColorState(current, event.target.value)
+                            : current,
+                        )
+                      }
                       className={`${inputClassName} py-1.5 font-mono text-xs uppercase`}
                     />
                   </div>
+                  <p className="text-xs leading-relaxed text-on-surface-variant/70">
+                    Used for the main button, send action, selected pills, and the strongest brand accents.
+                  </p>
                 </label>
-                <label className="block space-y-1.5">
-                  <span className={fieldLabelClassName}>Background Color</span>
+                <label className="block space-y-2">
+                  <span className={fieldLabelClassName}>Secondary Color</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={form.backgroundColor}
-                      onChange={(event) => setForm((current) => current ? { ...current, backgroundColor: event.target.value } : current)}
+                      value={form.secondaryColor}
+                      onChange={(event) => setForm((current) => current ? { ...current, secondaryColor: event.target.value } : current)}
                       className="h-9 w-14 cursor-pointer rounded bg-transparent p-0 border-0"
                     />
                     <input
                       type="text"
-                      value={form.backgroundColor.toUpperCase()}
-                      onChange={(event) => setForm((current) => current ? { ...current, backgroundColor: event.target.value } : current)}
+                      value={form.secondaryColor.toUpperCase()}
+                      onChange={(event) => setForm((current) => current ? { ...current, secondaryColor: event.target.value } : current)}
                       className={`${inputClassName} py-1.5 font-mono text-xs uppercase`}
                     />
                   </div>
+                  <p className="text-xs leading-relaxed text-on-surface-variant/70">
+                    Used for hover, soft highlights, focus rings, and the lighter interaction layer across the widget.
+                  </p>
                 </label>
-                <label className="block space-y-1.5">
-                  <span className={fieldLabelClassName}>Text Color</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={form.textColor}
-                      onChange={(event) => setForm((current) => current ? { ...current, textColor: event.target.value } : current)}
-                      className="h-9 w-14 cursor-pointer rounded bg-transparent p-0 border-0"
-                    />
-                    <input
-                      type="text"
-                      value={form.textColor.toUpperCase()}
-                      onChange={(event) => setForm((current) => current ? { ...current, textColor: event.target.value } : current)}
-                      className={`${inputClassName} py-1.5 font-mono text-xs uppercase`}
-                    />
-                  </div>
-                </label>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-2 pt-2 border-t border-outline-variant/10">
-                <label className="block space-y-1.5">
+                <label className="block space-y-2">
                   <span className={fieldLabelClassName}>Theme Preference</span>
                   <select
                     value={form.theme}
@@ -830,8 +837,13 @@ export default function WidgetDetailPage() {
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
                   </select>
+                  <p className="text-xs leading-relaxed text-on-surface-variant/70">
+                    Light and dark mode still control the base surfaces automatically, so you only customize the brand accents.
+                  </p>
                 </label>
-                
+              </div>
+
+              <div className="grid gap-5 pt-2 border-t border-outline-variant/10 sm:grid-cols-2">
                 <div className="flex items-center justify-between rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-3 sm:mt-6">
                   <div className="space-y-0.5">
                     <span className="text-sm font-medium text-on-surface">Show branding</span>

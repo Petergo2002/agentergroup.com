@@ -78,12 +78,14 @@ function parseDraftPreviewInput(body: Record<string, unknown>) {
       logoUrl: typeof widget.logoUrl === "string" ? widget.logoUrl.trim() : "",
       primaryColor:
         typeof widget.primaryColor === "string" ? widget.primaryColor.trim() : "#ff5c00",
-      backgroundColor:
-        typeof widget.backgroundColor === "string"
-          ? widget.backgroundColor.trim()
-          : "#0a0a0a",
-      textColor:
-        typeof widget.textColor === "string" ? widget.textColor.trim() : "#f5f5f5",
+      secondaryColor:
+        typeof widget.secondaryColor === "string" && widget.secondaryColor.trim()
+          ? widget.secondaryColor.trim()
+          : typeof widget.backgroundColor === "string" && widget.backgroundColor.trim()
+            ? widget.backgroundColor.trim()
+            : typeof widget.primaryColor === "string" && widget.primaryColor.trim()
+              ? widget.primaryColor.trim()
+              : "#ff5c00",
       theme: widget.theme === "light" ? "light" : "dark",
       language: typeof widget.language === "string" ? widget.language.trim() : "en",
       homeTitle: typeof widget.homeTitle === "string" ? widget.homeTitle.trim() : null,

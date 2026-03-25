@@ -5,6 +5,7 @@ Status note:
 - This document started as a phase-planning doc and should not be read as a fully current implementation spec.
 - The codebase now has delivered runtime traces, publish/rollback, widget conversation analytics, and auditability.
 - Approval-related tables and concepts still exist, but customer-facing chat does not currently pause on approval in the live runtime.
+- The public widget runtime now also includes per-session turn locking, runtime-token refresh/retry, tighter runtime-origin checks, and a dedicated load-test harness.
 
 ## Objective
 
@@ -60,6 +61,9 @@ Implement:
 - Approval records for sensitive actions, even if approval gating is not yet active in customer-facing chat
 - Audit logging
 - Clear lifecycle events
+- Public widget session-level concurrency control so the same session cannot run overlapping turns
+- Runtime auth boundaries for hosted vs embedded widget traffic
+- Repeatable load-testing coverage for public widget bootstrap/chat flows before shipping runtime changes
 
 ### Publishing and Lifecycle
 
@@ -114,6 +118,7 @@ Do not prioritize:
 - Sensitive actions can be modeled for approval, even if live customer chat does not yet block on approval
 - Published agents have clear version history and rollback support
 - Agents can be archived and restored without losing history
+- Public widget chat does not race overlapping turns from the same session
 
 ## Engineering Notes
 
@@ -121,3 +126,4 @@ Do not prioritize:
 - Prefer stable internal contracts between builder, database, and runtime
 - Expand supported agent behavior only after observability is good enough to debug failures
 - Add Trigger.dev only after the approval and trace model is stable enough to support async execution
+- When changing public widget bootstrap, chat auth, or runtime locking behavior, rerun the widget load-test harness in `scripts/widget-load-test.mjs`
