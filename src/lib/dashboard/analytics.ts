@@ -60,7 +60,7 @@ interface AnalyticsWidgetLeadRow {
 }
 
 interface DashboardConversationAggregationResult {
-  widgetOptions: Array<{ id: string; name: string }>;
+  widgetOptions: Array<{ id: string; name: string; status: "draft" | "deployed" }>;
   agentOptions: Array<{ id: string; name: string }>;
   filteredRows: DashboardAnalyticsConversationListItem[];
   conversations: DashboardAnalyticsConversationListItem[];
@@ -414,12 +414,15 @@ export async function listDashboardConversations(
   input: DashboardConversationQueryInput,
 ): Promise<DashboardConversationAggregationResult> {
   const { startIso } = getAnalyticsDateRange(input.appliedFilters.range);
-  const widgets = await listWorkspaceWidgetsForAnalytics(supabase, input.workspaceId);
-  const agents = await listWorkspaceAgentsForAnalytics(supabase, input.workspaceId);
+  const [widgets, agents] = await Promise.all([
+    listWorkspaceWidgetsForAnalytics(supabase, input.workspaceId),
+    listWorkspaceAgentsForAnalytics(supabase, input.workspaceId),
+  ]);
 
   const widgetOptions = widgets.map((widget) => ({
     id: widget.id,
     name: widget.name,
+    status: widget.status,
   }));
   const agentOptions = agents.map((agent) => ({
     id: agent.id,
@@ -691,31 +694,15 @@ export async function getDashboardConversationDetail(
     return null;
   }
 
-  const widgetAgents = await loadWidgetAgentsForWidgets(supabase, [widget.id]);
-  const widgetAgent =
-    (session.active_widget_agent_id
-      ? widgetAgents.find((item) => item.id === session.active_widget_agent_id) ?? null
-      : null) ??
-    (session.active_agent_id
-      ? widgetAgents.find((item) => item.agent_id === session.active_agent_id) ?? null
-      : null);
-
-  let agent: AnalyticsAgentRow | null = null;
-  if (session.active_agent_id) {
-    const { data: agentData, error: agentError } = await supabase
-      .from("agents")
-      .select("id, name")
-      .eq("id", session.active_agent_id)
-      .maybeSingle();
-
-    if (agentError) {
-      throw new Error(agentError.message);
-    }
-
-    agent = (agentData ?? null) as AnalyticsAgentRow | null;
-  }
-
-  const [transcriptData, leadData] = await Promise.all([
+  const [widgetAgents, agentResult, transcriptData, leadData] = await Promise.all([
+    loadWidgetAgentsForWidgets(supabase, [widget.id]),
+    session.active_agent_id
+      ? supabase
+          .from("agents")
+          .select("id, name")
+          .eq("id", session.active_agent_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
     supabase
       .from("widget_session_messages")
       .select("id, role, content, metadata, created_at")
@@ -731,6 +718,10 @@ export async function getDashboardConversationDetail(
       .maybeSingle(),
   ]);
 
+  if (agentResult.error) {
+    throw new Error(agentResult.error.message);
+  }
+
   if (transcriptData.error) {
     throw new Error(transcriptData.error.message);
   }
@@ -738,6 +729,16 @@ export async function getDashboardConversationDetail(
   if (leadData.error) {
     throw new Error(leadData.error.message);
   }
+
+  const widgetAgent =
+    (session.active_widget_agent_id
+      ? widgetAgents.find((item) => item.id === session.active_widget_agent_id) ?? null
+      : null) ??
+    (session.active_agent_id
+      ? widgetAgents.find((item) => item.agent_id === session.active_agent_id) ?? null
+      : null);
+
+  const agent = (agentResult.data ?? null) as AnalyticsAgentRow | null;
 
   return {
     conversation: {

@@ -27,6 +27,8 @@
   const PREVIEW_REQUEST_MESSAGE_TYPE = "ag:widget-preview:request-config";
   const BOOTSTRAP_MESSAGE_TYPE = "ag:widget-bootstrap";
   const BOOTSTRAP_REQUEST_MESSAGE_TYPE = "ag:widget-bootstrap:request";
+  const BOOTSTRAP_REFRESH_MESSAGE_TYPE = "ag:widget-bootstrap:refresh";
+  const BOOTSTRAP_ERROR_MESSAGE_TYPE = "ag:widget-bootstrap:error";
   const WIDGET_CLOSE_REQUEST_MESSAGE_TYPE = "ag:widget:close-request";
   const previousInstance = window[GLOBAL_INSTANCE_KEY];
   if (previousInstance && typeof previousInstance.destroy === "function") {
@@ -309,6 +311,12 @@
     return { type: BOOTSTRAP_REQUEST_MESSAGE_TYPE };
   }
 
+  function parseBootstrapRefreshMessage(data) {
+    if (!isObjectRecord(data)) return null;
+    if (data.type !== BOOTSTRAP_REFRESH_MESSAGE_TYPE) return null;
+    return { type: BOOTSTRAP_REFRESH_MESSAGE_TYPE };
+  }
+
   function postWidgetStateToIframe() {
     if (!iframe || !iframe.contentWindow) return;
 
@@ -329,6 +337,18 @@
       {
         type: BOOTSTRAP_MESSAGE_TYPE,
         payload: bootstrapPayload,
+      },
+      widgetBaseUrl,
+    );
+  }
+
+  function postBootstrapErrorToIframe(message) {
+    if (!iframe || !iframe.contentWindow) return;
+
+    iframe.contentWindow.postMessage(
+      {
+        type: BOOTSTRAP_ERROR_MESSAGE_TYPE,
+        error: message || "Failed to refresh widget bootstrap.",
       },
       widgetBaseUrl,
     );
@@ -435,6 +455,21 @@
 
     bootstrapPayload = await response.json();
     return bootstrapPayload;
+  }
+
+  async function refreshBootstrapForIframe() {
+    try {
+      await fetchBootstrap();
+      applyWidgetTheme();
+      postBootstrapToIframe();
+    } catch (error) {
+      console.error("[AgenterGroup Widget] Bootstrap refresh failed", error);
+      postBootstrapErrorToIframe(
+        error instanceof Error
+          ? error.message
+          : "Failed to refresh widget bootstrap.",
+      );
+    }
   }
 
   function shouldLockBackgroundScroll() {
@@ -1024,6 +1059,14 @@
       parseBootstrapRequestMessage(event.data)
     ) {
       postBootstrapToIframe();
+      return;
+    }
+
+    if (
+      isTrustedIframeMessage(event) &&
+      parseBootstrapRefreshMessage(event.data)
+    ) {
+      void refreshBootstrapForIframe();
       return;
     }
 

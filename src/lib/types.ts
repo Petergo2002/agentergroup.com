@@ -244,6 +244,8 @@ export interface WidgetSessionRecord {
   session_id: string;
   source: "embedded" | "hosted" | "preview";
   status: "active" | "completed";
+  active_turn_request_id: string | null;
+  active_turn_started_at: string | null;
   page_url: string | null;
   referrer: string | null;
   origin: string | null;

@@ -47,20 +47,13 @@ export async function fetchWidgets(userId: string): Promise<WidgetListItem[]> {
     throw new Error(error.message);
   }
 
-  const { data: hostedUrls } = await admin
-    .from("widgets")
-    .select("id, hosted_url")
-    .eq("workspace_id", context.workspace.id);
-
-  const hostedUrlMap = new Map((hostedUrls ?? []).map((w) => [w.id, w.hosted_url]));
-
   return (widgets ?? []).map((widget) => ({
     id: widget.id,
     name: widget.name,
     status: widget.status as "draft" | "deployed",
     widgetPublicKey: widget.widget_public_key,
     attachedAgentCount: (widget.widget_agents ?? []).length,
-    hostedUrl: hostedUrlMap.get(widget.id) || "",
+    hostedUrl: widget.hosted_url || "",
     needsRedeploy: widget.needs_redeploy ?? false,
     updatedAt: widget.updated_at,
   }));

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildDraftWidgetRuntimeAgents,
-  buildWidgetCorsHeaders,
+  buildWidgetRuntimeCorsHeaders,
   buildStoredWidgetRuntimeAgents,
   insertWidgetLead,
   loadWidgetByPublicKey,
   loadWidgetSession,
+  resolveWidgetRuntimeRequestOrigin,
   resolveWidgetPreviewContext,
   resolveWidgetRuntimeAccess,
   type RuntimeWidgetAgentSelection,
@@ -22,7 +23,7 @@ function buildErrorResponse(
 ) {
   return NextResponse.json(
     code ? { error, code } : { error },
-    { status, headers: buildWidgetCorsHeaders(request) },
+    { status, headers: buildWidgetRuntimeCorsHeaders(request) },
   );
 }
 
@@ -109,9 +110,20 @@ function resolveSelectedWidgetAgent(args: {
 }
 
 export async function OPTIONS(request: NextRequest) {
+  const runtimeOrigin = resolveWidgetRuntimeRequestOrigin(request);
+
+  if (!runtimeOrigin.ok) {
+    return buildErrorResponse(
+      request,
+      runtimeOrigin.status,
+      runtimeOrigin.error,
+      runtimeOrigin.code,
+    );
+  }
+
   return new NextResponse(null, {
     status: 204,
-    headers: buildWidgetCorsHeaders(request),
+    headers: buildWidgetRuntimeCorsHeaders(request),
   });
 }
 
@@ -121,8 +133,18 @@ export async function POST(
 ) {
   const { widgetPublicKey } = await params;
   const supabase = createAdminClient() as unknown as WidgetAdminSupabase;
+  const runtimeOrigin = resolveWidgetRuntimeRequestOrigin(request);
 
   try {
+    if (!runtimeOrigin.ok) {
+      return buildErrorResponse(
+        request,
+        runtimeOrigin.status,
+        runtimeOrigin.error,
+        runtimeOrigin.code,
+      );
+    }
+
     const loaded = await loadWidgetByPublicKey(supabase, widgetPublicKey);
 
     if (!loaded) {
@@ -223,7 +245,7 @@ export async function POST(
 
     return NextResponse.json(
       { ok: true, lead },
-      { headers: buildWidgetCorsHeaders(request) },
+      { headers: buildWidgetRuntimeCorsHeaders(request) },
     );
   } catch (error) {
     return buildErrorResponse(

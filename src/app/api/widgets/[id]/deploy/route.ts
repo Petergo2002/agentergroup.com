@@ -67,29 +67,25 @@ export async function POST(
   }
 
   const deployedAt = new Date().toISOString();
-  const { error: widgetError } = await supabase
+  const { data: updatedWidget, error: widgetError } = await supabase
     .from("widgets")
     .update({
       status: "deployed",
       deployed_at: deployedAt,
     })
     .eq("id", id)
-    .eq("workspace_id", context.workspace.id);
+    .eq("workspace_id", context.workspace.id)
+    .select("*")
+    .maybeSingle();
 
-  if (widgetError) {
+  if (widgetError || !updatedWidget) {
     return NextResponse.json(
-      { error: widgetError.message || "Failed to deploy widget." },
+      { error: widgetError?.message || "Failed to deploy widget." },
       { status: 500 },
     );
   }
 
-  const nextLoaded = await loadWidgetById(supabase as never, id);
-
-  if (!nextLoaded) {
-    return NextResponse.json({ error: "Widget not found." }, { status: 404 });
-  }
-
-  const summary = buildWidgetSummary(nextLoaded.widget, nextLoaded.widgetAgents, {
+  const summary = buildWidgetSummary(updatedWidget as never, loaded.widgetAgents, {
     preview: true,
   });
   const previewToken = await signWidgetPreviewToken(

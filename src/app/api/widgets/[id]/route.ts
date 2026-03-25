@@ -117,26 +117,22 @@ export async function PATCH(
       : loaded.widget.allowed_origins,
   };
 
-  const { error } = await supabase
+  const { data: updatedWidget, error } = await supabase
     .from("widgets")
     .update(payload)
     .eq("id", id)
-    .eq("workspace_id", context.workspace.id);
+    .eq("workspace_id", context.workspace.id)
+    .select("*")
+    .maybeSingle();
 
-  if (error) {
+  if (error || !updatedWidget) {
     return NextResponse.json(
-      { error: error.message || "Failed to update widget." },
+      { error: error?.message || "Failed to update widget." },
       { status: 500 },
     );
   }
 
-  const nextLoaded = await loadWidgetById(supabase as never, id);
-
-  if (!nextLoaded) {
-    return NextResponse.json({ error: "Widget not found." }, { status: 404 });
-  }
-
-  const summary = buildWidgetSummary(nextLoaded.widget, nextLoaded.widgetAgents, {
+  const summary = buildWidgetSummary(updatedWidget as never, loaded.widgetAgents, {
     preview: true,
   });
   const previewToken = await signWidgetPreviewToken(

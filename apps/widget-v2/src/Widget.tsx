@@ -55,6 +55,8 @@ const PREVIEW_RESET_MESSAGE_TYPE = "ag:widget-preview:reset-chat";
 const PREVIEW_REQUEST_MESSAGE_TYPE = "ag:widget-preview:request-config";
 const BOOTSTRAP_MESSAGE_TYPE = "ag:widget-bootstrap";
 const BOOTSTRAP_REQUEST_MESSAGE_TYPE = "ag:widget-bootstrap:request";
+const BOOTSTRAP_REFRESH_MESSAGE_TYPE = "ag:widget-bootstrap:refresh";
+const BOOTSTRAP_ERROR_MESSAGE_TYPE = "ag:widget-bootstrap:error";
 const WIDGET_CLOSE_REQUEST_MESSAGE_TYPE = "ag:widget:close-request";
 const WIDGET_STATE_MESSAGE_TYPE = "ag:widget:state";
 const MIN_INTERIM_STREAM_RENDER_DELAY_MS = 250;
@@ -85,6 +87,11 @@ interface WidgetPreviewResetPayload {
     previewRevision?: string | number;
     reason?: string;
   };
+}
+
+interface WidgetBootstrapErrorMessagePayload {
+  type: typeof BOOTSTRAP_ERROR_MESSAGE_TYPE;
+  error: string;
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -248,6 +255,19 @@ function parseWidgetBootstrapMessage(
   };
 }
 
+function parseWidgetBootstrapErrorMessage(
+  data: unknown,
+): WidgetBootstrapErrorMessagePayload | null {
+  if (!isObjectRecord(data)) return null;
+  if (data.type !== BOOTSTRAP_ERROR_MESSAGE_TYPE) return null;
+  if (typeof data.error !== "string") return null;
+
+  return {
+    type: BOOTSTRAP_ERROR_MESSAGE_TYPE,
+    error: data.error,
+  };
+}
+
 
 
 const WIDGET_DEFAULTS: Record<"sv" | "en", {
@@ -386,7 +406,7 @@ function resolveSelectedAgent(
   return null;
 }
 
-async function readJsonError(response: Response, fallback: string) {
+async function createJsonError(response: Response, fallback: string) {
   const payload = await response.json().catch(() => null);
   const error = new Error(
     typeof payload?.error === "string" ? payload.error : fallback,
@@ -394,7 +414,25 @@ async function readJsonError(response: Response, fallback: string) {
   if (typeof payload?.code === "string") {
     error.code = payload.code;
   }
-  throw error;
+  return error;
+}
+
+function hasErrorCode(error: unknown, code: string) {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as Error & { code?: string }).code === code
+  );
+}
+
+function buildRequestContextFromBootstrap(
+  bootstrapContext: WidgetRequestContext,
+  payload: WidgetBootstrapResponse,
+): WidgetRequestContext {
+  return {
+    ...bootstrapContext,
+    accessToken: payload.accessToken ?? null,
+  };
 }
 
 export default function Widget({
@@ -442,6 +480,7 @@ export default function Widget({
   const sessionEventDedupRef = useRef<Record<string, number>>({});
   const previousWidgetOpenRef = useRef<boolean | null>(null);
   const inactivityTimerRef = useRef<number | null>(null);
+  const bootstrapRefreshPromiseRef = useRef<Promise<WidgetBootstrapResponse> | null>(null);
 
   const bootstrapContext = useMemo<WidgetRequestContext>(
     () => ({
@@ -477,6 +516,160 @@ export default function Widget({
     setError(null);
   }, []);
 
+  const requestEmbeddedBootstrapRefresh = useCallback(() => {
+    return new Promise<WidgetBootstrapResponse>((resolve, reject) => {
+      if (window.parent === window || !embeddedParentOrigin) {
+        reject(
+          new Error("Could not refresh the embedded widget session. Please try again."),
+        );
+        return;
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        window.removeEventListener("message", handleRefreshMessage);
+        reject(new Error("Timed out while refreshing the widget session."));
+      }, 5000);
+
+      function cleanup() {
+        window.clearTimeout(timeoutId);
+        window.removeEventListener("message", handleRefreshMessage);
+      }
+
+      function handleRefreshMessage(event: MessageEvent) {
+        if (event.source !== window.parent || event.origin !== embeddedParentOrigin) {
+          return;
+        }
+
+        const bootstrap = parseWidgetBootstrapMessage(event.data);
+        if (bootstrap) {
+          cleanup();
+          resolve(bootstrap.payload);
+          return;
+        }
+
+        const bootstrapError = parseWidgetBootstrapErrorMessage(event.data);
+        if (bootstrapError) {
+          cleanup();
+          reject(new Error(bootstrapError.error));
+        }
+      }
+
+      window.addEventListener("message", handleRefreshMessage);
+      window.parent.postMessage(
+        { type: BOOTSTRAP_REFRESH_MESSAGE_TYPE },
+        embeddedParentOrigin,
+      );
+    });
+  }, [embeddedParentOrigin]);
+
+  const refreshWidgetAccess = useCallback(async () => {
+    if (previewMode) {
+      return requestContext;
+    }
+
+    if (bootstrapRefreshPromiseRef.current) {
+      const payload = await bootstrapRefreshPromiseRef.current;
+      return buildRequestContextFromBootstrap(bootstrapContext, payload);
+    }
+
+    const refreshPromise = (async () => {
+      if (isEmbedded) {
+        return requestEmbeddedBootstrapRefresh();
+      }
+
+      return getWidgetBootstrap(widgetPublicKey, bootstrapContext);
+    })();
+
+    bootstrapRefreshPromiseRef.current = refreshPromise;
+
+    try {
+      const payload = await refreshPromise;
+      applyBootstrapPayload(payload);
+      return buildRequestContextFromBootstrap(bootstrapContext, payload);
+    } catch (error) {
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Could not refresh the widget session. Please try again.",
+      );
+    } finally {
+      if (bootstrapRefreshPromiseRef.current === refreshPromise) {
+        bootstrapRefreshPromiseRef.current = null;
+      }
+    }
+  }, [
+    applyBootstrapPayload,
+    bootstrapContext,
+    isEmbedded,
+    previewMode,
+    requestContext,
+    requestEmbeddedBootstrapRefresh,
+    widgetPublicKey,
+  ]);
+
+  const completeSessionWithRetry = useCallback(
+    async (body: { sessionId: string; reason: "inactivity_timeout" }) => {
+      let activeContext = requestContext;
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          return await requestWidgetSessionCompletion(
+            widgetPublicKey,
+            body,
+            activeContext,
+          );
+        } catch (error) {
+          if (attempt === 0 && hasErrorCode(error, "WIDGET_ACCESS_TOKEN_INVALID")) {
+            activeContext = await refreshWidgetAccess();
+            continue;
+          }
+
+          throw error;
+        }
+      }
+
+      throw new Error("Failed to complete the widget session.");
+    },
+    [refreshWidgetAccess, requestContext, widgetPublicKey],
+  );
+
+  const sendMessageRequestWithRetry = useCallback(
+    async (body: {
+      sessionId: string;
+      message: string;
+      widgetAgentId?: string;
+      language: "sv" | "en";
+      pageUrl?: string;
+      referrer?: string;
+    }) => {
+      let activeContext = requestContext;
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await sendWidgetMessage(
+          widgetPublicKey,
+          body,
+          activeContext,
+        );
+
+        if (response.ok) {
+          return response;
+        }
+
+        const error = await createJsonError(response, "Failed to get response.");
+
+        if (attempt === 0 && error.code === "WIDGET_ACCESS_TOKEN_INVALID") {
+          activeContext = await refreshWidgetAccess();
+          continue;
+        }
+
+        throw error;
+      }
+
+      throw new Error("Failed to send widget message.");
+    },
+    [refreshWidgetAccess, requestContext, widgetPublicKey],
+  );
+
   const clearInactivityTimer = useCallback(() => {
     if (inactivityTimerRef.current !== null) {
       window.clearTimeout(inactivityTimerRef.current);
@@ -502,14 +695,10 @@ export default function Widget({
       }
 
       inactivityTimerRef.current = window.setTimeout(() => {
-        void requestWidgetSessionCompletion(
-          widgetPublicKey,
-          {
-            sessionId,
-            reason: "inactivity_timeout",
-          },
-          requestContext,
-        )
+        void completeSessionWithRetry({
+          sessionId,
+          reason: "inactivity_timeout",
+        })
           .then((payload) => {
             if (payload.sessionCompleted) {
               markConversationCompleted(
@@ -528,10 +717,9 @@ export default function Widget({
     },
     [
       clearInactivityTimer,
+      completeSessionWithRetry,
       markConversationCompleted,
-      requestContext,
       sessionId,
-      widgetPublicKey,
     ],
   );
 
@@ -945,24 +1133,16 @@ export default function Widget({
     setIsLoading(true);
 
     try {
-      const response = await sendWidgetMessage(
-        widgetPublicKey,
-        {
-          sessionId,
-          message: userMessage,
-          widgetAgentId: activeAgent.widgetAgentId,
-          language: activeLanguage,
-          pageUrl:
-            typeof window !== "undefined" ? window.location.href : undefined,
-          referrer:
-            typeof document !== "undefined" ? document.referrer : undefined,
-        },
-        requestContext,
-      );
-
-      if (!response.ok) {
-        await readJsonError(response, "Failed to get response.");
-      }
+      const response = await sendMessageRequestWithRetry({
+        sessionId,
+        message: userMessage,
+        widgetAgentId: activeAgent.widgetAgentId,
+        language: activeLanguage,
+        pageUrl:
+          typeof window !== "undefined" ? window.location.href : undefined,
+        referrer:
+          typeof document !== "undefined" ? document.referrer : undefined,
+      });
 
       if (!response.body) {
         throw new Error("No response stream from server.");
@@ -1121,10 +1301,7 @@ export default function Widget({
       }
     } catch (nextError) {
       console.error("Chat error:", nextError);
-      const isSessionCompletedError =
-        nextError instanceof Error &&
-        "code" in nextError &&
-        (nextError as Error & { code?: string }).code === "SESSION_COMPLETED";
+      const isSessionCompletedError = hasErrorCode(nextError, "SESSION_COMPLETED");
 
       if (isSessionCompletedError) {
         markConversationCompleted(null);

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "widget:load-test": "node scripts/widget-load-test.mjs",
     "widget:dev": "npm --prefix apps/widget-v2 run dev",
     "widget:build": "npm --prefix apps/widget-v2 run build"
   },

@@ -35,6 +35,11 @@ interface WidgetQueryResult<TData> {
   error?: { message: string } | null;
 }
 
+interface WidgetRpcQueryResult<TData> {
+  data?: TData | null;
+  error?: { message: string } | null;
+}
+
 interface WidgetSelectBuilder<TData> {
   eq: (column: string, value: string) => WidgetSelectBuilder<TData>;
   maybeSingle: () => Promise<WidgetQueryResult<TData>>;
@@ -81,6 +86,10 @@ interface WidgetTableQuery {
 
 export interface WidgetAdminSupabase {
   from: (table: string) => WidgetTableQuery;
+  rpc: <TData = unknown>(
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<WidgetRpcQueryResult<TData>>;
 }
 
 interface WidgetPreviewDraftRow extends WidgetPreviewDraftRecord {
@@ -125,9 +134,19 @@ export interface RuntimeWidgetAgentSelection {
 
 const WIDGET_PREVIEW_TTL_MS = 15 * 60 * 1000;
 const WIDGET_ACCESS_TTL_MS = 15 * 60 * 1000;
+const WIDGET_ACTIVE_TURN_STALE_MS = 10 * 60 * 1000;
 const DEPLOY_TIMESTAMP_SKEW_MS = 2000;
-const WIDGET_BOOTSTRAP_CACHE_CONTROL =
-  "public, max-age=60, s-maxage=60, stale-while-revalidate=300";
+const WIDGET_CORS_ALLOW_METHODS = "GET,POST,PATCH,DELETE,OPTIONS";
+const WIDGET_CORS_ALLOW_HEADERS =
+  "Content-Type,x-ag-widget-access-token,x-ag-preview-token,x-ag-preview-source,x-ag-preview-revision,x-ag-widget-context,x-ag-parent-origin";
+
+interface WidgetSessionTurnLockRow {
+  widget_session_id: string | null;
+  status: WidgetSessionRecord["status"] | null;
+  active_turn_request_id: string | null;
+  active_turn_started_at: string | null;
+  acquired: boolean;
+}
 
 async function loadWidgetAgentsWithAgents(
   supabase: WidgetAdminSupabase,
@@ -284,23 +303,87 @@ export function buildWidgetCorsHeaders(request: NextRequest) {
 
   return {
     "Access-Control-Allow-Origin": origin ?? "*",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers":
-      "Content-Type,x-ag-widget-access-token,x-ag-preview-token,x-ag-preview-source,x-ag-preview-revision,x-ag-widget-context,x-ag-parent-origin",
+    "Access-Control-Allow-Methods": WIDGET_CORS_ALLOW_METHODS,
+    "Access-Control-Allow-Headers": WIDGET_CORS_ALLOW_HEADERS,
     "Access-Control-Allow-Credentials": "true",
     Vary: "Origin",
   };
 }
 
+function getWidgetRuntimeAllowedOrigins() {
+  const runtimeOrigin = normalizeAllowedOrigin(getWidgetAppUrl());
+  const origins = new Set<string>();
+
+  if (runtimeOrigin) {
+    origins.add(runtimeOrigin);
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    origins.add("http://localhost:5173");
+    origins.add("http://127.0.0.1:5173");
+  }
+
+  return Array.from(origins);
+}
+
+function buildAllowedOriginHeaders(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": WIDGET_CORS_ALLOW_METHODS,
+    "Access-Control-Allow-Headers": WIDGET_CORS_ALLOW_HEADERS,
+    Vary: "Origin",
+  };
+
+  if (origin) {
+    headers["Access-Control-Allow-Origin"] = origin;
+    headers["Access-Control-Allow-Credentials"] = "true";
+  }
+
+  return headers;
+}
+
+export function resolveWidgetRuntimeRequestOrigin(request: NextRequest) {
+  const requestOrigin = getRequestOrigin(request);
+  const allowedOrigins = getWidgetRuntimeAllowedOrigins();
+
+  if (!requestOrigin) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Runtime request origin is missing.",
+      code: "WIDGET_RUNTIME_ORIGIN_REQUIRED",
+    };
+  }
+
+  if (!allowedOrigins.includes(requestOrigin)) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Runtime request origin is not allowed.",
+      code: "WIDGET_RUNTIME_ORIGIN_INVALID",
+    };
+  }
+
+  return {
+    ok: true as const,
+    origin: requestOrigin,
+  };
+}
+
+export function buildWidgetRuntimeCorsHeaders(request: NextRequest) {
+  const requestOrigin = normalizeAllowedOrigin(request.headers.get("origin"));
+  const allowedOrigins = getWidgetRuntimeAllowedOrigins();
+  const allowedOrigin =
+    requestOrigin && allowedOrigins.includes(requestOrigin) ? requestOrigin : null;
+
+  return buildAllowedOriginHeaders(allowedOrigin);
+}
+
 export function buildWidgetBootstrapHeaders(
   request: NextRequest,
-  options?: { preview?: boolean },
 ) {
   return {
     ...buildWidgetCorsHeaders(request),
-    "Cache-Control": options?.preview
-      ? "no-store, no-cache, must-revalidate"
-      : WIDGET_BOOTSTRAP_CACHE_CONTROL,
+    "Cache-Control": "no-store, no-cache, must-revalidate",
   };
 }
 
@@ -476,6 +559,90 @@ export async function resolveWidgetRuntimeAccess(args: {
     source: "embedded" as const,
     origin: accessToken.allowedOrigin,
   };
+}
+
+function getTurnLockStaleThreshold(referenceTime = Date.now()) {
+  return new Date(referenceTime - WIDGET_ACTIVE_TURN_STALE_MS).toISOString();
+}
+
+export function isWidgetSessionTurnLocked(
+  session: Pick<
+    WidgetSessionRecord,
+    "active_turn_request_id" | "active_turn_started_at"
+  > | null,
+  referenceTime = Date.now(),
+) {
+  if (!session?.active_turn_request_id || !session.active_turn_started_at) {
+    return false;
+  }
+
+  const startedAt = Date.parse(session.active_turn_started_at);
+
+  if (Number.isNaN(startedAt)) {
+    return false;
+  }
+
+  return startedAt >= referenceTime - WIDGET_ACTIVE_TURN_STALE_MS;
+}
+
+export async function acquireWidgetSessionTurnLock(
+  supabase: WidgetAdminSupabase,
+  input: {
+    widgetId: string;
+    sessionId: string;
+    requestId: string;
+    startedAt?: string;
+  },
+) {
+  const startedAt = input.startedAt ?? new Date().toISOString();
+  const { data, error } = await supabase.rpc<WidgetSessionTurnLockRow[]>(
+    "acquire_widget_session_turn_lock",
+    {
+      p_widget_id: input.widgetId,
+      p_session_id: input.sessionId,
+      p_request_id: input.requestId,
+      p_started_at: startedAt,
+      p_stale_before: getTurnLockStaleThreshold(Date.parse(startedAt)),
+    },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] ?? null : data ?? null;
+
+  return {
+    acquired: Boolean(row?.acquired),
+    sessionStatus: row?.status ?? null,
+    activeTurnRequestId: row?.active_turn_request_id ?? null,
+    activeTurnStartedAt: row?.active_turn_started_at ?? null,
+    startedAt,
+  };
+}
+
+export async function releaseWidgetSessionTurnLock(
+  supabase: WidgetAdminSupabase,
+  input: {
+    widgetId: string;
+    sessionId: string;
+    requestId: string;
+  },
+) {
+  const { data, error } = await supabase.rpc<boolean>(
+    "release_widget_session_turn_lock",
+    {
+      p_widget_id: input.widgetId,
+      p_session_id: input.sessionId,
+      p_request_id: input.requestId,
+    },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return Boolean(data);
 }
 
 export async function loadWidgetById(
@@ -1178,11 +1345,12 @@ export async function completeWidgetSession(
   });
 }
 
-export async function handleConversationCompleted(_input: {
+export async function handleConversationCompleted(input: {
   widget: WidgetRecord;
   session: WidgetSessionRecord;
   reason: ConversationEndReason;
 }) {
+  void input;
   // Future after-chat actions will attach here.
 }
 

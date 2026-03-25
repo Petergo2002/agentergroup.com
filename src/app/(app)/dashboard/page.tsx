@@ -36,7 +36,6 @@ export default function DashboardPage() {
 
       try {
         const response = await fetch("/api/dashboard/summary", {
-          next: { revalidate: 30 },
           signal: controller.signal,
         });
         const payload = await response.json().catch(() => null);

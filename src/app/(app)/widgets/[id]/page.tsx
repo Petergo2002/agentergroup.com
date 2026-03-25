@@ -214,9 +214,7 @@ export default function WidgetDetailPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/widgets/${widgetId}`, {
-        next: { revalidate: 30 },
-      });
+      const response = await fetch(`/api/widgets/${widgetId}`);
       const payload = await response.json().catch(() => null);
 
       if (!response.ok || !payload) {
@@ -392,57 +390,58 @@ export default function WidgetDetailPage() {
     setIsSaving(true);
 
     try {
-      const identityResponse = await fetch(`/api/widgets/${widgetId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: form.name,
-          brandName: form.brandName,
-          logoUrl: form.logoUrl,
-          primaryColor: form.primaryColor,
-          backgroundColor: form.backgroundColor,
-          textColor: form.textColor,
-          theme: form.theme,
-          language: form.language,
-          homeTitle: form.homeTitle || null,
-          homeSubtitle: form.homeSubtitle || null,
-          hostedEnabled: form.hostedEnabled,
-          showBranding: form.showBranding,
-          privacyPolicyUrl: form.privacyPolicyUrl,
-          allowedOrigins: form.allowedOrigins,
+      const [identityResponse, agentsResponse] = await Promise.all([
+        fetch(`/api/widgets/${widgetId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: form.name,
+            brandName: form.brandName,
+            logoUrl: form.logoUrl,
+            primaryColor: form.primaryColor,
+            backgroundColor: form.backgroundColor,
+            textColor: form.textColor,
+            theme: form.theme,
+            language: form.language,
+            homeTitle: form.homeTitle || null,
+            homeSubtitle: form.homeSubtitle || null,
+            hostedEnabled: form.hostedEnabled,
+            showBranding: form.showBranding,
+            privacyPolicyUrl: form.privacyPolicyUrl,
+            allowedOrigins: form.allowedOrigins,
+          }),
         }),
-      });
-      const identityPayload = await identityResponse.json().catch(() => null);
+        fetch(`/api/widgets/${widgetId}/agents`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            agents: attachedAgents.map((item, index) => ({
+              agentId: item.agentId,
+              label: item.agent.name,
+              description: item.description,
+              icon: item.icon || null,
+              sortOrder: index,
+              interactionMode: item.interactionMode,
+              greeting: item.greeting,
+              placeholder: item.placeholder,
+              showQuickActions: item.showQuickActions,
+              quickActions: item.quickActions,
+              contactFormSettings: item.contactFormSettings,
+            })),
+          }),
+        }),
+      ]);
 
+      const identityPayload = await identityResponse.json().catch(() => null);
       if (!identityResponse.ok || !identityPayload) {
         throw new Error(identityPayload?.error || 'Failed to save widget settings.');
       }
 
-      const agentsResponse = await fetch(`/api/widgets/${widgetId}/agents`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          agents: attachedAgents.map((item, index) => ({
-            agentId: item.agentId,
-            label: item.agent.name,
-            description: item.description,
-            icon: item.icon || null,
-            sortOrder: index,
-            interactionMode: item.interactionMode,
-            greeting: item.greeting,
-            placeholder: item.placeholder,
-            showQuickActions: item.showQuickActions,
-            quickActions: item.quickActions,
-            contactFormSettings: item.contactFormSettings,
-          })),
-        }),
-      });
       const agentsPayload = await agentsResponse.json().catch(() => null);
-
       if (!agentsResponse.ok || !agentsPayload) {
         throw new Error(agentsPayload?.error || 'Failed to save attached agents.');
       }

@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  buildWidgetBootstrapHeaders,
   buildStoredWidgetRuntimeConfig,
-  buildWidgetCorsHeaders,
+  buildWidgetRuntimeCorsHeaders,
   loadWidgetByPublicKey,
+  resolveWidgetRuntimeRequestOrigin,
   resolveWidgetPreviewContext,
   resolveWidgetRuntimeAccess,
   type WidgetAdminSupabase,
 } from "@/lib/widgets/server";
 
 export async function OPTIONS(request: NextRequest) {
+  const runtimeOrigin = resolveWidgetRuntimeRequestOrigin(request);
+
+  if (!runtimeOrigin.ok) {
+    return NextResponse.json(
+      { error: runtimeOrigin.error, code: runtimeOrigin.code },
+      { status: runtimeOrigin.status, headers: buildWidgetRuntimeCorsHeaders(request) },
+    );
+  }
+
   return new NextResponse(null, {
     status: 204,
-    headers: buildWidgetCorsHeaders(request),
+    headers: buildWidgetRuntimeCorsHeaders(request),
   });
 }
 
@@ -23,14 +32,22 @@ export async function GET(
 ) {
   const { widgetPublicKey } = await params;
   const supabase = createAdminClient() as unknown as WidgetAdminSupabase;
+  const runtimeOrigin = resolveWidgetRuntimeRequestOrigin(request);
 
   try {
+    if (!runtimeOrigin.ok) {
+      return NextResponse.json(
+        { error: runtimeOrigin.error, code: runtimeOrigin.code },
+        { status: runtimeOrigin.status, headers: buildWidgetRuntimeCorsHeaders(request) },
+      );
+    }
+
     const loaded = await loadWidgetByPublicKey(supabase, widgetPublicKey);
 
     if (!loaded) {
       return NextResponse.json(
         { error: "Widget not found." },
-        { status: 404, headers: buildWidgetCorsHeaders(request) },
+        { status: 404, headers: buildWidgetRuntimeCorsHeaders(request) },
       );
     }
 
@@ -49,14 +66,14 @@ export async function GET(
     if (!access.ok) {
       return NextResponse.json(
         access.code ? { error: access.error, code: access.code } : { error: access.error },
-        { status: access.status, headers: buildWidgetCorsHeaders(request) },
+        { status: access.status, headers: buildWidgetRuntimeCorsHeaders(request) },
       );
     }
 
     if (access.source !== "preview" && loaded.widget.status !== "deployed") {
       return NextResponse.json(
         { error: "Widget is not deployed.", code: "WIDGET_NOT_DEPLOYED" },
-        { status: 404, headers: buildWidgetCorsHeaders(request) },
+        { status: 404, headers: buildWidgetRuntimeCorsHeaders(request) },
       );
     }
 
@@ -71,18 +88,16 @@ export async function GET(
           },
         )),
       {
-        headers: buildWidgetBootstrapHeaders(request, {
-          preview: preview.isPreview,
-        }),
+        headers: buildWidgetRuntimeCorsHeaders(request),
       },
     );
   } catch (error) {
     return NextResponse.json(
       {
         error:
-          error instanceof Error ? error.message : "Failed to load widget config.",
+        error instanceof Error ? error.message : "Failed to load widget config.",
       },
-      { status: 500, headers: buildWidgetCorsHeaders(request) },
+      { status: 500, headers: buildWidgetRuntimeCorsHeaders(request) },
     );
   }
 }

@@ -172,17 +172,6 @@ export async function sendWidgetEvent(
   const url = buildWidgetUrl(widgetPublicKey, "/events");
   const payload = JSON.stringify(body);
 
-  if (
-    options?.preferBeacon &&
-    typeof navigator !== "undefined" &&
-    typeof navigator.sendBeacon === "function"
-  ) {
-    const blob = new Blob([payload], { type: "application/json" });
-    if (navigator.sendBeacon(url, blob)) {
-      return;
-    }
-  }
-
   await fetch(url, {
     method: "POST",
     headers: buildWidgetHeaders(context),

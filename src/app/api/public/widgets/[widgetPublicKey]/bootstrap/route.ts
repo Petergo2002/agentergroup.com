@@ -68,7 +68,7 @@ export async function GET(
           accessToken: null,
           source: "preview",
         },
-        { headers: buildWidgetBootstrapHeaders(request, { preview: true }) },
+        { headers: buildWidgetBootstrapHeaders(request) },
       );
     }
 

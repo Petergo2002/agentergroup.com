@@ -5,8 +5,9 @@ import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calen
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  acquireWidgetSessionTurnLock,
   buildDraftWidgetRuntimeAgents,
-  buildWidgetCorsHeaders,
+  buildWidgetRuntimeCorsHeaders,
   buildStoredWidgetRuntimeAgents,
   completeWidgetSession,
   getPublishedAgentVersion,
@@ -16,6 +17,8 @@ import {
   loadOrderedWidgetSessionHistory,
   loadWidgetByPublicKey,
   loadWidgetSession,
+  releaseWidgetSessionTurnLock,
+  resolveWidgetRuntimeRequestOrigin,
   resolveWidgetPreviewContext,
   resolveWidgetRuntimeAccess,
   type RuntimeWidgetAgentSelection,
@@ -35,9 +38,12 @@ function buildErrorResponse(
 ) {
   return Response.json(
     code ? { error, code } : { error },
-    { status, headers: buildWidgetCorsHeaders(request) },
+    { status, headers: buildWidgetRuntimeCorsHeaders(request) },
   );
 }
+
+const SESSION_BUSY_ERROR =
+  "Another reply is already being generated for this chat. Please wait for the current response to finish.";
 
 function resolveSelectedWidgetAgent(args: {
   widgetAgents: RuntimeWidgetAgentSelection[];
@@ -122,9 +128,20 @@ function resolveSelectedWidgetAgent(args: {
 }
 
 export async function OPTIONS(request: NextRequest) {
+  const runtimeOrigin = resolveWidgetRuntimeRequestOrigin(request);
+
+  if (!runtimeOrigin.ok) {
+    return buildErrorResponse(
+      request,
+      runtimeOrigin.status,
+      runtimeOrigin.error,
+      runtimeOrigin.code,
+    );
+  }
+
   return new Response(null, {
     status: 204,
-    headers: buildWidgetCorsHeaders(request),
+    headers: buildWidgetRuntimeCorsHeaders(request),
   });
 }
 
@@ -134,8 +151,40 @@ export async function POST(
 ) {
   const { widgetPublicKey } = await params;
   const supabase = createAdminClient() as unknown as WidgetAdminSupabase;
+  const runtimeOrigin = resolveWidgetRuntimeRequestOrigin(request);
+  let turnRequestId: string | null = null;
+  let turnLockHeld = false;
+  let turnLockWidgetId: string | null = null;
+  let turnLockSessionId: string | null = null;
+
+  async function releaseTurnLock(widgetId: string, sessionId: string) {
+    if (!turnRequestId || !turnLockHeld) {
+      return;
+    }
+
+    try {
+      await releaseWidgetSessionTurnLock(supabase, {
+        widgetId,
+        sessionId,
+        requestId: turnRequestId,
+      });
+    } catch (error) {
+      console.error("Failed to release widget turn lock:", error);
+    } finally {
+      turnLockHeld = false;
+    }
+  }
 
   try {
+    if (!runtimeOrigin.ok) {
+      return buildErrorResponse(
+        request,
+        runtimeOrigin.status,
+        runtimeOrigin.error,
+        runtimeOrigin.code,
+      );
+    }
+
     const loaded = await loadWidgetByPublicKey(supabase, widgetPublicKey);
 
     if (!loaded) {
@@ -221,7 +270,19 @@ export async function POST(
     }
 
     const selected = selection.selected;
-    const userMessageTimestamp = new Date().toISOString();
+    const selectedVersionId = preview.isPreview
+      ? selected!.publishedVersionId ?? selected!.agent.published_version_id
+      : selected!.publishedVersionId;
+
+    if (!selectedVersionId && !preview.isPreview) {
+      return buildErrorResponse(
+        request,
+        409,
+        "This agent is not deployed for the widget.",
+        "WIDGET_AGENT_NOT_DEPLOYED",
+      );
+    }
+
     const widgetSession = await upsertWidgetSession(supabase, {
       widgetId: loaded.widget.id,
       sessionId,
@@ -231,6 +292,47 @@ export async function POST(
       origin: access.origin,
       activeWidgetAgentId: selected!.persistedWidgetAgentId,
       activeAgentId: selected!.agent.id,
+    });
+
+    turnRequestId = crypto.randomUUID();
+    turnLockWidgetId = loaded.widget.id;
+    turnLockSessionId = sessionId;
+    const turnLock = await acquireWidgetSessionTurnLock(supabase, {
+      widgetId: loaded.widget.id,
+      sessionId,
+      requestId: turnRequestId,
+    });
+
+    if (!turnLock.acquired) {
+      if (turnLock.sessionStatus === "completed") {
+        return buildErrorResponse(
+          request,
+          409,
+          "This chat has already ended. Start a new chat to continue.",
+          "SESSION_COMPLETED",
+        );
+      }
+
+      return buildErrorResponse(
+        request,
+        409,
+        SESSION_BUSY_ERROR,
+        "SESSION_BUSY",
+      );
+    }
+
+    turnLockHeld = true;
+
+    const userMessageTimestamp = new Date().toISOString();
+    await upsertWidgetSession(supabase, {
+      widgetId: loaded.widget.id,
+      sessionId,
+      source: widgetSession.source,
+      pageUrl: widgetSession.page_url,
+      referrer: widgetSession.referrer,
+      origin: widgetSession.origin,
+      activeWidgetAgentId: widgetSession.active_widget_agent_id,
+      activeAgentId: widgetSession.active_agent_id,
       lastUserMessageAt: userMessageTimestamp,
     });
 
@@ -246,21 +348,6 @@ export async function POST(
       supabase,
       widgetSession.id,
     );
-
-    const selectedVersionId = preview.isPreview
-      ? selected!.publishedVersionId ?? selected!.agent.published_version_id
-      : selected!.publishedVersionId;
-
-    if (!selectedVersionId) {
-      if (!preview.isPreview) {
-        return buildErrorResponse(
-          request,
-          409,
-          "This agent is not deployed for the widget.",
-          "WIDGET_AGENT_NOT_DEPLOYED",
-        );
-      }
-    }
 
     const publishedVersion = await getPublishedAgentVersion(
       supabase,
@@ -398,6 +485,7 @@ export async function POST(
           );
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } finally {
+          await releaseTurnLock(loaded.widget.id, sessionId);
           controller.close();
         }
       },
@@ -405,13 +493,17 @@ export async function POST(
 
     return new Response(stream, {
       headers: {
-        ...buildWidgetCorsHeaders(request),
+        ...buildWidgetRuntimeCorsHeaders(request),
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
       },
     });
   } catch (error) {
+    if (turnLockWidgetId && turnLockSessionId) {
+      await releaseTurnLock(turnLockWidgetId, turnLockSessionId);
+    }
+
     return buildErrorResponse(
       request,
       500,

@@ -4,7 +4,6 @@ import {
   getAnalyticsDateRange,
   getDashboardAnalyticsOverview,
   listDashboardConversations,
-  listWorkspaceWidgetsForAnalytics,
 } from "@/lib/dashboard/analytics";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -46,18 +45,15 @@ export async function GET(request: NextRequest) {
     };
     const limit = parseLimit(searchParams.get("limit"));
     const cursor = searchParams.get("cursor");
-    const [conversationResult, widgets] = await Promise.all([
-      listDashboardConversations(admin, {
-        workspaceId: context.workspace.id,
-        appliedFilters,
-        cursor,
-        limit,
-      }),
-      listWorkspaceWidgetsForAnalytics(admin, context.workspace.id),
-    ]);
+    const conversationResult = await listDashboardConversations(admin, {
+      workspaceId: context.workspace.id,
+      appliedFilters,
+      cursor,
+      limit,
+    });
     const { startIso } = getAnalyticsDateRange(appliedFilters.range);
     const widgetStatusById = new Map(
-      widgets.map((widget) => [widget.id, widget.status] as const),
+      conversationResult.widgetOptions.map((widget) => [widget.id, widget.status] as const),
     );
     const overview = await getDashboardAnalyticsOverview(admin, {
       workspaceId: context.workspace.id,
