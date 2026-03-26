@@ -80,6 +80,20 @@
       radial-gradient(circle at top left, rgba(242, 107, 47, 0.08), transparent 28%),
       linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
   }
+  .admin-fade-in {
+    animation: admin-fade-in 180ms ease-out;
+  }
+}
+
+@keyframes admin-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .material-symbols-outlined {

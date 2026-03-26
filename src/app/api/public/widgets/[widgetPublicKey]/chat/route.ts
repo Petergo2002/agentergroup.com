@@ -1,9 +1,14 @@
 import { NextRequest } from "next/server";
+import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  validateBody,
+  validateWidgetChatBody,
+} from "@/lib/validation/widget-schemas";
 import {
   acquireWidgetSessionTurnLock,
   buildDraftWidgetRuntimeAgents,
@@ -216,20 +221,22 @@ export async function POST(
       return buildErrorResponse(request, 404, "Widget is not deployed.");
     }
 
-    const body = await request.json().catch(() => ({}));
-    const sessionId = String(body.sessionId ?? "").trim();
-    const message = String(body.message ?? "").trim();
-    const requestedWidgetAgentId = String(body.widgetAgentId ?? "").trim() || null;
-    const pageUrl = String(body.pageUrl ?? "").trim() || null;
-    const referrer = String(body.referrer ?? "").trim() || null;
+    // This public endpoint is billable and writes chat state, so reject
+    // malformed or oversized payloads before any session lookup, DB write, or
+    // LLM call can run.
+    const bodyValidation = await validateBody(request, validateWidgetChatBody);
 
-    if (!sessionId || !message) {
-      return buildErrorResponse(
-        request,
-        400,
-        "sessionId and message are required.",
-      );
+    if (!bodyValidation.valid) {
+      return buildErrorResponse(request, 400, bodyValidation.error);
     }
+
+    const {
+      sessionId,
+      message,
+      widgetAgentId: requestedWidgetAgentId,
+      pageUrl,
+      referrer,
+    } = bodyValidation.value;
 
     const existingSession = await loadWidgetSession(
       supabase,
@@ -392,7 +399,10 @@ export async function POST(
                   ? item.metadata.tool_call_id
                   : null,
             })),
-            toolUserId: selected!.agent.created_by,
+            toolUserId: buildWorkspaceComposioUserId(
+              selected!.agent.workspace_id,
+              selected!.agent.created_by,
+            ),
             audience: "widget",
             widgetPublicKey: loaded.widget.widget_public_key,
             calendarTimezone,

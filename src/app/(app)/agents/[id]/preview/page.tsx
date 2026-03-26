@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { useToast } from '@/components/ui/ToastProvider';
+import { getEffectiveConnectionStatus } from '@/lib/connections';
 import { extractEndChatPolicyFromDefinition } from '@/lib/end-chat';
 import { isChatIntegrationSlug } from '@/lib/integrations';
 import { getKnowledgeStatusTone } from '@/lib/knowledge';
@@ -213,7 +214,11 @@ export default function AgentPreviewPage() {
             .filter(
               (connection): connection is ConnectionRecord =>
                 Boolean(connection && isChatIntegrationSlug(connection.toolkit_slug)),
-            ),
+            )
+            .map((connection) => ({
+              ...connection,
+              status: getEffectiveConnectionStatus(connection),
+            })),
         );
         setKnowledgeSources(
           ((knowledgeResult.data ?? []) as unknown as AgentKnowledgeJoinRow[])

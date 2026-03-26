@@ -6,6 +6,7 @@ The official hosted and embeddable widget runtime for this repo.
 
 ```bash
 npm install --prefix apps/widget-v2
+cp apps/widget-v2/.env.example apps/widget-v2/.env.local
 npm run widget:dev
 ```
 

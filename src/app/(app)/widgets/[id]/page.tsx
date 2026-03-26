@@ -139,8 +139,11 @@ function getInitialAttachedAgents(summary: WidgetDetailResponse): AttachedAgentS
       interactionMode: widgetAgent.interaction_mode,
       greeting: widgetAgent.greeting,
       placeholder: widgetAgent.placeholder,
-      showQuickActions: true,
-      quickActions: buildQuickActionsFromPrompts(agent.starter_prompts.slice(0, 3)),
+      showQuickActions: widgetAgent.show_quick_actions,
+      quickActions:
+        widgetAgent.quick_actions.length > 0
+          ? widgetAgent.quick_actions
+          : buildQuickActionsFromPrompts(agent.starter_prompts.slice(0, 3)),
       contactFormSettings: widgetAgent.contact_form_settings,
       publishedVersionId: widgetAgent.published_version_id,
       agent,
@@ -716,6 +719,7 @@ export default function WidgetDetailPage() {
                   <div className="mt-1 flex items-start gap-4">
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-outline-variant/20 bg-surface-container-low">
                       {form.logoUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element -- this preview accepts arbitrary user-provided logo URLs */
                         <img
                           src={form.logoUrl}
                           alt={form.brandName || form.name || 'Widget logo'}
@@ -847,7 +851,7 @@ export default function WidgetDetailPage() {
                 <div className="flex items-center justify-between rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-3 sm:mt-6">
                   <div className="space-y-0.5">
                     <span className="text-sm font-medium text-on-surface">Show branding</span>
-                    <p className="text-xs text-on-surface-variant/70">Display "Powered by" badge</p>
+                    <p className="text-xs text-on-surface-variant/70">Display a &quot;Powered by&quot; badge</p>
                   </div>
                   <input
                     type="checkbox"
@@ -931,7 +935,7 @@ export default function WidgetDetailPage() {
               {attachedAgents.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-outline-variant/30 bg-background px-5 py-8 text-center">
                   <p className="text-sm font-medium text-on-surface-variant">No specialists added yet.</p>
-                  <p className="mt-1 text-xs text-on-surface-variant/70">Add an agent to start building your widget's home screen.</p>
+                  <p className="mt-1 text-xs text-on-surface-variant/70">Add an agent to start building the widget home screen.</p>
                 </div>
               ) : (
                 attachedAgents.map((item, index) => (

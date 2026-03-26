@@ -224,7 +224,7 @@ export async function ensureWorkspaceContext(
   const profileResult = await supabase
     .from("profiles")
     .upsert(profilePayload, { onConflict: "id" })
-    .select()
+    .select("id, email, full_name, avatar_url")
     .single();
 
   if (profileResult.error) {

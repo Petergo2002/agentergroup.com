@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  validateBody,
+  validateWidgetLeadBody,
+} from "@/lib/validation/widget-schemas";
+import {
   buildDraftWidgetRuntimeAgents,
   buildWidgetRuntimeCorsHeaders,
   buildStoredWidgetRuntimeAgents,
@@ -176,21 +180,22 @@ export async function POST(
       return buildErrorResponse(request, 404, "Widget is not deployed.");
     }
 
-    const body = await request.json().catch(() => ({}));
-    const sessionId = String(body.sessionId ?? "").trim();
-    const requestedWidgetAgentId = String(body.widgetAgentId ?? "").trim() || null;
-    const name = String(body.name ?? "").trim();
-    const email = String(body.email ?? "").trim();
-    const phone = String(body.phone ?? "").trim() || null;
-    const message = String(body.message ?? "").trim() || null;
+    // This public endpoint writes lead data, so validate required fields,
+    // field sizes, and email format before any session or database work runs.
+    const bodyValidation = await validateBody(request, validateWidgetLeadBody);
 
-    if (!sessionId || !name || !email) {
-      return buildErrorResponse(
-        request,
-        400,
-        "sessionId, name, and email are required.",
-      );
+    if (!bodyValidation.valid) {
+      return buildErrorResponse(request, 400, bodyValidation.error);
     }
+
+    const {
+      sessionId,
+      widgetAgentId: requestedWidgetAgentId,
+      name,
+      email,
+      phone,
+      message,
+    } = bodyValidation.value;
 
     const existingSession = await loadWidgetSession(
       supabase,

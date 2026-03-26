@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import type { WidgetAgentConfig, WidgetConfig } from "../types";
 
 interface HomeTabProps {
@@ -16,14 +17,47 @@ const TRANSLATIONS = {
     contactBadge: "Contact",
     chatBadge: "Chat",
     openSpecialist: "Open this specialist to continue.",
+    tabAll: "All",
+    tabActive: "Active",
+    tabDraft: "Draft",
+    colAgent: "Agent",
+    colModel: "Model",
+    colPrompts: "Prompts",
+    colUpdated: "Last Update",
+    colStatus: "Status",
+    showing: "Showing",
+    of: "of",
+    agents: "Agents",
   },
   sv: {
     noSpecialists: "Inga specialister är kopplade till denna widget ännu.",
     contactBadge: "Kontakt",
     chatBadge: "Chatt",
     openSpecialist: "Öppna denna specialist för att fortsätta.",
+    tabAll: "Alla",
+    tabActive: "Aktiva",
+    tabDraft: "Utkast",
+    colAgent: "Agent",
+    colModel: "Modell",
+    colPrompts: "Prompter",
+    colUpdated: "Senast uppdaterad",
+    colStatus: "Status",
+    showing: "Visar",
+    of: "av",
+    agents: "Agenter",
   },
 };
+
+
+
+/** Returns a colour for the left-side status dot */
+function statusDotColor(active: boolean): string {
+  return active
+    ? "bg-emerald-500"
+    : "bg-amber-400";
+}
+
+const ITEMS_PER_PAGE = 4;
 
 export function HomeTab({
   config,
@@ -35,12 +69,35 @@ export function HomeTab({
 }: HomeTabProps) {
   const t = TRANSLATIONS[config.widget.language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
 
+  // Tab state: "all" | "active" | "draft"
+  const [activeTab, setActiveTab] = useState<"all" | "active" | "draft">("all");
+  const [currentPage, setCurrentPage] = useState(1);
+
   const handleQuickAction = (prompt: string) => {
     onSendMessage(prompt);
     onSwitchToMessages();
   };
 
   if (isChooserMode || !selectedAgent) {
+    // Filter agents by tab
+    const filteredAgents = config.agents.filter((agent) => {
+      if (activeTab === "active") return agent.interactionMode === "chat";
+      if (activeTab === "draft") return agent.interactionMode === "contact_form";
+      return true;
+    });
+
+    const totalPages = Math.max(1, Math.ceil(filteredAgents.length / ITEMS_PER_PAGE));
+    const safePage = Math.min(currentPage, totalPages);
+    const pagedAgents = filteredAgents.slice(
+      (safePage - 1) * ITEMS_PER_PAGE,
+      safePage * ITEMS_PER_PAGE
+    );
+
+    const handleTabChange = (tab: "all" | "active" | "draft") => {
+      setActiveTab(tab);
+      setCurrentPage(1);
+    };
+
     return (
       <motion.div
         key="chooser"
@@ -48,49 +105,150 @@ export function HomeTab({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.25 }}
-        className="absolute inset-0 overflow-y-auto px-6 pb-12 pt-10 widget-scroll md:px-10 lg:px-14"
+        className="absolute inset-0 flex flex-col overflow-hidden"
       >
-        <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center">
-          <div className="mx-auto max-w-xl text-center">
-            <h1 className="text-4xl font-bold tracking-tight text-widget-fg">
+        {/* Header title */}
+        {config.home.title ? (
+          <div className="px-5 pt-6 pb-3 shrink-0">
+            <h1 className="text-xl font-bold tracking-tight text-widget-fg">
               {config.home.title}
             </h1>
             {config.home.subtitle ? (
-              <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-widget-muted">
-                {config.home.subtitle}
-              </p>
+              <p className="mt-1 text-xs text-widget-muted">{config.home.subtitle}</p>
             ) : null}
           </div>
+        ) : null}
 
-          <div className="mt-10 grid gap-3 sm:grid-cols-2">
-            {config.agents.length === 0 ? (
-              <div className="rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] p-6 text-center text-sm leading-6 text-widget-muted sm:col-span-2">
-                {t.noSpecialists}
-              </div>
-            ) : (
-              config.agents.map((agent) => {
-                return (
-                  <button
-                    key={agent.widgetAgentId}
-                    onClick={() => onSelectAgent(agent.widgetAgentId)}
-                    className="widget-surface-button group rounded-[28px] p-5 text-left"
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <h2 className="text-lg font-semibold text-widget-fg">
-                        {agent.label}
-                      </h2>
-                      <span className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-widget-muted">
-                        {t.chatBadge}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-widget-muted">
+        {/* Tabs row */}
+        <div className="px-5 pb-3 shrink-0 flex items-center gap-1 border-b border-[var(--widget-border)]">
+          {(["all", "active", "draft"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => handleTabChange(tab)}
+              className={`picker-tab ${activeTab === tab ? "picker-tab-active" : ""}`}
+            >
+              {tab === "all" ? t.tabAll : tab === "active" ? t.tabActive : t.tabDraft}
+            </button>
+          ))}
+        </div>
+
+        {/* Table header */}
+        <div className="picker-table-header shrink-0 grid grid-cols-[auto_1fr_auto_auto_auto] items-center px-5 py-2.5 gap-3">
+          <div className="w-2.5" />
+          <span className="picker-col-label">{t.colAgent}</span>
+          <span className="picker-col-label text-right w-16">{t.colPrompts}</span>
+          <span className="picker-col-label text-right w-20 hidden sm:block">{t.colUpdated}</span>
+          <span className="picker-col-label text-right w-12">{t.colStatus}</span>
+        </div>
+
+        {/* Agent rows */}
+        <div className="flex-1 overflow-y-auto widget-scroll">
+          {pagedAgents.length === 0 ? (
+            <div className="flex items-center justify-center h-full px-5 text-sm text-widget-muted">
+              {t.noSpecialists}
+            </div>
+          ) : (
+            pagedAgents.map((agent, idx) => {
+              const isActive = agent.interactionMode === "chat";
+              const dotColor = statusDotColor(isActive);
+              const promptCount = agent.quickActions?.length ?? 0;
+
+              return (
+                <motion.button
+                  key={agent.widgetAgentId}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.04 }}
+                  onClick={() => onSelectAgent(agent.widgetAgentId)}
+                  className="picker-row w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center px-5 py-3.5 gap-3 text-left"
+                >
+                  {/* Status dot */}
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
+
+                  {/* Agent name + description */}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-widget-fg truncate">
+                      {agent.label}
+                    </p>
+                    <p className="text-xs text-widget-muted truncate mt-0.5">
                       {agent.description || t.openSpecialist}
                     </p>
-                  </button>
-                );
-              })
-            )}
-          </div>
+                  </div>
+
+                  {/* Prompts */}
+                  <span className="text-xs text-widget-muted text-right w-16 shrink-0">
+                    {promptCount} {t.colPrompts}
+                  </span>
+
+                  {/* Last Update - hidden on tiny screens */}
+                  <span className="text-xs text-widget-muted text-right w-20 shrink-0 hidden sm:block">
+                    —
+                  </span>
+
+                  {/* Toggle-style status */}
+                  <span
+                    className={`shrink-0 w-9 h-5 rounded-full relative transition-colors duration-200 ${
+                      isActive ? "bg-[var(--widget-primary)]" : "bg-[var(--widget-border)]"
+                    }`}
+                    aria-label={isActive ? "Active" : "Inactive"}
+                    style={{ display: "block" }}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        isActive ? "translate-x-[18px]" : "translate-x-0.5"
+                      }`}
+                    />
+                  </span>
+                </motion.button>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer: count + pagination */}
+        <div className="shrink-0 px-5 py-3 border-t border-[var(--widget-border)] flex items-center justify-between gap-3">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-widget-muted">
+            {t.showing} {Math.min((safePage - 1) * ITEMS_PER_PAGE + 1, filteredAgents.length)}–{Math.min(safePage * ITEMS_PER_PAGE, filteredAgents.length)} {t.of} {filteredAgents.length} {t.agents}
+          </span>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              {/* Prev */}
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="picker-page-btn"
+                aria-label="Previous page"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+              </button>
+
+              {/* Page numbers */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`picker-page-btn ${page === safePage ? "picker-page-btn-active" : ""}`}
+                >
+                  {page}
+                </button>
+              ))}
+
+              {/* Next */}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="picker-page-btn"
+                aria-label="Next page"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </motion.div>
     );

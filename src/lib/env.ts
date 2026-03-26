@@ -1,3 +1,5 @@
+/** Shared environment helpers for the dashboard app and widget runtime. */
+
 function requireEnv(value: string | undefined, name: string): string {
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -14,7 +16,12 @@ function parseBooleanEnv(value: string | undefined, fallback: boolean) {
   return fallback;
 }
 
-export function getSupabaseEnv() {
+/**
+ * Returns the required public Supabase environment variables.
+ *
+ * @returns The public Supabase URL and publishable key.
+ */
+export function getSupabaseEnv(): { url: string; publishableKey: string } {
   return {
     url: requireEnv(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -27,29 +34,54 @@ export function getSupabaseEnv() {
   };
 }
 
-export function hasSupabaseEnv() {
+/**
+ * Checks whether the public Supabase environment is configured.
+ *
+ * @returns `true` when both public Supabase values are present.
+ */
+export function hasSupabaseEnv(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   );
 }
 
-export function getSupabaseServiceRoleKey() {
+/**
+ * Returns the required service-role key for privileged server operations.
+ *
+ * @returns The configured Supabase service-role key.
+ */
+export function getSupabaseServiceRoleKey(): string {
   return requireEnv(
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     "SUPABASE_SERVICE_ROLE_KEY",
   );
 }
 
-export function hasSupabaseServiceRoleEnv() {
+/**
+ * Checks whether the service-role key is configured.
+ *
+ * @returns `true` when the service-role key exists.
+ */
+export function hasSupabaseServiceRoleEnv(): boolean {
   return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-export function getOpenRouterModel() {
+/**
+ * Returns the default OpenRouter model for agent turns.
+ *
+ * @returns The configured model id, or the repo default.
+ */
+export function getOpenRouterModel(): string {
   return process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
 }
 
-export function hasOpenRouterEnv() {
+/**
+ * Checks whether OpenRouter can be used.
+ *
+ * @returns `true` when the OpenRouter API key exists.
+ */
+export function hasOpenRouterEnv(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY);
 }
 
@@ -58,6 +90,11 @@ export interface OpenRouterProviderPreferences {
   zdr?: boolean;
 }
 
+/**
+ * Builds provider privacy preferences for OpenRouter requests.
+ *
+ * @returns The provider preference payload sent to OpenRouter.
+ */
 export function getOpenRouterProviderPreferences(): OpenRouterProviderPreferences {
   const dataCollection =
     process.env.OPENROUTER_DATA_COLLECTION?.trim().toLowerCase() === "allow"
@@ -71,15 +108,30 @@ export function getOpenRouterProviderPreferences(): OpenRouterProviderPreference
   };
 }
 
-export function hasComposioEnv() {
+/**
+ * Checks whether Composio-backed integrations are enabled.
+ *
+ * @returns `true` when the Composio API key exists.
+ */
+export function hasComposioEnv(): boolean {
   return Boolean(process.env.COMPOSIO_API_KEY);
 }
 
-export function getAppUrl() {
+/**
+ * Returns the public dashboard base URL.
+ *
+ * @returns The configured dashboard origin.
+ */
+export function getAppUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
 
-export function getWidgetAppUrl() {
+/**
+ * Returns the hosted widget runtime base URL.
+ *
+ * @returns The configured widget origin, with support for the legacy alias.
+ */
+export function getWidgetAppUrl(): string {
   return (
     process.env.NEXT_PUBLIC_WIDGET_APP_URL ??
     process.env.WIDGET_APP_URL ??
@@ -87,13 +139,23 @@ export function getWidgetAppUrl() {
   );
 }
 
-export function getGdprRetentionCronSecret() {
+/**
+ * Returns the secret used by the GDPR retention cron route.
+ *
+ * @returns The configured retention secret.
+ */
+export function getGdprRetentionCronSecret(): string {
   return requireEnv(
     process.env.GDPR_RETENTION_CRON_SECRET,
     "GDPR_RETENTION_CRON_SECRET",
   );
 }
 
-export function hasGdprRetentionCronSecret() {
+/**
+ * Checks whether the GDPR retention cron secret is configured.
+ *
+ * @returns `true` when the retention secret exists.
+ */
+export function hasGdprRetentionCronSecret(): boolean {
   return Boolean(process.env.GDPR_RETENTION_CRON_SECRET);
 }

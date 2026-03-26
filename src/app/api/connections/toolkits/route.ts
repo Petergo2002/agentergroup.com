@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { getEffectiveConnectionStatus } from "@/lib/connections";
 import { syncConnectedAccountsToDatabase } from "@/lib/composio";
 import { SUPPORTED_INTEGRATIONS } from "@/lib/integrations";
 import type { ConnectionRecord } from "@/lib/types";
@@ -24,9 +25,16 @@ export async function GET() {
     .eq("workspace_id", context.workspace.id)
     .order("display_name", { ascending: true });
 
-  const connectionRows = ((storedConnections ?? []) as ConnectionRecord[]).filter((connection) =>
-    SUPPORTED_INTEGRATIONS.some((integration) => integration.slug === connection.toolkit_slug),
-  );
+  const connectionRows = ((storedConnections ?? []) as ConnectionRecord[])
+    .filter((connection) =>
+      SUPPORTED_INTEGRATIONS.some(
+        (integration) => integration.slug === connection.toolkit_slug,
+      ),
+    )
+    .map((connection) => ({
+      ...connection,
+      status: getEffectiveConnectionStatus(connection),
+    }));
 
   const merged = SUPPORTED_INTEGRATIONS.map((toolkit) => {
     const connection =

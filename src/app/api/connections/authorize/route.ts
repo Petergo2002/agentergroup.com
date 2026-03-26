@@ -28,7 +28,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const connectionRequest = await createConnectionRequest(user.id, toolkitSlug);
+    const connectionRequest = await createConnectionRequest(
+      context.workspace.id,
+      user.id,
+      toolkitSlug,
+    );
 
     await supabase.from("connections").upsert(
       {
@@ -41,12 +45,14 @@ export async function POST(request: NextRequest) {
         account_label: "default",
         toolkit_data: connectionRequest.session
           ? {
-              authConfigId: connectionRequest.authConfigId,
+            authConfigId: connectionRequest.authConfigId,
+            composioUserId: connectionRequest.composioUserId,
               toolRouterSessionId: connectionRequest.session.sessionId,
               toolRouterSessionUrl: connectionRequest.session.mcp.url,
             }
           : {
               authConfigId: connectionRequest.authConfigId,
+              composioUserId: connectionRequest.composioUserId,
             },
         created_by: user.id,
       },

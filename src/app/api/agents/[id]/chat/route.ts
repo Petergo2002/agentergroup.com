@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
@@ -15,6 +16,13 @@ interface PersistedAssistantMessage {
   id: string;
   content: string;
   metadata: Record<string, unknown>;
+}
+
+interface PreviewThreadRecord {
+  id: string;
+  workspace_id: string;
+  agent_id: string;
+  created_by: string;
 }
 
 function mapHistory(messages: MessageRecord[]) {
@@ -85,7 +93,32 @@ export async function POST(
 
   let threadId = providedThreadId;
 
-  if (!threadId) {
+  if (threadId) {
+    const { data: existingThread, error: threadLookupError } = await supabase
+      .from("chat_threads")
+      .select("id, workspace_id, agent_id, created_by")
+      .eq("id", threadId)
+      .eq("workspace_id", agent.workspace_id)
+      .eq("agent_id", agent.id)
+      .eq("created_by", user.id)
+      .maybeSingle();
+
+    if (threadLookupError) {
+      return NextResponse.json(
+        { error: "Failed to load the preview thread." },
+        { status: 500 },
+      );
+    }
+
+    const previewThread = existingThread as PreviewThreadRecord | null;
+
+    if (!previewThread) {
+      return NextResponse.json(
+        { error: "Preview thread not found for this agent." },
+        { status: 404 },
+      );
+    }
+  } else {
     const { data: thread, error: threadError } = await supabase
       .from("chat_threads")
       .insert({
@@ -220,7 +253,7 @@ export async function POST(
       agent,
       input,
       history: mapHistory((history ?? []) as MessageRecord[]),
-      toolUserId: user.id,
+      toolUserId: buildWorkspaceComposioUserId(agent.workspace_id, user.id),
       audience: "preview",
       knowledgeAccessToken: session?.access_token ?? null,
       calendarTimezone,

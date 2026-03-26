@@ -1,4 +1,5 @@
 import type OpenAI from "openai";
+import { getConnectionComposioUserId } from "@/lib/connections";
 import { getWrappedTools, handleChatToolCalls } from "@/lib/composio";
 import {
   buildDisabledEndChatPolicy,
@@ -68,6 +69,11 @@ interface ToolMessage {
   [key: string]: unknown;
 }
 
+type ToolDefinitionLike = Record<string, unknown> & {
+  function?: {
+    name?: string;
+  };
+};
 
 
 /** Shape of a single chunk from an OpenRouter streaming response. */
@@ -92,6 +98,7 @@ interface AttachedConnectionRow {
   connection: {
     toolkit_slug: string;
     status: string;
+    toolkit_data: Record<string, unknown> | null;
   } | null;
 }
 
@@ -308,12 +315,13 @@ function parseInternalToolArguments(rawArguments: string) {
 async function loadRuntimeContext(
   supabase: RuntimeSupabaseLike,
   agentId: string,
+  toolUserId: string,
 ) {
   const [{ data: attachedConnections }, { data: attachedKnowledgeSources }] =
     await Promise.all([
       supabase
         .from("agent_connections")
-        .select("connection:connections(toolkit_slug, status)")
+        .select("connection:connections(toolkit_slug, status, toolkit_data)")
         .eq("agent_id", agentId),
       supabase
         .from("agent_knowledge_sources")
@@ -329,7 +337,10 @@ async function loadRuntimeContext(
       (
         connection,
       ): connection is NonNullable<AttachedConnectionRow["connection"]> =>
-        Boolean(connection?.status === "connected"),
+        Boolean(
+          connection?.status === "connected" &&
+            getConnectionComposioUserId(connection) === toolUserId,
+        ),
     )
     .map((connection) => connection.toolkit_slug);
 
@@ -434,6 +445,7 @@ export async function runAgentChat({
   const { connectedToolkits, readyKnowledgeSources } = await loadRuntimeContext(
     supabase,
     agent.id,
+    toolUserId,
   );
   const effectiveEndChatPolicy = endChatPolicy ?? buildDisabledEndChatPolicy();
   const effectiveGmailRecipientPolicy: GmailRecipientPolicy =
@@ -540,8 +552,8 @@ export async function runAgentChat({
   }
 
   const tools = await getWrappedTools(toolUserId, enabledToolkits);
-  const toolDefinitions = [
-    ...(tools as unknown as Array<Record<string, unknown>>),
+  const toolDefinitions: ToolDefinitionLike[] = [
+    ...(tools as unknown as ToolDefinitionLike[]),
     ...(effectiveEndChatPolicy.enabled &&
     effectiveEndChatPolicy.allowAssistantSuggestion
       ? [INTERNAL_END_CHAT_TOOL_DEFINITION]
@@ -655,7 +667,7 @@ export async function runAgentChat({
         if (tc.function.arguments) {
           parsedArgs = JSON.parse(tc.function.arguments);
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
 
@@ -854,7 +866,7 @@ export async function runAgentChat({
   const debugTrace: import("@/lib/types").DebugTrace = {
     durationMs,
     iterationsUsed: iterationsUsed + 1,
-    toolsAvailable: toolDefinitions.map(t => String((t as any).function?.name || "unknown")),
+    toolsAvailable: toolDefinitions.map((tool) => tool.function?.name ?? "unknown"),
     knowledgeHits: knowledgeMatches.length,
     events: debugEvents,
     hadError,

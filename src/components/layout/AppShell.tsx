@@ -24,6 +24,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
   const isFocusedAgentRoute =
     /^\/agents\/[^/]+\/(builder|preview)$/.test(pathname) ||
     /^\/widgets\/[^/]+\/preview$/.test(pathname);
+  const isAnalyticsRoute = pathname.startsWith("/analytics");
 
   return (
     <AppContextProvider value={{ ...context, user }}>
@@ -59,7 +60,13 @@ export function AppShell({ children, context, user }: AppShellProps) {
 
               <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 <Topbar onOpenSidebar={() => setIsSidebarOpen(true)} />
-                <main className="flex-1 overflow-y-auto w-full">{children}</main>
+                <main
+                  className={`flex-1 w-full ${
+                    isAnalyticsRoute ? "overflow-hidden" : "overflow-y-auto"
+                  }`}
+                >
+                  {children}
+                </main>
               </div>
             </div>
           )}

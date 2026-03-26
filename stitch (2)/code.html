@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Analytics | Agentergroup</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-dim": "#dbdad9",
+                        "on-secondary-fixed-variant": "#474746",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-tertiary-fixed-variant": "#00497f",
+                        "tertiary-fixed-dim": "#a0c9ff",
+                        "primary-fixed": "#ffdbce",
+                        "on-primary-container": "#521800",
+                        "secondary": "#5f5e5e",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#a73a00",
+                        "inverse-surface": "#303031",
+                        "background": "#fbf9f8",
+                        "tertiary-container": "#0096fd",
+                        "surface": "#fbf9f8",
+                        "primary-container": "#ff5c00",
+                        "tertiary-fixed": "#d2e4ff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "surface-container": "#efeded",
+                        "secondary-container": "#e2dfde",
+                        "on-surface": "#1b1c1c",
+                        "on-primary-fixed-variant": "#802a00",
+                        "on-tertiary-container": "#002d51",
+                        "outline-variant": "#e4beb1",
+                        "on-surface-variant": "#5b4137",
+                        "on-background": "#1b1c1c",
+                        "inverse-primary": "#ffb59a",
+                        "inverse-on-surface": "#f2f0f0",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "outline": "#8f7065",
+                        "surface-bright": "#fbf9f8",
+                        "primary": "#a73a00",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e9e8e7",
+                        "on-secondary-container": "#636262",
+                        "primary-fixed-dim": "#ffb59a",
+                        "surface-container-highest": "#e4e2e2",
+                        "tertiary": "#0061a6",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f5f3f3",
+                        "on-primary-fixed": "#370e00",
+                        "on-tertiary-fixed": "#001c37",
+                        "surface-variant": "#e4e2e2",
+                        "on-error-container": "#93000a"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; font-size: 13px; }
+        .material-symbols-outlined { font-icon-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e4e2e2; border-radius: 2px; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface overflow-hidden">
+<!-- SideNavBar (from JSON) -->
+<aside class="fixed left-0 top-0 h-full flex flex-col z-40 h-screen w-64 border-r border-zinc-200 bg-zinc-100 dark:bg-zinc-900">
+<div class="p-6">
+<div class="text-lg font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+<span class="w-8 h-8 bg-[#FF5C00] rounded flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</span>
+                Agentergroup
+            </div>
+<div class="text-xs text-zinc-500 mt-1 uppercase tracking-widest font-semibold">Workspace</div>
+</div>
+<nav class="flex-1 px-2 space-y-1 mt-4">
+<a class="flex items-center gap-3 px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors font-['Inter'] text-sm font-medium tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-[#a73a00] bg-[#FF5C00]/10 border-l-2 border-[#FF5C00] transition-colors font-['Inter'] text-sm font-medium tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="analytics" style="font-variation-settings: 'FILL' 1;">analytics</span>
+                Analytics
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors font-['Inter'] text-sm font-medium tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+                Agents
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors font-['Inter'] text-sm font-medium tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="widgets">widgets</span>
+                Widgets
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors font-['Inter'] text-sm font-medium tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="auto_stories">auto_stories</span>
+                Knowledge
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors font-['Inter'] text-sm font-medium tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+                Connections
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors font-['Inter'] text-sm font-medium tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                Settings
+            </a>
+</nav>
+<div class="p-4 border-t border-zinc-200 dark:border-zinc-800">
+<button class="w-full bg-[#FF5C00] text-white py-2 rounded font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all">
+                Create Agent
+            </button>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 flex flex-col h-screen overflow-hidden">
+<!-- TopAppBar (from JSON) -->
+<header class="flex items-center justify-between px-6 sticky top-0 z-30 w-full h-16 border-b border-zinc-200/30 bg-white dark:bg-zinc-950 font-['Inter'] text-sm font-semibold tracking-tight">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-96">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-lg">search</span>
+<input class="w-full pl-10 pr-4 py-1.5 bg-zinc-50 border border-zinc-200 rounded text-xs focus:ring-1 focus:ring-[#FF5C00] outline-none" placeholder="Search conversations..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3 mr-4">
+<button class="p-2 text-zinc-500 hover:bg-zinc-50 rounded transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-zinc-500 hover:bg-zinc-50 rounded transition-colors">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+</div>
+<div class="flex items-center gap-3 pl-4 border-l border-zinc-200">
+<img alt="User Profile" class="w-8 h-8 rounded-full object-cover" data-alt="professional headshot of a business man in a dark suit with a clean office background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBM3pDe3ZRxQdguh_Jj6TxFdERJXhUzWqyR8RTFVtB4pd72jmWeu8TcY7dyFszSTAZ6iBRDA1iOVfmbzuIsW9zRh8n2RQAb6YXC6I1TkHv28rS26uwdXlgZgpFJ799NGYeHFYV6YoOF5h74-j4WdvgpsMcsFc1siPcGQBsXg2gDM9O1Kgmby-JmD6KHCYSsT_V1o2Gt41v82aQKQOqWaaK_Lq_8zYQ8RSofyLhrVkXx8JGNj0jWNCPlJKpZ4gpxgFX4vcsN_TvGH82J"/>
+<span class="text-zinc-900 font-bold">Agentergroup</span>
+</div>
+</div>
+</header>
+<!-- Filter Bar -->
+<section class="h-12 border-b border-outline-variant/30 flex items-center px-6 gap-6 bg-surface-container-low">
+<div class="flex items-center gap-2">
+<span class="text-on-surface-variant font-medium text-[11px] uppercase tracking-wider">Agent:</span>
+<select class="bg-transparent border-none text-[13px] font-semibold text-on-surface focus:ring-0 cursor-pointer py-0">
+<option>Sales Assistant Alpha</option>
+<option>Support Bot v2</option>
+<option>Lead Gen Specialist</option>
+</select>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-on-surface-variant font-medium text-[11px] uppercase tracking-wider">Widget:</span>
+<select class="bg-transparent border-none text-[13px] font-semibold text-on-surface focus:ring-0 cursor-pointer py-0">
+<option>Global Website Widget</option>
+<option>Documentation Hub</option>
+</select>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-on-surface-variant font-medium text-[11px] uppercase tracking-wider">Date:</span>
+<button class="flex items-center gap-1 text-[13px] font-semibold text-on-surface">
+                    Last 7 Days
+                    <span class="material-symbols-outlined text-sm">expand_more</span>
+</button>
+</div>
+<div class="ml-auto flex items-center gap-2">
+<button class="flex items-center gap-2 px-3 py-1 bg-surface-container-lowest border border-outline-variant/30 rounded text-[12px] font-medium hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-[16px]">download</span>
+                    Export CSV
+                </button>
+</div>
+</section>
+<!-- Inbox + Transcript + Details Triple Panel -->
+<section class="flex-1 flex overflow-hidden">
+<!-- Panel 1: Conversation Inbox (Left) -->
+<div class="w-80 border-r border-outline-variant/30 flex flex-col bg-surface-container-low overflow-hidden">
+<div class="p-4 border-b border-outline-variant/10 flex items-center justify-between">
+<h2 class="font-bold text-on-surface uppercase tracking-tight text-[11px]">Conversations (24)</h2>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant cursor-pointer">sort</span>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+<!-- Conversation Item: Active -->
+<div class="p-4 border-l-4 border-primary_container bg-surface-container-lowest cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<span class="font-bold text-on-surface truncate pr-2">j.miller@acmecorp.com</span>
+<span class="text-[10px] text-on-surface-variant whitespace-nowrap">2m ago</span>
+</div>
+<p class="text-[12px] text-on-surface-variant line-clamp-1 mb-2">How do I integrate the API with our CRM?</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-black rounded uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                Lead
+                            </span>
+<span class="text-[11px] text-on-secondary-fixed-variant font-medium">Sales Alpha</span>
+</div>
+</div>
+<!-- Conversation Item: Secondary -->
+<div class="p-4 border-l-4 border-transparent hover:bg-surface-container-high cursor-pointer transition-colors border-b border-outline-variant/10">
+<div class="flex justify-between items-start mb-1">
+<span class="font-bold text-on-surface truncate pr-2">anonymous_7822</span>
+<span class="text-[10px] text-on-surface-variant whitespace-nowrap">15m ago</span>
+</div>
+<p class="text-[12px] text-on-surface-variant line-clamp-1 mb-2">Check pricing for the enterprise tier...</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-tertiary-container/10 text-tertiary text-[10px] font-black rounded uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                                New
+                            </span>
+<span class="text-[11px] text-on-secondary-fixed-variant font-medium">Global Widget</span>
+</div>
+</div>
+<!-- Conversation Item -->
+<div class="p-4 border-l-4 border-transparent hover:bg-surface-container-high cursor-pointer transition-colors border-b border-outline-variant/10">
+<div class="flex justify-between items-start mb-1">
+<span class="font-bold text-on-surface truncate pr-2">Sarah Thompson</span>
+<span class="text-[10px] text-on-surface-variant whitespace-nowrap">1h ago</span>
+</div>
+<p class="text-[12px] text-on-surface-variant line-clamp-1 mb-2">The last update fixed the bug, thanks!</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-black rounded uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                                Active
+                            </span>
+<span class="text-[11px] text-on-secondary-fixed-variant font-medium">Support Bot</span>
+</div>
+</div>
+<!-- More Items -->
+<div class="p-4 border-l-4 border-transparent hover:bg-surface-container-high cursor-pointer transition-colors border-b border-outline-variant/10">
+<div class="flex justify-between items-start mb-1">
+<span class="font-bold text-on-surface truncate pr-2">Mike Ross</span>
+<span class="text-[10px] text-on-surface-variant whitespace-nowrap">3h ago</span>
+</div>
+<p class="text-[12px] text-on-surface-variant line-clamp-1 mb-2">Can you explain the billing cycle?</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-black rounded uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                                Active
+                            </span>
+<span class="text-[11px] text-on-secondary-fixed-variant font-medium">Support Bot</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Panel 2: Transcript (Center) -->
+<div class="flex-1 flex flex-col bg-surface-container-lowest overflow-hidden">
+<div class="h-14 px-6 border-b border-outline-variant/30 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container-high flex items-center justify-center font-bold text-primary">JM</div>
+<div>
+<div class="font-bold text-on-surface">j.miller@acmecorp.com</div>
+<div class="text-[10px] text-on-surface-variant flex items-center gap-2">
+<span class="flex items-center gap-0.5"><span class="material-symbols-outlined text-[12px]">location_on</span> San Francisco, US</span>
+<span class="flex items-center gap-0.5"><span class="material-symbols-outlined text-[12px]">laptop</span> Chrome / Mac OS</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 text-xs font-semibold text-on-surface hover:bg-surface-container-low transition-colors rounded">Take Over</button>
+<button class="px-3 py-1.5 text-xs font-semibold bg-primary-container text-white rounded">Resolved</button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+<!-- Message: Bot -->
+<div class="flex gap-4 max-w-2xl">
+<div class="w-8 h-8 rounded bg-primary-container flex-shrink-0 flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="font-bold text-on-surface">Sales Assistant Alpha</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-medium">2:30 PM</span>
+</div>
+<div class="bg-surface-container-low p-3 rounded-lg border border-outline-variant/20 leading-relaxed">
+                                Hello! Welcome to Agentergroup. I see you're looking for enterprise pricing. Would you like me to connect you with an account manager?
+                            </div>
+</div>
+</div>
+<!-- Message: User -->
+<div class="flex gap-4 max-w-2xl ml-auto flex-row-reverse text-right">
+<div class="w-8 h-8 rounded bg-secondary-fixed flex-shrink-0 flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-sm">person</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2 justify-end">
+<span class="text-[10px] text-on-surface-variant uppercase font-medium">2:31 PM</span>
+<span class="font-bold text-on-surface">J. Miller</span>
+</div>
+<div class="bg-primary-container/5 p-3 rounded-lg border border-primary/20 leading-relaxed inline-block text-left">
+                                Yes, that would be great. But first, how do I integrate the API with our CRM? We use Salesforce.
+                            </div>
+</div>
+</div>
+<!-- Message: Bot -->
+<div class="flex gap-4 max-w-2xl">
+<div class="w-8 h-8 rounded bg-primary-container flex-shrink-0 flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="font-bold text-on-surface">Sales Assistant Alpha</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-medium">2:31 PM</span>
+</div>
+<div class="bg-surface-container-low p-3 rounded-lg border border-outline-variant/20 leading-relaxed">
+                                Integration with Salesforce is native! You can find your API key in the <b>Connections</b> tab. I've also identified you as a potential high-volume lead based on your domain. Would you like a technical overview?
+                            </div>
+<div class="mt-2 text-[11px] text-primary flex items-center gap-1 font-bold">
+<span class="material-symbols-outlined text-[14px]">auto_stories</span>
+                                Source: Salesforce Integration Guide v1.2
+                            </div>
+</div>
+</div>
+<!-- Message: User -->
+<div class="flex gap-4 max-w-2xl ml-auto flex-row-reverse text-right">
+<div class="w-8 h-8 rounded bg-secondary-fixed flex-shrink-0 flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-sm">person</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2 justify-end">
+<span class="text-[10px] text-on-surface-variant uppercase font-medium">2:32 PM</span>
+<span class="font-bold text-on-surface">J. Miller</span>
+</div>
+<div class="bg-primary-container/5 p-3 rounded-lg border border-primary/20 leading-relaxed inline-block text-left">
+                                That works. Can we set up a call for Thursday at 10 AM PST?
+                            </div>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/30">
+<div class="relative">
+<textarea class="w-full p-4 pr-12 bg-surface-container-low border border-outline-variant/30 rounded focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none h-24 text-[13px]" placeholder="Type a message to take over conversation..."></textarea>
+<button class="absolute bottom-4 right-4 text-primary p-1 hover:bg-primary/10 rounded transition-colors">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Panel 3: Details (Right) -->
+<div class="w-72 border-l border-outline-variant/30 flex flex-col bg-surface-container-low overflow-hidden">
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+<!-- Lead Capture Section -->
+<section class="p-5 border-b border-outline-variant/10">
+<h3 class="font-black text-on-surface uppercase tracking-tight text-[11px] mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">account_circle</span>
+                            Lead Details
+                        </h3>
+<div class="space-y-4">
+<div>
+<label class="block text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Name</label>
+<div class="text-[13px] font-bold text-on-surface">James Miller</div>
+</div>
+<div>
+<label class="block text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Email</label>
+<div class="text-[13px] font-bold text-on-surface">j.miller@acmecorp.com</div>
+</div>
+<div>
+<label class="block text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Phone</label>
+<div class="text-[13px] font-bold text-on-surface">+1 (555) 902-1244</div>
+</div>
+<div>
+<label class="block text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Company</label>
+<div class="text-[13px] font-bold text-on-surface">Acme Corp</div>
+</div>
+</div>
+</section>
+<!-- Agent Involved -->
+<section class="p-5 border-b border-outline-variant/10">
+<h3 class="font-black text-on-surface uppercase tracking-tight text-[11px] mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">smart_toy</span>
+                            Active Agent
+                        </h3>
+<div class="flex items-center gap-3 p-3 bg-surface-container-lowest border border-outline-variant/20 rounded">
+<div class="w-10 h-10 rounded bg-primary-container/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">rocket_launch</span>
+</div>
+<div>
+<div class="font-bold text-on-surface">Sales Alpha</div>
+<div class="text-[11px] text-on-surface-variant">v2.4.1 (Stable)</div>
+</div>
+</div>
+</section>
+<!-- Debug Trace Section -->
+<section class="p-5">
+<h3 class="font-black text-on-surface uppercase tracking-tight text-[11px] mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">terminal</span>
+                            Execution Trace
+                        </h3>
+<div class="space-y-3 font-mono text-[10px] bg-zinc-900 text-zinc-400 p-4 rounded border border-zinc-800">
+<div class="flex gap-2">
+<span class="text-emerald-500">[14:30:12]</span>
+<span>Input detected: "API Integration"</span>
+</div>
+<div class="flex gap-2">
+<span class="text-blue-500">[14:30:13]</span>
+<span>Embedding lookup: Success</span>
+</div>
+<div class="flex gap-2">
+<span class="text-primary-container">[14:30:15]</span>
+<span>LLM Inference: Completions/v1</span>
+</div>
+<div class="flex gap-2">
+<span class="text-zinc-500">[14:30:16]</span>
+<span>Action: SetTag("Lead")</span>
+</div>
+<div class="flex gap-2">
+<span class="text-zinc-500">[14:30:16]</span>
+<span>Action: Schedule(Meeting)</span>
+</div>
+<div class="animate-pulse flex gap-1">
+<span class="text-emerald-500">_</span>
+</div>
+</div>
+</section>
+</div>
+<div class="p-4 bg-surface-container-high border-t border-outline-variant/30">
+<button class="w-full py-2 bg-transparent border border-outline-variant text-[11px] font-bold uppercase tracking-widest text-on-surface hover:bg-surface-container-lowest transition-colors">
+                        View Raw Logs
+                    </button>
+</div>
+</div>
+</section>
+</main>
+</body></html>

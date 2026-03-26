@@ -49,6 +49,16 @@ interface AnalyticsWidgetMessageRow {
   created_at: string;
 }
 
+interface AnalyticsTranscriptRow {
+  id: string;
+  role: string;
+  content: string;
+  created_at: string;
+  metadata?: {
+    debugTrace?: DashboardConversationDetailResponse["transcript"][number]["debugTrace"];
+  } | null;
+}
+
 interface AnalyticsWidgetLeadRow {
   id: string;
   widget_session_id: string | null;
@@ -767,7 +777,7 @@ export async function getDashboardConversationDetail(
           createdAt: leadData.data.created_at,
         }
       : null,
-    transcript: ((transcriptData.data ?? []) as any[]).map(
+    transcript: ((transcriptData.data ?? []) as AnalyticsTranscriptRow[]).map(
       (message) => ({
         id: message.id,
         role: message.role === "assistant" ? "assistant" : "user",

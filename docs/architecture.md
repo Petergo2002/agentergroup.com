@@ -658,6 +658,7 @@ It combines:
 - raw `tool` role messages are hidden from the visible customer transcript
 - they are still persisted for runtime history and debugging
 - the visible chat timeline is the customer-facing conversation only
+- if the client provides an existing preview `threadId`, the backend now requires that thread to belong to the same agent, workspace, and authenticated creator before it will append messages or runs
 
 This separation is important because the product goal is a frontdesk-style assistant, not a debug console exposed to end users.
 
@@ -1009,6 +1010,9 @@ Instead it:
 2. normalizes them
 3. syncs them into the `connections` table
 
+The Composio identity is now scoped to the workspace runtime, not the raw auth user id.
+That means each workspace has its own external connection surface even if the same human belongs to multiple workspaces.
+
 This allows the app to:
 
 - render connection state consistently
@@ -1054,6 +1058,11 @@ Current flow:
 4. backend creates a Composio managed auth config, links the connected account flow, and upserts a `connections` row as pending
 5. user completes external provider auth
 6. app later syncs the connected account into `connections`
+
+Important runtime rule:
+
+- connected accounts are keyed to the workspace-scoped Composio identity
+- stale legacy rows without the expected scoped identity are treated as disconnected until reconnected
 
 ### Google Calendar selector flow
 
@@ -1231,6 +1240,12 @@ The preview page uses this to show which sources informed the answer.
 7. Backend uploads the raw file to Supabase Storage
 8. Backend invokes `process-knowledge-source`
 9. Source becomes a normal Supabase-backed knowledge source
+
+Download hardening:
+
+- the backend accepts inline content directly
+- remote file fetches are restricted to vetted `https` object-download hosts
+- local file-path reads and arbitrary remote URLs are rejected
 
 ### Important architectural rule
 

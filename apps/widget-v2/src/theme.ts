@@ -1,3 +1,4 @@
+/** Theme helpers for deriving the widget palette from brand inputs. */
 type RGB = {
   r: number;
   g: number;
@@ -157,6 +158,7 @@ const LIGHT_PALETTE = {
   muted: "#6b7280",
 };
 
+/** Builds the runtime palette from the configured brand colors and theme mode. */
 export function deriveWidgetPalette(
   brandColor: string | undefined,
   secondaryColor: string | undefined,
@@ -180,8 +182,6 @@ export function deriveWidgetPalette(
     ? secondary
     : mixColors(accentStrong, base.fg, isDark ? 0.18 : 0.1);
 
-  const neutralHover = deriveNeutralSurface(base.bg, base.fg, isDark ? 0.08 : 0.045);
-  const neutralSelected = deriveNeutralSurface(base.bg, base.fg, isDark ? 0.12 : 0.075);
   const neutralSelectedBorder = deriveNeutralSurface(
     base.bg,
     base.fg,
@@ -235,6 +235,7 @@ export function deriveWidgetPalette(
   };
 }
 
+/** Infers the closest widget theme mode from the configured background color. */
 export function detectThemeFromColors(
   backgroundColor: string | undefined,
 ): WidgetThemeMode {

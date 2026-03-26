@@ -1,5 +1,7 @@
 import type { WidgetBootstrapResponse, WidgetConfig } from "../types";
 
+/** Public API helpers used by the standalone widget runtime. */
+
 export interface WidgetRequestContext {
   accessToken?: string | null;
   previewToken?: string;
@@ -7,7 +9,12 @@ export interface WidgetRequestContext {
   previewRevision?: string;
 }
 
-export function resolveWidgetApiBase() {
+/**
+ * Resolves the API origin the widget should talk to.
+ *
+ * @returns The widget API base URL.
+ */
+export function resolveWidgetApiBase(): string {
   if (import.meta.env.VITE_API_BASE) {
     return import.meta.env.VITE_API_BASE;
   }
@@ -82,7 +89,7 @@ function buildWidgetUrl(widgetPublicKey: string, path: string) {
 export async function getWidgetBootstrap(
   widgetPublicKey: string,
   context: WidgetRequestContext,
-) {
+): Promise<WidgetBootstrapResponse> {
   const response = await fetch(buildWidgetUrl(widgetPublicKey, "/bootstrap"), {
     headers: buildWidgetHeaders(context, { includeContentType: false }),
     cache: context.previewToken ? "no-store" : "default",
@@ -98,7 +105,7 @@ export async function getWidgetBootstrap(
 export async function getWidgetConfig(
   widgetPublicKey: string,
   context: WidgetRequestContext,
-) {
+): Promise<WidgetConfig> {
   const response = await fetch(buildWidgetUrl(widgetPublicKey, "/config"), {
     headers: buildWidgetHeaders(context, { includeContentType: false }),
     cache: context.previewToken ? "no-store" : "default",
@@ -122,7 +129,7 @@ export async function sendWidgetMessage(
     referrer?: string;
   },
   context: WidgetRequestContext,
-) {
+): Promise<Response> {
   return fetch(buildWidgetUrl(widgetPublicKey, "/chat"), {
     method: "POST",
     headers: buildWidgetHeaders(context),
@@ -137,7 +144,11 @@ export async function completeWidgetSession(
     reason: "inactivity_timeout";
   },
   context: WidgetRequestContext,
-) {
+): Promise<{
+  ok: boolean;
+  sessionCompleted: boolean;
+  endReason: "assistant_suggestion" | "inactivity_timeout" | null;
+}> {
   const response = await fetch(buildWidgetUrl(widgetPublicKey, "/complete"), {
     method: "POST",
     headers: buildWidgetHeaders(context),
@@ -168,7 +179,7 @@ export async function sendWidgetEvent(
   },
   context: WidgetRequestContext,
   options?: { preferBeacon?: boolean },
-) {
+): Promise<void> {
   const url = buildWidgetUrl(widgetPublicKey, "/events");
   const payload = JSON.stringify(body);
 

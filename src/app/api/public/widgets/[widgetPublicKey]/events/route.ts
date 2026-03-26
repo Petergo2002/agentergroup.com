@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  validateBody,
+  validateWidgetEventBody,
+} from "@/lib/validation/widget-schemas";
+import {
   buildWidgetRuntimeCorsHeaders,
   loadWidgetByPublicKey,
   resolveWidgetRuntimeRequestOrigin,
@@ -89,14 +93,16 @@ export async function POST(
       return buildErrorResponse(request, 404, "Widget is not deployed.");
     }
 
-    const body = await request.json().catch(() => ({}));
-    const sessionId = String(body.sessionId ?? "").trim();
-    const pageUrl = String(body.pageUrl ?? "").trim() || null;
-    const referrer = String(body.referrer ?? "").trim() || null;
+    // Presence events are public and best-effort, but they still update stored
+    // session state, so reject unknown event types and oversized payloads
+    // before any write occurs.
+    const bodyValidation = await validateBody(request, validateWidgetEventBody);
 
-    if (!sessionId) {
-      return buildErrorResponse(request, 400, "sessionId is required.");
+    if (!bodyValidation.valid) {
+      return buildErrorResponse(request, 400, bodyValidation.error);
     }
+
+    const { sessionId, pageUrl, referrer } = bodyValidation.value;
 
     await upsertWidgetSession(supabase, {
       widgetId: loaded.widget.id,

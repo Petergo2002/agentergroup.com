@@ -1,168 +1,145 @@
-# Agentergroup — AI Agent Platform
+# Agentergroup
 
-A full-stack SaaS platform for building, deploying, and embedding AI agents into any product. Built with **Next.js 16 (App Router)**, **Supabase**, **OpenRouter**, and **Composio**.
+Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a public widget runtime, Supabase-backed storage/auth, OpenRouter model routing, and Composio-powered external actions.
 
----
+## Packages
 
-## What It Does
+- `.`: Main dashboard app built with Next.js 16, React 19, and Tailwind CSS v4.
+- `apps/widget-v2`: Standalone hosted/embedded widget built with Vite and React 18.
 
-- **Build AI Agents** — Create and configure agents with custom instructions, models, and published versions.
-- **Widget System** — Deploy the same AI chat widget as either a hosted runtime or an embeddable script (`widget-v2`).
-- **Live Preview** — Preview widget changes in real time with signed preview tokens and draft payloads.
-- **Connections** — Integrate third-party tools via Composio (e.g. Gmail, Notion, GitHub).
-- **Knowledge Base** — Attach knowledge sources to agents for contextual retrieval.
-- **Multi-Workspace** — Scoped workspaces with per-workspace agents, widgets, and settings.
-- **Auth** — Supabase Auth with SSR session handling.
+## What The Platform Does
 
----
+- Build, configure, preview, publish, and archive AI agents.
+- Attach knowledge sources and use them during agent conversations.
+- Connect external tools such as Gmail, Google Calendar, and Google Drive through Composio.
+- Deploy widgets for hosted usage or third-party site embedding.
+- Track widget sessions, transcripts, leads, and analytics inside each workspace.
+- Run owner-only privacy workflows for lookup, export, deletion, and retention cleanup.
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router, React 19) |
-| Language | TypeScript 5 |
-| Styling | Tailwind CSS v4 |
-| Database / Auth | Supabase (Postgres + Auth + RLS) |
-| AI Inference | OpenRouter (multi-model) |
-| Tool Integrations | Composio |
-| Widget Canvas | React (`apps/widget-v2`) |
-| Flow Builder | `@xyflow/react` |
-| Animation | Framer Motion |
-
----
-
-## Project Structure
-
-```
-.
-├── src/
-│   ├── app/                    # Next.js App Router pages & API routes
-│   │   ├── (app)/              # Authenticated dashboard shell
-│   │   ├── agents/             # Agent builder & preview pages
-│   │   ├── api/
-│   │   │   ├── agents/         # Agent chat & management endpoints
-│   │   │   ├── widgets/        # Widget CRUD, deploy, preview endpoints
-│   │   │   ├── public/widgets/ # Public widget runtime endpoints (chat, events, sessions)
-│   │   │   ├── connections/    # Composio integration endpoints
-│   │   │   ├── dashboard/      # Dashboard data endpoints
-│   │   │   ├── knowledge/      # Knowledge base endpoints
-│   │   │   └── workspaces/     # Workspace management
-│   │   ├── auth/               # Auth callback handlers
-│   │   └── login/              # Login page
-│   ├── components/             # Shared React components
-│   ├── lib/
-│   │   ├── agents/             # Agent runtime logic
-│   │   ├── widgets/            # Widget server utilities & type-safe query helpers
-│   │   ├── runtime/            # AI inference & streaming helpers
-│   │   ├── supabase/           # Supabase client factories (server, client, admin)
-│   │   ├── openrouter.ts       # OpenRouter API client
-│   │   ├── composio.ts         # Composio tool integration
-│   │   ├── types.ts            # Shared TypeScript types (DB row shapes)
-│   │   └── widgets.ts          # Widget config builders & helpers
-│   └── supabase/               # Supabase migrations
-├── scripts/                    # Utility scripts such as widget load testing
-└── apps/
-    └── widget-v2/              # Embeddable chat widget (standalone React build)
-```
-
----
-
-## Getting Started
+## Local Development
 
 ### 1. Install dependencies
 
 ```bash
 npm install
+npm install --prefix apps/widget-v2
 ```
 
-### 2. Set up environment variables
-
-Copy `.env.example` to `.env.local` and fill in your values:
+### 2. Configure environment variables
 
 ```bash
 cp .env.example .env.local
+cp apps/widget-v2/.env.example apps/widget-v2/.env.local
 ```
 
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key |
-| `OPENROUTER_API_KEY` | OpenRouter API key |
-| `OPENROUTER_MODEL` | Default model (e.g. `openai/gpt-4o-mini`) |
-| `COMPOSIO_API_KEY` | Composio API key for tool integrations |
-| `NEXT_PUBLIC_APP_URL` | App base URL (e.g. `http://localhost:3000`) |
-| `NEXT_PUBLIC_WIDGET_APP_URL` | Hosted widget app URL (defaults to `http://localhost:5173` locally) |
+Root app variables:
 
-### 3. Run the development server
+| Variable | Required | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL for browser/server clients |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Privileged Supabase key for admin routes and jobs |
+| `OPENROUTER_API_KEY` | Yes | OpenRouter API key |
+| `OPENROUTER_MODEL` | No | Default model id for agent turns |
+| `OPENROUTER_DATA_COLLECTION` | No | Provider privacy mode, defaults to `deny` |
+| `OPENROUTER_REQUIRE_ZDR` | No | Enables OpenRouter ZDR preference when truthy |
+| `COMPOSIO_API_KEY` | Yes for tool integrations | Composio API key |
+| `COMPOSIO_TOOLKIT_VERSION_GMAIL` | No | Gmail toolkit version override |
+| `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR` | No | Google Calendar toolkit version override |
+| `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE` | No | Google Drive toolkit version override |
+| `NEXT_PUBLIC_APP_URL` | No | Dashboard origin, defaults to `http://localhost:3000` |
+| `NEXT_PUBLIC_WIDGET_APP_URL` | No | Hosted widget origin, defaults to `http://localhost:5173` |
+| `WIDGET_APP_URL` | No | Legacy fallback alias for the hosted widget origin |
+| `WIDGET_ACCESS_SECRET` | Yes | Secret used to sign public widget access tokens |
+| `WIDGET_PREVIEW_SECRET` | Yes | Secret used to sign widget preview tokens |
+| `GDPR_RETENTION_CRON_SECRET` | Yes for retention job | Secret for the internal privacy retention route |
+
+Widget package variables:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `VITE_API_BASE` | No | Build-time override for the dashboard API origin |
+
+### 3. Run the apps
 
 ```bash
-# Main dashboard app
+# Dashboard app
 npm run dev
 
-# Widget (in a separate terminal)
+# Widget runtime, in a second terminal
 npm run widget:dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
+Open [http://localhost:3000](http://localhost:3000) for the dashboard and [http://localhost:5173](http://localhost:5173) for the hosted widget runtime.
 
 ## Scripts
 
 ```bash
-npm run dev           # Start Next.js dev server
-npm run build         # Production build
-npm run start         # Start production server
-npm run lint          # ESLint
-npm run widget:dev    # Start widget-v2 dev server
-npm run widget:build  # Build widget-v2 for production
-npm run widget:load-test -- --help  # Load-test the public widget runtime
+npm run dev
+npm run build
+npm run start
+npm run lint
+npm run widget:dev
+npm run widget:build
+npm run widget:load-test -- --help
 ```
 
----
+## Repository Layout
 
-## Key Routes
+```text
+.
+├── src/
+│   ├── app/                    # Next.js routes, layouts, server actions, and API handlers
+│   ├── components/             # Dashboard UI, modals, layout, and widget previews
+│   └── lib/                    # Shared runtime, Supabase, widget, privacy, and integration helpers
+├── apps/
+│   └── widget-v2/              # Standalone widget runtime and embed assets
+├── supabase/
+│   ├── functions/              # Edge functions for knowledge processing/search
+│   └── migrations/             # Database schema and platform migrations
+├── scripts/                    # Load testing and utility scripts
+├── docs/                       # Architecture notes, rollout docs, and implementation plans
+├── public/                     # Static assets served by the dashboard app
+└── proxy.ts                    # Request/session proxy hook for auth session updates
+```
 
-| Route | Description |
-|---|---|
-| `/` | Redirects to dashboard |
-| `/login` | Auth page |
-| `/dashboard` | Main workspace dashboard |
-| `/agents` | Agents list |
-| `/agents/[id]/builder` | Agent flow builder |
-| `/agents/[id]/preview` | Live agent chat preview |
-| `/widgets` | Widget list and deployment management |
-| `/analytics` | Widget conversation analytics and operations |
-| `/connections` | Third-party tool connections |
-| `/settings` | Workspace settings |
+## Important Routes
 
----
+| Route | Purpose |
+| --- | --- |
+| `/login` | Supabase-authenticated login flow |
+| `/dashboard` | Workspace overview and operational summary |
+| `/agents` | Agent list and lifecycle actions |
+| `/agents/[id]/builder` | Visual agent builder |
+| `/agents/[id]/preview` | Live chat preview for draft agents |
+| `/widgets` | Widget list and management |
+| `/widgets/[id]` | Widget configuration, agents, appearance, and deployment state |
+| `/analytics` | Widget conversation analytics and transcript detail |
+| `/connections` | Connected app authorization and status |
+| `/settings` | Workspace profile, compliance links, and admin settings |
 
 ## Widget Embedding
 
-The `widget-v2` app compiles to a self-contained script. To embed on any site:
+The widget loader is built from `apps/widget-v2/public/loader.js` and expects a widget public key:
 
 ```html
-<script src="https://widget.agentergroup.com/loader.js"
+<script
+  src="https://widget.agentergroup.com/loader.js"
   data-widget="YOUR_WIDGET_PUBLIC_KEY"
-  async>
-</script>
+  async
+></script>
 ```
 
-The widget communicates with the platform via the public API routes under `/api/public/widgets/`.
+The loader and hosted runtime talk to the public API routes under `/api/public/widgets/`.
 
-## Widget Runtime Notes
+## Operational Notes
 
-- Bootstrap issues a short-lived signed widget access token. The current TTL is 15 minutes.
-- Widget appearance is now driven by `theme`, `primaryColor`, and `secondaryColor`. Base surfaces and text are derived automatically.
-- Hosted and embedded widget clients both retry one bootstrap refresh automatically when the runtime token expires.
-- Public widget chat allows one active turn per session at a time. Overlapping sends for the same session return `409 SESSION_BUSY`.
-- The widget runtime has a dedicated load-test harness in `scripts/widget-load-test.mjs`.
-- For local hosted-widget testing, keep the widget origin aligned with `NEXT_PUBLIC_WIDGET_APP_URL`. With repo defaults that means `http://localhost:5173`, not `http://127.0.0.1:5173`.
-
----
+- Widget bootstrap currently issues a signed access token with a 15-minute TTL.
+- Hosted and embedded widget clients both retry bootstrap once when the runtime token expires.
+- Widget chat is serialized per session; overlapping turns return `409 SESSION_BUSY`.
+- `scripts/widget-load-test.mjs` exercises bootstrap/chat flows and the same-session lock path.
+- The top-level `/data-processing` and `/subprocessors` routes are compatibility redirects into `/settings/...`.
 
 ## License
 
-Private — All rights reserved. Agentergroup © 2026.
+Private repository. All rights reserved. Agentergroup © 2026.

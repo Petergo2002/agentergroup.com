@@ -9,7 +9,6 @@ import {
   type SetStateAction,
 } from "react";
 import { useToast } from "@/components/ui/ToastProvider";
-import { useAppContext } from "@/components/app/AppContext";
 import { formatRelativeDate } from "@/lib/utils";
 import type {
   DashboardAnalyticsAppliedFilters,
@@ -35,6 +34,56 @@ import {
 
 type AnalyticsView = "chat" | "analytics";
 
+function AnalyticsTabs({
+  activeView,
+  onChange,
+}: {
+  activeView: AnalyticsView;
+  onChange: (view: AnalyticsView) => void;
+}) {
+  const items: Array<{
+    key: AnalyticsView;
+    label: string;
+    icon: LucideIcon;
+  }> = [
+    {
+      key: "chat",
+      label: "Chat",
+      icon: MessageSquare,
+    },
+    {
+      key: "analytics",
+      label: "Analytics",
+      icon: BarChart3,
+    },
+  ];
+
+  return (
+    <div className="inline-flex items-center rounded-full border border-outline-variant/30 bg-surface-container-low p-1">
+      {items.map((item) => {
+        const Icon = item.icon;
+        const isActive = item.key === activeView;
+
+        return (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => onChange(item.key)}
+            className={`rounded-full px-4 py-2 text-[13px] font-medium transition-all ${
+              isActive
+                ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            <Icon className="h-4 w-4" strokeWidth={2} />
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 interface DashboardAnalyticsState {
   isLoading: boolean;
   isLoadingMore: boolean;
@@ -45,12 +94,8 @@ interface DashboardAnalyticsState {
   detailCache: Record<string, DashboardConversationDetailResponse>;
 }
 
-const railItemClassName =
-  "group relative flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200";
 const fieldClassName =
-  "h-10 w-full rounded-xl border border-outline-variant/15 bg-background px-3 text-sm text-on-surface outline-none transition-colors focus:border-on-surface/20";
-const shellClassName =
-  "overflow-hidden rounded-[1.8rem] border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_50px_rgba(15,23,42,0.06)]";
+  "h-10 w-full rounded border bg-surface-container-lowest px-3 text-sm text-on-surface outline-none transition-colors focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container";
 
 function buildAnalyticsUrl(
   filters: DashboardAnalyticsAppliedFilters,
@@ -78,87 +123,6 @@ function buildAnalyticsUrl(
   return `/api/dashboard/analytics?${params.toString()}`;
 }
 
-function AnalyticsRail({
-  activeView,
-  onChange,
-}: {
-  activeView: AnalyticsView;
-  onChange: (view: AnalyticsView) => void;
-}) {
-  const items: Array<{
-    key: AnalyticsView;
-    label: string;
-    description: string;
-    icon: LucideIcon;
-  }> = [
-    {
-      key: "chat",
-      label: "Chat",
-      description: "Inbox and transcripts",
-      icon: MessageSquare,
-    },
-    {
-      key: "analytics",
-      label: "Analytics",
-      description: "KPIs and overview",
-      icon: BarChart3,
-    },
-  ];
-
-  return (
-    <aside className="flex h-full flex-col bg-background/70">
-      <div className="border-b border-outline-variant/10 px-4 py-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant/55">
-          Workspace view
-        </p>
-        <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-          Switch between the live inbox and the broader analytics overview.
-        </p>
-      </div>
-
-      <nav className="flex gap-2 overflow-x-auto px-3 py-3 lg:flex-1 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-4 lg:py-4">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const isActive = item.key === activeView;
-
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => onChange(item.key)}
-              className={`${railItemClassName} min-w-[13rem] text-left lg:min-w-0 ${
-                isActive
-                  ? "bg-[#FF6B52]/10 text-on-surface"
-                  : "text-secondary hover:bg-surface-container-low hover:text-on-surface"
-              }`}
-            >
-              {isActive ? (
-                <div className="absolute left-0 top-2.5 bottom-2.5 hidden w-0.5 rounded-full bg-[#FF6B52] lg:block" />
-              ) : null}
-              <Icon
-                className={`h-[1.05rem] w-[1.05rem] shrink-0 ${
-                  isActive
-                    ? "text-[#FF6B52]"
-                    : "text-on-surface-variant group-hover:text-on-surface"
-                }`}
-                strokeWidth={1.9}
-              />
-              <span className="min-w-0">
-                <span className={`block text-sm ${isActive ? "font-semibold" : "font-medium"}`}>
-                  {item.label}
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-on-surface-variant">
-                  {item.description}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </nav>
-    </aside>
-  );
-}
-
 function InboxToolbar({
   filters,
   setFilters,
@@ -169,20 +133,14 @@ function InboxToolbar({
   data: DashboardAnalyticsResponse | null;
 }) {
   return (
-    <div className="border-b border-outline-variant/10 px-4 py-4 sm:px-5">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
-            Chat
-          </p>
-          <h2 className="mt-2 text-lg font-semibold text-on-surface">Inbox</h2>
-        </div>
-        <span className="text-xs text-on-surface-variant/60">
+    <div className="border-b border-outline-variant/20 bg-surface-container-lowest p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-on-surface">Sessions inbox</h2>
+        <span className="text-[11px] font-medium text-on-surface-variant">
           {(data?.conversations.length ?? 0)} sessions
         </span>
       </div>
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         <select
           value={filters.agentId ?? ""}
           onChange={(event) =>
@@ -191,7 +149,7 @@ function InboxToolbar({
               agentId: event.target.value || null,
             }))
           }
-          className={fieldClassName}
+          className="h-9 rounded border border-outline-variant/20 bg-surface-container-low px-2 text-xs"
           aria-label="Filter by agent"
         >
           <option value="">All agents</option>
@@ -201,7 +159,6 @@ function InboxToolbar({
             </option>
           ))}
         </select>
-
         <select
           value={filters.widgetId ?? ""}
           onChange={(event) =>
@@ -210,7 +167,7 @@ function InboxToolbar({
               widgetId: event.target.value || null,
             }))
           }
-          className={fieldClassName}
+          className="h-9 rounded border border-outline-variant/20 bg-surface-container-low px-2 text-xs"
           aria-label="Filter by widget"
         >
           <option value="">All widgets</option>
@@ -220,7 +177,6 @@ function InboxToolbar({
             </option>
           ))}
         </select>
-
         <select
           value={filters.range}
           onChange={(event) =>
@@ -229,16 +185,15 @@ function InboxToolbar({
               range: event.target.value as DashboardAnalyticsRange,
             }))
           }
-          className={fieldClassName}
+          className="h-9 rounded border border-outline-variant/20 bg-surface-container-low px-2 text-xs"
           aria-label="Filter by range"
         >
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
+          <option value="7d">7 days</option>
+          <option value="30d">30 days</option>
+          <option value="90d">90 days</option>
         </select>
-
         <label className="relative block sm:col-span-2">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/50" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-on-surface-variant" />
           <input
             value={filters.search}
             onChange={(event) =>
@@ -247,8 +202,8 @@ function InboxToolbar({
                 search: event.target.value,
               }))
             }
-            placeholder="Search agent or widget"
-            className={`${fieldClassName} pl-10`}
+            placeholder="Search sessions, agents, leads..."
+            className="h-9 w-full rounded border border-outline-variant/20 bg-surface-container-low pl-8 pr-2 text-xs"
             aria-label="Search conversations"
           />
         </label>
@@ -270,39 +225,37 @@ function ConversationRow({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
+      className={`w-full border-b border-outline-variant/10 px-4 py-3 text-left transition-colors ${
         selected
-          ? "border-on-surface/20 bg-surface-container"
-          : "border-transparent bg-transparent hover:border-outline-variant/10 hover:bg-surface-container-low"
+          ? "border-l-4 border-l-primary-container bg-primary-container/10"
+          : "hover:bg-surface-container-low"
       }`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-on-surface">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-medium text-on-surface">
             {conversation.agentLabel || conversation.agentName || "Unknown agent"}
           </p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
-            <span className="truncate">{conversation.widgetName}</span>
-            <span className="rounded-full border border-outline-variant/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant/70">
-              {conversation.source}
+          <p className="truncate text-[12px] text-on-surface-variant mt-0.5">
+            {conversation.latestSnippet || "No messages yet"}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className="text-[10px] text-on-surface-variant">
+            {formatRelativeDate(conversation.lastActivityAt)}
+          </span>
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] text-on-surface-variant">
+              {conversation.messageCount} msg
             </span>
-            {conversation.hasLead ? (
-              <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
-                Lead
-              </span>
-            ) : null}
+            {conversation.hasLead && (
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+            )}
           </div>
         </div>
-        <span className="shrink-0 text-[11px] text-on-surface-variant/60">
-          {formatRelativeDate(conversation.lastActivityAt)}
-        </span>
       </div>
 
-      <p className="mt-3 line-clamp-2 text-sm leading-6 text-on-surface-variant">
-        {conversation.latestSnippet || "No customer-facing messages yet."}
-      </p>
-
-      <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-on-surface-variant/65">
+      <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-on-surface-variant">
         <span>{conversation.messageCount} messages</span>
         <span>{conversation.userMessageCount} user</span>
       </div>
@@ -327,23 +280,24 @@ function ConversationInboxPane({
   const hasFilters = Boolean(
     filters.search || filters.widgetId || filters.agentId,
   );
+  const hasMore = Boolean(state.data?.pageInfo.hasMore);
 
   return (
-    <section className="flex min-h-[32rem] flex-col bg-surface-container-lowest lg:h-full lg:min-h-0 lg:overflow-hidden">
+    <section className="flex h-full min-h-0 flex-col bg-surface-container-lowest">
       <InboxToolbar filters={filters} setFilters={setFilters} data={state.data} />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {state.isLoading ? (
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          <div className="flex-1 space-y-2 p-3">
             {Array.from({ length: 7 }).map((_, index) => (
               <div
                 key={index}
-                className="h-28 animate-pulse rounded-2xl bg-surface-container-low"
+                className="h-20 animate-pulse bg-surface-container-low rounded"
               />
             ))}
           </div>
         ) : conversations.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-outline-variant/15 bg-background px-5 text-center">
+          <div className="flex flex-1 items-center justify-center p-8 text-center">
             <div>
               <p className="text-base font-semibold text-on-surface">
                 {hasFilters
@@ -358,34 +312,41 @@ function ConversationInboxPane({
             </div>
           </div>
         ) : (
-          <>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {conversations.map((conversation) => (
-                <ConversationRow
-                  key={conversation.widgetSessionId}
-                  conversation={conversation}
-                  selected={
-                    conversation.widgetSessionId === state.selectedWidgetSessionId
-                  }
-                  onClick={() => onSelectConversation(conversation.widgetSessionId)}
-                />
-              ))}
-            </div>
-
-            {state.data?.pageInfo.hasMore ? (
-              <div className="border-t border-outline-variant/10 px-1 pt-3">
-                <button
-                  type="button"
-                  onClick={onLoadMore}
-                  disabled={state.isLoadingMore}
-                  className="w-full rounded-xl border border-outline-variant/15 bg-background px-4 py-2.5 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container disabled:opacity-50"
-                >
-                  {state.isLoadingMore ? "Loading..." : "Load more"}
-                </button>
-              </div>
-            ) : null}
-          </>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {conversations.map((conversation) => (
+              <ConversationRow
+                key={conversation.widgetSessionId}
+                conversation={conversation}
+                selected={
+                  conversation.widgetSessionId === state.selectedWidgetSessionId
+                }
+                onClick={() => onSelectConversation(conversation.widgetSessionId)}
+              />
+            ))}
+          </div>
         )}
+
+        {!state.isLoading && conversations.length > 0 ? (
+          <div className="border-t border-outline-variant/10 p-3">
+            <p className="mb-2 text-[11px] text-on-surface-variant">
+              Showing {conversations.length} sessions
+            </p>
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={onLoadMore}
+                disabled={state.isLoadingMore}
+                className="h-9 w-full rounded border border-outline-variant/20 bg-surface-container-low px-3 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {state.isLoadingMore ? "Loading more..." : "Load more sessions"}
+              </button>
+            ) : (
+              <p className="text-xs text-on-surface-variant">
+                You&apos;ve reached the end of this result set.
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -395,11 +356,11 @@ function DebugPanel({ trace }: { trace: DebugTrace }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-low text-on-surface-variant">
+    <div className="mt-4 overflow-hidden rounded bg-surface-container-low text-on-surface-variant">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-on-surface/5"
+        className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-surface-container-high"
       >
         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider">
           {expanded ? (
@@ -426,9 +387,9 @@ function DebugPanel({ trace }: { trace: DebugTrace }) {
       </button>
 
       {expanded ? (
-        <div className="border-t border-outline-variant/10 p-3 text-[11px] font-mono leading-relaxed">
+        <div className="p-3 text-[11px] font-mono leading-relaxed">
           {trace.hadError && trace.errorSummary ? (
-            <div className="mb-3 flex items-start gap-2 rounded-xl bg-error/10 p-2 text-error">
+            <div className="mb-3 flex items-start gap-2 rounded bg-error/10 p-2 text-error">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>{trace.errorSummary}</span>
             </div>
@@ -453,7 +414,7 @@ function DebugPanel({ trace }: { trace: DebugTrace }) {
                       {isError ? (
                         <AlertCircle className="h-3 w-3 shrink-0 text-error" />
                       ) : isSuccess ? (
-                        <CheckCircle2 className="h-3 w-3 shrink-0 text-primary" />
+                        <CheckCircle2 className="h-3 w-3 shrink-0 text-primary-container" />
                       ) : (
                         <Activity className="h-3 w-3 shrink-0 opacity-50" />
                       )}
@@ -513,14 +474,14 @@ function ConversationDetail({
     "Conversation detail";
 
   return (
-    <section className="flex min-h-[32rem] flex-col bg-background lg:h-full lg:min-h-0">
-      <div className="border-b border-outline-variant/10 px-5 py-5">
+    <section className="flex flex-col h-full bg-surface-container-lowest">
+      <div className="px-6 py-5 border-b border-outline-variant/10">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
               Conversation
             </p>
-            <h2 className="mt-2 truncate text-2xl font-headline font-bold text-on-surface">
+            <h2 className="mt-2 truncate text-[1.25rem] font-semibold text-on-surface">
               {title}
             </h2>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
@@ -533,7 +494,7 @@ function ConversationDetail({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full border border-outline-variant/10 px-3 py-2 text-xs font-semibold text-on-surface-variant"
+              className="rounded border px-3 py-2 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high"
             >
               Close
             </button>
@@ -542,17 +503,17 @@ function ConversationDetail({
 
         {detail ? (
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-full border border-outline-variant/10 bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+            <span className="rounded bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
               Started {formatRelativeDate(detail.conversation.startedAt)}
             </span>
-            <span className="rounded-full border border-outline-variant/10 bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+            <span className="rounded bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
               Active {formatRelativeDate(detail.conversation.lastActivityAt)}
             </span>
-            <span className="rounded-full border border-outline-variant/10 bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+            <span className="rounded bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
               {detail.conversation.source}
             </span>
             {detail.lead ? (
-              <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+              <span className="rounded bg-primary-container/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-container">
                 Lead captured
               </span>
             ) : null}
@@ -562,11 +523,11 @@ function ConversationDetail({
 
       {isLoading ? (
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
-          <div className="h-20 animate-pulse rounded-2xl bg-surface-container-low" />
+          <div className="h-20 animate-pulse bg-surface-container-low" />
           {Array.from({ length: 5 }).map((_, index) => (
             <div
               key={index}
-              className={`h-24 animate-pulse rounded-2xl bg-surface-container-low ${
+              className={`h-24 animate-pulse bg-surface-container-low ${
                 index % 2 === 0 ? "ml-auto max-w-[78%]" : "max-w-[82%]"
               }`}
             />
@@ -574,7 +535,7 @@ function ConversationDetail({
         </div>
       ) : !detail ? (
         <div className="flex flex-1 items-center justify-center px-5 py-10">
-          <div className="max-w-md rounded-2xl border border-dashed border-outline-variant/15 bg-surface-container-low px-6 py-8 text-center">
+          <div className="max-w-md bg-surface-container-low px-6 py-8 text-center">
             <p className="text-base font-semibold text-on-surface">
               No conversation selected yet.
             </p>
@@ -586,8 +547,8 @@ function ConversationDetail({
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           {detail.lead ? (
-            <div className="mb-5 rounded-2xl border border-primary/15 bg-primary/5 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
+            <div className="mb-5 bg-primary-container/5 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
                 Lead
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -625,31 +586,31 @@ function ConversationDetail({
 
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
                 Transcript
               </p>
               <p className="mt-2 text-sm text-on-surface-variant">
                 Customer and assistant messages for this session.
               </p>
             </div>
-            <span className="text-xs text-on-surface-variant/60">
+            <span className="text-xs text-on-surface-variant">
               {detail.transcript.length} messages
             </span>
           </div>
 
           {detail.transcript.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-outline-variant/15 bg-surface-container-low px-5 py-8 text-sm leading-7 text-on-surface-variant">
+            <div className="bg-surface-container-low px-5 py-8 text-sm leading-7 text-on-surface-variant">
               No customer-facing messages stored for this session yet.
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {detail.transcript.map((message) => (
                 <div
                   key={message.id}
-                  className={`max-w-[85%] rounded-[1.4rem] px-4 py-4 ${
+                  className={`max-w-[85%] rounded px-4 py-4 ${
                     message.role === "user"
-                      ? "ml-auto bg-[#79C3FF] text-[#062139]"
-                      : "border border-outline-variant/10 bg-surface-container-low text-on-surface"
+                      ? "ml-auto bg-primary-container text-white"
+                      : "bg-surface-container-low text-on-surface"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -699,27 +660,28 @@ function AnalyticsOverview({
   ] as const;
 
   return (
-    <section className="min-h-[32rem] bg-surface-container-lowest lg:h-full lg:min-h-0 lg:overflow-y-auto">
-      <div className="border-b border-outline-variant/10 px-5 py-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
-          Analytics
-        </p>
-        <h2 className="mt-2 text-2xl font-headline font-bold text-on-surface">
-          Workspace performance
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
-          Read the current signal across conversations, agents, widgets and connected apps.
-        </p>
+    <section className="flex flex-col h-full bg-surface-container-lowest overflow-y-auto">
+      <div className="px-8 py-8">
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-[1.5rem] font-semibold text-on-surface">
+              Workspace Performance
+            </h2>
+            <p className="mt-2 text-[14px] leading-6 text-on-surface-variant">
+              Track your conversations, agents, and widget performance
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-6 px-5 py-5">
-        <div className="grid gap-4 md:grid-cols-3">
+      <div className="flex-1 p-8 pt-0">
+        <div className="grid gap-6 md:grid-cols-3">
           {topMetrics.map(([label, value]) => (
             <div
               key={label}
-              className="rounded-2xl border border-outline-variant/15 bg-background px-5 py-5"
+              className="bg-surface-container-low px-5 py-5"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
                 {label}
               </p>
               <p className="mt-4 text-4xl font-headline font-bold text-on-surface">
@@ -729,25 +691,25 @@ function AnalyticsOverview({
           ))}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-3">
           {supportMetrics.map(([label, value]) => (
             <div
               key={label}
-              className="rounded-2xl border border-outline-variant/15 bg-background px-5 py-4"
+              className="bg-surface-container-low px-6 py-6"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
                 {label}
               </p>
-              <p className="mt-3 text-2xl font-headline font-bold text-on-surface">
+              <p className="mt-4 text-3xl font-semibold text-on-surface">
                 {value}
               </p>
             </div>
           ))}
         </div>
 
-        <div className="rounded-2xl border border-outline-variant/15 bg-background p-4">
+        <div className="bg-surface-container-low p-6 mt-6">
           <div className="mb-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
               Filters
             </p>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
@@ -811,7 +773,7 @@ function AnalyticsOverview({
             </select>
 
             <label className="relative block lg:col-span-3">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/50" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
               <input
                 value={filters.search}
                 onChange={(event) =>
@@ -833,7 +795,6 @@ function AnalyticsOverview({
 }
 
 export function AnalyticsWorkspaceView() {
-  const { workspace } = useAppContext();
   const { showToast } = useToast();
   const [activeView, setActiveView] = useState<AnalyticsView>("chat");
   const [filters, setFilters] = useState<DashboardAnalyticsAppliedFilters>({
@@ -1030,7 +991,7 @@ export function AnalyticsWorkspaceView() {
       isMounted = false;
       controller.abort();
     };
-  }, [showToast, state.selectedWidgetSessionId]);
+  }, [showToast, state.detailCache, state.selectedWidgetSessionId]);
 
   useEffect(() => {
     if (activeView !== "chat") {
@@ -1115,57 +1076,51 @@ export function AnalyticsWorkspaceView() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1720px] flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+      <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-            Conversation operations
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+            Workspace insights
           </p>
-          <h1 className="mt-3 text-[2.15rem] font-headline font-bold leading-tight tracking-tight text-on-surface sm:text-[2.45rem]">
+          <h1 className="mt-2 text-[1.5rem] font-semibold tracking-tight text-on-surface">
             Analytics
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
-            Separate live chat review from workspace analytics across {workspace.name}.
-          </p>
         </div>
+        <AnalyticsTabs activeView={activeView} onChange={setActiveView} />
       </div>
 
-      {activeView === "chat" ? (
-        <div className={`${shellClassName} grid lg:h-[calc(100dvh-12rem)] lg:min-h-0 lg:grid-cols-[15rem_24rem_minmax(0,1fr)]`}>
-          <div className="border-b border-outline-variant/10 lg:h-full lg:min-h-0 lg:border-b-0 lg:border-r">
-            <AnalyticsRail activeView={activeView} onChange={setActiveView} />
+      <div className="min-h-0 flex-1 overflow-hidden rounded-[1.6rem] border border-outline-variant/30 bg-surface-container-lowest shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+        {activeView === "chat" ? (
+          <div className="grid h-full min-h-0 grid-cols-1 gap-3 p-3 lg:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.65fr)] lg:gap-4 lg:p-4">
+            <div className="min-h-0 overflow-hidden rounded-[1.2rem] border border-outline-variant/20">
+              <ConversationInboxPane
+                state={state}
+                filters={filters}
+                setFilters={setFilters}
+                onSelectConversation={handleSelectConversation}
+                onLoadMore={() => void loadMore()}
+              />
+            </div>
+            <div className="hidden min-h-0 overflow-hidden rounded-[1.2rem] border border-outline-variant/20 lg:block">
+              <ConversationDetail
+                detail={state.selectedConversation}
+                isLoading={state.isDetailLoading}
+              />
+            </div>
           </div>
-          <div className="border-b border-outline-variant/10 lg:h-full lg:min-h-0 lg:border-b-0 lg:border-r">
-            <ConversationInboxPane
-              state={state}
+        ) : (
+          <div className="h-full min-h-0 overflow-hidden">
+            <AnalyticsOverview
+              data={state.data}
               filters={filters}
               setFilters={setFilters}
-              onSelectConversation={handleSelectConversation}
-              onLoadMore={() => void loadMore()}
             />
           </div>
-          <div className="hidden lg:h-full lg:min-h-0 lg:block">
-            <ConversationDetail
-              detail={state.selectedConversation}
-              isLoading={state.isDetailLoading}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className={`${shellClassName} grid lg:h-[calc(100dvh-12rem)] lg:min-h-0 lg:grid-cols-[15rem_minmax(0,1fr)]`}>
-          <div className="border-b border-outline-variant/10 lg:h-full lg:min-h-0 lg:border-b-0 lg:border-r">
-            <AnalyticsRail activeView={activeView} onChange={setActiveView} />
-          </div>
-          <AnalyticsOverview
-            data={state.data}
-            filters={filters}
-            setFilters={setFilters}
-          />
-        </div>
-      )}
+        )}
+      </div>
 
       {isMobileDetailOpen && activeView === "chat" ? (
-        <div className="fixed inset-0 z-50 bg-background/85 p-4 backdrop-blur-sm lg:hidden">
+        <div className="fixed inset-0 z-50 bg-surface-container-lowest/85 p-4 backdrop-blur-sm lg:hidden">
           <div className="h-full overflow-y-auto">
             <ConversationDetail
               detail={state.selectedConversation}

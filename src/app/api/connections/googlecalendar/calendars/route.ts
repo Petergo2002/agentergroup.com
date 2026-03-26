@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import {
+  getConnectionComposioUserId,
+  getEffectiveConnectionStatus,
+} from "@/lib/connections";
 import { listGoogleCalendars, syncConnectedAccountsToDatabase } from "@/lib/composio";
 import { createClient } from "@/lib/supabase/server";
+import type { ConnectionStatus } from "@/lib/types";
 
 interface GoogleCalendarConnectionRow {
   id: string;
   workspace_id: string;
   toolkit_slug: string;
-  status: string;
+  status: ConnectionStatus;
   external_id: string | null;
   toolkit_data: Record<string, unknown> | null;
-  created_by: string;
 }
 
 function pickString(value: unknown) {
@@ -45,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("connections")
-    .select("id, workspace_id, toolkit_slug, status, external_id, toolkit_data, created_by")
+    .select("id, workspace_id, toolkit_slug, status, external_id, toolkit_data")
     .eq("id", connectionId)
     .eq("workspace_id", context.workspace.id)
     .maybeSingle();
@@ -66,17 +70,25 @@ export async function GET(request: NextRequest) {
     connection.external_id ??
     pickString(connection.toolkit_data?.id) ??
     pickString(connection.toolkit_data?.connectedAccountId);
+  const composioUserId = getConnectionComposioUserId(connection);
 
-  if (connection.status !== "connected" || !connectedAccountId) {
+  if (
+    getEffectiveConnectionStatus(connection) !== "connected" ||
+    !connectedAccountId ||
+    !composioUserId
+  ) {
     return NextResponse.json(
-      { error: "Google Calendar must be connected before calendars can be loaded." },
+      {
+        error:
+          "Google Calendar must be reconnected in this workspace before calendars can be loaded.",
+      },
       { status: 400 },
     );
   }
 
   try {
     const calendars = await listGoogleCalendars(
-      connection.created_by,
+      composioUserId,
       connectedAccountId,
     );
 
@@ -85,7 +97,7 @@ export async function GET(request: NextRequest) {
     console.error("[Google Calendar] Failed to load calendars:", {
       connectionId: connection.id,
       connectedAccountId,
-      createdBy: connection.created_by,
+      composioUserId,
       error,
     });
 

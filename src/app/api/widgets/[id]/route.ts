@@ -112,6 +112,7 @@ export async function PATCH(
     language: parseString(body.language) ?? "en",
     home_title: parseString(body.homeTitle),
     home_subtitle: parseString(body.homeSubtitle),
+    hosted_enabled: parseBoolean(body.hostedEnabled, loaded.widget.hosted_enabled),
     show_branding: parseBoolean(body.showBranding, loaded.widget.show_branding),
     privacy_policy_url:
       parseString(body.privacyPolicyUrl) ?? loaded.widget.privacy_policy_url,

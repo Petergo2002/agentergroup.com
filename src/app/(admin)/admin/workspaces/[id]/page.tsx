@@ -1,0 +1,116 @@
+import { notFound } from "next/navigation";
+import { AdminAgentsTable } from "@/components/admin/AdminAgentsTable";
+import {
+  AdminTabs,
+  type AdminWorkspaceTab,
+} from "@/components/admin/AdminTabs";
+import { AdminWidgetsTable } from "@/components/admin/AdminWidgetsTable";
+import { AdminWorkspaceAnalytics } from "@/components/admin/AdminWorkspaceAnalytics";
+import { AdminWorkspaceSummaryPanel } from "@/components/admin/AdminWorkspaceSummaryPanel";
+import { requireAdminUser } from "@/lib/admin/auth";
+import {
+  getDailyMessageActivity,
+  getWorkspaceDetail,
+  getWorkspaceWidgets,
+} from "@/lib/admin/queries";
+
+interface AdminWorkspaceDetailPageProps {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}
+
+function resolveTab(tab: string | undefined): AdminWorkspaceTab {
+  if (tab === "agents" || tab === "widgets") {
+    return tab;
+  }
+
+  return "analytics";
+}
+
+export default async function AdminWorkspaceDetailPage({
+  params,
+  searchParams,
+}: AdminWorkspaceDetailPageProps) {
+  await requireAdminUser();
+
+  const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
+  const currentTab = resolveTab(resolvedSearchParams.tab);
+  const [workspaceDetail, activityPoints, widgets] = await Promise.all([
+    getWorkspaceDetail(id),
+    getDailyMessageActivity(id, 30),
+    getWorkspaceWidgets(id),
+  ]);
+
+  if (!workspaceDetail) {
+    notFound();
+  }
+
+  const widgetLastActiveAt =
+    widgets
+      .map((widget) => widget.lastActiveAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1) ?? null;
+  const workspace = {
+    ...workspaceDetail.workspace,
+    lastActiveAt:
+      [workspaceDetail.workspace.lastActiveAt, widgetLastActiveAt]
+        .filter(Boolean)
+        .sort()
+        .at(-1) ?? workspaceDetail.workspace.lastActiveAt,
+  };
+
+  return (
+    <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <AdminWorkspaceSummaryPanel workspace={workspace} />
+
+      <section className="min-w-0 space-y-6">
+        <header className="admin-fade-in">
+          <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+            Customer detail
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+            {workspace.name}
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-neutral-500">
+            Read-only activity, build, and widget usage for this workspace.
+          </p>
+        </header>
+
+        <AdminTabs currentTab={currentTab} workspaceId={id} />
+
+        {currentTab === "analytics" ? (
+          <AdminWorkspaceAnalytics workspace={workspace} points={activityPoints} />
+        ) : null}
+
+        {currentTab === "agents" ? (
+          <div className="space-y-4 admin-fade-in">
+            <div>
+              <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+                Agents
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-white">
+                Workspace agents
+              </h3>
+            </div>
+            <AdminAgentsTable agents={workspaceDetail.agents} />
+          </div>
+        ) : null}
+
+        {currentTab === "widgets" ? (
+          <div className="space-y-4 admin-fade-in">
+            <div>
+              <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+                Widgets
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-white">
+                Workspace widgets
+              </h3>
+            </div>
+            <AdminWidgetsTable widgets={widgets} />
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}

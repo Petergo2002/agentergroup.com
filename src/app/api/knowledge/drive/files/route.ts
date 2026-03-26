@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import { listDriveImportFiles, syncConnectedAccountsToDatabase } from "@/lib/composio";
 
 export async function GET(request: NextRequest) {
@@ -32,9 +33,17 @@ export async function GET(request: NextRequest) {
 
   const search = request.nextUrl.searchParams.get("search") ?? "";
   const pageToken = request.nextUrl.searchParams.get("pageToken") ?? undefined;
+  const composioUserId = buildWorkspaceComposioUserId(
+    context.workspace.id,
+    user.id,
+  );
 
   try {
-    const result = await listDriveImportFiles(user.id, search, pageToken);
+    const result = await listDriveImportFiles(
+      composioUserId,
+      search,
+      pageToken,
+    );
 
     return NextResponse.json({
       files: result.files,

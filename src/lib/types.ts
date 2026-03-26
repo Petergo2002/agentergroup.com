@@ -89,6 +89,7 @@ export interface ConnectionRecord {
   external_id: string | null;
   account_label: string | null;
   toolkit_data: Record<string, unknown>;
+  created_by: string;
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;

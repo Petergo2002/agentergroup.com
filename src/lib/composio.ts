@@ -1,5 +1,6 @@
 import { Composio } from "@composio/core";
 import type OpenAI from "openai";
+import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import { hasComposioEnv } from "@/lib/env";
 import { normalizeGmailRecipientEmail } from "@/lib/gmail";
 import { extractGoogleCalendarListItems } from "@/lib/google-calendar";
@@ -180,6 +181,7 @@ function extractDriveFileArray(data: Record<string, unknown>) {
 function normalizeConnectedAccount(
   item: ComposioConnectedAccountItem,
   session: ToolRouterSessionRef | null,
+  composioUserId: string,
 ): SyncedConnectedAccount | null {
   const toolkitSlugCandidate =
     item.toolkit?.slug ??
@@ -210,6 +212,7 @@ function normalizeConnectedAccount(
     authConfigId: item.authConfig?.id ?? null,
     toolkitData: {
       ...item,
+      composioUserId,
       toolRouterSessionId: session?.sessionId ?? null,
       toolRouterSessionUrl: session?.url ?? null,
     },
@@ -260,8 +263,6 @@ export async function getOrCreateToolRouterSession(userId: string) {
 
     toolRouterSessionCache.set(userId, nextValue);
     composioSessionCache.set(userId, session);
-
-    console.log("[Composio] Created session for user:", userId, "Session ID:", session.sessionId);
     return nextValue;
   } catch (error) {
     console.error("[Composio] Failed to create session:", error);
@@ -313,16 +314,16 @@ export async function getMCPSession(userId: string) {
   return mcpInfo;
 }
 
-export async function listConnectedAccounts(userId: string) {
+export async function listConnectedAccounts(composioUserId: string) {
   const composio = createComposioClient();
 
   if (!composio) {
     return [];
   }
 
-  await getComposioSession(userId);
+  await getComposioSession(composioUserId);
   const response = await composio.connectedAccounts.list({
-    userIds: [userId],
+    userIds: [composioUserId],
     toolkitSlugs: SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
   });
 
@@ -330,10 +331,16 @@ export async function listConnectedAccounts(userId: string) {
     ? response.items
     : []) as unknown as ComposioConnectedAccountItem[];
 
-  const toolRouterSession = toolRouterSessionCache.get(userId);
+  const toolRouterSession = toolRouterSessionCache.get(composioUserId);
 
   return items
-    .map((item) => normalizeConnectedAccount(item, toolRouterSession ?? null))
+    .map((item) =>
+      normalizeConnectedAccount(
+        item,
+        toolRouterSession ?? null,
+        composioUserId,
+      ),
+    )
     .filter(Boolean) as SyncedConnectedAccount[];
 }
 
@@ -346,7 +353,8 @@ export async function syncConnectedAccountsToDatabase(
   workspaceId: string,
   userId: string,
 ) {
-  const connectedAccounts = await listConnectedAccounts(userId);
+  const composioUserId = buildWorkspaceComposioUserId(workspaceId, userId);
+  const connectedAccounts = await listConnectedAccounts(composioUserId);
 
   if (connectedAccounts.length === 0) {
     return [];
@@ -377,7 +385,11 @@ export async function syncConnectedAccountsToDatabase(
   return connectedAccounts;
 }
 
-export async function createConnectionRequest(userId: string, toolkitSlug: string) {
+export async function createConnectionRequest(
+  workspaceId: string,
+  userId: string,
+  toolkitSlug: string,
+) {
   const composio = createComposioClient();
 
   if (!composio) {
@@ -390,7 +402,8 @@ export async function createConnectionRequest(userId: string, toolkitSlug: strin
     throw new Error("Unsupported integration.");
   }
 
-  const session = await getComposioSession(userId);
+  const composioUserId = buildWorkspaceComposioUserId(workspaceId, userId);
+  const session = await getComposioSession(composioUserId);
   const authConfig = await composio.authConfigs.create(toolkitSlug, {
     name: `${integration.displayName} Managed Auth`,
     type: "use_composio_managed_auth",
@@ -404,11 +417,12 @@ export async function createConnectionRequest(userId: string, toolkitSlug: strin
     throw new Error("Failed to create a Composio auth config.");
   }
 
-  const request = await composio.connectedAccounts.link(userId, authConfigId);
+  const request = await composio.connectedAccounts.link(composioUserId, authConfigId);
 
   return {
     id: request.id,
     authConfigId,
+    composioUserId,
     redirectUrl: request.redirectUrl,
     session,
   };
@@ -435,7 +449,6 @@ export async function getWrappedTools(userId: string, toolkitSlugs: string[]) {
   const allowedTools = getAllowedChatToolsForToolkits(toolkitSlugs);
 
   if (allowedTools.length === 0) {
-    console.log("[Composio] No allowed tools for toolkits:", toolkitSlugs);
     return [];
   }
 
@@ -443,7 +456,6 @@ export async function getWrappedTools(userId: string, toolkitSlugs: string[]) {
     const tools = await composio.tools.get(userId, {
       tools: allowedTools,
     });
-    console.log("[Composio] Got tools for user:", userId, "Tools count:", allowedTools.length);
     return tools;
   } catch (error) {
     console.error("[Composio] Failed to get tools:", error);
@@ -485,17 +497,12 @@ export async function handleChatToolCalls(
       ),
       options?.gmailRecipientPolicy ?? null,
     );
-    let sessionToUse = session;
     let sessionWasRecreated = false;
 
     // Retry once if we get a serverless cache miss error from Composio.
     try {
       const results = await composio.provider.handleToolCalls(userId, patchedCompletion);
-      
-      if (results && results.length > 0) {
-        console.log("[Composio] Tool call results:", results.length);
-      }
-      
+
       return {
         results: sanitizeGmailToolMessages(results, options?.gmailRecipientPolicy ?? null),
         sessionWasRecreated,
@@ -513,8 +520,7 @@ export async function handleChatToolCalls(
           if (newSession) {
             composioSessionCache.set(userId, newSession);
             sessionWasRecreated = true;
-            console.log("[Composio] Session recreated successfully.");
-            
+
             // Retry handling tool calls with the new session
             const retryResults = await composio.provider.handleToolCalls(userId, patchedCompletion);
             return {
@@ -972,11 +978,11 @@ export async function executeToolCall(
 }
 
 export async function listGoogleCalendars(
-  userId: string,
+  composioUserId: string,
   connectedAccountId?: string | null,
 ) {
   const result = await executeToolCall(
-    userId,
+    composioUserId,
     "GOOGLECALENDAR_LIST_CALENDARS",
     {},
     {
@@ -988,7 +994,7 @@ export async function listGoogleCalendars(
 }
 
 export async function listDriveImportFiles(
-  userId: string,
+  composioUserId: string,
   search = "",
   pageToken?: string,
 ) {
@@ -999,7 +1005,7 @@ export async function listDriveImportFiles(
   }
 
   const result = await composio.tools.execute("GOOGLEDRIVE_FIND_FILE", {
-    userId,
+    userId: composioUserId,
     arguments: {
       q: buildDriveSearchQuery(search),
       corpora: "user",
@@ -1022,7 +1028,7 @@ export async function listDriveImportFiles(
   };
 }
 
-export async function getDriveFileMetadata(userId: string, fileId: string) {
+export async function getDriveFileMetadata(composioUserId: string, fileId: string) {
   const composio = createComposioClient();
 
   if (!composio) {
@@ -1030,7 +1036,7 @@ export async function getDriveFileMetadata(userId: string, fileId: string) {
   }
 
   const result = await composio.tools.execute("GOOGLEDRIVE_GET_FILE_METADATA", {
-    userId,
+    userId: composioUserId,
     arguments: {
       fileId,
     },
@@ -1059,7 +1065,7 @@ export async function getDriveFileMetadata(userId: string, fileId: string) {
   };
 }
 
-export async function downloadDriveFile(userId: string, fileId: string) {
+export async function downloadDriveFile(composioUserId: string, fileId: string) {
   const composio = createComposioClient();
 
   if (!composio) {
@@ -1067,7 +1073,7 @@ export async function downloadDriveFile(userId: string, fileId: string) {
   }
 
   const result = await composio.tools.execute("GOOGLEDRIVE_DOWNLOAD_FILE", {
-    userId,
+    userId: composioUserId,
     arguments: {
       file_id: fileId,
     },

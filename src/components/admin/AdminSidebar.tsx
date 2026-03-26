@@ -1,0 +1,72 @@
+"use client";
+
+import packageJson from "../../../package.json";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ArrowLeft, LayoutGrid, Shield, Users } from "lucide-react";
+
+const navItems = [
+  { href: "/admin", label: "Overview", icon: LayoutGrid },
+  { href: "/admin/customers", label: "Customers", icon: Users },
+];
+
+export function AdminSidebar() {
+  const pathname = usePathname();
+
+  return (
+    <aside className="fixed inset-y-0 left-0 flex w-60 flex-col border-r border-white/5 bg-[#0f0f0f] px-4 py-6">
+      <div className="px-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-neutral-500">
+          Agentergroup Admin
+        </p>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#171717] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-300">
+          <Shield className="h-3.5 w-3.5 text-[#FF5C00]" />
+          Internal
+        </div>
+      </div>
+
+      <nav className="mt-8 space-y-1.5">
+        {navItems.map((item) => {
+          const isActive =
+            item.href === "/admin"
+              ? pathname === "/admin"
+              : pathname?.startsWith(item.href) ||
+                pathname?.startsWith("/admin/workspaces/");
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
+                isActive
+                  ? "bg-[#171717] text-white"
+                  : "text-neutral-400 hover:bg-[#151515] hover:text-white"
+              }`}
+            >
+              {isActive ? (
+                <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-[#FF5C00]" />
+              ) : null}
+              <Icon className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+              <span className="font-medium">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto space-y-3 px-3">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-neutral-500 transition-colors hover:bg-[#151515] hover:text-neutral-200"
+        >
+          <ArrowLeft className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+          <span className="font-medium">Back to App</span>
+        </Link>
+        <div className="border-t border-white/5 pt-3 text-[11px] text-neutral-600">
+          <p>Internal dashboard</p>
+          <p className="mt-1">web v{packageJson.version}</p>
+        </div>
+      </div>
+    </aside>
+  );
+}

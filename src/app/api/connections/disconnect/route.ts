@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { getEffectiveConnectionStatus } from "@/lib/connections";
 import { deleteConnectedAccount } from "@/lib/composio";
 import { createClient } from "@/lib/supabase/server";
+import type { ConnectionStatus } from "@/lib/types";
 
 interface DisconnectConnectionRow {
   id: string;
   workspace_id: string;
   toolkit_slug: string;
-  status: string;
+  status: ConnectionStatus;
   external_id: string | null;
+  toolkit_data: Record<string, unknown> | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -31,7 +34,7 @@ export async function POST(request: NextRequest) {
   const context = await ensureWorkspaceContext(supabase as never, user);
   const { data, error } = await supabase
     .from("connections")
-    .select("id, workspace_id, toolkit_slug, status, external_id")
+    .select("id, workspace_id, toolkit_slug, status, external_id, toolkit_data")
     .eq("id", connectionId)
     .eq("workspace_id", context.workspace.id)
     .maybeSingle();
@@ -46,7 +49,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (connection.status === "connected" && connection.external_id) {
+    if (
+      getEffectiveConnectionStatus(connection) === "connected" &&
+      connection.external_id
+    ) {
       await deleteConnectedAccount(connection.external_id);
     }
   } catch (error) {
@@ -73,4 +79,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ ok: true });
 }
-

@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/ToastProvider';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { buildInitialDefinition } from '@/lib/agents/defaults';
+import { getEffectiveConnectionStatus } from '@/lib/connections';
 import { DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS } from '@/lib/end-chat';
 import { normalizeGmailRecipientEmail } from '@/lib/gmail';
 import type { GoogleCalendarListItem } from '@/lib/google-calendar';
@@ -933,6 +934,42 @@ export default function AgentBuilderPage() {
     event.stopPropagation();
   };
 
+  const updateNode = useCallback(
+    (nodeId: string, updater: (node: BuilderFlowNode) => BuilderFlowNode) => {
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => (node.id === nodeId ? updater(node) : node)),
+      );
+    },
+    [setNodes],
+  );
+
+  const updateGoogleCalendarSettings = useCallback(
+    (
+      nodeId: string,
+      updates: Partial<
+        Pick<
+          GoogleCalendarBuilderNodeData,
+          'timezone' | 'calendarId' | 'calendarLabel' | 'includePrimaryCalendar'
+        >
+      >,
+    ) => {
+      updateNode(nodeId, (node) => {
+        if (node.data.kind !== 'googlecalendar') {
+          return node;
+        }
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            ...updates,
+          },
+        };
+      });
+    },
+    [updateNode],
+  );
+
   const saveToHistory = useCallback(() => {
     setPastStates((prev) => [...prev.slice(-19), { nodes: [...nodes], edges: [...edges] }]);
     setFutureStates([]);
@@ -1052,9 +1089,12 @@ export default function AgentBuilderPage() {
       throw knowledgeSourcesResult.error;
     }
 
-    const chatConnections = ((connectionsResult.data ?? []) as ConnectionRecord[]).filter(
-      (connection) => isChatIntegrationSlug(connection.toolkit_slug),
-    );
+    const chatConnections = ((connectionsResult.data ?? []) as ConnectionRecord[])
+      .map((connection) => ({
+        ...connection,
+        status: getEffectiveConnectionStatus(connection),
+      }))
+      .filter((connection) => isChatIntegrationSlug(connection.toolkit_slug));
     const attachedConnectionIds = ((attachedResult.data ?? []) as Array<{ connection_id: string }>).map(
       (item) => item.connection_id,
     );
@@ -1238,7 +1278,14 @@ export default function AgentBuilderPage() {
     return () => {
       isMounted = false;
     };
-  }, [resolveCalendarOption, selectedGoogleCalendarConnectionId, selectedNode, showToast]);
+  }, [
+    calendarOptionsStatusByConnectionId,
+    resolveCalendarOption,
+    selectedGoogleCalendarConnectionId,
+    selectedNode,
+    showToast,
+    updateGoogleCalendarSettings,
+  ]);
 
   useEffect(() => {
     if (nodes.length === 0) {
@@ -1288,10 +1335,6 @@ export default function AgentBuilderPage() {
     setIsToolPickerOpen(false);
   };
 
-  const updateNode = (nodeId: string, updater: (node: BuilderFlowNode) => BuilderFlowNode) => {
-    setNodes((currentNodes) => currentNodes.map((node) => (node.id === nodeId ? updater(node) : node)));
-  };
-
   const updateKnowledgeSources = (sourceId: string, checked: boolean) => {
     const knowledgeNode = nodes.find((node) => node.data.kind === 'knowledge');
 
@@ -1337,30 +1380,6 @@ export default function AgentBuilderPage() {
         data: {
           ...node.data,
           connectionId,
-        },
-      };
-    });
-  };
-
-  const updateGoogleCalendarSettings = (
-    nodeId: string,
-    updates: Partial<
-      Pick<
-        GoogleCalendarBuilderNodeData,
-        'timezone' | 'calendarId' | 'calendarLabel' | 'includePrimaryCalendar'
-      >
-    >,
-  ) => {
-    updateNode(nodeId, (node) => {
-      if (node.data.kind !== 'googlecalendar') {
-        return node;
-      }
-
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          ...updates,
         },
       };
     });
