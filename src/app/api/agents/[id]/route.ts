@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  INTERNAL_ASSISTANTS_DISABLED_CODE,
+  INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+  isInternalAssistantBlocked,
+} from "@/lib/assistants/feature-flags";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createAuditLog } from "@/lib/runtime/observability";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +29,7 @@ export async function DELETE(
 
   const agentResult = await supabase
     .from("agents")
-    .select("id, name, workspace_id, archived_at")
+    .select("id, name, workspace_id, archived_at, surface")
     .eq("id", agentId)
     .maybeSingle();
 
@@ -44,6 +49,16 @@ export async function DELETE(
 
   if (!targetWorkspace) {
     return NextResponse.json({ error: "Workspace not found." }, { status: 404 });
+  }
+
+  if (isInternalAssistantBlocked(agent, targetWorkspace.workspace)) {
+    return NextResponse.json(
+      {
+        error: INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+        code: INTERNAL_ASSISTANTS_DISABLED_CODE,
+      },
+      { status: 403 },
+    );
   }
 
   if (targetWorkspace.membership.role !== "owner") {

@@ -251,7 +251,7 @@ function parseWidgetBootstrapMessage(
 
   return {
     type: BOOTSTRAP_MESSAGE_TYPE,
-    payload: data.payload as WidgetBootstrapResponse,
+    payload: data.payload as unknown as WidgetBootstrapResponse,
   };
 }
 
@@ -783,6 +783,7 @@ export default function Widget({
       },
     ) => {
       if (!widgetPublicKey || !sessionId) return;
+      if (previewMode) return;
       if (!requestContext.accessToken && !requestContext.previewToken) return;
 
       const dedupeKey = options?.dedupeKey || event;
@@ -815,7 +816,7 @@ export default function Widget({
         { preferBeacon: options?.preferBeacon },
       );
     },
-    [requestContext, sessionId, widgetPublicKey],
+    [previewMode, requestContext, sessionId, widgetPublicKey],
   );
 
   useEffect(() => {

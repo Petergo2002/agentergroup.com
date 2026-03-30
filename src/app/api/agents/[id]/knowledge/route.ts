@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  INTERNAL_ASSISTANTS_DISABLED_CODE,
+  INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+  isInternalAssistantBlocked,
+} from "@/lib/assistants/feature-flags";
+import { canEditAgentRecord } from "@/lib/agents/access";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import type { KnowledgeSourceRecord } from "@/lib/types";
@@ -24,13 +30,23 @@ export async function GET(
   const context = await ensureWorkspaceContext(supabase as never, user);
   const { data: agent, error: agentError } = await supabase
     .from("agents")
-    .select("id")
+    .select("id, surface")
     .eq("id", agentId)
     .eq("workspace_id", context.workspace.id)
     .single();
 
   if (agentError || !agent) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  }
+
+  if (isInternalAssistantBlocked(agent as never, context.workspace)) {
+    return NextResponse.json(
+      {
+        error: INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+        code: INTERNAL_ASSISTANTS_DISABLED_CODE,
+      },
+      { status: 403 },
+    );
   }
 
   const { data, error } = await supabase
@@ -73,13 +89,30 @@ export async function POST(
 
   const { data: agent, error: agentError } = await supabase
     .from("agents")
-    .select("id, workspace_id")
+    .select("id, workspace_id, surface, created_by")
     .eq("id", agentId)
     .eq("workspace_id", context.workspace.id)
     .single();
 
   if (agentError || !agent) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  }
+
+  if (isInternalAssistantBlocked(agent as never, context.workspace)) {
+    return NextResponse.json(
+      {
+        error: INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+        code: INTERNAL_ASSISTANTS_DISABLED_CODE,
+      },
+      { status: 403 },
+    );
+  }
+
+  if (!canEditAgentRecord(agent as never, user.id, context.membership.role)) {
+    return NextResponse.json(
+      { error: "You do not have permission to edit this agent." },
+      { status: 403 },
+    );
   }
 
   if (sourceIds.length > 0) {

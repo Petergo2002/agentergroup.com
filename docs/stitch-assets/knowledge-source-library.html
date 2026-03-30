@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Agentergroup Knowledge Library</title>
+<!-- Google Fonts: Manrope & Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-highest": "#e2e2e2",
+              "tertiary-fixed-dim": "#9ccaff",
+              "secondary-fixed-dim": "#ffb693",
+              "primary-fixed": "#ffdbcc",
+              "on-error": "#ffffff",
+              "surface-tint": "#a04100",
+              "on-secondary": "#ffffff",
+              "error-container": "#ffdad6",
+              "surface-variant": "#e2e2e2",
+              "on-tertiary-fixed": "#001d35",
+              "tertiary-fixed": "#d0e4ff",
+              "tertiary": "#0062a1",
+              "surface-bright": "#f9f9f8",
+              "primary-container": "#ff6b00",
+              "on-secondary-fixed": "#351000",
+              "surface-container-low": "#f3f4f3",
+              "on-primary-container": "#572000",
+              "on-secondary-container": "#763006",
+              "on-primary": "#ffffff",
+              "secondary-fixed": "#ffdbcc",
+              "error": "#ba1a1a",
+              "outline-variant": "#e2bfb0",
+              "inverse-primary": "#ffb693",
+              "on-error-container": "#93000a",
+              "on-primary-fixed-variant": "#7a3000",
+              "surface-container-high": "#e8e8e7",
+              "on-surface-variant": "#5a4136",
+              "surface-container": "#eeeeed",
+              "on-primary-fixed": "#351000",
+              "on-background": "#1a1c1c",
+              "secondary": "#96481e",
+              "background": "#f9f9f8",
+              "on-tertiary-fixed-variant": "#00497b",
+              "outline": "#8e7164",
+              "inverse-on-surface": "#f1f1f0",
+              "primary": "#a04100",
+              "on-surface": "#1a1c1c",
+              "tertiary-container": "#059eff",
+              "on-tertiary": "#ffffff",
+              "surface-container-lowest": "#ffffff",
+              "inverse-surface": "#2f3130",
+              "on-tertiary-container": "#003357",
+              "secondary-container": "#fe9a69",
+              "on-secondary-fixed-variant": "#783207",
+              "surface-dim": "#dadad9",
+              "primary-fixed-dim": "#ffb693",
+              "surface": "#f9f9f8"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "1.5rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f3 25%, #eeeeed 50%, #f3f4f3 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- SideNavBar Shell -->
+<aside class="h-screen w-64 fixed left-0 top-0 border-r-0 bg-[#F3F4F3] dark:bg-zinc-900 flex flex-col h-full py-8 px-4 z-50">
+<div class="mb-10 px-2 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-lg">hub</span>
+</div>
+<div>
+<h1 class="text-xl font-bold text-[#1A1C1C] dark:text-[#F9F9F8] font-headline tracking-tight leading-none">Agentergroup</h1>
+<p class="text-[10px] font-medium text-on-surface-variant uppercase tracking-widest mt-1">AI Workspace</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg font-manrope font-medium text-sm tracking-tight text-[#5A4136] dark:text-zinc-400 hover:bg-white/40 transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg font-manrope font-medium text-sm tracking-tight text-[#5A4136] dark:text-zinc-400 hover:bg-white/40 transition-colors" href="#">
+<span class="material-symbols-outlined">analytics</span>
+                Analytics
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg font-manrope font-medium text-sm tracking-tight text-[#5A4136] dark:text-zinc-400 hover:bg-white/40 transition-colors" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+                Agents
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg font-manrope font-medium text-sm tracking-tight text-[#5A4136] dark:text-zinc-400 hover:bg-white/40 transition-colors" href="#">
+<span class="material-symbols-outlined">widgets</span>
+                Widgets
+            </a>
+<!-- Active Navigation Item -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg font-manrope font-semibold text-sm tracking-tight text-[#A04100] dark:text-[#FF6B00] border-r-2 border-[#FF6B00] bg-white/50 dark:bg-white/5 scale-[0.98] transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_stories</span>
+                Knowledge
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg font-manrope font-medium text-sm tracking-tight text-[#5A4136] dark:text-zinc-400 hover:bg-white/40 transition-colors" href="#">
+<span class="material-symbols-outlined">hub</span>
+                Connections
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg font-manrope font-medium text-sm tracking-tight text-[#5A4136] dark:text-zinc-400 hover:bg-white/40 transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+</nav>
+<div class="mt-auto pt-8 border-t border-surface-container space-y-1">
+<button class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-manrope font-medium text-sm tracking-tight text-[#5A4136] dark:text-zinc-400 hover:bg-white/40 transition-colors">
+<span class="material-symbols-outlined">help</span>
+                Help
+            </button>
+<div class="flex items-center gap-3 px-4 py-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="portrait of a professional creative woman in a clean studio environment with soft neutral lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6iwmW423BagHyTLUvi596AENXoKtTmlMHk0WJ0IFs8aZrthHWwLDCecM5wX1fdJ5H9-x7ZMFIZMm9cCOawjIccqOLxDaDZ0DqGprYAo4nFberUyZLKMyglHwCm80_8diuiv3Q8UgvjYGEDQPXYSUwF7I0aNx4njX5z1idRZeeXMKjvSCdHTx0UBnF58aVioLmlMntmIfuYW6V3DUWgS-9GWqZD6m0b67c0iiviSkB5_wXpRuBbC4vW-Lo8Yv70oVb2LVuSmTGOW1p"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-xs font-semibold text-on-surface truncate">Alex Rivera</p>
+<p class="text-[10px] text-on-surface-variant truncate">Premium Plan</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="ml-64 min-h-screen">
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] z-40 bg-[#F9F9F8]/70 dark:bg-zinc-950/70 backdrop-blur-xl shadow-[0px_12px_32px_rgba(26,28,28,0.04)] h-20 px-12 flex justify-between items-center">
+<div class="flex items-center gap-8">
+<h2 class="font-headline font-bold text-lg text-[#1A1C1C]">Knowledge Library</h2>
+<div class="hidden md:flex gap-6">
+<a class="font-manrope font-semibold text-sm text-[#1A1C1C] border-b-2 border-[#FF6B00] pb-1" href="#">Overview</a>
+<a class="font-manrope font-semibold text-sm text-[#5A4136] hover:text-[#A04100] transition-all" href="#">Team</a>
+<a class="font-manrope font-semibold text-sm text-[#5A4136] hover:text-[#A04100] transition-all" href="#">Usage</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+<input class="bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-sm w-64 focus:ring-1 focus:ring-primary transition-all outline-none" placeholder="Search knowledge..." type="text"/>
+</div>
+<button class="p-2 rounded-full hover:bg-surface-container transition-colors relative">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-primary-container rounded-full border-2 border-surface"></span>
+</button>
+<div class="h-8 w-[1px] bg-surface-container-highest mx-2"></div>
+<button class="bg-primary-container text-white px-5 py-2 rounded-lg font-manrope font-semibold text-sm hover:opacity-90 active:scale-95 transition-all">
+                    Invite
+                </button>
+</div>
+</header>
+<!-- Content Area -->
+<div class="pt-32 pb-20 px-12 max-w-7xl mx-auto">
+<!-- Header Section -->
+<div class="mb-12">
+<h3 class="font-headline text-4xl font-bold tracking-tight text-on-surface mb-2">Manage Knowledge</h3>
+<p class="text-on-surface-variant text-lg">Centralize your business context to power your AI agents with verified information.</p>
+</div>
+<!-- Bento Grid: Add Sources -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+<!-- Text Entry Card -->
+<div class="group bg-surface-container-lowest p-8 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex flex-col items-start border border-outline-variant/10">
+<div class="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary mb-6 group-hover:bg-primary-container group-hover:text-white transition-colors">
+<span class="material-symbols-outlined text-2xl">edit_note</span>
+</div>
+<h4 class="font-headline text-xl font-semibold mb-2">Write Text</h4>
+<p class="text-on-surface-variant text-sm mb-6 leading-relaxed">Paste or write manual documentation and guidelines directly into your library.</p>
+<button class="mt-auto text-primary font-semibold text-sm flex items-center gap-1 group/btn">
+                        Start writing <span class="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+<!-- Upload Card -->
+<div class="group bg-surface-container-lowest p-8 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex flex-col items-start border border-outline-variant/10">
+<div class="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary mb-6 group-hover:bg-primary-container group-hover:text-white transition-colors">
+<span class="material-symbols-outlined text-2xl">upload_file</span>
+</div>
+<h4 class="font-headline text-xl font-semibold mb-2">Upload Files</h4>
+<p class="text-on-surface-variant text-sm mb-6 leading-relaxed">Support for PDF, DOCX, TXT, and Markdown files up to 50MB per document.</p>
+<button class="mt-auto text-primary font-semibold text-sm flex items-center gap-1 group/btn">
+                        Select files <span class="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+<!-- Import Card -->
+<div class="group bg-surface-container-lowest p-8 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex flex-col items-start border border-outline-variant/10">
+<div class="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary mb-6 group-hover:bg-primary-container group-hover:text-white transition-colors">
+<span class="material-symbols-outlined text-2xl">cloud_sync</span>
+</div>
+<h4 class="font-headline text-xl font-semibold mb-2">Cloud Import</h4>
+<p class="text-on-surface-variant text-sm mb-6 leading-relaxed">Sync documents directly from Google Drive, Notion, or SharePoint workspaces.</p>
+<div class="flex gap-3 mt-auto">
+<button class="p-2 rounded-lg bg-surface hover:bg-surface-container transition-colors">
+<img alt="Google Drive" class="w-5 h-5 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsYWxlke2DHsg4ZzDSd18FKToyCJm3ne-yyijcm1r1Kn6p4rRiaxwxpx0SV56c82DwlkYUrU0Ogrm7xMCqVG5Dh9D4_Xi8R7q8eLkRLvh9F2kEgUC6_bCx5YiRZCC_bZjYHiF8LtUW-fIRzVfITXHAr5bS_5XKyUB5gn8Cb9wtpsor2RsVrcEeG9_g7_IKcpXlDeg-sIsS9YvlWR1mzVSo9NMrGW7jvqRzqhF4BQSFS3i4nk90hKR3fTELcMEkw8Z2TsRI014Ajc7t"/>
+</button>
+<button class="p-2 rounded-lg bg-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant text-lg">link</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Table Section -->
+<div class="bg-surface-container-lowest rounded-xl shadow-[0px_12px_32px_rgba(26,28,28,0.04)] overflow-hidden">
+<div class="px-8 py-6 border-b border-surface-container flex items-center justify-between">
+<h4 class="font-headline text-lg font-semibold">Active Sources</h4>
+<div class="flex items-center gap-2">
+<span class="text-xs font-label text-on-surface-variant">Show:</span>
+<select class="text-xs font-label bg-transparent border-none focus:ring-0 cursor-pointer text-on-surface font-semibold">
+<option>All Sources</option>
+<option>Ready Only</option>
+<option>Processing</option>
+</select>
+</div>
+</div>
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/30">
+<th class="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Name</th>
+<th class="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Type</th>
+<th class="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Status</th>
+<th class="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Last Updated</th>
+<th class="px-8 py-4"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container">
+<!-- Row: Ready -->
+<tr class="hover:bg-surface transition-colors">
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant/40">description</span>
+<span class="font-medium text-sm">2024_Product_Strategy.pdf</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-2 py-1 rounded bg-surface-container-high text-[10px] font-bold text-on-surface-variant uppercase">Document</span>
+</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"></span>
+<span class="text-sm font-medium">Ready</span>
+</div>
+</td>
+<td class="px-8 py-5 text-sm text-on-surface-variant">2 hours ago</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-surface-container rounded-lg transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+<!-- Row: Syncing (Skeleton Loader Style) -->
+<tr class="hover:bg-surface transition-colors">
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant/40">language</span>
+<span class="font-medium text-sm">Customer_Support_FAQ_Wiki</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-2 py-1 rounded bg-surface-container-high text-[10px] font-bold text-on-surface-variant uppercase">External URL</span>
+</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-16 h-2 rounded-full skeleton"></div>
+<span class="text-xs font-semibold text-primary animate-pulse">Syncing...</span>
+</div>
+</td>
+<td class="px-8 py-5 text-sm text-on-surface-variant">Just now</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-surface-container rounded-lg transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+<!-- Row: Failed -->
+<tr class="hover:bg-surface transition-colors">
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant/40">table_view</span>
+<span class="font-medium text-sm">Raw_Sales_Data_Q3.csv</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-2 py-1 rounded bg-surface-container-high text-[10px] font-bold text-on-surface-variant uppercase">CSV</span>
+</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="text-sm font-medium text-error">Failed</span>
+</div>
+</td>
+<td class="px-8 py-5 text-sm text-on-surface-variant">Oct 12, 2023</td>
+<td class="px-8 py-5 text-right">
+<button class="text-primary font-semibold text-xs px-3 py-1 hover:bg-primary-fixed rounded-lg transition-colors">Retry</button>
+</td>
+</tr>
+<!-- Row: Ready -->
+<tr class="hover:bg-surface transition-colors">
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant/40">folder</span>
+<span class="font-medium text-sm">Brand_Identity_Guidelines</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-2 py-1 rounded bg-surface-container-high text-[10px] font-bold text-on-surface-variant uppercase">Google Drive</span>
+</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"></span>
+<span class="text-sm font-medium">Ready</span>
+</div>
+</td>
+<td class="px-8 py-5 text-sm text-on-surface-variant">Yesterday</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-surface-container rounded-lg transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="px-8 py-4 bg-surface-container-low/20 flex items-center justify-between">
+<p class="text-[10px] font-medium text-on-surface-variant uppercase">Showing 4 of 28 sources</p>
+<div class="flex gap-2">
+<button class="p-1 rounded hover:bg-surface-container transition-colors disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Contextual Floating Action Button -->
+<button class="fixed bottom-8 right-8 bg-primary text-white p-4 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 group">
+<span class="material-symbols-outlined">add</span>
+<span class="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 font-semibold text-sm whitespace-nowrap">Add New Agent</span>
+</button>
+</body></html>

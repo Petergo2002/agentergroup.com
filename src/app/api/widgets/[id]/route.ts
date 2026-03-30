@@ -44,6 +44,7 @@ export async function GET(
     .from("agents")
     .select("*")
     .eq("workspace_id", context.workspace.id)
+    .eq("surface", "widget")
     .is("archived_at", null)
     .order("updated_at", { ascending: false });
 

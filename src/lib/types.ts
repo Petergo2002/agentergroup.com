@@ -1,4 +1,5 @@
 export type AgentStatus = "draft" | "active" | "paused";
+export type AgentSurface = "assistant" | "widget";
 export type ConnectionStatus =
   | "pending"
   | "connected"
@@ -14,6 +15,7 @@ export type RunStatus =
   | "failed"
   | "waiting_approval";
 export type MessageRole = "system" | "user" | "assistant" | "tool";
+export type ThreadSource = "preview" | "assistant";
 export type RunStepStatus =
   | "pending"
   | "running"
@@ -36,6 +38,7 @@ export interface WorkspaceRecord {
   slug: string;
   description: string | null;
   owner_id: string;
+  internal_assistants_enabled: boolean;
 }
 
 export interface WorkspaceMemberRecord {
@@ -54,6 +57,7 @@ export interface AgentRecord {
   id: string;
   workspace_id: string;
   created_by: string;
+  surface: AgentSurface;
   name: string;
   slug: string;
   description: string;
@@ -477,6 +481,62 @@ export interface DashboardSummaryResponse {
   };
 }
 
+export interface AssistantListItem {
+  id: string;
+  name: string;
+  description: string;
+  model: string;
+  status: AgentStatus;
+  surface: AgentSurface;
+  createdBy: string;
+  updatedAt: string;
+  threadCount: number;
+  lastActivityAt: string | null;
+  canEdit: boolean;
+}
+
+export interface AssistantThreadSummary {
+  id: string;
+  title: string;
+  source: ThreadSource;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+  lastMessageAt: string | null;
+  lastMessageSnippet: string | null;
+}
+
+export interface AssistantDownloadAsset {
+  url: string;
+  filename: string;
+  mimeType: string | null;
+  label: string;
+  embeddedDataBase64?: string | null;
+}
+
+export interface AssistantConversationMessage {
+  id: string;
+  threadId: string;
+  role: MessageRole;
+  content: string;
+  toolName: string | null;
+  toolCallId: string | null;
+  metadata: Record<string, unknown>;
+  createdBy: string | null;
+  createdAt: string;
+  senderName: string | null;
+  downloads: AssistantDownloadAsset[];
+}
+
+export interface AssistantDetailResponse {
+  assistant: AgentRecord;
+  canEdit: boolean;
+  threads: AssistantThreadSummary[];
+  activeThreadId: string | null;
+  messages: AssistantConversationMessage[];
+}
+
 /** A single debug event captured during one agent turn. Stored in message metadata. */
 export interface DebugEvent {
   /** Event type */
@@ -645,8 +705,11 @@ export interface ThreadRecord {
   id: string;
   workspace_id: string;
   agent_id: string;
+  source: ThreadSource;
   title: string;
   created_by: string;
+  active_turn_request_id: string | null;
+  active_turn_started_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -660,6 +723,7 @@ export interface MessageRecord {
   tool_name: string | null;
   tool_call_id: string | null;
   metadata: Record<string, unknown>;
+  created_by: string | null;
   created_at: string;
 }
 

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  INTERNAL_ASSISTANTS_DISABLED_CODE,
+  INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+  isInternalAssistantBlocked,
+} from "@/lib/assistants/feature-flags";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
+import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import {
@@ -23,6 +29,7 @@ interface PreviewThreadRecord {
   workspace_id: string;
   agent_id: string;
   created_by: string;
+  source: "preview";
 }
 
 function mapHistory(messages: MessageRecord[]) {
@@ -64,6 +71,8 @@ export async function POST(
     return NextResponse.json({ error: "Message is required." }, { status: 400 });
   }
 
+  const context = await ensureWorkspaceContext(supabase as never, user);
+
   const { data: agent } = await supabase
     .from("agents")
     .select("*")
@@ -72,6 +81,16 @@ export async function POST(
 
   if (!agent) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  }
+
+  if (isInternalAssistantBlocked(agent, context.workspace)) {
+    return NextResponse.json(
+      {
+        error: INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+        code: INTERNAL_ASSISTANTS_DISABLED_CODE,
+      },
+      { status: 403 },
+    );
   }
 
   const { data: draft } = await supabase
@@ -96,10 +115,11 @@ export async function POST(
   if (threadId) {
     const { data: existingThread, error: threadLookupError } = await supabase
       .from("chat_threads")
-      .select("id, workspace_id, agent_id, created_by")
+      .select("id, workspace_id, agent_id, created_by, source")
       .eq("id", threadId)
       .eq("workspace_id", agent.workspace_id)
       .eq("agent_id", agent.id)
+      .eq("source", "preview")
       .eq("created_by", user.id)
       .maybeSingle();
 
@@ -124,6 +144,7 @@ export async function POST(
       .insert({
         workspace_id: agent.workspace_id,
         agent_id: agent.id,
+        source: "preview",
         created_by: user.id,
         title: input.slice(0, 48),
       })

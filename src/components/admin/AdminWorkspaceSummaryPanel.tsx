@@ -3,6 +3,7 @@ import {
   formatAdminNumber,
 } from "@/lib/admin/format";
 import { AdminTimestamp } from "@/components/admin/AdminTimestamp";
+import { AdminInternalAssistantsToggle } from "@/components/admin/AdminInternalAssistantsToggle";
 
 interface AdminWorkspaceSummaryPanelProps {
   workspace: AdminWorkspaceDetailSummary;
@@ -71,6 +72,11 @@ export function AdminWorkspaceSummaryPanel({
           </div>
         ))}
       </div>
+
+      <AdminInternalAssistantsToggle
+        workspaceId={workspace.id}
+        enabled={workspace.internalAssistantsEnabled}
+      />
     </aside>
   );
 }

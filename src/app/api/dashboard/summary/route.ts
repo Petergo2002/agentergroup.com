@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import type { AgentRecord } from "@/lib/types";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import {
   listDashboardConversations,
-  listWorkspaceAgentsForAnalytics,
 } from "@/lib/dashboard/analytics";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -25,7 +25,7 @@ export async function GET() {
 
     const [
       conversationResult,
-      agents,
+      agentsResult,
       widgetsResult,
       liveWidgetsResult,
       connectedAppsResult,
@@ -42,7 +42,12 @@ export async function GET() {
         cursor: null,
         limit: 4,
       }),
-      listWorkspaceAgentsForAnalytics(admin, context.workspace.id),
+      admin
+        .from("agents")
+        .select("*")
+        .eq("workspace_id", context.workspace.id)
+        .is("archived_at", null)
+        .order("updated_at", { ascending: false }),
       admin
         .from("widgets")
         .select("id", { count: "exact", head: true })
@@ -64,6 +69,7 @@ export async function GET() {
     ]);
 
     const errors = [
+      agentsResult.error,
       widgetsResult.error,
       liveWidgetsResult.error,
       connectedAppsResult.error,
@@ -73,6 +79,11 @@ export async function GET() {
     if (errors.length > 0) {
       throw errors[0];
     }
+
+    const agents = ((agentsResult.data ?? []) as AgentRecord[]).filter(
+      (agent) =>
+        context.workspace.internal_assistants_enabled || agent.surface !== "assistant",
+    );
 
     return NextResponse.json({
       recentConversations: conversationResult.conversations,

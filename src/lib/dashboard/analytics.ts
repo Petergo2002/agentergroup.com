@@ -220,6 +220,7 @@ export async function listWorkspaceAgentsForAnalytics(
     .from("agents")
     .select("id, name")
     .eq("workspace_id", workspaceId)
+    .eq("surface", "widget")
     .is("archived_at", null)
     .order("name", { ascending: true });
 

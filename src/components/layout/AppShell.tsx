@@ -23,7 +23,8 @@ export function AppShell({ children, context, user }: AppShellProps) {
   const pathname = usePathname();
   const isFocusedAgentRoute =
     /^\/agents\/[^/]+\/(builder|preview)$/.test(pathname) ||
-    /^\/widgets\/[^/]+\/preview$/.test(pathname);
+    /^\/widgets\/[^/]+\/preview$/.test(pathname) ||
+    /^\/assistants\/[^/]+$/.test(pathname);
   const isAnalyticsRoute = pathname.startsWith("/analytics");
 
   return (

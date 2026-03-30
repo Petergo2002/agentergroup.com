@@ -70,6 +70,36 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const requestedName =
     typeof body.name === "string" && body.name.trim() ? body.name.trim() : "Untitled Widget";
+  const requestedAgentId =
+    typeof body.agentId === "string" && body.agentId.trim() ? body.agentId.trim() : null;
+  let seededAgent: AgentRecord | null = null;
+
+  if (requestedAgentId) {
+    const { data: agent, error: agentError } = await supabase
+      .from("agents")
+      .select("*")
+      .eq("id", requestedAgentId)
+      .eq("workspace_id", context.workspace.id)
+      .eq("surface", "widget")
+      .maybeSingle();
+
+    if (agentError) {
+      return NextResponse.json(
+        { error: agentError.message || "Failed to load the requested agent." },
+        { status: 500 },
+      );
+    }
+
+    if (!agent) {
+      return NextResponse.json(
+        { error: "Only website widget agents can seed a widget." },
+        { status: 400 },
+      );
+    }
+
+    seededAgent = agent as AgentRecord;
+  }
+
   const widgetDefaults = buildDefaultWidgetInput(context.workspace, {
     name: requestedName,
     slug: buildWidgetSlug(requestedName),
@@ -91,25 +121,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const requestedAgentId =
-    typeof body.agentId === "string" && body.agentId.trim() ? body.agentId.trim() : null;
-
-  if (requestedAgentId) {
-    const { data: agent } = await supabase
-      .from("agents")
-      .select("*")
-      .eq("id", requestedAgentId)
-      .eq("workspace_id", context.workspace.id)
-      .maybeSingle();
-
-    if (agent) {
-      const defaults = buildDefaultWidgetAgentInput(agent as AgentRecord);
-      await supabase.from("widget_agents").insert({
-        widget_id: widget.id,
-        agent_id: requestedAgentId,
-        ...defaults,
-      });
-    }
+  if (seededAgent) {
+    const defaults = buildDefaultWidgetAgentInput(seededAgent);
+    await supabase.from("widget_agents").insert({
+      widget_id: widget.id,
+      agent_id: seededAgent.id,
+      ...defaults,
+    });
   }
 
   return NextResponse.json({

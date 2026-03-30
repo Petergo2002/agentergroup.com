@@ -17,8 +17,11 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useParams, useRouter } from 'next/navigation';
+import { useAppContext } from '@/components/app/AppContext';
+import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/ToastProvider';
+import { canEditAgentRecord } from '@/lib/agents/access';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { buildInitialDefinition } from '@/lib/agents/defaults';
 import { getEffectiveConnectionStatus } from '@/lib/connections';
@@ -204,46 +207,51 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
 
   return (
     <div
-      className={`w-56 rounded-2xl bg-surface-container-lowest shadow-lg transition-all ${
-        selected ? 'ring-8 ring-primary/5 shadow-xl' : 'shadow-lg'
+      className={`group/node min-w-[280px] rounded-3xl border border-outline-variant/10 bg-surface shadow-2xl transition-all ${
+        selected ? 'ring-8 ring-primary/5 border-primary/20' : 'hover:border-outline-variant/30'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className="!h-3 !w-3 !-left-[7px] !border-2 !border-surface-container-lowest !bg-primary"
+        className="!h-3.5 !w-3.5 !-left-[8px] !border-[3px] !border-surface !bg-primary !transition-transform group-hover/node:scale-125"
       />
       <div
-        className={`flex items-center justify-between rounded-t-[1rem] px-3 py-2 ${
+        className={`flex items-center justify-between rounded-t-3xl px-4 py-3 ${
           selected
-            ? 'bg-primary/5'
-            : 'bg-surface-container'
+            ? 'bg-primary/[0.03]'
+            : 'bg-surface-container-low'
         }`}
       >
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/70">
-          {data.type || 'Node'}
+        <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary/70">
+          {data.type || 'Blueprint Node'}
         </span>
-        <span className="material-symbols-outlined text-sm text-on-surface-variant/40">
-          {selected ? 'tune' : 'more_horiz'}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {selected && (
+            <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+          )}
+          <span className="material-symbols-outlined text-sm text-on-surface-variant/30">
+            {selected ? 'tune' : 'drag_indicator'}
+          </span>
+        </div>
       </div>
-      <div className="space-y-3 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
+      <div className="space-y-4 p-5">
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 shadow-inner">
             {(data as { simpleIcon?: string }).simpleIcon ? (
               <SimpleIcon 
                 iconKey={(data as { simpleIcon?: string }).simpleIcon} 
                 color={(data as { simpleIconColor?: string }).simpleIconColor}
-                size={22} 
+                size={24} 
                 className="text-primary"
               />
             ) : (
-              <span className="material-symbols-outlined text-base">{data.icon || 'smart_toy'}</span>
+              <span className="material-symbols-outlined text-xl text-primary">{data.icon || 'smart_toy'}</span>
             )}
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-on-surface">{data.label}</p>
-            <p className="text-[11px] leading-5 text-on-surface-variant">{data.description}</p>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <p className="text-sm font-bold text-on-surface tracking-tight">{data.label}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70 italic">{data.description}</p>
           </div>
         </div>
         {data.badgeText ? (
@@ -273,7 +281,7 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
       <Handle
         type="source"
         position={Position.Right}
-        className="!h-3 !w-3 !-right-[7px] !border-2 !border-surface-container-lowest !bg-primary"
+        className="!h-3.5 !w-3.5 !-right-[8px] !border-[3px] !border-surface !bg-primary !transition-transform group-hover/node:scale-125"
       />
     </div>
   );
@@ -881,6 +889,7 @@ export default function AgentBuilderPage() {
   const [supabase] = useState(() => createClient());
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { membership, user, workspace } = useAppContext();
   const { showToast } = useToast();
   const agentId = params.id;
   const [nodes, setNodes, onNodesChange] = useNodesState<BuilderFlowNode>([]);
@@ -1014,6 +1023,10 @@ export default function AgentBuilderPage() {
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null;
   const displayNodes = nodes.map((node) => enrichNodeForDisplay(node, connections));
+  const canEditCurrentAgent = agent
+    ? canEditAgentRecord(agent, user.id, membership.role)
+    : true;
+  const surfaceLabel = agent?.surface === 'assistant' ? 'Internal Assistant' : 'Website Widget';
 
   const syncSelectedConnections = async (nextNodes: BuilderFlowNode[]) => {
     const selectedConnectionIds = getSelectedConnectionIdsFromNodes(nextNodes);
@@ -1172,6 +1185,27 @@ export default function AgentBuilderPage() {
       isMounted = false;
     };
   }, [loadBuilder, showToast]);
+
+  useEffect(() => {
+    if (!agent || agent.surface !== 'assistant' || hasInternalAssistantsEnabled(workspace)) {
+      return;
+    }
+
+    showToast('Internal assistants are disabled for this workspace.', 'error');
+    router.replace('/dashboard');
+  }, [agent, router, showToast, workspace]);
+
+  useEffect(() => {
+    if (!agent || agent.surface !== 'assistant' || canEditCurrentAgent) {
+      return;
+    }
+
+    showToast(
+      'This internal assistant is managed by another workspace editor. Open it from Assistants instead.',
+      'info',
+    );
+    router.replace(`/assistants/${agent.id}`);
+  }, [agent, canEditCurrentAgent, router, showToast]);
 
   useEffect(() => {
     if (nodes.length === 0) {
@@ -1444,6 +1478,9 @@ export default function AgentBuilderPage() {
             model,
             starter_prompts: definition.config.starterPrompts,
             timezone,
+            ...(agent.surface === 'assistant' && agent.status === 'draft'
+              ? { status: 'active' }
+              : {}),
           })
           .eq('id', agentId),
         supabase.from('agent_drafts').upsert(
@@ -1470,6 +1507,23 @@ export default function AgentBuilderPage() {
 
       await syncSelectedConnections(nodes);
       await syncSelectedKnowledgeSources(nodes);
+      setAgent((current) =>
+        current
+          ? {
+              ...current,
+              name,
+              description,
+              instructions,
+              model,
+              starter_prompts: definition.config.starterPrompts,
+              timezone,
+              status:
+                current.surface === 'assistant' && current.status === 'draft'
+                  ? 'active'
+                  : current.status,
+            }
+          : current,
+      );
       setStatusNote(`Last saved ${new Date().toLocaleString()}`);
       showToast('Draft saved.', 'success');
     } catch (error) {
@@ -1483,7 +1537,7 @@ export default function AgentBuilderPage() {
   };
 
   const publishVersion = async () => {
-    if (!agent) {
+    if (!agent || agent.surface === 'assistant') {
       return;
     }
 
@@ -1629,109 +1683,106 @@ export default function AgentBuilderPage() {
 
     if (selectedNode.data.kind === 'agent') {
       return (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              Name
+            <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+              Identity
             </label>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               onKeyDown={stopBuilderFieldKeyDown}
-              className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
+              placeholder="Agent name..."
+              className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
             />
           </div>
-          <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              onKeyDown={stopBuilderFieldKeyDown}
-              rows={3}
-              className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              Model
-            </label>
-            <select
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              onKeyDown={stopBuilderFieldKeyDown}
-              className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-            >
-              {MODEL_OPTIONS.map((modelOption) => (
-                <option key={modelOption} value={modelOption}>
-                  {modelOption}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              Instructions
-            </label>
-            <textarea
-              value={instructions}
-              onChange={(event) => setInstructions(event.target.value)}
-              onKeyDown={stopBuilderFieldKeyDown}
-              rows={10}
-              className="min-h-[260px] w-full resize-y rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-sm leading-6 outline-none"
-            />
-            <p className="mt-2 text-xs text-on-surface-variant">
-              Keep this focused on live chat behavior, knowledge use, and tool use.
-            </p>
-          </div>
-          <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              Timezone
-            </label>
-            <select
-              value={timezone}
-              onChange={(event) => setTimezone(event.target.value)}
-              onKeyDown={stopBuilderFieldKeyDown}
-              className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-            >
-              {TIMEZONE_OPTIONS.map((tz) => (
-                <option key={tz.value} value={tz.value}>
-                  {tz.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-2 text-xs text-on-surface-variant">
-              Used for calendar and time-based operations.
-            </p>
-          </div>
-          <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              Starter Prompts
-            </label>
-            <div className="space-y-3">
-              {starterPromptFields.map((prompt, index) => (
-                <input
-                  key={`starter-prompt-${index}`}
-                  value={prompt}
-                  onChange={(event) =>
-                    setStarterPromptFields((current) =>
-                      current.map((item, itemIndex) =>
-                        itemIndex === index ? event.target.value : item,
-                      ),
-                    )
-                  }
-                  onKeyDown={stopBuilderFieldKeyDown}
-                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-                  placeholder={`Prompt ${index + 1}`}
-                />
-              ))}
+            <div>
+              <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+                Contextual Note
+              </label>
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                onKeyDown={stopBuilderFieldKeyDown}
+                rows={3}
+                placeholder="Internal description..."
+                className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
+              />
             </div>
-            <p className="mt-2 text-xs text-on-surface-variant">
-              Fill one to three prompts. Empty fields stay hidden in the widget.
-            </p>
+            <div>
+              <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+                Cognitive Model
+              </label>
+              <select
+                value={model}
+                onChange={(event) => setModel(event.target.value)}
+                onKeyDown={stopBuilderFieldKeyDown}
+                className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high appearance-none cursor-pointer"
+              >
+                {MODEL_OPTIONS.map((modelOption) => (
+                  <option key={modelOption} value={modelOption}>
+                    {modelOption}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+                Operational Instructions
+              </label>
+              <textarea
+                value={instructions}
+                onChange={(event) => setInstructions(event.target.value)}
+                onKeyDown={stopBuilderFieldKeyDown}
+                rows={10}
+                placeholder="System orientation..."
+                className="min-h-[300px] w-full resize-y rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-4 text-sm font-medium leading-relaxed outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
+              />
+              <p className="mt-3 text-[11px] leading-relaxed text-on-surface-variant/60 italic">
+                Focus on live chat behavior, library retrieval, and tool permissions.
+              </p>
+            </div>
+            <div>
+              <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+                Temporal Orientation
+              </label>
+              <select
+                value={timezone}
+                onChange={(event) => setTimezone(event.target.value)}
+                onKeyDown={stopBuilderFieldKeyDown}
+                className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high appearance-none cursor-pointer"
+              >
+                {TIMEZONE_OPTIONS.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-3 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+                Conversation Starters
+              </label>
+              <div className="space-y-2">
+                {starterPromptFields.map((prompt, index) => (
+                  <input
+                    key={`starter-prompt-${index}`}
+                    value={prompt}
+                    onChange={(event) =>
+                      setStarterPromptFields((current) =>
+                        current.map((item, itemIndex) =>
+                          itemIndex === index ? event.target.value : item,
+                        ),
+                      )
+                    }
+                    onKeyDown={stopBuilderFieldKeyDown}
+                    className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
+                    placeholder={`Starter Chip ${index + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
       );
     }
 
@@ -1739,72 +1790,84 @@ export default function AgentBuilderPage() {
       const attachedSourceIds = knowledgeNode.data.sourceIds;
 
       return (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm leading-6 text-on-surface-variant">
-              Choose the sources this agent can retrieve from.
-            </p>
-            <span className="rounded-full bg-background px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              {attachedSourceIds.length} attached
-            </span>
-          </div>
-          <Link
-            href="/knowledge"
-            className="inline-flex rounded-full border border-outline-variant/15 px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-          >
-            Manage Sources
-          </Link>
-          <div className="space-y-3">
-            {knowledgeSources.length === 0 ? (
-              <p className="rounded-2xl bg-background px-4 py-4 text-sm text-on-surface-variant">
-                No knowledge sources yet.
+          <div className="space-y-6">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm leading-relaxed text-on-surface-variant/80">
+                Choose the semantic sources this builder can retrieve from.
               </p>
-            ) : (
-              knowledgeSources.map((source) => {
-                const checked = attachedSourceIds.includes(source.id);
-                const isReady = isReadyKnowledgeSource(source);
+              <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                <div className="h-1 w-1 rounded-full bg-primary" />
+                {attachedSourceIds.length} source{attachedSourceIds.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+            <div className="space-y-3">
+              {knowledgeSources.length === 0 ? (
+                <div className="flex items-center gap-3 rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-5 text-sm text-on-surface-variant/60 italic">
+                  <span className="material-symbols-outlined text-base">info</span>
+                  No library sources indexed yet.
+                </div>
+              ) : (
+                knowledgeSources.map((source) => {
+                  const checked = attachedSourceIds.includes(source.id);
+                  const isReady = isReadyKnowledgeSource(source);
 
-                return (
-                  <label
-                    key={source.id}
-                    className={`flex items-start gap-3 rounded-2xl border px-4 py-4 ${
-                      isReady
-                        ? 'border-outline-variant/10 bg-background'
-                        : 'border-outline-variant/10 bg-surface-container-high'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={!isReady}
-                      onChange={(event) => updateKnowledgeSources(source.id, event.target.checked)}
-                      className="mt-1"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-on-surface">{source.name}</p>
-                        <span
-                          className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${getKnowledgeStatusTone(source.status)}`}
-                        >
-                          {source.status}
-                        </span>
+                  return (
+                    <label
+                      key={source.id}
+                      className={`group flex items-start gap-4 rounded-2xl border px-5 py-5 transition-all cursor-pointer ${
+                        isReady
+                          ? checked 
+                            ? 'border-primary/30 bg-primary/[0.03]' 
+                            : 'border-outline-variant/10 bg-surface-container-low hover:border-outline-variant/30'
+                          : 'border-outline-variant/10 bg-surface-container-high/50 grayscale'
+                      }`}
+                    >
+                      <div className="relative mt-1 flex h-5 w-5 shrink-0 items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!isReady}
+                          onChange={(event) => updateKnowledgeSources(source.id, event.target.checked)}
+                          className="peer absolute h-full w-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                        />
+                        <div className="h-5 w-5 rounded-md border-2 border-outline-variant/30 transition-all peer-checked:border-primary peer-checked:bg-primary" />
+                        <span className="material-symbols-outlined absolute scale-0 text-white text-sm transition-transform peer-checked:scale-100">check</span>
                       </div>
-                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/70">
-                        {source.chunk_count} chunks
-                      </p>
-                    </div>
-                  </label>
-                );
-              })
-            )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold text-on-surface tracking-tight">{source.name}</p>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${getKnowledgeStatusTone(source.status)}`}
+                          >
+                            {source.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/40">
+                          {source.chunk_count} cognitive chunks
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+            
+            <div className="flex items-center gap-3 pt-4">
+              <Link
+                href="/knowledge"
+                className="flex-1 rounded-full border border-outline-variant/15 px-4 py-2.5 text-center text-xs font-bold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-[0.98]"
+              >
+                Sync Operations
+              </Link>
+              <button
+                onClick={() => removeOptionalNode('knowledge')}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-all hover:bg-red-500/10 hover:text-red-500 active:scale-[0.98]"
+                title="Remove Node"
+              >
+                <span className="material-symbols-outlined text-lg focus:outline-none">delete</span>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => removeOptionalNode('knowledge')}
-            className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-          >
-            Remove Node
-          </button>
-        </div>
       );
     }
 
@@ -2135,85 +2198,105 @@ export default function AgentBuilderPage() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <header className="shrink-0 flex items-center justify-between border-b border-outline-variant/10 bg-surface-container-lowest/50 px-6 py-3 backdrop-blur-md">
-        <div className="flex items-center gap-4">
+      <header className="shrink-0 flex h-20 items-center justify-between border-b border-outline-variant/10 bg-surface/70 px-8 backdrop-blur-xl">
+        <div className="flex items-center gap-8">
           <Link
             href="/dashboard"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-outline-variant/15 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-outline-variant/15 bg-surface-container-low text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-95"
           >
-            <span className="material-symbols-outlined text-lg">chevron_left</span>
+            <span className="material-symbols-outlined text-xl">arrow_back</span>
           </Link>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">
-                Dashboard
+          
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/60">
+                Blueprint
               </span>
-              <span className="text-on-surface-variant/30">/</span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-                Builder
-              </span>
-              <span className="text-on-surface-variant/30">/</span>
-              <h1 className="font-headline text-lg font-bold text-on-surface">
-                {name || agent?.name || 'Agent Builder'}
+              <span className="text-on-surface-variant/20 text-[10px]">/</span>
+              <h1 className="font-headline text-xl font-bold tracking-tight text-on-surface">
+                {name || agent?.name || 'Agent' }
               </h1>
+              {agent ? (
+                <div className="ml-3 flex items-center gap-1.5 rounded-full bg-primary/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                  <div className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
+                  {surfaceLabel}
+                </div>
+              ) : null}
             </div>
+
+            <div className="h-4 w-[1px] bg-outline-variant/20" />
+
             <AgentViewTabs agentId={agentId} current="builder" />
           </div>
         </div>
 
+        <div className="hidden items-center gap-6 lg:flex">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">Nodes</span>
+              <span className="text-sm font-headline font-bold text-on-surface">{nodes.length}</span>
+            </div>
+            <div className="h-4 w-[1px] bg-outline-variant/20" />
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">Connections</span>
+              <span className="text-sm font-headline font-bold text-on-surface">{edges.length}</span>
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center gap-6">
-          <p className="text-[10px] font-medium tracking-wide text-on-surface-variant/60">
-            {statusNote}
-          </p>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-full border border-outline-variant/15">
+          <div className="hidden flex-col items-end xl:flex">
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 line-clamp-1">Last Update</span>
+            <p className="text-[10px] font-medium tracking-wide text-on-surface-variant whitespace-nowrap">
+              {statusNote || 'Draft'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center rounded-xl bg-surface-container-low p-1 border border-outline-variant/10">
               <button
                 onClick={undo}
                 disabled={!canUndo}
-                className="rounded-l-full px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-30"
-                title="Undo (Ctrl+Z)"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface disabled:opacity-20 active:scale-95"
+                title="Undo"
               >
                 <span className="material-symbols-outlined text-base">undo</span>
               </button>
-              <div className="h-4 w-px bg-outline-variant/15" />
               <button
                 onClick={redo}
                 disabled={!canRedo}
-                className="rounded-r-full px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-30"
-                title="Redo (Ctrl+Shift+Z)"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface disabled:opacity-20 active:scale-95"
+                title="Redo"
               >
                 <span className="material-symbols-outlined text-base">redo</span>
               </button>
             </div>
-            <button
-              onClick={() => setIsHistoryOpen(true)}
-              className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-            >
-              History
-            </button>
+            
             <button
               onClick={() => void saveDraft()}
-              disabled={isSaving}
-              className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:opacity-60"
+              disabled={isSaving || !canEditCurrentAgent}
+              className="px-5 py-2.5 text-xs font-bold text-on-surface-variant transition-all hover:text-on-surface disabled:opacity-40"
             >
               {isSaving ? 'Saving...' : 'Save Draft'}
             </button>
-            <button
-              onClick={() => void publishVersion()}
-              disabled={isPublishing}
-              className="signature-gradient rounded-full px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-primary/20 transition-transform active:scale-95 disabled:opacity-60"
-            >
-              {isPublishing ? 'Publishing...' : 'Publish'}
-            </button>
+
+            {agent?.surface === 'widget' ? (
+              <button
+                onClick={() => void publishVersion()}
+                disabled={isPublishing}
+                className="signature-gradient h-10 rounded-full px-6 text-xs font-bold text-white shadow-xl shadow-primary/20 transition-all hover:shadow-2xl hover:shadow-primary/30 active:scale-95 disabled:opacity-60"
+              >
+                {isPublishing ? 'Publishing...' : 'Deploy Blueprint'}
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
 
       <div className="relative grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <div className="group absolute bottom-0 left-0 top-0 z-20 w-80 -translate-x-[calc(100%-1.25rem)] transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] hover:translate-x-0">
-          <aside className="relative flex h-full flex-col border-r border-outline-variant/10 bg-surface-container-lowest/90 p-6 shadow-2xl backdrop-blur-2xl">
+        <div className="group absolute bottom-0 left-0 top-0 z-20 w-80 -translate-x-[calc(100%-1.25rem)] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] hover:translate-x-0">
+          <aside className="relative flex h-full flex-col border-r border-outline-variant/10 bg-surface/80 p-8 shadow-[0_0_50px_rgba(0,0,0,0.1)] backdrop-blur-2xl">
             <div className="absolute bottom-0 right-0 top-0 flex w-5 items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
-              <div className="h-12 w-1 rounded-full bg-primary/20 transition-all group-hover:bg-primary/40" />
+              <div className="h-12 w-[2px] rounded-full bg-primary/30 transition-all group-hover:bg-primary/50" />
             </div>
 
             <div className="flex-1 overflow-y-auto opacity-0 transition-opacity duration-300 delay-100 group-hover:opacity-100">
@@ -2247,10 +2330,10 @@ export default function AgentBuilderPage() {
                           : undefined
                       }
                       disabled={isDisabled}
-                      className={`flex w-full items-start gap-3 rounded-2xl border border-outline-variant/10 bg-surface-container p-4 text-left transition-colors ${
+                      className={`group/item flex w-full items-start gap-4 rounded-2xl border border-outline-variant/10 bg-surface-container-low p-5 text-left transition-all ${
                         isFixed
-                          ? 'border-dashed border-outline-variant/30 bg-surface-container-low cursor-default'
-                          : 'hover:border-primary/30 hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50'
+                          ? 'border-dashed border-outline-variant/20 bg-surface-container-lowest/50 cursor-default opacity-80'
+                          : 'hover:border-primary/40 hover:bg-surface-container-high hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]'
                       }`}
                     >
                       <span className={`material-symbols-outlined ${isFixed ? 'text-on-surface-variant/40' : 'text-primary'}`}>
@@ -2301,21 +2384,21 @@ export default function AgentBuilderPage() {
           </ReactFlow>
         </section>
 
-        <aside className="overflow-y-auto bg-surface-container-lowest p-5">
+        <aside className="border-l border-outline-variant/10 overflow-y-auto bg-surface/70 p-8 backdrop-blur-xl">
           {selectedNode ? (
-            <div className="p-5">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <span className="material-symbols-outlined text-lg">{selectedNode.data.icon}</span>
+            <div className="space-y-8">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
+                  <span className="material-symbols-outlined text-xl">{selectedNode.data.icon}</span>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
                     {selectedNode.data.type}
                   </p>
-                  <h2 className="mt-2 text-xl font-semibold text-on-surface">
+                  <h2 className="mt-1.5 font-headline text-2xl font-bold tracking-tight text-on-surface">
                     {selectedNode.data.label}
                   </h2>
-                  <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+                  <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/80">
                     {selectedNode.data.description}
                   </p>
                 </div>

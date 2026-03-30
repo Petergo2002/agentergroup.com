@@ -5,6 +5,18 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
+export async function isAdminUser(userId: string) {
+  const adminClient = createAdminClient();
+  const { data: profile, error } = await adminClient
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .eq("is_admin", true)
+    .maybeSingle();
+
+  return !error && Boolean(profile);
+}
+
 /**
  * Ensures the current request is authenticated as an internal admin.
  *
@@ -22,22 +34,11 @@ export async function requireAdminUser(): Promise<User> {
     redirect("/dashboard");
   }
 
-  let adminClient;
-
   try {
-    adminClient = createAdminClient();
+    if (!(await isAdminUser(user.id))) {
+      redirect("/dashboard");
+    }
   } catch {
-    redirect("/dashboard");
-  }
-
-  const { data: profile, error: profileError } = await adminClient
-    .from("profiles")
-    .select("id")
-    .eq("id", user.id)
-    .eq("is_admin", true)
-    .maybeSingle();
-
-  if (profileError || !profile) {
     redirect("/dashboard");
   }
 

@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
+import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { useToast } from '@/components/ui/ToastProvider';
 import { getEffectiveConnectionStatus } from '@/lib/connections';
@@ -45,19 +47,20 @@ function getKnowledgeMatches(message: MessageRecord) {
 export default function AgentPreviewPage() {
   const [supabase] = useState(() => createClient());
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const { workspace, user } = useAppContext();
   const { showToast } = useToast();
   const agentId = params.id;
   const [agent, setAgent] = useState<AgentRecord | null>(null);
-  const [connections, setConnections] = useState<ConnectionRecord[]>([]);
+  const [, setConnections] = useState<ConnectionRecord[]>([]);
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceRecord[]>([]);
-  const [threads, setThreads] = useState<ThreadRecord[]>([]);
+  const [, setThreads] = useState<ThreadRecord[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageRecord[]>([]);
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [runSteps, setRunSteps] = useState<RunStepRecord[]>([]);
-  const [runApprovals, setRunApprovals] = useState<RunApprovalRecord[]>([]);
+  const [, setRunApprovals] = useState<RunApprovalRecord[]>([]);
   const [draftMessage, setDraftMessage] = useState('');
   const [completedThreadIds, setCompletedThreadIds] = useState<string[]>([]);
   const [endChatPolicy, setEndChatPolicy] = useState<EndChatPolicy>({
@@ -72,6 +75,15 @@ export default function AgentPreviewPage() {
     ? completedThreadIds.includes(activeThreadId)
     : false;
   const [previewInactivityTimerId, setPreviewInactivityTimerId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!agent || agent.surface !== 'assistant' || hasInternalAssistantsEnabled(workspace)) {
+      return;
+    }
+
+    showToast('Internal assistants are disabled for this workspace.', 'error');
+    router.replace('/dashboard');
+  }, [agent, router, showToast, workspace]);
 
   const clearPreviewInactivityTimer = useCallback(() => {
     if (previewInactivityTimerId !== null) {
@@ -100,6 +112,7 @@ export default function AgentPreviewPage() {
       .insert({
         workspace_id: workspace.id,
         agent_id: agentId,
+        source: 'preview',
         created_by: user.id,
         title: title ?? 'New chat',
       })
@@ -162,6 +175,8 @@ export default function AgentPreviewPage() {
             .from('chat_threads')
             .select('*')
             .eq('agent_id', agentId)
+            .eq('source', 'preview')
+            .eq('created_by', user.id)
             .order('updated_at', { ascending: false }),
           supabase
             .from('runs')
@@ -251,7 +266,7 @@ export default function AgentPreviewPage() {
     return () => {
       isMounted = false;
     };
-  }, [agentId, createThread, loadMessages, loadRunDetails, showToast, supabase]);
+  }, [agentId, createThread, loadMessages, loadRunDetails, showToast, supabase, user.id]);
 
   useEffect(() => {
     return () => {
@@ -282,6 +297,7 @@ export default function AgentPreviewPage() {
       tool_name: null,
       tool_call_id: null,
       metadata: {},
+      created_by: user.id,
       created_at: new Date().toISOString(),
     };
 
@@ -352,317 +368,300 @@ export default function AgentPreviewPage() {
     }
   };
 
-  return (
-    <div className="flex h-[100dvh] min-h-0 flex-col gap-6 overflow-hidden bg-background px-4 py-4 sm:px-6 lg:px-8 lg:py-6 xl:flex-row">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-outline-variant/10 bg-surface-container-low">
-        <div className="flex shrink-0 items-center justify-between border-b border-outline-variant/10 bg-surface-container-lowest px-6 py-5">
-          <div>
-            <h1 className="font-headline text-2xl font-bold text-on-surface">
-              {agent?.name ?? 'Agent Preview'}
-            </h1>
-            <p className="mt-1 text-xs uppercase tracking-[0.2em] text-on-surface-variant/60">
-              Live Phase 2 Runtime
-            </p>
-            <div className="mt-4">
-              <AgentViewTabs agentId={agentId} current="preview" />
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => void createThread(agent?.name)}
-              className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low"
-            >
-              New Session
-            </button>
-          </div>
-        </div>
+  const surfaceLabel = agent?.surface === 'widget' ? 'Website Widget' : 'Conversation Hub';
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          {isLoading ? (
-            Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-20 animate-pulse rounded-2xl bg-surface-container-high" />
-            ))
-          ) : (
-            <>
-              {visibleMessages.length === 0 ? (
-                <div className="rounded-[2rem] border border-dashed border-outline-variant/20 bg-surface-container-lowest p-8 text-center">
-                  <p className="font-headline text-xl font-bold text-on-surface">
-                    Start the first conversation
-                  </p>
-                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-on-surface-variant">
-                    Send a message to test the live runtime and see how the assistant responds.
-                  </p>
+  return (
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <header className="shrink-0 flex h-20 items-center justify-between border-b border-outline-variant/10 bg-surface/70 px-8 backdrop-blur-xl">
+        <div className="flex items-center gap-8">
+          <Link
+            href="/dashboard"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-outline-variant/15 bg-surface-container-low text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-95"
+          >
+            <span className="material-symbols-outlined text-xl">arrow_back</span>
+          </Link>
+          
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/60">
+                Blueprint
+              </span>
+              <span className="text-on-surface-variant/20 text-[10px]">/</span>
+              <h1 className="font-headline text-xl font-bold tracking-tight text-on-surface">
+                {agent?.name || 'Agent'}
+              </h1>
+              {agent ? (
+                <div className="ml-3 flex items-center gap-1.5 rounded-full bg-primary/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                  <div className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
+                  {surfaceLabel}
                 </div>
               ) : null}
+            </div>
 
-              {visibleMessages.map((message) => (
-                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className="max-w-[85%] space-y-3">
-                    <div
-                      className={`rounded-[1.5rem] px-4 py-3 text-sm leading-7 ${
-                        message.role === 'user'
-                          ? 'bg-primary text-white'
-                          : 'bg-surface-container-lowest text-on-surface'
+            <div className="h-4 w-[1px] bg-outline-variant/20" />
+
+            <AgentViewTabs agentId={agentId} current="preview" />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <div className="hidden flex-col items-end xl:flex">
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 line-clamp-1">Runtime Status</span>
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(var(--success-rgb),0.5)]" />
+              <p className="text-[10px] font-medium tracking-wide text-on-surface-variant whitespace-nowrap">
+                Connected & Ready
+              </p>
+            </div>
+          </div>
+
+          <div className="h-4 w-[1px] bg-outline-variant/20" />
+
+          <button
+            onClick={() => void createThread(agent?.name)}
+            className="h-10 px-6 rounded-2xl border border-outline-variant/15 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:bg-surface-container transition-all active:scale-95"
+          >
+            New Session
+          </button>
+        </div>
+      </header>
+
+      <main className="flex flex-1 min-h-0 divide-x divide-outline-variant/10">
+        {/* Chat Section */}
+        <div className="flex flex-1 flex-col min-w-0 bg-surface-container-low/30">
+          <div className="flex-1 overflow-y-auto px-12 py-10 space-y-8 scroll-smooth hide-scrollbar">
+            {isLoading ? (
+              <div className="space-y-6">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+                    <div className="h-24 w-1/2 animate-pulse rounded-[2rem] bg-surface-container" />
+                  </div>
+                ))}
+              </div>
+            ) : visibleMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center space-y-4 max-w-lg mx-auto">
+                <div className="h-16 w-16 rounded-[2rem] bg-primary/5 flex items-center justify-center mb-4">
+                  <span className="material-symbols-outlined text-3xl text-primary">chat_bubble</span>
+                </div>
+                <h2 className="font-headline text-2xl font-bold text-on-surface tracking-tight">
+                  Start the conversation
+                </h2>
+                <p className="text-on-surface-variant/60 leading-relaxed text-sm">
+                  Send a message to test the live runtime and see how {agent?.name || 'the assistant'} responds to your blueprint.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-8 pb-4">
+                {visibleMessages.map((message) => (
+                  <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] space-y-3 ${message.role === 'user' ? 'items-end flex flex-col' : ''}`}>
+                      <div
+                        className={`rounded-[2rem] px-6 py-4 text-sm leading-7 shadow-sm transition-all hover:shadow-md ${
+                          message.role === 'user'
+                            ? 'bg-on-surface text-background font-medium'
+                            : 'bg-surface-container-lowest border border-outline-variant/10 text-on-surface'
+                        }`}
+                      >
+                        {message.content}
+                      </div>
+                      
+                      {message.role === 'assistant' && getKnowledgeMatches(message).length > 0 && (
+                        <div className="flex flex-wrap gap-2 px-2">
+                          {getKnowledgeMatches(message).map((match) => (
+                            <div
+                              key={`${message.id}-${match.chunk_id}`}
+                              className="flex items-center gap-1.5 rounded-full border border-outline-variant/10 bg-surface-container-lowest px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                            >
+                              <div className="h-1 w-1 rounded-full bg-primary" />
+                              {match.source_name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Input Area */}
+          <div className="shrink-0 border-t border-outline-variant/10 bg-surface/50 p-8 backdrop-blur-xl">
+            <div className="max-w-4xl mx-auto space-y-4">
+              {/* Starter Prompts */}
+              <div className="flex flex-wrap gap-2 justify-center">
+                {(agent?.starter_prompts ?? []).map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => {
+                      setDraftMessage(prompt);
+                      void handleSendMessage(prompt);
+                    }}
+                    disabled={isSubmitting || isActiveThreadCompleted}
+                    className="h-8 px-4 rounded-full border border-outline-variant/15 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant bg-surface-container-lowest hover:bg-surface-container-low hover:text-on-surface transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+
+              {isActiveThreadCompleted && (
+                <div className="text-center py-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">
+                    Session ended. Start a new one to continue.
+                  </span>
+                </div>
+              )}
+
+              <div className="relative group focus-within:scale-[1.01] transition-all duration-300">
+                <input
+                  value={draftMessage}
+                  onChange={(e) => setDraftMessage(e.target.value)}
+                  disabled={isActiveThreadCompleted || isSubmitting}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleSendMessage(draftMessage);
+                    }
+                  }}
+                  className="w-full h-14 pl-6 pr-32 rounded-2xl bg-surface-container-lowest border border-outline-variant/10 shadow-sm outline-none focus:border-primary/30 focus:shadow-lg focus:shadow-primary/5 text-sm placeholder:text-on-surface-variant/40 transition-all disabled:opacity-50"
+                  placeholder={isActiveThreadCompleted ? 'Session completed' : 'Type a message to test the runtime...'}
+                />
+                <div className="absolute right-2 top-2 bottom-2 p-1 flex items-center gap-2">
+                  <button
+                    onClick={() => void handleSendMessage(draftMessage)}
+                    disabled={isSubmitting || isActiveThreadCompleted || !draftMessage.trim()}
+                    className="h-full px-6 rounded-xl bg-on-surface text-background text-[11px] font-bold uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {isSubmitting ? 'Running...' : 'Send'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Activity Sidebar */}
+        <aside className="w-88 shrink-0 overflow-y-auto bg-surface-container-lowest/50 p-6 space-y-6 hide-scrollbar">
+          {/* Agent Summary Card */}
+          <section className="p-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/60">Registry</span>
+              <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
+            </div>
+            <h2 className="font-headline text-xl font-bold text-on-surface tracking-tight leading-tight">
+              {agent?.name || 'Loading...'}
+            </h2>
+            <p className="mt-3 text-xs leading-relaxed text-on-surface-variant/70 min-h-[3em]">
+              {agent?.description || 'Evaluating system blueprint and runtime parameters...'}
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <div className="px-3 py-1.5 rounded-full border border-outline-variant/10 bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                {agent?.model?.split('/').pop() || 'GPT-4o'}
+              </div>
+              <div className="px-3 py-1.5 rounded-full border border-outline-variant/10 bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Preview Mode
+              </div>
+            </div>
+          </section>
+
+          {/* Activity Cards */}
+          <div className="space-y-4">
+            {/* Knowledge Sources */}
+            <div className="p-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
+              <div className="flex items-center justify-between mb-5">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">Knowledge</span>
+                <span className="text-[10px] font-bold text-primary">{knowledgeSources.length} Active</span>
+              </div>
+              <div className="space-y-2">
+                {knowledgeSources.length === 0 ? (
+                  <p className="text-[11px] text-on-surface-variant/40 text-center py-4 border border-dashed border-outline-variant/20 rounded-2xl">
+                    No sources attached
+                  </p>
+                ) : (
+                  knowledgeSources.map((source) => (
+                    <div key={source.id} className="flex items-center justify-between p-3 rounded-2xl bg-surface-container-low/50 border border-outline-variant/5">
+                      <span className="text-xs font-semibold text-on-surface truncate pr-2">{source.name}</span>
+                      <div className={`h-1.5 w-1.5 rounded-full ${getKnowledgeStatusTone(source.status).includes('success') ? 'bg-success' : 'bg-warning'}`} />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Run History */}
+            <div className="p-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
+              <div className="flex items-center justify-between mb-5">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">Recent Activity</span>
+                <span className="text-[10px] font-bold text-on-surface-variant/30">{runs.length} Runs</span>
+              </div>
+              <div className="space-y-3">
+                {runs.length === 0 ? (
+                  <p className="text-[11px] text-on-surface-variant/40 text-center py-4 border border-dashed border-outline-variant/20 rounded-2xl">
+                    No runtime activity
+                  </p>
+                ) : (
+                  runs.map((run) => (
+                    <button
+                      key={run.id}
+                      onClick={() => {
+                        setSelectedRunId(run.id);
+                        void loadRunDetails(run.id);
+                      }}
+                      className={`w-full group p-3 rounded-2xl border transition-all ${
+                        selectedRunId === run.id
+                          ? 'bg-primary/5 border-primary/20 ring-1 ring-primary/10'
+                          : 'bg-surface-container-low/50 border-outline-variant/5 hover:bg-surface-container-low hover:border-outline-variant/20'
                       }`}
                     >
-                      {message.content}
-                    </div>
-                    {message.role === 'assistant' && getKnowledgeMatches(message).length > 0 ? (
-                      <div className="flex flex-wrap gap-2 px-1">
-                        {getKnowledgeMatches(message).map((match) => (
-                          <span
-                            key={`${message.id}-${match.chunk_id}`}
-                            className="rounded-full border border-outline-variant/10 bg-surface-container-low px-3 py-1 text-[11px] font-semibold text-on-surface-variant"
-                          >
-                            {match.source_name}
-                          </span>
-                        ))}
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${run.status === 'succeeded' ? 'text-success' : 'text-primary'}`}>
+                          {run.status}
+                        </span>
+                        <span className="text-[9px] font-medium text-on-surface-variant/40">
+                          {formatRelativeDate(run.created_at)}
+                        </span>
                       </div>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-
-        <div className="shrink-0 border-t border-outline-variant/10 bg-surface-container-lowest px-6 py-4">
-          <div className="mb-3 flex flex-wrap gap-2">
-            {(agent?.starter_prompts ?? []).map((prompt) => (
-              <button
-                key={prompt}
-                onClick={() => {
-                  setDraftMessage(prompt);
-                  void handleSendMessage(prompt);
-                }}
-                disabled={isSubmitting || isActiveThreadCompleted}
-                className="rounded-full border border-outline-variant/15 px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-          {isActiveThreadCompleted ? (
-            <div className="mb-3 rounded-[1.5rem] border border-outline-variant/10 bg-surface-container px-4 py-3 text-sm text-on-surface-variant">
-              This session has ended. Start a new session to continue.
+                      {run.error_message ? (
+                        <p className="text-[10px] text-error line-clamp-1 mt-1 opacity-80">{run.error_message}</p>
+                      ) : (
+                        <div className="h-1 w-full bg-on-surface/5 rounded-full mt-2 overflow-hidden">
+                          <div className={`h-full bg-success transition-all duration-500 ${run.status === 'succeeded' ? 'w-full' : 'w-1/2'}`} />
+                        </div>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
-          ) : null}
-          <div className="flex items-center gap-3 rounded-[1.75rem] border border-outline-variant/10 bg-surface-container px-3 py-3 ring-primary/20 focus-within:ring-2">
-            <input
-              value={draftMessage}
-              onChange={(event) => setDraftMessage(event.target.value)}
-              disabled={isActiveThreadCompleted}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  void handleSendMessage(draftMessage);
-                }
-              }}
-              className="flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-on-surface-variant/50"
-              placeholder={
-                isActiveThreadCompleted
-                  ? 'Start a new session to continue...'
-                  : 'Send a real message through the runtime...'
-              }
-            />
-            <button
-              onClick={() => void handleSendMessage(draftMessage)}
-              disabled={isSubmitting || isActiveThreadCompleted}
-              className="signature-gradient rounded-2xl px-4 py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-            >
-              {isSubmitting ? 'Running...' : 'Send'}
-            </button>
-          </div>
-        </div>
-      </section>
 
-      <aside className="min-h-0 w-full space-y-6 overflow-y-auto pr-2 xl:h-full xl:w-88 hide-scrollbar">
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-            Agent Summary
-          </p>
-          <h2 className="mt-4 font-headline text-2xl font-bold text-on-surface">
-            {agent?.name ?? 'Loading...'}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-            {agent?.description || 'No description yet.'}
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <span className="rounded-full bg-surface-container px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              {agent?.model ?? 'openai/gpt-4o-mini'}
-            </span>
-            <span className="rounded-full bg-surface-container px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              {agent?.status ?? 'draft'}
-            </span>
-            <span className="rounded-full bg-surface-container px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              {threads.length} sessions
-            </span>
+            {/* Run Trace */}
+            <div className="p-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
+              <div className="flex items-center justify-between mb-5">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">Step Trace</span>
+                {runSteps.length > 0 && <span className="text-[10px] font-bold text-primary">Live</span>}
+              </div>
+              <div className="space-y-3">
+                {runSteps.length === 0 ? (
+                  <p className="text-[11px] text-on-surface-variant/40 text-center py-4 border border-dashed border-outline-variant/20 rounded-2xl">
+                    Select a run to trace
+                  </p>
+                ) : (
+                  runSteps.map((step) => (
+                    <div key={step.id} className="relative pl-5 before:absolute before:left-0 before:top-2 before:bottom-0 before:w-[1px] before:bg-outline-variant/20 last:before:h-2">
+                      <div className="absolute left-[-3px] top-1.5 h-1.5 w-1.5 rounded-full bg-primary ring-4 ring-surface-container-lowest" />
+                      <p className="text-[11px] font-bold text-on-surface line-clamp-1">{step.title}</p>
+                      <p className="text-[10px] text-on-surface-variant/60 leading-relaxed mt-1 line-clamp-2">
+                        {step.detail}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-              Knowledge Sources
-            </p>
-            <span className="rounded-full bg-surface-container px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              {knowledgeSources.length} attached
-            </span>
-          </div>
-          <div className="mt-5 space-y-3">
-            {knowledgeSources.length === 0 ? (
-              <p className="rounded-2xl bg-surface-container px-4 py-4 text-sm text-on-surface-variant">
-                No knowledge sources are attached to this agent yet.
-              </p>
-            ) : (
-              knowledgeSources.map((source) => (
-                <div
-                  key={source.id}
-                  className="flex items-center justify-between rounded-2xl bg-surface-container px-4 py-4"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-on-surface">{source.name}</p>
-                    <p className="mt-1 text-xs text-on-surface-variant">
-                      {source.chunk_count} chunks
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${getKnowledgeStatusTone(source.status)}`}
-                  >
-                    {source.status}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-            Connected Tools
-          </p>
-          <div className="mt-5 space-y-3">
-            {connections.length === 0 ? (
-              <p className="rounded-2xl bg-surface-container px-4 py-4 text-sm text-on-surface-variant">
-                No connected toolkits are attached to this agent yet.
-              </p>
-            ) : (
-              connections.map((connection) => (
-                <div
-                  key={connection.id}
-                  className="flex items-center justify-between rounded-2xl bg-surface-container px-4 py-4"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-on-surface">
-                      {connection.display_name}
-                    </p>
-                    <p className="mt-1 text-xs text-on-surface-variant">
-                      {connection.account_label}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-background px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                    {connection.status}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-            Recent Runs
-          </p>
-          <div className="mt-5 space-y-3">
-            {runs.length === 0 ? (
-              <p className="rounded-2xl bg-surface-container px-4 py-4 text-sm text-on-surface-variant">
-                No runs yet.
-              </p>
-            ) : (
-              runs.map((run) => (
-                <button
-                  key={run.id}
-                  onClick={() => {
-                    setSelectedRunId(run.id);
-                    void loadRunDetails(run.id);
-                  }}
-                  className={`w-full rounded-2xl px-4 py-4 text-left transition-colors ${
-                    selectedRunId === run.id
-                      ? 'bg-primary/5 ring-1 ring-primary/20'
-                      : 'bg-surface-container hover:bg-surface-container-high'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-on-surface">{run.status}</p>
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                      {formatRelativeDate(run.created_at)}
-                    </span>
-                  </div>
-                  {run.error_message ? (
-                    <p className="mt-2 text-xs leading-6 text-error">{run.error_message}</p>
-                  ) : null}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-            Run Trace
-          </p>
-          <div className="mt-5 space-y-3">
-            {runSteps.length === 0 ? (
-              <p className="rounded-2xl bg-surface-container px-4 py-4 text-sm text-on-surface-variant">
-                No trace data yet.
-              </p>
-            ) : (
-              runSteps.map((step) => (
-                <div key={step.id} className="rounded-2xl bg-surface-container px-4 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-on-surface">{step.title}</p>
-                    <span className="rounded-full bg-background px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                      {step.status}
-                    </span>
-                  </div>
-                  {step.detail ? (
-                    <p className="mt-2 text-xs leading-6 text-on-surface-variant">{step.detail}</p>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-            Approvals
-          </p>
-          <div className="mt-5 space-y-3">
-            {runApprovals.length === 0 ? (
-              <p className="rounded-2xl bg-surface-container px-4 py-4 text-sm text-on-surface-variant">
-                No approval requests on this run.
-              </p>
-            ) : (
-              runApprovals.map((approval) => (
-                <div key={approval.id} className="rounded-2xl bg-surface-container px-4 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-on-surface">{approval.title}</p>
-                    <span className="rounded-full bg-background px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                      {approval.status}
-                    </span>
-                  </div>
-                  {approval.detail ? (
-                    <p className="mt-2 text-xs leading-6 text-on-surface-variant">
-                      {approval.detail}
-                    </p>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </aside>
+        </aside>
+      </main>
     </div>
   );
 }

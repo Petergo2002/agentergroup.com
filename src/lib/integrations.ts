@@ -1,4 +1,5 @@
 export type SupportedIntegrationSlug = "gmail" | "googlecalendar" | "googledrive";
+export type InternalAssistantToolkitSlug = "text_to_pdf";
 export type IntegrationSurface = "chat" | "knowledge";
 
 export interface SupportedIntegration {
@@ -13,6 +14,12 @@ export interface SupportedIntegration {
   surface: IntegrationSurface;
   allowedChatTools: string[];
   allowedKnowledgeTools: string[];
+}
+
+export interface InternalAssistantToolkit {
+  slug: InternalAssistantToolkitSlug;
+  displayName: string;
+  description: string;
 }
 
 export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
@@ -67,6 +74,14 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
   },
 ];
 
+export const INTERNAL_ASSISTANT_TOOLKITS: InternalAssistantToolkit[] = [
+  {
+    slug: "text_to_pdf",
+    displayName: "Text to PDF",
+    description: "Create downloadable PDF files directly from generated or pasted text.",
+  },
+];
+
 const SUPPORTED_INTEGRATION_SLUGS = new Set(
   SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
 );
@@ -74,6 +89,9 @@ const CHAT_INTEGRATION_SLUGS = new Set(
   SUPPORTED_INTEGRATIONS.filter((integration) => integration.surface === "chat").map(
     (integration) => integration.slug,
   ),
+);
+const INTERNAL_ASSISTANT_TOOLKIT_SLUGS = new Set(
+  INTERNAL_ASSISTANT_TOOLKITS.map((toolkit) => toolkit.slug),
 );
 
 export const DRIVE_IMPORT_SUPPORTED_MIME_TYPES = [
@@ -102,6 +120,16 @@ export function getAllowedChatToolsForToolkits(toolkitSlugs: string[]) {
       ),
     ),
   );
+}
+
+export function isInternalAssistantToolkitSlug(
+  slug: string,
+): slug is InternalAssistantToolkitSlug {
+  return INTERNAL_ASSISTANT_TOOLKIT_SLUGS.has(slug as InternalAssistantToolkitSlug);
+}
+
+export function getInternalAssistantToolkitSlugs() {
+  return INTERNAL_ASSISTANT_TOOLKITS.map((toolkit) => toolkit.slug);
 }
 
 export function getChatIntegrationSlugs() {

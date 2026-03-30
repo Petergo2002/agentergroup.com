@@ -1,25 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useModals } from "@/components/ui/ModalProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAppContext } from "@/components/app/AppContext";
-import { formatRelativeDate } from "@/lib/utils";
-import type { AgentRecord, DashboardSummaryResponse } from "@/lib/types";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { StatsGrid } from "@/components/dashboard/StatsGrid";
+import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { AgentStatusList } from "@/components/dashboard/AgentStatusList";
+import type { DashboardSummaryResponse } from "@/lib/types";
 
 interface DashboardState {
   isLoading: boolean;
   data: DashboardSummaryResponse | null;
 }
 
-const summaryCardClassName =
-  "rounded-[1.6rem] border border-outline-variant/35 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]";
-
-
-
 export default function DashboardPage() {
-  const { workspace } = useAppContext();
+  const { profile } = useAppContext();
   const { openCreateAgent } = useModals();
   const { showToast } = useToast();
   const [state, setState] = useState<DashboardState>({
@@ -77,222 +74,53 @@ export default function DashboardPage() {
       controller.abort();
     };
   }, [showToast]);
-  const agents: AgentRecord[] = state.data?.agents ?? [];
-  const recentConversations = state.data?.recentConversations ?? [];
-  const workspaceSummary = state.data?.workspaceSummary ?? {
-    totalWidgets: 0,
-    liveWidgets: 0,
-    connectedApps: 0,
-    knowledgeSources: 0,
-  };
-  const activeAgents = agents.filter(
-    (agent) => !agent.archived_at && agent.status === "active",
-  ).length;
-  const summaryCards = [
-    ["Active Agents", String(activeAgents)],
-    ["Live Widgets", String(workspaceSummary.liveWidgets)],
-    ["Connected Apps", String(workspaceSummary.connectedApps)],
-    ["Knowledge Sources", String(workspaceSummary.knowledgeSources)],
-  ] as const;
 
-  const formatAgentState = (agent: AgentRecord) => {
-    if (agent.archived_at) {
-      return "Archived";
-    }
-
-    if (agent.status === "active" && agent.published_version_id) {
-      return "Live";
-    }
-
-    if (agent.status === "active") {
-      return "Active";
-    }
-
-    if (agent.status === "paused") {
-      return "Paused";
-    }
-
-    return "Draft";
-  };
-
-  const getAgentStateClasses = (agent: AgentRecord) => {
-    if (agent.archived_at) {
-      return "border-outline-variant/10 bg-surface-container text-on-surface-variant";
-    }
-
-    if (agent.status === "active" && agent.published_version_id) {
-      return "border-primary/20 bg-primary/10 text-primary";
-    }
-
-    if (agent.status === "active") {
-      return "border-outline-variant/15 bg-surface-container-low text-on-surface";
-    }
-
-    if (agent.status === "paused") {
-      return "border-outline-variant/10 bg-surface-container text-on-surface-variant";
-    }
-
-    return "border-outline-variant/10 bg-background text-on-surface-variant";
+  const stats = {
+    activeAgents: state.data?.agents.filter(a => !a.archived_at && a.status === "active").length ?? 0,
+    liveWidgets: state.data?.workspaceSummary.liveWidgets ?? 0,
+    connectedApps: state.data?.workspaceSummary.connectedApps ?? 0,
+    knowledgeSources: state.data?.workspaceSummary.knowledgeSources ?? 0,
+    leads: 0, // Defaulting to 0 as requested by the user
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-            Workspace overview
-          </p>
-          <h1 className="mt-3 text-[2.15rem] font-headline font-bold leading-tight tracking-tight text-on-surface sm:text-[2.45rem]">
-            Dashboard
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
-            See what is live, what needs attention, and where to continue work across {workspace.name}.
-          </p>
-        </div>
-        <button
-          onClick={openCreateAgent}
-          className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90"
-        >
-          Create Agent
-        </button>
+    <div className="mx-auto w-full max-w-[1440px] px-6 py-12 lg:px-12 space-y-10 animate-in fade-in duration-1000">
+      <DashboardHeader 
+        userName={profile?.full_name?.split(" ")[0]} 
+      />
+
+      <StatsGrid stats={stats} isLoading={state.isLoading} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        <section className="lg:col-span-8 flex flex-col gap-6">
+          <RecentActivity 
+            conversations={state.data?.recentConversations ?? []} 
+            isLoading={state.isLoading} 
+          />
+        </section>
+
+        <section className="lg:col-span-4 flex flex-col gap-6">
+          <div className="flex flex-col gap-8">
+            <AgentStatusList 
+              agents={state.data?.agents ?? []} 
+              isLoading={state.isLoading} 
+            />
+            
+            <button
+              onClick={() => openCreateAgent()}
+              className="signature-gradient group relative flex h-[72px] items-center justify-between rounded-[2rem] px-8 text-sm font-bold text-white shadow-xl shadow-primary/15 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[20px]">add_circle</span>
+                <span className="uppercase tracking-[0.18em]">Initialize New Agent</span>
+              </div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm group-hover:bg-white/20 transition-colors">
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </div>
+            </button>
+          </div>
+        </section>
       </div>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {state.isLoading
-          ? Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={index}
-                className={`${summaryCardClassName} h-[132px] animate-pulse bg-surface-container-low`}
-              />
-            ))
-          : summaryCards.map(([label, value]) => (
-              <div key={label} className={summaryCardClassName}>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/65">
-                  {label}
-                </p>
-                <p className="mt-5 text-4xl font-headline font-bold text-on-surface">
-                  {value}
-                </p>
-              </div>
-            ))}
-      </section>
-
-      <section className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="rounded-[1.75rem] border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] sm:p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/65">
-                Latest customer activity
-              </p>
-              <h2 className="mt-3 text-xl font-headline font-bold text-on-surface">
-                Recent conversations
-              </h2>
-            </div>
-            <Link
-              href="/analytics"
-              className="rounded-full border border-outline-variant/20 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
-            >
-              Open analytics
-            </Link>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {state.isLoading ? (
-              Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-20 animate-pulse rounded-[1.5rem] bg-surface-container-low"
-                />
-              ))
-            ) : recentConversations.length === 0 ? (
-              <div className="rounded-[1.6rem] border border-dashed border-outline-variant/15 bg-background px-5 py-8 text-sm leading-7 text-on-surface-variant">
-                No public widget conversations yet.
-              </div>
-            ) : (
-              recentConversations.map((conversation) => (
-                <Link
-                  key={conversation.widgetSessionId}
-                  href="/analytics"
-                  className="block rounded-[1.5rem] border border-outline-variant/10 bg-background px-4 py-4 transition-colors hover:bg-surface-container-low"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-on-surface">
-                        {conversation.widgetName}
-                      </p>
-                      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/60">
-                        {conversation.agentLabel || conversation.agentName || "Unknown agent"}
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-xs text-on-surface-variant/60">
-                      {formatRelativeDate(conversation.lastActivityAt)}
-                    </p>
-                  </div>
-                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-on-surface-variant">
-                    {conversation.latestSnippet || "No customer-facing messages yet."}
-                  </p>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-[1.75rem] border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] sm:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/65">
-                Agents
-              </p>
-              <h2 className="mt-3 text-xl font-headline font-bold text-on-surface">
-                Agent status
-              </h2>
-            </div>
-            <Link
-              href="/agents"
-              className="rounded-full border border-outline-variant/20 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
-            >
-              Open agents
-            </Link>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {state.isLoading ? (
-              Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-16 animate-pulse rounded-[1.4rem] bg-surface-container-low"
-                />
-              ))
-            ) : agents.length === 0 ? (
-              <div className="rounded-[1.6rem] border border-dashed border-outline-variant/15 bg-background px-5 py-6 text-sm leading-7 text-on-surface-variant">
-                No agents created yet.
-              </div>
-            ) : (
-              agents.map((agent) => (
-                <Link
-                  key={agent.id}
-                  href={`/agents/${agent.id}/builder`}
-                  className="flex items-center justify-between gap-4 rounded-[1.4rem] border border-outline-variant/10 bg-background px-4 py-4 transition-colors hover:bg-surface-container-low"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-on-surface">
-                      {agent.name}
-                    </p>
-                    <p className="mt-1 text-xs text-on-surface-variant/60">
-                      Updated {formatRelativeDate(agent.updated_at)}
-                    </p>
-                  </div>
-                  <span
-                    className={`inline-flex shrink-0 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${getAgentStateClasses(agent)}`}
-                  >
-                    {formatAgentState(agent)}
-                  </span>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

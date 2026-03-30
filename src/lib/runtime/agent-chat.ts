@@ -1,4 +1,6 @@
 import type OpenAI from "openai";
+import { generatePdfFromText } from "@/lib/assistants/pdf";
+import { sanitizeAssistantDownloadFilename } from "@/lib/assistants/downloads";
 import { getConnectionComposioUserId } from "@/lib/connections";
 import { getWrappedTools, handleChatToolCalls } from "@/lib/composio";
 import {
@@ -114,12 +116,19 @@ export interface AgentRuntimeInput {
   supabase: RuntimeSupabaseLike;
   agent: Pick<
     AgentRecord,
-    "id" | "workspace_id" | "name" | "model" | "instructions" | "created_by" | "timezone"
+    | "id"
+    | "workspace_id"
+    | "name"
+    | "model"
+    | "instructions"
+    | "created_by"
+    | "timezone"
+    | "surface"
   >;
   input: string;
   history: RuntimeMessage[];
   toolUserId: string;
-  audience: "preview" | "widget";
+  audience: "preview" | "assistant" | "widget";
   knowledgeAccessToken?: string | null;
   widgetPublicKey?: string | null;
   calendarTimezone?: string | null;
@@ -147,6 +156,9 @@ const OMITTED_ASSISTANT_HISTORY_MESSAGES = new Set([
   "This is rarely an acceptable response and a retry should be issued.",
 ]);
 const INTERNAL_END_CHAT_TOOL_NAME = "suggest_end_chat";
+const INTERNAL_ASSISTANT_TOOLKIT_PROMPT =
+  "If the user asks for a downloadable PDF, a printable version, or wants content exported as a PDF, use the available PDF tool to generate it. After the tool finishes, briefly tell the user the PDF is ready to download.";
+const INTERNAL_CREATE_PDF_TOOL_NAME = "create_pdf_from_text";
 const INTERNAL_END_CHAT_TOOL_DEFINITION = {
   type: "function",
   function: {
@@ -166,12 +178,83 @@ const INTERNAL_END_CHAT_TOOL_DEFINITION = {
     },
   },
 } satisfies Record<string, unknown>;
+const INTERNAL_CREATE_PDF_TOOL_DEFINITION = {
+  type: "function",
+  function: {
+    name: INTERNAL_CREATE_PDF_TOOL_NAME,
+    description:
+      "Create a downloadable PDF from plain text for the user.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "The full text content that should be placed into the PDF.",
+        },
+        filename: {
+          type: "string",
+          description: "Optional filename for the generated PDF.",
+        },
+      },
+      required: ["text"],
+      additionalProperties: false,
+    },
+  },
+} satisfies Record<string, unknown>;
+
+function createPdfToolMessage(
+  toolCallId: string,
+  rawArguments: string,
+): ToolMessage {
+  const parsedArgs = parseInternalToolArguments(rawArguments);
+  const text =
+    typeof parsedArgs?.text === "string" && parsedArgs.text.trim()
+      ? parsedArgs.text.trim()
+      : null;
+
+  if (!text) {
+    return {
+      role: "tool",
+      tool_call_id: toolCallId,
+      name: INTERNAL_CREATE_PDF_TOOL_NAME,
+      content:
+        "PDF generation failed because no text content was provided.",
+      error: "Missing text for PDF generation.",
+    };
+  }
+
+  const requestedFilename =
+    typeof parsedArgs?.filename === "string" ? parsedArgs.filename : null;
+  const filename = sanitizeAssistantDownloadFilename(
+    requestedFilename?.trim() || "generated-document.pdf",
+  );
+  const pdfBytes = generatePdfFromText(text);
+
+  return {
+    role: "tool",
+    tool_call_id: toolCallId,
+    name: INTERNAL_CREATE_PDF_TOOL_NAME,
+    content:
+      `A downloadable PDF named "${filename}" has been prepared for the user. ` +
+      "Do not invent sandbox paths, markdown file links, or raw URLs. " +
+      "Tell the user the PDF is ready to download below.",
+    generated_file: {
+      filename,
+      mime_type: "application/pdf",
+      data_base64: pdfBytes.toString("base64"),
+    },
+  };
+}
 
 
 
 function mapDbMessagesToModel(messages: RuntimeMessage[]) {
   return messages
     .filter((message) => {
+      if (message.role === "tool") {
+        return false;
+      }
+
       if (message.role !== "assistant") {
         return true;
       }
@@ -179,14 +262,6 @@ function mapDbMessagesToModel(messages: RuntimeMessage[]) {
       return !OMITTED_ASSISTANT_HISTORY_MESSAGES.has(message.content.trim());
     })
     .map((message) => {
-      if (message.role === "tool") {
-        return {
-          role: "tool",
-          content: message.content,
-          tool_call_id: message.tool_call_id,
-        };
-      }
-
       const result: Record<string, unknown> = {
         role: message.role,
         content: message.content,
@@ -498,6 +573,13 @@ export async function runAgentChat({
     });
   }
 
+  if (audience === "assistant" && agent.surface === "assistant") {
+    modelMessages.splice(1, 0, {
+      role: "system",
+      content: INTERNAL_ASSISTANT_TOOLKIT_PROMPT,
+    });
+  }
+
   const toolGuidance = buildToolGuidance(
     enabledToolkits,
     effectiveGmailRecipientPolicy,
@@ -554,6 +636,9 @@ export async function runAgentChat({
   const tools = await getWrappedTools(toolUserId, enabledToolkits);
   const toolDefinitions: ToolDefinitionLike[] = [
     ...(tools as unknown as ToolDefinitionLike[]),
+    ...(audience === "assistant" && agent.surface === "assistant"
+      ? [INTERNAL_CREATE_PDF_TOOL_DEFINITION]
+      : []),
     ...(effectiveEndChatPolicy.enabled &&
     effectiveEndChatPolicy.allowAssistantSuggestion
       ? [INTERNAL_END_CHAT_TOOL_DEFINITION]
@@ -680,11 +765,16 @@ export async function runAgentChat({
       });
     }
 
-    const internalToolCalls = toolCallsArray.filter(
-      (toolCall) => toolCall.function.name === INTERNAL_END_CHAT_TOOL_NAME,
+    const internalToolCalls = toolCallsArray.filter((toolCall) =>
+      [INTERNAL_END_CHAT_TOOL_NAME, INTERNAL_CREATE_PDF_TOOL_NAME].includes(
+        toolCall.function.name,
+      ),
     );
     const externalToolCalls = toolCallsArray.filter(
-      (toolCall) => toolCall.function.name !== INTERNAL_END_CHAT_TOOL_NAME,
+      (toolCall) =>
+        ![INTERNAL_END_CHAT_TOOL_NAME, INTERNAL_CREATE_PDF_TOOL_NAME].includes(
+          toolCall.function.name,
+        ),
     );
     const internalToolMessages: ToolMessage[] = [];
     let externalToolMessages: ToolMessage[] = [];
@@ -708,13 +798,22 @@ export async function runAgentChat({
     }
 
     for (const toolCall of internalToolCalls) {
-      internalToolMessages.push({
-        role: "tool",
-        tool_call_id: toolCall.id,
-        name: toolCall.function.name,
-        content:
-          "The conversation has been marked complete. Write a brief natural closing message to the user.",
-      });
+      if (toolCall.function.name === INTERNAL_END_CHAT_TOOL_NAME) {
+        internalToolMessages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          name: toolCall.function.name,
+          content:
+            "The conversation has been marked complete. Write a brief natural closing message to the user.",
+        });
+        continue;
+      }
+
+      if (toolCall.function.name === INTERNAL_CREATE_PDF_TOOL_NAME) {
+        internalToolMessages.push(
+          createPdfToolMessage(toolCall.id, toolCall.function.arguments ?? ""),
+        );
+      }
     }
 
     try {
@@ -814,7 +913,12 @@ export async function runAgentChat({
       ...internalToolMessages,
       ...externalToolMessages,
     ];
-    toolMessages.push(...externalToolMessages);
+    toolMessages.push(
+      ...internalToolMessages.filter(
+        (message) => message.name !== INTERNAL_END_CHAT_TOOL_NAME,
+      ),
+      ...externalToolMessages,
+    );
     conversationMessages.push(assistantMessage, ...iterationToolMessages);
   }
 

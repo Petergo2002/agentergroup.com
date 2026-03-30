@@ -30,6 +30,7 @@ Out of scope in v1:
 - per-workspace retention configuration
 - retention automation for imported knowledge
 - full privacy tooling for authenticated preview chat
+- full privacy tooling for authenticated internal assistant chat
 
 ## Current Subprocessors
 
@@ -166,7 +167,7 @@ Each delete action writes an audit log using `privacy.dsar.delete`.
 - transcript matching is best-effort and content-based
 - the product does not currently verify identity automatically
 - imported knowledge is not automatically expired
-- this does not yet cover all authenticated internal chats
+- this does not yet cover authenticated preview chat or internal assistant chat end-to-end
 
 ## Incident Escalation
 

@@ -37,6 +37,7 @@ export interface AdminWorkspaceDetailSummary {
   name: string;
   ownerEmail: string | null;
   createdAt: string;
+  internalAssistantsEnabled: boolean;
   agentCount: number;
   widgetCount: number;
   conversationCount: number;

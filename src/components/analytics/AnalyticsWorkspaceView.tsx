@@ -1,19 +1,16 @@
 "use client";
 
-import {
+import React, {
   useDeferredValue,
   useEffect,
   useMemo,
   useState,
-  type Dispatch,
-  type SetStateAction,
 } from "react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatRelativeDate } from "@/lib/utils";
 import type {
   DashboardAnalyticsAppliedFilters,
   DashboardAnalyticsConversationListItem,
-  DashboardAnalyticsRange,
   DashboardAnalyticsResponse,
   DashboardConversationDetailResponse,
   DebugTrace,
@@ -21,68 +18,10 @@ import type {
 import {
   Activity,
   AlertCircle,
-  BarChart3,
   Bug,
-  CheckCircle2,
-  ChevronDown,
   ChevronRight,
-  Clock,
   MessageSquare,
-  Search,
-  type LucideIcon,
 } from "lucide-react";
-
-type AnalyticsView = "chat" | "analytics";
-
-function AnalyticsTabs({
-  activeView,
-  onChange,
-}: {
-  activeView: AnalyticsView;
-  onChange: (view: AnalyticsView) => void;
-}) {
-  const items: Array<{
-    key: AnalyticsView;
-    label: string;
-    icon: LucideIcon;
-  }> = [
-    {
-      key: "chat",
-      label: "Chat",
-      icon: MessageSquare,
-    },
-    {
-      key: "analytics",
-      label: "Analytics",
-      icon: BarChart3,
-    },
-  ];
-
-  return (
-    <div className="inline-flex items-center rounded-full border border-outline-variant/30 bg-surface-container-low p-1">
-      {items.map((item) => {
-        const Icon = item.icon;
-        const isActive = item.key === activeView;
-
-        return (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => onChange(item.key)}
-            className={`rounded-full px-4 py-2 text-[13px] font-medium transition-all ${
-              isActive
-                ? "bg-surface-container-lowest text-on-surface shadow-sm"
-                : "text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            <Icon className="h-4 w-4" strokeWidth={2} />
-            {item.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 interface DashboardAnalyticsState {
   isLoading: boolean;
@@ -94,120 +33,123 @@ interface DashboardAnalyticsState {
   detailCache: Record<string, DashboardConversationDetailResponse>;
 }
 
-const fieldClassName =
-  "h-10 w-full rounded border bg-surface-container-lowest px-3 text-sm text-on-surface outline-none transition-colors focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container";
-
 function buildAnalyticsUrl(
   filters: DashboardAnalyticsAppliedFilters,
-  cursor?: string | null,
+  cursor?: string,
 ) {
-  const params = new URLSearchParams();
-  params.set("range", filters.range);
-
-  if (filters.widgetId) {
-    params.set("widgetId", filters.widgetId);
-  }
-
-  if (filters.agentId) {
-    params.set("agentId", filters.agentId);
-  }
-
-  if (filters.search.trim()) {
-    params.set("search", filters.search.trim());
-  }
-
-  if (cursor) {
-    params.set("cursor", cursor);
-  }
-
-  return `/api/dashboard/analytics?${params.toString()}`;
+  const url = new URL("/api/dashboard/analytics", window.location.origin);
+  url.searchParams.set("range", filters.range);
+  if (filters.widgetId) url.searchParams.set("widgetId", filters.widgetId);
+  if (filters.agentId) url.searchParams.set("agentId", filters.agentId);
+  if (filters.search) url.searchParams.set("search", filters.search);
+  if (cursor) url.searchParams.set("cursor", cursor);
+  return url.toString();
 }
 
-function InboxToolbar({
-  filters,
-  setFilters,
-  data,
-}: {
-  filters: DashboardAnalyticsAppliedFilters;
-  setFilters: Dispatch<SetStateAction<DashboardAnalyticsAppliedFilters>>;
-  data: DashboardAnalyticsResponse | null;
+function AgentFilterSelector({ 
+  agents, 
+  selectedId, 
+  onSelect 
+}: { 
+  agents: Array<{ id: string; name: string }>; 
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
 }) {
   return (
-    <div className="border-b border-outline-variant/20 bg-surface-container-lowest p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-on-surface">Sessions inbox</h2>
-        <span className="text-[11px] font-medium text-on-surface-variant">
-          {(data?.conversations.length ?? 0)} sessions
-        </span>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <select
-          value={filters.agentId ?? ""}
-          onChange={(event) =>
-            setFilters((current) => ({
-              ...current,
-              agentId: event.target.value || null,
-            }))
-          }
-          className="h-9 rounded border border-outline-variant/20 bg-surface-container-low px-2 text-xs"
-          aria-label="Filter by agent"
+    <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none hide-scrollbar">
+      <button
+        onClick={() => onSelect(null)}
+        className={`shrink-0 rounded-full px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all ${
+          selectedId === null
+            ? "bg-primary-container text-white shadow-lg shadow-primary-container/20"
+            : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+        }`}
+      >
+        All Agents
+      </button>
+      {agents.map((agent) => (
+        <button
+          key={agent.id}
+          onClick={() => onSelect(agent.id)}
+          className={`shrink-0 rounded-full px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all ${
+            selectedId === agent.id
+                ? "bg-primary-container text-white shadow-lg shadow-primary-container/20"
+                : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+          }`}
         >
-          <option value="">All agents</option>
-          {(data?.filters.agents ?? []).map((agent) => (
-            <option key={agent.id} value={agent.id}>
-              {agent.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filters.widgetId ?? ""}
-          onChange={(event) =>
-            setFilters((current) => ({
-              ...current,
-              widgetId: event.target.value || null,
-            }))
-          }
-          className="h-9 rounded border border-outline-variant/20 bg-surface-container-low px-2 text-xs"
-          aria-label="Filter by widget"
-        >
-          <option value="">All widgets</option>
-          {(data?.filters.widgets ?? []).map((widget) => (
-            <option key={widget.id} value={widget.id}>
-              {widget.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filters.range}
-          onChange={(event) =>
-            setFilters((current) => ({
-              ...current,
-              range: event.target.value as DashboardAnalyticsRange,
-            }))
-          }
-          className="h-9 rounded border border-outline-variant/20 bg-surface-container-low px-2 text-xs"
-          aria-label="Filter by range"
-        >
-          <option value="7d">7 days</option>
-          <option value="30d">30 days</option>
-          <option value="90d">90 days</option>
-        </select>
-        <label className="relative block sm:col-span-2">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-on-surface-variant" />
-          <input
-            value={filters.search}
-            onChange={(event) =>
-              setFilters((current) => ({
-                ...current,
-                search: event.target.value,
-              }))
-            }
-            placeholder="Search sessions, agents, leads..."
-            className="h-9 w-full rounded border border-outline-variant/20 bg-surface-container-low pl-8 pr-2 text-xs"
-            aria-label="Search conversations"
-          />
-        </label>
-      </div>
+          {agent.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DebugPanel({ trace }: { trace: DebugTrace }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-lg border border-outline-variant/10">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between bg-surface-container-low px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant transition-colors hover:bg-surface-container-high"
+      >
+        <div className="flex items-center gap-2">
+          <Bug className="h-3 w-3" />
+          <span>Execution Context — {trace.durationMs}ms</span>
+        </div>
+        <ChevronRight
+          className={`h-3 w-3 transition-transform duration-200 ${
+            isOpen ? "rotate-90" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="bg-surface-container-lowest p-3">
+          <div className="space-y-3">
+            {trace.events.map((event, index) => {
+              const isAction = event.type === "tool_call" || event.type === "knowledge_hit";
+              const Icon = isAction ? Activity : AlertCircle;
+              
+              const label = (() => {
+                switch (event.type) {
+                  case "tool_call": return `Tool Call: ${event.name}`;
+                  case "tool_result": return `Tool Success: ${event.name}`;
+                  case "tool_error": return `Tool Error: ${event.name}`;
+                  case "knowledge_hit": return "Knowledge Retrieval Match";
+                  case "session_created": return "Operational Session Initialized";
+                  default: return event.type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+                }
+              })();
+
+              return (
+                <div key={index} className="flex gap-3">
+                  <div className="mt-0.5 shrink-0 rounded-full bg-surface-container-high p-1">
+                    <Icon className="h-3 w-3 text-on-surface-variant" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-bold text-on-surface">
+                        {label}
+                      </p>
+                      <span className="text-[9px] font-medium text-on-surface-variant/40">+{event.ts}ms</span>
+                    </div>
+                    {event.error && (
+                      <p className="mt-1 text-[11px] text-error">{event.error}</p>
+                    )}
+                    {!!(event.args || event.result) && (
+                      <pre className="mt-1.5 max-h-32 overflow-auto rounded-md bg-surface-container-low p-2 text-[10px] text-on-surface-variant font-mono scrollbar-thin">
+                        {JSON.stringify(event.args || event.result, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -225,39 +167,57 @@ function ConversationRow({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full border-b border-outline-variant/10 px-4 py-3 text-left transition-colors ${
+      className={`group relative w-full border-b border-outline-variant/5 px-6 py-5 text-left transition-all ${
         selected
-          ? "border-l-4 border-l-primary-container bg-primary-container/10"
-          : "hover:bg-surface-container-low"
+          ? "bg-surface-container-lowest shadow-sm"
+          : "hover:bg-surface-container-low/60"
       }`}
     >
+      {selected && (
+        <div className="absolute left-0 top-0 h-full w-1 bg-primary-container" />
+      )}
+      
+      <div className="flex items-center justify-between gap-3 mb-2.5">
+        <div className="flex items-center gap-2">
+          {conversation.hasLead ? (
+            <span className="rounded-full bg-primary-container/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-tight text-primary-container">
+              Lead Captured
+            </span>
+          ) : (
+            <span className="rounded-full bg-success/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-tight text-success">
+              Active
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] font-medium text-on-surface-variant/60">
+          {formatRelativeDate(conversation.lastActivityAt)}
+        </span>
+      </div>
+
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-on-surface">
+          <p className="truncate font-headline text-[14px] font-bold text-on-surface group-hover:text-primary-container transition-colors">
             {conversation.agentLabel || conversation.agentName || "Unknown agent"}
           </p>
-          <p className="truncate text-[12px] text-on-surface-variant mt-0.5">
-            {conversation.latestSnippet || "No messages yet"}
+          <p className="mt-1 line-clamp-1 text-[12px] leading-relaxed text-on-surface-variant">
+            {conversation.latestSnippet || "Monitoring session parameters..."}
           </p>
-        </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className="text-[10px] text-on-surface-variant">
-            {formatRelativeDate(conversation.lastActivityAt)}
-          </span>
-          <div className="flex items-center gap-1">
-            <span className="text-[9px] text-on-surface-variant">
-              {conversation.messageCount} msg
-            </span>
-            {conversation.hasLead && (
-              <span className="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
-            )}
-          </div>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-on-surface-variant">
-        <span>{conversation.messageCount} messages</span>
-        <span>{conversation.userMessageCount} user</span>
+      <div className="mt-4 flex items-center justify-between border-t border-outline-variant/5 pt-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-container-highest text-[10px] font-bold text-on-surface-variant">
+            {conversation.agentName?.[0] || "A"}
+          </div>
+          <span className="text-[10px] font-medium text-on-surface-variant">
+            {conversation.widgetName || "Global Widget"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 opacity-60">
+          <MessageSquare className="h-3 w-3" />
+          <span className="text-[10px] font-bold">{conversation.messageCount}</span>
+        </div>
       </div>
     </button>
   );
@@ -265,197 +225,86 @@ function ConversationRow({
 
 function ConversationInboxPane({
   state,
-  filters,
-  setFilters,
   onSelectConversation,
   onLoadMore,
+  onAgentSelect,
+  selectedAgentId,
 }: {
   state: DashboardAnalyticsState;
-  filters: DashboardAnalyticsAppliedFilters;
-  setFilters: Dispatch<SetStateAction<DashboardAnalyticsAppliedFilters>>;
   onSelectConversation: (widgetSessionId: string) => void;
   onLoadMore: () => void;
+  onAgentSelect: (id: string | null) => void;
+  selectedAgentId: string | null;
 }) {
   const conversations = state.data?.conversations ?? [];
-  const hasFilters = Boolean(
-    filters.search || filters.widgetId || filters.agentId,
-  );
   const hasMore = Boolean(state.data?.pageInfo.hasMore);
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-surface-container-lowest">
-      <InboxToolbar filters={filters} setFilters={setFilters} data={state.data} />
+    <section className="flex h-full min-h-0 flex-col bg-surface-container-low/20">
+      <div className="px-6 py-8 border-b border-outline-variant/5 surface-container-low/40">
+        <h2 className="font-headline text-xl font-bold tracking-tight text-on-surface">
+          Live Intelligence
+        </h2>
+        <div className="mt-1.5 flex items-center gap-2 mb-6">
+          <span className="text-[11px] font-bold text-primary-container uppercase tracking-widest animate-pulse">
+            Monitoring
+          </span>
+          <div className="h-1 w-1 rounded-full bg-outline-variant/30" />
+          <span className="text-[11px] font-medium text-on-surface-variant">
+            {conversations.length} active sessions
+          </span>
+        </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {state.data?.filters?.agents && (
+          <AgentFilterSelector 
+            agents={state.data.filters.agents}
+            selectedId={selectedAgentId}
+            onSelect={onAgentSelect}
+          />
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto hide-scrollbar">
         {state.isLoading ? (
-          <div className="flex-1 space-y-2 p-3">
-            {Array.from({ length: 7 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-20 animate-pulse bg-surface-container-low rounded"
-              />
-            ))}
+          <div className="animate-pulse space-y-4 p-6">
+            <div className="h-24 rounded-2xl bg-surface-container-low" />
+            <div className="h-24 rounded-2xl bg-surface-container-low" />
+            <div className="h-24 rounded-2xl bg-surface-container-low" />
           </div>
         ) : conversations.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center p-8 text-center">
-            <div>
-              <p className="text-base font-semibold text-on-surface">
-                {hasFilters
-                  ? "No conversations match these filters."
-                  : "No widget conversations yet."}
-              </p>
-              <p className="mt-2 text-sm leading-7 text-on-surface-variant">
-                {hasFilters
-                  ? "Try clearing one or more filters to widen the result set."
-                  : "Once customers start chatting through your widgets, their sessions will appear here."}
-              </p>
+          <div className="flex flex-col items-center justify-center py-20 text-center px-10">
+            <div className="w-12 h-12 bg-surface-container-low rounded-xl flex items-center justify-center text-on-surface-variant/40 mb-4">
+              <span className="material-symbols-outlined">analytics</span>
             </div>
+            <p className="text-sm font-medium text-on-surface">No active sessions</p>
+            <p className="text-[12px] text-on-surface-variant mt-1.5">Awaiting live traffic input.</p>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="divide-y divide-outline-variant/5">
             {conversations.map((conversation) => (
               <ConversationRow
                 key={conversation.widgetSessionId}
                 conversation={conversation}
-                selected={
-                  conversation.widgetSessionId === state.selectedWidgetSessionId
-                }
+                selected={state.selectedWidgetSessionId === conversation.widgetSessionId}
                 onClick={() => onSelectConversation(conversation.widgetSessionId)}
               />
             ))}
-          </div>
-        )}
-
-        {!state.isLoading && conversations.length > 0 ? (
-          <div className="border-t border-outline-variant/10 p-3">
-            <p className="mb-2 text-[11px] text-on-surface-variant">
-              Showing {conversations.length} sessions
-            </p>
-            {hasMore ? (
-              <button
-                type="button"
-                onClick={onLoadMore}
-                disabled={state.isLoadingMore}
-                className="h-9 w-full rounded border border-outline-variant/20 bg-surface-container-low px-3 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {state.isLoadingMore ? "Loading more..." : "Load more sessions"}
-              </button>
-            ) : (
-              <p className="text-xs text-on-surface-variant">
-                You&apos;ve reached the end of this result set.
-              </p>
+            {hasMore && (
+              <div className="p-4 text-center">
+                <button
+                  type="button"
+                  onClick={onLoadMore}
+                  disabled={state.isLoadingMore}
+                  className="rounded-full border border-outline-variant/10 px-4 py-2 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                >
+                  {state.isLoadingMore ? "Loading..." : "Load more signals"}
+                </button>
+              </div>
             )}
           </div>
-        ) : null}
+        )}
       </div>
     </section>
-  );
-}
-
-function DebugPanel({ trace }: { trace: DebugTrace }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="mt-4 overflow-hidden rounded bg-surface-container-low text-on-surface-variant">
-      <button
-        type="button"
-        onClick={() => setExpanded((current) => !current)}
-        className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-surface-container-high"
-      >
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider">
-          {expanded ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronRight className="h-3 w-3" />
-          )}
-          <span>Debug Trace</span>
-        </div>
-        <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider opacity-70">
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {(trace.durationMs / 1000).toFixed(1)}s
-          </span>
-          <span className="flex items-center gap-1">
-            <Activity className="h-3 w-3" />
-            {trace.iterationsUsed} iter
-          </span>
-          <span className="flex items-center gap-1">
-            <Bug className="h-3 w-3" />
-            {trace.events.length} events
-          </span>
-        </div>
-      </button>
-
-      {expanded ? (
-        <div className="p-3 text-[11px] font-mono leading-relaxed">
-          {trace.hadError && trace.errorSummary ? (
-            <div className="mb-3 flex items-start gap-2 rounded bg-error/10 p-2 text-error">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>{trace.errorSummary}</span>
-            </div>
-          ) : null}
-
-          <div className="space-y-2">
-            {trace.events.map((event, index) => {
-              const isError =
-                event.type.includes("error") || event.type === "session_miss";
-              const isSuccess =
-                event.type === "tool_result" ||
-                event.type === "session_created" ||
-                event.type === "knowledge_hit";
-
-              return (
-                <div key={index} className="flex items-start gap-3">
-                  <div className="w-12 shrink-0 text-right text-[10px] opacity-50">
-                    +{event.ts}ms
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      {isError ? (
-                        <AlertCircle className="h-3 w-3 shrink-0 text-error" />
-                      ) : isSuccess ? (
-                        <CheckCircle2 className="h-3 w-3 shrink-0 text-primary-container" />
-                      ) : (
-                        <Activity className="h-3 w-3 shrink-0 opacity-50" />
-                      )}
-                      <span className={`font-semibold ${isError ? "text-error" : ""}`}>
-                        {event.type}
-                      </span>
-                      {event.name ? (
-                        <span className="truncate rounded bg-on-surface/5 px-1.5 opacity-70">
-                          {event.name}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    {event.error ? (
-                      <div className="mt-1 whitespace-pre-wrap break-words pl-4.5 text-error">
-                        {event.error}
-                      </div>
-                    ) : null}
-
-                    {event.args ? (
-                      <div className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-words pl-4.5 opacity-70">
-                        args: {JSON.stringify(event.args)}
-                      </div>
-                    ) : null}
-
-                    {event.result ? (
-                      <div className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-words pl-4.5 opacity-70">
-                        result:{" "}
-                        {typeof event.result === "string"
-                          ? event.result
-                          : JSON.stringify(event.result)}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-    </div>
   );
 }
 
@@ -468,170 +317,102 @@ function ConversationDetail({
   isLoading: boolean;
   onClose?: () => void;
 }) {
-  const title =
-    detail?.conversation.agentLabel ||
-    detail?.conversation.agentName ||
-    "Conversation detail";
-
   return (
-    <section className="flex flex-col h-full bg-surface-container-lowest">
-      <div className="px-6 py-5 border-b border-outline-variant/10">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-              Conversation
-            </p>
-            <h2 className="mt-2 truncate text-[1.25rem] font-semibold text-on-surface">
-              {title}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-              {detail
-                ? `${detail.conversation.widgetName} · ${detail.conversation.source}`
-                : "Select a session from the inbox to inspect the transcript."}
-            </p>
-          </div>
-          {onClose ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded border px-3 py-2 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high"
-            >
-              Close
-            </button>
-          ) : null}
-        </div>
-
-        {detail ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
-              Started {formatRelativeDate(detail.conversation.startedAt)}
-            </span>
-            <span className="rounded bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
-              Active {formatRelativeDate(detail.conversation.lastActivityAt)}
-            </span>
-            <span className="rounded bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
-              {detail.conversation.source}
-            </span>
-            {detail.lead ? (
-              <span className="rounded bg-primary-container/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-container">
-                Lead captured
+    <section className="flex h-full flex-col bg-surface relative overflow-hidden">
+      <div className="shrink-0 p-8 pb-4 flex justify-between items-end border-b border-outline-variant/5 lg:border-none">
+        <div className="min-w-0">
+          <h2 className="font-headline text-3xl font-bold tracking-tight text-on-surface truncate">
+            {detail ? `Session with ${detail.lead?.name || "Anonymous"}` : "Operational Preview"}
+          </h2>
+          {detail && (
+            <div className="flex items-center gap-4 mt-2.5">
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">
+                <span className="material-symbols-outlined text-[14px]">schedule</span>
+                04:12 Session Duration
               </span>
-            ) : null}
-          </div>
-        ) : null}
+              <div className="h-1 w-1 rounded-full bg-outline-variant/30" />
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">
+                <span className="material-symbols-outlined text-[14px]">hub</span>
+                {detail.conversation.source}
+              </span>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
+          {onClose && (
+            <button onClick={onClose} className="p-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-colors lg:hidden">
+              <span className="material-symbols-outlined text-on-surface-variant">close</span>
+            </button>
+          )}
+          <button className="p-2.5 rounded-xl border border-outline-variant/10 bg-white/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow group">
+            <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary-container transition-colors">download</span>
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
-          <div className="h-20 animate-pulse bg-surface-container-low" />
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div
-              key={index}
-              className={`h-24 animate-pulse bg-surface-container-low ${
-                index % 2 === 0 ? "ml-auto max-w-[78%]" : "max-w-[82%]"
-              }`}
-            />
-          ))}
+        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+          <div className="h-32 w-2/3 animate-pulse rounded-2xl bg-surface-container-low" />
+          <div className="h-32 w-1/2 ml-auto animate-pulse rounded-2xl bg-primary-container/10" />
+          <div className="h-48 w-3/4 animate-pulse rounded-2xl bg-surface-container-low" />
         </div>
       ) : !detail ? (
-        <div className="flex flex-1 items-center justify-center px-5 py-10">
-          <div className="max-w-md bg-surface-container-low px-6 py-8 text-center">
-            <p className="text-base font-semibold text-on-surface">
-              No conversation selected yet.
-            </p>
-            <p className="mt-2 text-sm leading-7 text-on-surface-variant">
-              Select a session from the inbox to inspect the transcript.
-            </p>
+        <div className="flex flex-1 flex-col items-center justify-center p-12 text-center">
+          <div className="w-16 h-16 bg-surface-container-low rounded-2xl flex items-center justify-center text-on-surface-variant/40 mb-6">
+            <span className="material-symbols-outlined text-3xl">analytics</span>
           </div>
+          <h3 className="font-headline text-xl font-bold text-on-surface">No session selected</h3>
+          <p className="mt-2 text-sm text-on-surface-variant max-w-xs leading-relaxed">
+            Select an active intelligence session from the sidebar to inspect real-time agent responses.
+          </p>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          {detail.lead ? (
-            <div className="mb-5 bg-primary-container/5 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                Lead
-              </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs text-on-surface-variant">Name</p>
-                  <p className="mt-1 text-sm font-medium text-on-surface">
-                    {detail.lead.name}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-on-surface-variant">Email</p>
-                  <p className="mt-1 text-sm font-medium text-on-surface">
-                    {detail.lead.email}
-                  </p>
-                </div>
-                {detail.lead.phone ? (
-                  <div>
-                    <p className="text-xs text-on-surface-variant">Phone</p>
-                    <p className="mt-1 text-sm font-medium text-on-surface">
-                      {detail.lead.phone}
-                    </p>
-                  </div>
-                ) : null}
-                {detail.lead.message ? (
-                  <div className="sm:col-span-2">
-                    <p className="text-xs text-on-surface-variant">Message</p>
-                    <p className="mt-1 text-sm leading-6 text-on-surface">
-                      {detail.lead.message}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                Transcript
-              </p>
-              <p className="mt-2 text-sm text-on-surface-variant">
-                Customer and assistant messages for this session.
-              </p>
-            </div>
-            <span className="text-xs text-on-surface-variant">
-              {detail.transcript.length} messages
-            </span>
-          </div>
-
+        <div className="flex-1 overflow-y-auto p-12 pb-48 space-y-12 hide-scrollbar">
           {detail.transcript.length === 0 ? (
-            <div className="bg-surface-container-low px-5 py-8 text-sm leading-7 text-on-surface-variant">
-              No customer-facing messages stored for this session yet.
+            <div className="flex flex-col items-center py-20 text-on-surface-variant/40">
+              <span className="material-symbols-outlined text-4xl mb-4">forum</span>
+              <p className="text-sm italic">Waiting for initial message capture...</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {detail.transcript.map((message) => (
-                <div
-                  key={message.id}
-                  className={`max-w-[85%] rounded px-4 py-4 ${
-                    message.role === "user"
-                      ? "ml-auto bg-primary-container text-white"
-                      : "bg-surface-container-low text-on-surface"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] opacity-70">
-                      {message.role === "user" ? "User" : "Assistant"}
-                    </p>
-                    <p className="text-[11px] opacity-60">
-                      {formatRelativeDate(message.createdAt)}
-                    </p>
+            detail.transcript.map((message) => (
+              <React.Fragment key={message.id}>
+                <div className={`flex gap-6 ${message.role === "user" ? "max-w-2xl ml-auto flex-row-reverse" : "max-w-3xl"}`}>
+                  <div className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center font-headline font-bold text-xs ring-4 ring-offset-2 ring-offset-surface ${
+                    message.role === "user" 
+                      ? "bg-on-surface-variant/10 text-on-surface-variant ring-transparent" 
+                      : "bg-primary-container text-white ring-primary-container/10"
+                  }`}>
+                    {message.role === "user" ? (detail.lead?.name?.[0] || "U") : <span className="material-symbols-outlined text-sm">smart_toy</span>}
                   </div>
+                  
+                  <div className={`space-y-3 ${message.role === "user" ? "text-right" : ""}`}>
+                    <div className={`flex items-baseline gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
+                      <span className={`font-headline font-bold text-[13px] ${message.role === "user" ? "text-on-surface" : "text-primary-container"}`}>
+                        {message.role === "user" ? (detail.lead?.name || "Anonymous User") : (detail.conversation.agentLabel || "AI Agent")}
+                      </span>
+                      <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">{formatRelativeDate(message.createdAt)}</span>
+                    </div>
 
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-7">
-                    {message.content}
-                  </p>
+                    <div className={`p-6 rounded-2xl shadow-sm border border-black/[0.02] ${
+                      message.role === "user" 
+                        ? "bg-primary-container text-white" 
+                        : "bg-surface-container-lowest text-on-surface"
+                    }`}>
+                      <p className={`text-[15px] leading-relaxed font-label ${message.role === "user" ? "font-medium" : "font-normal opacity-90"}`}>
+                        {message.content}
+                      </p>
 
-                  {message.role === "assistant" && message.debugTrace ? (
-                    <DebugPanel trace={message.debugTrace} />
-                  ) : null}
+
+                      {message.role === "assistant" && message.debugTrace && (
+                        <DebugPanel trace={message.debugTrace} />
+                      )}
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
+
+              </React.Fragment>
+            ))
           )}
         </div>
       )}
@@ -639,164 +420,8 @@ function ConversationDetail({
   );
 }
 
-function AnalyticsOverview({
-  data,
-  filters,
-  setFilters,
-}: {
-  data: DashboardAnalyticsResponse | null;
-  filters: DashboardAnalyticsAppliedFilters;
-  setFilters: Dispatch<SetStateAction<DashboardAnalyticsAppliedFilters>>;
-}) {
-  const topMetrics = [
-    ["Conversations", String(data?.overview.conversations ?? 0)],
-    ["Messages", String(data?.overview.messages ?? 0)],
-    ["Active Widgets", String(data?.overview.activeWidgets ?? 0)],
-  ] as const;
-  const supportMetrics = [
-    ["Agents", String(data?.overview.agents ?? 0)],
-    ["Connected Apps", String(data?.overview.connectedApps ?? 0)],
-    ["Failures", String(data?.overview.failures ?? 0)],
-  ] as const;
-
-  return (
-    <section className="flex flex-col h-full bg-surface-container-lowest overflow-y-auto">
-      <div className="px-8 py-8">
-        <div className="flex items-end justify-between">
-          <div>
-            <h2 className="text-[1.5rem] font-semibold text-on-surface">
-              Workspace Performance
-            </h2>
-            <p className="mt-2 text-[14px] leading-6 text-on-surface-variant">
-              Track your conversations, agents, and widget performance
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 p-8 pt-0">
-        <div className="grid gap-6 md:grid-cols-3">
-          {topMetrics.map(([label, value]) => (
-            <div
-              key={label}
-              className="bg-surface-container-low px-5 py-5"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                {label}
-              </p>
-              <p className="mt-4 text-4xl font-headline font-bold text-on-surface">
-                {value}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-3">
-          {supportMetrics.map(([label, value]) => (
-            <div
-              key={label}
-              className="bg-surface-container-low px-6 py-6"
-            >
-              <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                {label}
-              </p>
-              <p className="mt-4 text-3xl font-semibold text-on-surface">
-                {value}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="bg-surface-container-low p-6 mt-6">
-          <div className="mb-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-              Filters
-            </p>
-            <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Narrow the analytics overview by period, widget, agent or search.
-            </p>
-          </div>
-
-          <div className="grid gap-3 lg:grid-cols-[180px_1fr_1fr]">
-            <select
-              value={filters.range}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  range: event.target.value as DashboardAnalyticsRange,
-                }))
-              }
-              className={fieldClassName}
-              aria-label="Filter analytics by range"
-            >
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-            </select>
-
-            <select
-              value={filters.widgetId ?? ""}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  widgetId: event.target.value || null,
-                }))
-              }
-              className={fieldClassName}
-              aria-label="Filter analytics by widget"
-            >
-              <option value="">All widgets</option>
-              {(data?.filters.widgets ?? []).map((widget) => (
-                <option key={widget.id} value={widget.id}>
-                  {widget.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filters.agentId ?? ""}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  agentId: event.target.value || null,
-                }))
-              }
-              className={fieldClassName}
-              aria-label="Filter analytics by agent"
-            >
-              <option value="">All agents</option>
-              {(data?.filters.agents ?? []).map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name}
-                </option>
-              ))}
-            </select>
-
-            <label className="relative block lg:col-span-3">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-              <input
-                value={filters.search}
-                onChange={(event) =>
-                  setFilters((current) => ({
-                    ...current,
-                    search: event.target.value,
-                  }))
-                }
-                placeholder="Search widget or agent"
-                className={`${fieldClassName} pl-10`}
-                aria-label="Search analytics"
-              />
-            </label>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function AnalyticsWorkspaceView() {
   const { showToast } = useToast();
-  const [activeView, setActiveView] = useState<AnalyticsView>("chat");
   const [filters, setFilters] = useState<DashboardAnalyticsAppliedFilters>({
     range: "30d",
     widgetId: null,
@@ -884,12 +509,14 @@ export function AnalyticsWorkspaceView() {
     const conversations = state.data?.conversations ?? [];
 
     if (conversations.length === 0) {
-      setState((current) => ({
-        ...current,
-        selectedWidgetSessionId: null,
-        selectedConversation: null,
-      }));
-      setIsMobileDetailOpen(false);
+      if (!state.isLoading) {
+        setState((current) => ({
+          ...current,
+          selectedWidgetSessionId: null,
+          selectedConversation: null,
+        }));
+        setIsMobileDetailOpen(false);
+      }
       return;
     }
 
@@ -897,13 +524,13 @@ export function AnalyticsWorkspaceView() {
       (conversation) => conversation.widgetSessionId === state.selectedWidgetSessionId,
     );
 
-    if (!selectionStillExists) {
+    if (!selectionStillExists && !state.isLoading) {
       setState((current) => ({
         ...current,
         selectedWidgetSessionId: conversations[0].widgetSessionId,
       }));
     }
-  }, [state.data?.conversations, state.selectedWidgetSessionId]);
+  }, [state.data?.conversations, state.selectedWidgetSessionId, state.isLoading]);
 
   useEffect(() => {
     if (!state.selectedWidgetSessionId) {
@@ -993,12 +620,6 @@ export function AnalyticsWorkspaceView() {
     };
   }, [showToast, state.detailCache, state.selectedWidgetSessionId]);
 
-  useEffect(() => {
-    if (activeView !== "chat") {
-      setIsMobileDetailOpen(false);
-    }
-  }, [activeView]);
-
   const loadMore = async () => {
     if (!state.data?.pageInfo.nextCursor) {
       return;
@@ -1076,52 +697,64 @@ export function AnalyticsWorkspaceView() {
   };
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1720px] flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
-            Workspace insights
-          </p>
-          <h1 className="mt-2 text-[1.5rem] font-semibold tracking-tight text-on-surface">
-            Analytics
+    <div className="flex h-screen w-full flex-col bg-surface overflow-hidden">
+      {/* Header Strip: Operational Metrics */}
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-outline-variant/10 bg-surface/70 px-8 backdrop-blur-xl">
+        <div className="flex items-center gap-6">
+          <h1 className="font-headline text-lg font-bold tracking-tight text-on-surface">
+            Operational Console
           </h1>
+          <div className="h-4 w-[1px] bg-outline-variant/30" />
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Live</span>
+              <span className="text-sm font-headline font-bold text-on-surface">
+                {state.data?.conversations.length ?? 0}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Throughput</span>
+              <span className="text-sm font-headline font-bold text-on-surface">
+                {state.data?.overview.conversations ?? 0}
+              </span>
+            </div>
+          </div>
         </div>
-        <AnalyticsTabs activeView={activeView} onChange={setActiveView} />
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-hidden rounded-[1.6rem] border border-outline-variant/30 bg-surface-container-lowest shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
-        {activeView === "chat" ? (
-          <div className="grid h-full min-h-0 grid-cols-1 gap-3 p-3 lg:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.65fr)] lg:gap-4 lg:p-4">
-            <div className="min-h-0 overflow-hidden rounded-[1.2rem] border border-outline-variant/20">
-              <ConversationInboxPane
-                state={state}
-                filters={filters}
-                setFilters={setFilters}
-                onSelectConversation={handleSelectConversation}
-                onLoadMore={() => void loadMore()}
-              />
-            </div>
-            <div className="hidden min-h-0 overflow-hidden rounded-[1.2rem] border border-outline-variant/20 lg:block">
-              <ConversationDetail
-                detail={state.selectedConversation}
-                isLoading={state.isDetailLoading}
-              />
-            </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-success">
+            <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
+            <span className="text-[11px] font-bold tracking-tight">System Online</span>
           </div>
-        ) : (
-          <div className="h-full min-h-0 overflow-hidden">
-            <AnalyticsOverview
-              data={state.data}
-              filters={filters}
-              setFilters={setFilters}
-            />
-          </div>
-        )}
-      </div>
+        </div>
+      </header>
 
-      {isMobileDetailOpen && activeView === "chat" ? (
-        <div className="fixed inset-0 z-50 bg-surface-container-lowest/85 p-4 backdrop-blur-sm lg:hidden">
-          <div className="h-full overflow-y-auto">
+      {/* Main Operational Body */}
+      <main className="flex min-h-0 flex-1 overflow-hidden">
+        {/* Pane 1: Live Intelligence Feed */}
+        <aside className="w-[384px] shrink-0 border-r border-outline-variant/10 bg-surface-container-low/40">
+          <ConversationInboxPane
+            state={state}
+            onSelectConversation={handleSelectConversation}
+            onLoadMore={() => void loadMore()}
+            onAgentSelect={(id) => setFilters(prev => ({ ...prev, agentId: id }))}
+            selectedAgentId={filters.agentId}
+          />
+        </aside>
+
+        {/* Pane 2: Transcript Canvas */}
+        <section className="relative flex min-w-0 flex-1 flex-col bg-surface">
+          <ConversationDetail
+            detail={state.selectedConversation}
+            isLoading={state.isDetailLoading}
+          />
+          
+        </section>
+
+      </main>
+
+      {isMobileDetailOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 p-4 backdrop-blur-sm lg:hidden">
+          <div className="h-full w-full overflow-hidden rounded-3xl bg-surface">
             <ConversationDetail
               detail={state.selectedConversation}
               isLoading={state.isDetailLoading}
@@ -1129,7 +762,7 @@ export function AnalyticsWorkspaceView() {
             />
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

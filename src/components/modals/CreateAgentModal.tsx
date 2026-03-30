@@ -7,19 +7,38 @@ import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
 import { useToast } from '@/components/ui/ToastProvider';
 import { buildAgentPayload, buildInitialDefinition } from '@/lib/agents/defaults';
+import type { AgentSurface } from '@/lib/types';
+import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
 
 interface CreateAgentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialSurface?: AgentSurface;
 }
 
-export const CreateAgentModal = ({ isOpen, onClose }: CreateAgentModalProps) => {
+export const CreateAgentModal = ({
+  isOpen,
+  onClose,
+  initialSurface = 'widget',
+}: CreateAgentModalProps) => {
   const router = useRouter();
   const supabase = createClient();
   const { workspace, user } = useAppContext();
   const { showToast } = useToast();
+  const internalAssistantsEnabled = hasInternalAssistantsEnabled(workspace);
   const [name, setName] = useState('');
+  const [surface, setSurface] = useState<AgentSurface>(initialSurface);
   const [isSaving, setIsSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setSurface(
+        initialSurface === 'assistant' && !internalAssistantsEnabled
+          ? 'widget'
+          : initialSurface,
+      );
+    }
+  }, [initialSurface, internalAssistantsEnabled, isOpen]);
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -27,10 +46,15 @@ export const CreateAgentModal = ({ isOpen, onClose }: CreateAgentModalProps) => 
       return;
     }
 
+    if (surface === 'assistant' && !internalAssistantsEnabled) {
+      showToast('Internal assistants are disabled for this workspace.', 'error');
+      return;
+    }
+
     setIsSaving(true);
 
     try {
-      const agentPayload = buildAgentPayload('custom', name);
+      const agentPayload = buildAgentPayload('custom', name, surface);
       const definition = buildInitialDefinition('custom');
 
       const { data: agent, error: agentError } = await supabase
@@ -61,6 +85,7 @@ export const CreateAgentModal = ({ isOpen, onClose }: CreateAgentModalProps) => 
       showToast('Agent created.', 'success');
       onClose();
       setName('');
+      setSurface('widget');
       router.push(`/agents/${agent.id}/builder`);
       router.refresh();
     } catch (error) {
@@ -77,12 +102,49 @@ export const CreateAgentModal = ({ isOpen, onClose }: CreateAgentModalProps) => 
       <div className="space-y-6">
         <div className="space-y-4">
           <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary">
+              Surface
+            </label>
+            <div className={`grid gap-3 ${internalAssistantsEnabled ? 'sm:grid-cols-2' : ''}`}>
+              {internalAssistantsEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => setSurface('assistant')}
+                  className={`rounded-2xl border px-4 py-4 text-left transition-colors ${
+                    surface === 'assistant'
+                      ? 'border-primary bg-primary/5 text-on-surface'
+                      : 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
+                  }`}
+                >
+                  <p className="text-sm font-bold text-on-surface">Internal Assistant</p>
+                  <p className="mt-1 text-xs leading-5">
+                    Shared inside the workspace and available in Assistants after the first save.
+                  </p>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setSurface('widget')}
+                className={`rounded-2xl border px-4 py-4 text-left transition-colors ${
+                  surface === 'widget'
+                    ? 'border-primary bg-primary/5 text-on-surface'
+                    : 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
+                }`}
+              >
+                <p className="text-sm font-bold text-on-surface">Website Widget</p>
+                <p className="mt-1 text-xs leading-5">
+                  Built for hosted and embeddable customer-facing chat surfaces.
+                </p>
+              </button>
+            </div>
+          </div>
+          <div>
             <label className="text-xs font-bold text-secondary uppercase tracking-widest block mb-2">
-              Agent Name
+              {surface === 'assistant' ? 'Assistant Name' : 'Agent Name'}
             </label>
             <input 
               type="text" 
-              placeholder="e.g. My Custom Agent"
+              placeholder={surface === 'assistant' ? 'e.g. Sales Assistant' : 'e.g. My Custom Agent'}
               value={name}
               onChange={(event) => setName(event.target.value)}
               className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"
@@ -102,7 +164,7 @@ export const CreateAgentModal = ({ isOpen, onClose }: CreateAgentModalProps) => 
             disabled={isSaving}
             className="flex-1 px-4 py-3 signature-gradient text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
           >
-            {isSaving ? 'Creating...' : 'Create Agent'}
+            {isSaving ? 'Creating...' : surface === 'assistant' ? 'Create Assistant' : 'Create Agent'}
           </button>
         </div>
       </div>

@@ -10,6 +10,7 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 ## What The Platform Does
 
 - Build, configure, preview, publish, and archive AI agents.
+- Use internal assistants in authenticated workspace chat surfaces.
 - Attach knowledge sources and use them during agent conversations.
 - Connect external tools such as Gmail, Google Calendar, and Google Drive through Composio.
 - Deploy widgets for hosted usage or third-party site embedding.
@@ -112,6 +113,8 @@ npm run widget:load-test -- --help
 | `/agents` | Agent list and lifecycle actions |
 | `/agents/[id]/builder` | Visual agent builder |
 | `/agents/[id]/preview` | Live chat preview for draft agents |
+| `/assistants` | Shared internal assistant list for the active workspace |
+| `/assistants/[id]` | Internal assistant chat surface with shared workspace threads |
 | `/widgets` | Widget list and management |
 | `/widgets/[id]` | Widget configuration, agents, appearance, and deployment state |
 | `/analytics` | Widget conversation analytics and transcript detail |
@@ -137,6 +140,8 @@ The loader and hosted runtime talk to the public API routes under `/api/public/w
 - Widget bootstrap currently issues a signed access token with a 15-minute TTL.
 - Hosted and embedded widget clients both retry bootstrap once when the runtime token expires.
 - Widget chat is serialized per session; overlapping turns return `409 SESSION_BUSY`.
+- Internal assistant chat is serialized per `chat_threads` row; overlapping turns return `409 THREAD_BUSY`.
+- Internal assistants become usable after the first normal builder save; publish remains widget-only in v1.
 - `scripts/widget-load-test.mjs` exercises bootstrap/chat flows and the same-session lock path.
 - The top-level `/data-processing` and `/subprocessors` routes are compatibility redirects into `/settings/...`.
 

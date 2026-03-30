@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Upload, RefreshCw, Cloud, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
@@ -8,6 +9,8 @@ import {
   SUPPORTED_KNOWLEDGE_MIME_TYPES,
 } from "@/lib/knowledge";
 import type { DriveImportFileRecord, KnowledgeSourceRecord } from "@/lib/types";
+import { SourceBentoGrid } from "@/components/knowledge/SourceBentoGrid";
+import { SourceTable } from "@/components/knowledge/SourceTable";
 import { formatRelativeDate } from "@/lib/utils";
 
 const ACCEPTED_FILE_TYPES = [...SUPPORTED_KNOWLEDGE_MIME_TYPES, ...SUPPORTED_KNOWLEDGE_EXTENSIONS].join(",");
@@ -34,7 +37,7 @@ function inferMimeType(file: File) {
   return "";
 }
 
-type InputTab = "text" | "file" | "drive";
+type InputTab = "text" | "file" | "drive" | null;
 
 export default function KnowledgePage() {
   const [supabase] = useState(() => createClient());
@@ -54,13 +57,12 @@ export default function KnowledgePage() {
   const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null);
   const [driveSearch, setDriveSearch] = useState("");
   const [driveFiles, setDriveFiles] = useState<DriveImportFileRecord[]>([]);
-  const [driveNextPageToken, setDriveNextPageToken] = useState<string | null>(null);
   const [isLoadingDriveFiles, setIsLoadingDriveFiles] = useState(false);
   const [isImportingDriveFileId, setIsImportingDriveFileId] = useState<string | null>(null);
   const [driveStatus, setDriveStatus] = useState<string>(
     "Connect Google Drive to browse and import files into the workspace library.",
   );
-  const [activeTab, setActiveTab] = useState<InputTab>("text");
+  const [activeTab, setActiveTab] = useState<InputTab>(null);
 
   const filteredSources = useMemo(() => {
     if (!sourceSearch.trim()) return sources;
@@ -119,7 +121,6 @@ export default function KnowledgePage() {
 
         const nextFiles = (payload.files ?? []) as DriveImportFileRecord[];
         setDriveFiles((current) => (reset ? nextFiles : [...current, ...nextFiles]));
-        setDriveNextPageToken(payload.nextPageToken ?? null);
         setDriveStatus(
           nextFiles.length > 0 || (!reset && driveFiles.length > 0)
             ? "Browse supported Google Drive files and import them into Supabase."
@@ -369,361 +370,265 @@ export default function KnowledgePage() {
   };
 
   const renderStatPill = (icon: string, label: string, value: number, colorClass: string) => (
-    <div className="flex items-center gap-3 rounded-full border border-outline-variant/15 bg-surface-container px-4 py-2">
-      <span className={`material-symbols-outlined text-lg ${colorClass}`}>{icon}</span>
-      <div className="flex flex-col">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">{label}</span>
-        <span className="text-sm font-bold text-on-surface">{value}</span>
+    <div className="flex flex-col gap-1 px-4 py-2 border-r border-outline-variant/10 last:border-0">
+      <div className="flex items-center gap-1.5">
+        <span className={`material-symbols-outlined text-[15px] ${colorClass}`}>{icon}</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">{label}</span>
       </div>
+      <span className="text-sm font-bold text-on-surface">{value}</span>
     </div>
   );
 
-  const tabs = [
-    { id: "text" as const, label: "Paste Text", icon: "edit_note" },
-    { id: "file" as const, label: "Upload File", icon: "upload_file" },
-    { id: "drive" as const, label: "Google Drive", icon: "cloud" },
-  ];
-
   return (
-    <div className="mx-auto max-w-[1440px] space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      {/* Header Section */}
-      <section className="rounded-[1.8rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-              Knowledge Library
-            </p>
-            <h1 className="mt-3 font-headline text-[2.15rem] font-bold text-on-surface sm:text-[2.35rem]">
-              Reusable context for your agents
-            </h1>
-            <p className="mt-3 text-sm leading-7 text-on-surface-variant">
-              Add documents or paste text, then attach to agents for retrieval during conversations.
-            </p>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-10 font-label">
+      {/* Editorial Header */}
+      <header className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between border-b border-outline-variant/10 pb-10">
+        <div className="max-w-xl">
+          <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-primary-container/10 text-primary-container mb-4">
+            <span className="material-symbols-outlined text-[14px]">auto_stories</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest">Workspace Library</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {renderStatPill("folder", "Total", stats.total, "text-on-surface-variant")}
-            {renderStatPill("check_circle", "Ready", stats.ready, "text-success")}
-            {renderStatPill("sync", "Processing", stats.processing, "text-primary")}
-            {renderStatPill("error", "Failed", stats.failed, "text-error")}
-          </div>
+          <h1 className="font-headline text-[2.5rem] font-bold leading-[1.1] text-on-surface tracking-tight">
+            Knowledge Source Library
+          </h1>
+          <p className="mt-4 text-[13px] font-medium leading-relaxed text-on-surface-variant/80 max-w-lg">
+            A centralized hub for your workspace&apos;s proprietary data. Connect and process documents 
+            to provide your agents with deep domain expertise.
+          </p>
         </div>
-      </section>
+        
+        <div className="flex rounded-2xl bg-surface-container-low/40 p-1 ring-1 ring-outline-variant/5">
+          {renderStatPill("folder_open", "Total", stats.total, "text-on-surface-variant")}
+          {renderStatPill("check_circle", "Ready", stats.ready, "text-success")}
+          {renderStatPill("sync", "Syncing", stats.processing, "text-primary")}
+          {renderStatPill("error", "Failed", stats.failed, "text-error")}
+        </div>
+      </header>
 
-      {/* Input Section with Tabs */}
-      <section className="overflow-hidden rounded-[1.8rem] border border-outline-variant/30 bg-surface-container-lowest shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
-        {/* Tab Navigation */}
-        <div className="flex border-b border-outline-variant/10">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-1 items-center justify-center gap-2 px-4 py-4 text-sm font-semibold transition-all ${
-                activeTab === tab.id
-                  ? "bg-surface-container-lowest text-primary border-b-2 border-primary -mb-px"
-                  : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
-              }`}
-            >
-              <span className="material-symbols-outlined text-lg">{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
+      {/* Add Knowledge Section */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">
+            Add Knowledge Source
+          </h2>
+          <div className="h-[1px] flex-1 bg-outline-variant/10 ml-4" />
         </div>
 
-        {/* Tab Content */}
-        <div className="p-6">
-          {activeTab === "text" && (
-            <div className="space-y-4">
-              <div className="max-w-xl">
-                <p className="text-sm text-on-surface-variant">
-                  Paste policies, handbooks, or notes for immediate agent access.
-                </p>
+        {activeTab ? (
+          <div className="rounded-2xl bg-surface-container-low p-8 ring-1 ring-outline-variant/10 admin-fade-in">
+            <div className="mb-6 flex items-center justify-between border-b border-outline-variant/10 pb-4">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setActiveTab(null)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-surface-container transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                </button>
+                <h3 className="font-headline text-lg font-bold text-on-surface">
+                  {activeTab === "text" && "Write New Knowledge Source"}
+                  {activeTab === "file" && "Upload Document"}
+                  {activeTab === "drive" && "Import from Cloud"}
+                </h3>
               </div>
-              <div className="space-y-3">
-                <input
-                  value={textName}
-                  onChange={(event) => setTextName(event.target.value)}
-                  placeholder="Source name (e.g., Refund Policy)"
-                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/5"
-                />
-                <textarea
-                  value={textDescription}
-                  onChange={(event) => setTextDescription(event.target.value)}
-                  rows={2}
-                  placeholder="Optional short description"
-                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/5"
-                />
-                <textarea
-                  value={rawText}
-                  onChange={(event) => setRawText(event.target.value)}
-                  rows={8}
-                  placeholder="Paste the text content you want the agent to retrieve..."
-                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm leading-6 outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/5"
-                />
-                <div className="flex justify-end">
+            </div>
+
+            {activeTab === "text" && (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 focus-within:text-primary transition-colors">
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Source Name</label>
+                    <input
+                      value={textName}
+                      onChange={(event) => setTextName(event.target.value)}
+                      placeholder="e.g., Q3 Marketing Strategy"
+                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Description (Optional)</label>
+                    <input
+                      value={textDescription}
+                      onChange={(event) => setTextDescription(event.target.value)}
+                      placeholder="Internal strategy docs"
+                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Knowledge Content</label>
+                  <textarea
+                    value={rawText}
+                    onChange={(event) => setRawText(event.target.value)}
+                    rows={12}
+                    placeholder="Paste the documentation here..."
+                    className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-4 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-primary/20"
+                  />
+                </div>
+                <div className="flex justify-end pt-2">
                   <button
                     onClick={() => void handleCreateTextSource()}
-                    disabled={isCreatingText}
-                    className="signature-gradient rounded-full px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition-all hover:shadow-xl hover:brightness-110 disabled:opacity-50"
+                    disabled={isCreatingText || !textName || !rawText}
+                    className="signature-gradient h-11 px-8 rounded-full text-xs font-bold text-white shadow-lg shadow-primary/20 disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
                   >
-                    {isCreatingText ? "Creating..." : "Create Text Source"}
+                    {isCreatingText ? "Processing..." : "Finish and Sync"}
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {activeTab === "file" && (
-            <div className="space-y-4">
-              <div className="max-w-xl">
-                <p className="text-sm text-on-surface-variant">
-                  Upload `.txt`, `.md`, or `.pdf` files. They will be chunked and embedded automatically.
-                </p>
-              </div>
-              <div className="space-y-3">
-                <input
-                  value={fileName}
-                  onChange={(event) => setFileName(event.target.value)}
-                  placeholder="Source name (e.g., Support Handbook)"
-                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/5"
-                />
-                <textarea
-                  value={fileDescription}
-                  onChange={(event) => setFileDescription(event.target.value)}
-                  rows={2}
-                  placeholder="Optional short description"
-                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/5"
-                />
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-outline-variant/20 bg-background px-6 py-10 text-center transition-all hover:border-primary/30 hover:bg-surface-container">
-                  <span className="material-symbols-outlined text-4xl text-primary">upload_file</span>
-                  <p className="mt-3 text-sm font-semibold text-on-surface">
-                    {selectedFile ? selectedFile.name : "Drop a file or click to browse"}
+            {activeTab === "file" && (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Source Name</label>
+                    <input
+                      value={fileName}
+                      onChange={(event) => setFileName(event.target.value)}
+                      placeholder="Support Handbook V2"
+                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Description</label>
+                    <input
+                      value={fileDescription}
+                      onChange={(event) => setFileDescription(event.target.value)}
+                      placeholder="Customer service guidelines"
+                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
+                    />
+                  </div>
+                </div>
+                <label className="flex h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest/50 transition-all hover:bg-surface-container hover:border-primary/20">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container shadow-sm mb-4">
+                    <Upload className="h-5 w-5 text-on-surface-variant" />
+                  </div>
+                  <p className="text-sm font-bold text-on-surface">
+                    {selectedFile ? selectedFile.name : "Drop your file here"}
                   </p>
-                  <p className="mt-1 text-xs text-on-surface-variant">
-                    {selectedFile
-                      ? `${(selectedFile.size / 1024).toFixed(1)} KB`
-                      : `Supported: ${SUPPORTED_KNOWLEDGE_EXTENSIONS.join(", ")}`}
+                  <p className="mt-1 text-xs text-on-surface-variant/60">
+                    {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : "PDF, Markdown, or Text files supported"}
                   </p>
                   <input
                     type="file"
                     accept={ACCEPTED_FILE_TYPES}
                     className="hidden"
-                    onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      setSelectedFile(file);
+                      if (file && !fileName) setFileName(file.name.replace(/\.[^/.]+$/, ""));
+                    }}
                   />
                 </label>
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-2">
                   <button
                     onClick={() => void handleUploadFileSource()}
-                    disabled={isUploadingFile || !selectedFile}
-                    className="rounded-full border border-outline-variant/15 bg-surface-container px-6 py-3 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-high disabled:opacity-50"
+                    disabled={isUploadingFile || !selectedFile || !fileName}
+                    className="signature-gradient h-11 px-8 rounded-full text-xs font-bold text-white shadow-lg shadow-primary/20 disabled:opacity-50 transition-all hover:scale-105"
                   >
-                    {isUploadingFile ? "Uploading..." : "Upload and Process"}
+                    {isUploadingFile ? "Uploading..." : "Import Document"}
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {activeTab === "drive" && (
-            <div className="space-y-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div className="max-w-xl">
-                  <p className="text-sm text-on-surface-variant">
-                    Import files from your connected Google Drive account.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    value={driveSearch}
-                    onChange={(event) => setDriveSearch(event.target.value)}
-                    placeholder="Search files..."
-                    className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-2 text-sm outline-none transition-all focus:border-primary/40 sm:w-48"
-                  />
+            {activeTab === "drive" && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="relative flex-1">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[20px] text-on-surface-variant/40">search</span>
+                    <input
+                      value={driveSearch}
+                      onChange={(event) => setDriveSearch(event.target.value)}
+                      placeholder="Search Drive files..."
+                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest pl-11 pr-4 py-2.5 text-sm outline-none"
+                    />
+                  </div>
                   <button
                     onClick={() => void loadDriveFiles({ reset: true })}
                     disabled={isLoadingDriveFiles}
-                    className="rounded-full border border-outline-variant/15 bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-high disabled:opacity-50"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
                   >
-                    <span className="material-symbols-outlined">search</span>
+                    <RefreshCw className={`h-4.5 w-4.5 ${isLoadingDriveFiles ? "animate-spin" : ""}`} />
                   </button>
                 </div>
-              </div>
 
-              <div className="rounded-2xl bg-surface-container px-4 py-3">
-                <p className="text-sm text-on-surface-variant">{driveStatus}</p>
-              </div>
-
-              <div className="space-y-2">
-                {driveFiles.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-outline-variant/20 bg-surface-container px-6 py-12 text-center">
-                    <span className="material-symbols-outlined text-4xl text-on-surface-variant">cloud_off</span>
-                    <p className="mt-3 font-semibold text-on-surface">No Drive files loaded</p>
-                    <p className="mt-1 text-sm text-on-surface-variant">
-                      Connect Google Drive from the Connections page to browse files.
-                    </p>
-                  </div>
-                ) : (
-                  driveFiles.map((file) => (
-                    <div
-                      key={file.id}
-                      className="flex items-center justify-between rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-3 transition-all hover:border-primary/20"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-on-surface">{file.name}</p>
-                        <p className="text-xs text-on-surface-variant">
-                          {file.size ? `${(parseInt(file.size) / 1024).toFixed(1)} KB` : ""}
-                          {file.modifiedTime ? ` · Updated ${formatRelativeDate(file.modifiedTime)}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2 ml-4">
-                        {file.webViewLink ? (
-                          <a
-                            href={file.webViewLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-full border border-outline-variant/15 px-3 py-1.5 text-xs font-semibold text-on-surface hover:bg-surface-container-high"
-                          >
-                            Open
-                          </a>
-                        ) : null}
+                <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  {driveFiles.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 opacity-40">
+                      <Cloud className="h-8 w-8 mb-3" />
+                      <p className="text-xs font-bold uppercase tracking-widest">{driveStatus}</p>
+                    </div>
+                  ) : (
+                    driveFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        className="group/item flex items-center justify-between rounded-xl bg-surface-container-lowest p-3 ring-1 ring-outline-variant/10 transition-all hover:bg-white hover:ring-primary/20 hover:shadow-sm"
+                      >
+                        <div className="flex items-center gap-3 truncate">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container group-hover/item:bg-primary/10 group-hover/item:text-primary transition-colors">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div className="truncate">
+                            <p className="truncate text-xs font-bold text-on-surface">{file.name}</p>
+                            <p className="mt-0.5 text-[10px] text-on-surface-variant/50">
+                              {formatRelativeDate(file.modifiedTime)}
+                            </p>
+                          </div>
+                        </div>
                         <button
                           onClick={() => void handleDriveImport(file)}
                           disabled={isImportingDriveFileId === file.id}
-                          className="signature-gradient rounded-full px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                          className="rounded-full bg-primary/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-white transition-all disabled:opacity-50"
                         >
                           {isImportingDriveFileId === file.id ? "..." : "Import"}
                         </button>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {driveNextPageToken && (
-                <div className="flex justify-center pt-2">
-                  <button
-                    onClick={() => void loadDriveFiles({ reset: false, pageToken: driveNextPageToken })}
-                    disabled={isLoadingDriveFiles}
-                    className="rounded-full border border-outline-variant/15 px-5 py-2 text-sm font-semibold text-on-surface hover:bg-surface-container disabled:opacity-50"
-                  >
-                    {isLoadingDriveFiles ? "Loading..." : "Load More"}
-                  </button>
+                    ))
+                  )}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <SourceBentoGrid 
+            onAddText={() => setActiveTab("text")}
+            onUploadFile={() => setActiveTab("file")}
+            onCloudImport={() => setActiveTab("drive")}
+          />
+        )}
       </section>
 
-      {/* Sources List */}
-      <section className="rounded-[1.8rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-primary">
-              Workspace Sources
-            </p>
-            <p className="mt-1 text-sm text-on-surface-variant">
-              {sources.length} source{sources.length !== 1 ? "s" : ""} in library
-            </p>
+      {/* List Section */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">
+              Active Knowledge Sources
+            </h2>
+            <div className="flex items-center gap-2 rounded-full bg-surface-container-high px-2 py-0.5 text-[9px] font-bold text-on-surface-variant">
+              {sources.length} Total
+            </div>
           </div>
+          
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant">
-              search
-            </span>
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant/40">filter_list</span>
             <input
               value={sourceSearch}
               onChange={(event) => setSourceSearch(event.target.value)}
-              placeholder="Filter sources..."
-              className="w-full rounded-full border border-outline-variant/10 bg-background pl-10 pr-4 py-2 text-sm outline-none transition-all focus:border-primary/40 sm:w-64"
+              placeholder="Filter library..."
+              className="w-full rounded-full border border-outline-variant/10 bg-surface-container-low px-10 py-2 text-[12px] outline-none transition-all focus:bg-white focus:ring-1 focus:ring-primary/10 sm:w-64"
             />
           </div>
         </div>
 
-        <div className="mt-6 space-y-2">
-          {isLoading ? (
-            Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-16 animate-pulse rounded-2xl bg-surface-container"
-              />
-            ))
-          ) : filteredSources.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-outline-variant/20 bg-surface-container px-6 py-12 text-center">
-              <span className="material-symbols-outlined text-4xl text-on-surface-variant">folder_open</span>
-              <p className="mt-3 font-headline text-lg font-bold text-on-surface">
-                {sourceSearch ? "No matching sources" : "No knowledge sources yet"}
-              </p>
-              <p className="mt-1 mx-auto max-w-md text-sm text-on-surface-variant">
-                {sourceSearch
-                  ? "Try adjusting your search terms."
-                  : "Add a text source or upload a file to get started."}
-              </p>
-            </div>
-          ) : (
-            filteredSources.map((source) => (
-              <div
-                key={source.id}
-                className="group flex items-center justify-between rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-3 transition-all hover:border-primary/20 hover:shadow-sm"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        source.status === "ready"
-                          ? "bg-success"
-                          : source.status === "processing"
-                            ? "bg-primary animate-pulse"
-                            : "bg-error"
-                      }`}
-                    />
-                    <p className="truncate text-sm font-semibold text-on-surface">{source.name}</p>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        source.status === "ready"
-                          ? "bg-success/10 text-success"
-                          : source.status === "processing"
-                            ? "bg-primary/10 text-primary"
-                            : "bg-error/10 text-error"
-                      }`}
-                    >
-                      {source.status}
-                    </span>
-                    <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                      {source.source_type}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-on-surface-variant">
-                    <span>{source.chunk_count} chunks</span>
-                    <span>Updated {formatRelativeDate(source.updated_at)}</span>
-                    {source.description && (
-                      <span className="truncate max-w-xs">· {source.description}</span>
-                    )}
-                  </div>
-                  {source.error_message && (
-                    <p className="mt-2 rounded-xl bg-error/5 px-3 py-2 text-xs text-error">
-                      {source.error_message}
-                    </p>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100 ml-4">
-                  <button
-                    onClick={() => void handleProcess(source.id)}
-                    disabled={processingSourceId === source.id || deletingSourceId === source.id}
-                    className="rounded-full border border-outline-variant/15 px-3 py-1.5 text-xs font-semibold text-on-surface hover:bg-surface-container-high disabled:opacity-50"
-                  >
-                    {processingSourceId === source.id ? "..." : source.status === "ready" ? "Reprocess" : "Process"}
-                  </button>
-                  <button
-                    onClick={() => void handleDelete(source)}
-                    disabled={deletingSourceId === source.id || processingSourceId === source.id}
-                    className="rounded-full border border-error/20 px-3 py-1.5 text-xs font-semibold text-error hover:bg-error/5 disabled:opacity-50"
-                  >
-                    {deletingSourceId === source.id ? "..." : "Delete"}
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <SourceTable 
+          sources={filteredSources}
+          isLoading={isLoading}
+          onProcess={handleProcess}
+          onDelete={handleDelete}
+          processingId={processingSourceId}
+          deletingId={deletingSourceId}
+        />
       </section>
     </div>
   );

@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  INTERNAL_ASSISTANTS_DISABLED_CODE,
+  INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+  isInternalAssistantBlocked,
+} from "@/lib/assistants/feature-flags";
+import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 import { createAuditLog } from "@/lib/runtime/observability";
 import type { BuilderDefinition } from "@/lib/types";
@@ -16,6 +22,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const context = await ensureWorkspaceContext(supabase as never, user);
 
   const body = await request.json().catch(() => ({}));
   const versionId = String(body.versionId ?? "").trim();
@@ -38,6 +46,16 @@ export async function POST(
 
   if (agentError || !agent) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  }
+
+  if (isInternalAssistantBlocked(agent, context.workspace)) {
+    return NextResponse.json(
+      {
+        error: INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+        code: INTERNAL_ASSISTANTS_DISABLED_CODE,
+      },
+      { status: 403 },
+    );
   }
 
   if (versionError || !version) {

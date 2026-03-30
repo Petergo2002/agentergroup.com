@@ -53,6 +53,7 @@ export async function POST(
     .from("agents")
     .select("*")
     .eq("workspace_id", context.workspace.id)
+    .eq("surface", "widget")
     .in("id", requestedAgentIds);
 
   if (agentsError) {

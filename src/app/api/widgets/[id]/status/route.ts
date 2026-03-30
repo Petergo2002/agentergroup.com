@@ -41,6 +41,19 @@ export async function POST(
       );
     }
 
+    const unsupportedAgent = loaded.widgetAgents.find(
+      ({ agent }) => agent.surface !== "widget",
+    );
+
+    if (unsupportedAgent) {
+      return NextResponse.json(
+        {
+          error: `${unsupportedAgent.agent.name} is an internal assistant and cannot be attached to widgets.`,
+        },
+        { status: 400 },
+      );
+    }
+
     const unpublishedAgent = loaded.widgetAgents.find(
       ({ agent }) => !agent.published_version_id,
     );

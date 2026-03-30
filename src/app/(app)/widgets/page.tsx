@@ -35,14 +35,6 @@ export default function WidgetsPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const highlightedAgentId = searchParams.get('agent');
 
-  const getWidgetStateLabel = (widget: WidgetListItem) => {
-    if (widget.status === 'deployed') {
-      return 'Live';
-    }
-
-    return 'Off';
-  };
-
   useEffect(() => {
     let isMounted = true;
 
@@ -216,137 +208,137 @@ export default function WidgetsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-            Customer surfaces
+    <div className="mx-auto w-full max-w-[1440px] px-6 py-10 sm:px-8 lg:px-10">
+      {/* Page Header */}
+      <div className="mb-12 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="max-w-2xl">
+          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
+            Customer Surfaces
           </p>
-          <h1 className="mt-3 text-[2.15rem] font-headline font-bold tracking-tight text-on-surface sm:text-[2.45rem]">
-            Widgets
+          <h1 className="mt-4 text-[2.5rem] font-headline font-bold tracking-tight text-on-surface sm:text-[3rem]">
+            Widget Registry
           </h1>
-          <p className="mt-3 text-sm leading-7 text-on-surface-variant">
-            Assemble specialists into customer-facing chat surfaces, preview the result, and keep deployment under control.
+          <p className="mt-4 text-base leading-relaxed text-on-surface-variant/60">
+            Assemble specialists into multi-agent chat surfaces, monitor real-time deployments, and manage your customer-facing interaction layer.
           </p>
         </div>
         <button
           onClick={() => void createWidget()}
           disabled={isCreating}
-          className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="group relative flex items-center gap-3 overflow-hidden rounded-full bg-on-surface px-8 py-4 text-sm font-bold uppercase tracking-[0.16em] text-background shadow-xl transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60"
         >
-          {isCreating ? 'Creating...' : highlightedAgentId ? 'New Widget From Agent' : 'New Widget'}
+          <span className="relative z-10">
+            {isCreating ? 'Creating Workspace...' : highlightedAgentId ? 'New Widget From Agent' : 'Initialize New Widget'}
+          </span>
+          <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
         </button>
       </div>
 
-      {highlightedAgentId ? (
-        <div className="mb-6 rounded-[1.6rem] border border-outline-variant/25 bg-surface-container-lowest px-5 py-4 text-sm text-on-surface-variant shadow-[0_18px_50px_rgba(15,23,42,0.05)]">
-          Widget management moved here. Create a widget and attach that agent from this workspace.
+      {highlightedAgentId && (
+        <div className="mb-8 flex items-center gap-4 rounded-[1.8rem] border border-primary/20 bg-primary/5 px-6 py-4 text-sm font-medium text-primary shadow-sm animate-in fade-in slide-in-from-top-4">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] text-background">!</span>
+          Widget management session active. Create a widget to attach the selected specialist.
         </div>
-      ) : null}
+      )}
 
-      <div className="overflow-hidden rounded-[1.8rem] border border-outline-variant/30 bg-surface-container-lowest shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
-        {isLoading ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-24 animate-pulse rounded-2xl bg-surface-container-low" />
-            ))}
+      {/* Grid Registry */}
+      {isLoading ? (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-64 animate-pulse rounded-[2.5rem] bg-surface-container-low" />
+          ))}
+        </div>
+      ) : sortedWidgets.length === 0 ? (
+        <div className="rounded-[3rem] border border-dashed border-outline-variant/20 bg-surface-container-lowest px-6 py-24 text-center">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-surface-container-low">
+             <span className="text-3xl opacity-20">💬</span>
           </div>
-        ) : sortedWidgets.length === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <span className="material-symbols-outlined rounded-full bg-primary/5 p-4 text-3xl text-primary">
-              chat_bubble
-            </span>
-            <h2 className="mt-4 font-headline text-2xl font-bold text-on-surface">
-              No widgets yet
-            </h2>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-on-surface-variant">
-              Create a widget, attach the right specialists, and deploy a single customer-facing chat surface.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-outline-variant/10">
-            {sortedWidgets.map((widget) => (
-              <div
-                key={widget.id}
-                className="px-8 py-7 transition-colors hover:bg-surface-container-low/45"
-              >
-                <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex min-w-0 flex-1 flex-col gap-4 xl:flex-row xl:items-center xl:gap-8">
-                    <Link href={`/widgets/${widget.id}`} className="min-w-0 xl:min-w-[300px] xl:flex-1">
-                      <p className="truncate text-base font-semibold text-on-surface">{widget.name}</p>
-                      <p className="mt-1.5 truncate text-sm text-on-surface-variant">
-                        {widget.hostedUrl}
-                      </p>
-                    </Link>
-
-                    <Link
-                      href={`/widgets/${widget.id}`}
-                      className="flex flex-wrap items-center gap-2.5 xl:flex-[0.9]"
-                    >
-                      <span className="rounded-full bg-background px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant/85 ring-1 ring-outline-variant/10">
-                        {widget.attachedAgentCount} agents
+          <h2 className="font-headline text-2xl font-bold text-on-surface">No Registered Widgets</h2>
+          <p className="mx-auto mt-3 max-w-sm text-sm text-on-surface-variant/50 leading-relaxed">
+            Initialize your first chat surface to begin connecting specialists with your customers.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {sortedWidgets.map((widget) => {
+             const isLive = widget.status === 'deployed';
+             return (
+               <div
+                 key={widget.id}
+                 className="group relative flex flex-col rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm transition-all hover:border-primary/20 hover:shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500"
+               >
+                 {/* Card Header: Identity */}
+                 <div className="mb-8 flex items-start justify-between">
+                   <div className="flex-1 min-w-0">
+                     <Link href={`/widgets/${widget.id}`}>
+                       <h3 className="truncate font-headline text-xl font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors">
+                         {widget.name}
+                       </h3>
+                     </Link>
+                     <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/40">
+                       ID: {widget.id.slice(0, 8)} • Updated {formatRelativeDate(widget.updatedAt)}
+                     </p>
+                   </div>
+                   <div className="flex items-center gap-1.5 rounded-full bg-surface-container-low px-2.5 py-1 ring-1 ring-inset ring-outline-variant/5">
+                      <span className={`h-1.5 w-1.5 rounded-full ${isLive ? 'bg-primary animate-pulse' : 'bg-on-surface-variant/20'}`} />
+                      <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-on-surface-variant/60">
+                        {isLive ? 'Live' : 'Draft'}
                       </span>
-                      {widget.needsRedeploy ? (
-                        <span className="rounded-full bg-primary/10 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
-                          Needs update
-                        </span>
-                      ) : null}
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] ${
-                          widget.status === 'deployed'
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-surface-container text-on-surface-variant'
-                        }`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            widget.status === 'deployed' ? 'bg-primary' : 'bg-on-surface-variant/40'
-                          }`}
-                        />
-                        {getWidgetStateLabel(widget)}
-                      </span>
-                    </Link>
-                  </div>
+                   </div>
+                 </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5 xl:gap-3">
-                    <div className="text-xs font-medium text-on-surface-variant/60">
-                      Updated {formatRelativeDate(widget.updatedAt)}
-                    </div>
+                 {/* Metrics / Metadata */}
+                 <div className="mb-10 flex flex-wrap gap-3">
+                   <span className="rounded-full bg-background px-4 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/60 ring-1 ring-outline-variant/10">
+                     {widget.attachedAgentCount} {widget.attachedAgentCount === 1 ? 'Specialist' : 'Specialists'}
+                   </span>
+                   {widget.needsRedeploy && (
+                     <span className="rounded-full bg-primary/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+                        Needs Sync
+                     </span>
+                   )}
+                 </div>
+
+                 {/* Bottom Actions */}
+                 <div className="mt-auto flex items-center justify-between border-t border-outline-variant/5 pt-6">
                     <StatusToggle
-                      checked={widget.status === 'deployed'}
-                      onClick={() => void handleStatusToggle(widget)}
-                      disabled={togglingWidgetId === widget.id || deletingWidgetId === widget.id}
-                      label={`Toggle ${widget.name}`}
-                      activeLabel="On"
-                      inactiveLabel="Off"
+                       checked={isLive}
+                       onClick={() => void handleStatusToggle(widget)}
+                       disabled={togglingWidgetId === widget.id || deletingWidgetId === widget.id}
+                       label={`Toggle ${widget.name}`}
+                       activeLabel="On"
+                       inactiveLabel="Off"
                     />
-                    <Link
-                      href={`/widgets/${widget.id}`}
-                      className="rounded-full bg-on-surface px-4 py-2.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
-                    >
-                      Open
-                    </Link>
-                    <EntityActionsMenu
-                      onDelete={() => void handlePermanentDelete(widget)}
-                      deleteDisabled={
-                        deletingWidgetId === widget.id ||
-                        togglingWidgetId === widget.id ||
-                        membership.role !== 'owner'
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                    
+                    <div className="flex items-center gap-2">
+                       <Link
+                         href={`/widgets/${widget.id}`}
+                         className="rounded-full border border-outline-variant/15 px-5 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant transition-all hover:bg-on-surface hover:text-background"
+                       >
+                         Open
+                       </Link>
+                       <EntityActionsMenu
+                         onDelete={() => void handlePermanentDelete(widget)}
+                         deleteDisabled={
+                           deletingWidgetId === widget.id ||
+                           togglingWidgetId === widget.id ||
+                           membership.role !== 'owner'
+                         }
+                       />
+                    </div>
+                 </div>
+               </div>
+             );
+          })}
+        </div>
+      )}
+
       <ConfirmDeleteModal
         isOpen={Boolean(widgetToDelete)}
-        title="Delete Widget"
+        title="Permanently Remove Widget"
         entityName={widgetToDelete?.name ?? ''}
-        entityLabel="Widget"
-        description="This permanently removes the widget, including its attached agents, sessions, messages, leads, and preview drafts."
+        entityLabel="Widget Registry Entry"
+        description="This action will terminate all associated sessions, hosted portals, and embedded instances. This cannot be undone."
         confirmationValue={deleteConfirmation}
         onConfirmationChange={setDeleteConfirmation}
         onClose={closeDeleteModal}

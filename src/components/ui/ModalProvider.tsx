@@ -2,9 +2,10 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { CreateAgentModal } from '../modals/CreateAgentModal';
+import type { AgentSurface } from '@/lib/types';
 
 interface ModalContextType {
-  openCreateAgent: () => void;
+  openCreateAgent: (surface?: AgentSurface) => void;
 }
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined);
@@ -19,9 +20,16 @@ export const useModals = () => {
 
 export const ModalProvider = ({ children }: { children: ReactNode }) => {
   const [isCreateAgentOpen, setIsCreateAgentOpen] = useState(false);
+  const [initialSurface, setInitialSurface] = useState<AgentSurface>('widget');
 
-  const openCreateAgent = () => setIsCreateAgentOpen(true);
-  const closeCreateAgent = () => setIsCreateAgentOpen(false);
+  const openCreateAgent = (surface: AgentSurface = 'widget') => {
+    setInitialSurface(surface);
+    setIsCreateAgentOpen(true);
+  };
+  const closeCreateAgent = () => {
+    setIsCreateAgentOpen(false);
+    setInitialSurface('widget');
+  };
 
   return (
     <ModalContext.Provider value={{ openCreateAgent }}>
@@ -29,6 +37,7 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
       <CreateAgentModal 
         isOpen={isCreateAgentOpen} 
         onClose={closeCreateAgent} 
+        initialSurface={initialSurface}
       />
     </ModalContext.Provider>
   );

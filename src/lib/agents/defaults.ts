@@ -1,6 +1,6 @@
 import { slugify } from "@/lib/utils";
 import { SUPPORTED_INTEGRATIONS } from "@/lib/integrations";
-import type { BuilderDefinition } from "@/lib/types";
+import type { AgentSurface, BuilderDefinition } from "@/lib/types";
 
 export const SUPPORTED_TOOLKITS = SUPPORTED_INTEGRATIONS.map((integration) => ({
   slug: integration.slug,
@@ -136,7 +136,11 @@ export function buildInitialDefinition(templateId: string): BuilderDefinition {
   };
 }
 
-export function buildAgentPayload(templateId: string, customName: string) {
+export function buildAgentPayload(
+  templateId: string,
+  customName: string,
+  surface: AgentSurface = "widget",
+) {
   const preset = getTemplatePreset(templateId);
   const name = customName.trim() || preset.name;
 
@@ -145,6 +149,7 @@ export function buildAgentPayload(templateId: string, customName: string) {
     slug: `${slugify(name)}-${Date.now().toString().slice(-6)}`,
     description: preset.description,
     status: "draft" as const,
+    surface,
     model: "openai/gpt-4o-mini",
     instructions: preset.instructions,
     starter_prompts: [...preset.starterPrompts],

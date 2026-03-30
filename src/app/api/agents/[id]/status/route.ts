@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  INTERNAL_ASSISTANTS_DISABLED_CODE,
+  INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+  isInternalAssistantBlocked,
+} from "@/lib/assistants/feature-flags";
+import { canEditAgentRecord, getMembershipRoleForWorkspace } from "@/lib/agents/access";
+import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createAuditLog } from "@/lib/runtime/observability";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,6 +22,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const context = await ensureWorkspaceContext(supabase as never, user);
 
   const body = await request.json().catch(() => ({}));
   const status = body.status === "active" ? "active" : body.status === "paused" ? "paused" : null;
@@ -33,6 +42,28 @@ export async function POST(
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
   }
 
+  if (isInternalAssistantBlocked(agent, context.workspace)) {
+    return NextResponse.json(
+      {
+        error: INTERNAL_ASSISTANTS_DISABLED_MESSAGE,
+        code: INTERNAL_ASSISTANTS_DISABLED_CODE,
+      },
+      { status: 403 },
+    );
+  }
+
+  const membershipRole = getMembershipRoleForWorkspace(
+    context.workspaces,
+    agent.workspace_id,
+  );
+
+  if (!canEditAgentRecord(agent, user.id, membershipRole)) {
+    return NextResponse.json(
+      { error: "You do not have permission to change this agent." },
+      { status: 403 },
+    );
+  }
+
   if (agent.archived_at) {
     return NextResponse.json(
       { error: "Restore the agent before changing its status." },
@@ -40,7 +71,11 @@ export async function POST(
     );
   }
 
-  if (status === "active" && !agent.published_version_id) {
+  if (
+    status === "active" &&
+    agent.surface === "widget" &&
+    !agent.published_version_id
+  ) {
     return NextResponse.json(
       { error: "Publish the agent before turning it on." },
       { status: 400 },

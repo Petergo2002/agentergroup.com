@@ -1,6 +1,6 @@
 # Agent Platform Architecture
 
-Last updated: 2026-03-14
+Last updated: 2026-03-26
 
 ## Purpose
 
@@ -16,11 +16,12 @@ This document should be treated as the operational source of truth for future ma
 
 ## Product Scope
 
-The current product is a conversational AI agent platform with three core capabilities:
+The current product is a conversational AI agent platform with four core capabilities:
 
 1. Build and configure agents in a visual editor
 2. Run agents in a live preview chat
-3. Let agents use:
+3. Use internal assistants in shared authenticated workspace chats
+4. Let agents use:
    - workspace knowledge stored in Supabase
    - connected external tools through Composio
 
@@ -108,6 +109,8 @@ Important implementation docs:
 - `src/app/(app)/agents/page.tsx`
 - `src/app/(app)/agents/[id]/builder/page.tsx`
 - `src/app/(app)/agents/[id]/preview/page.tsx`
+- `src/app/(app)/assistants/page.tsx`
+- `src/app/(app)/assistants/[id]/page.tsx`
 - `src/app/(app)/widgets/page.tsx`
 - `src/app/(app)/widgets/[id]/page.tsx`
 - `src/app/(app)/widgets/[id]/preview/page.tsx`
@@ -135,6 +138,10 @@ Important implementation docs:
 - `src/app/api/agents/[id]/archive/route.ts`
 - `src/app/api/agents/[id]/rollback/route.ts`
 - `src/app/api/agents/[id]/widget/route.ts`
+- `src/app/api/assistants/route.ts`
+- `src/app/api/assistants/[id]/route.ts`
+- `src/app/api/assistants/[id]/threads/route.ts`
+- `src/app/api/assistants/[id]/chat/route.ts`
 - `src/app/api/connections/toolkits/route.ts`
 - `src/app/api/connections/authorize/route.ts`
 - `src/app/api/connections/googlecalendar/calendars/route.ts`
@@ -196,6 +203,7 @@ Important implementation docs:
 - `supabase/migrations/20260325_widget_session_turn_locks.sql`
 - `supabase/migrations/20260325_widget_session_turn_locks_fix_status_ambiguity.sql`
 - `supabase/migrations/20260325_widget_session_turn_locks_fix_active_turn_ambiguity.sql`
+- `supabase/migrations/20260326_internal_assistants.sql`
 - `supabase/functions/process-knowledge-source/index.ts`
 - `supabase/functions/search-knowledge/index.ts`
 - `supabase/functions/_shared/knowledge.ts`
@@ -248,6 +256,7 @@ Important exception:
 
 Additional note:
 
+- internal assistant usage now lives under `/assistants`
 - widget management now lives under `/widgets`
 - the legacy `/agents/[id]/widget` surface only redirects users into the widgets area
 - analytics lives at `/analytics` as a workspace-level operations surface for widget conversations
@@ -385,15 +394,16 @@ Purpose:
 
 Purpose:
 
-- `agents`: current editable/live agent metadata
+- `agents`: current editable/live agent metadata, including the primary `surface` (`assistant` or `widget`)
 - `agent_drafts`: builder draft definition and current graph/config
 - `agent_versions`: published snapshots for version history and rollback
 
 Important current behavior:
 
 - the builder edits the current agent and current draft directly
-- preview/runtime currently reads from the current `agents` row
+- preview and internal assistant runtime both read from the current agent plus the last saved draft state
 - publish creates versioned snapshots, but runtime is not exclusively version-bound
+- publish is only required for widget agents; internal assistants become usable after the first normal save and move from `draft` to `active`
 
 ### 3. Connections and runtime conversations
 
@@ -410,7 +420,7 @@ Purpose:
 
 - `connections`: workspace-level external app connections
 - `agent_connections`: which connections a specific agent is allowed to use
-- `chat_threads`: conversation containers
+- `chat_threads`: conversation containers with a `source` of `preview` or `assistant`
 - `messages`: user, assistant, and internal tool messages
 - `runs`: one top-level execution per user message
 - `run_steps`: detailed runtime trace
@@ -421,6 +431,8 @@ Important current behavior:
 
 - the customer-facing chat flow no longer pauses for approvals
 - approval schema still exists for future internal/governed flows
+- internal assistant threads are shared across the workspace and use per-thread active-turn locks
+- preview threads remain creator-scoped and are kept separate from assistant threads through `chat_threads.source`
 
 ### 4. Knowledge base
 
@@ -634,6 +646,7 @@ Important current behavior:
 - `Preview` does not implicitly save when the user changes tabs
 - preview/runtime reads the last saved draft and current durable attachments
 - unsaved builder changes remain browser-local until the user saves or publishes
+- internal assistants do not appear in `/assistants` until the builder has been saved at least once
 
 ## Preview Architecture
 
@@ -662,13 +675,42 @@ It combines:
 
 This separation is important because the product goal is a frontdesk-style assistant, not a debug console exposed to end users.
 
+## Assistants Architecture
+
+The internal assistant surface lives at:
+
+- `src/app/(app)/assistants/page.tsx`
+- `src/app/(app)/assistants/[id]/page.tsx`
+
+### Purpose
+
+Assistants is the authenticated day-to-day chat surface for internal use.
+
+It provides:
+
+- workspace-visible internal assistant discovery
+- shared thread lists per assistant
+- a clean ChatGPT-style chat interface without preview traces
+- assistant-specific editing links for authorized users
+
+### Important current behavior
+
+- only agents with `surface='assistant'` and a non-`draft` status appear here
+- internal assistant threads are shared across the workspace
+- user messages retain `created_by` and are enriched server-side with sender names
+- paused assistants remain readable but reject new messages and new threads
+
 ## Conversation Runtime Architecture
 
-The main runtime lives in:
+The authenticated preview runtime lives in:
 
 - `src/app/api/agents/[id]/chat/route.ts`
 
-This route is the most important backend path in the product.
+The internal assistant runtime lives in:
+
+- `src/app/api/assistants/[id]/chat/route.ts`
+
+These are the main authenticated chat backends in the product.
 
 ### Runtime inputs
 

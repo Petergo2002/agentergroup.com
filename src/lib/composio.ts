@@ -12,7 +12,9 @@ import type {
 import {
   getDriveImportMimeTypes,
   getAllowedChatToolsForToolkits,
+  getInternalAssistantToolkitSlugs,
   getSupportedIntegration,
+  isInternalAssistantToolkitSlug,
   isSupportedIntegrationSlug,
   SUPPORTED_INTEGRATIONS,
   type SupportedIntegrationSlug,
@@ -73,12 +75,17 @@ const DEFAULT_COMPOSIO_TOOLKIT_VERSIONS = {
   gmail: process.env.COMPOSIO_TOOLKIT_VERSION_GMAIL ?? "20260307_00",
   googlecalendar: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR ?? "20260309_00",
   googledrive: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE ?? "20260309_00",
+  text_to_pdf: process.env.COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF ?? "latest",
 } as const;
 
 const SESSION_TTL_MS = 1000 * 60 * 30;
 const toolRouterSessionCache = new Map<string, ToolRouterSessionRef>();
 const composioSessionCache = new Map<string, Awaited<ReturnType<Composio["create"]>>>();
 const MCP_SESSION_CACHE = new Map<string, MCPSessionInfo>();
+const COMPOSIO_SESSION_TOOLKITS = [
+  ...SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
+  ...getInternalAssistantToolkitSlugs(),
+];
 
 function normalizeConnectionStatus(value?: string | null) {
   const status = (value ?? "").toUpperCase();
@@ -252,7 +259,7 @@ export async function getOrCreateToolRouterSession(userId: string) {
 
   try {
     const session = await composio.create(userId, {
-      toolkits: SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
+      toolkits: COMPOSIO_SESSION_TOOLKITS,
     });
 
     const nextValue = {
@@ -284,7 +291,7 @@ export async function getComposioSession(userId: string) {
   }
 
   const session = await composio.create(userId, {
-    toolkits: SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
+    toolkits: COMPOSIO_SESSION_TOOLKITS,
   });
 
   composioSessionCache.set(userId, session);
@@ -447,16 +454,27 @@ export async function getWrappedTools(userId: string, toolkitSlugs: string[]) {
   }
 
   const allowedTools = getAllowedChatToolsForToolkits(toolkitSlugs);
+  const builtInToolkits = toolkitSlugs.filter(isInternalAssistantToolkitSlug);
 
-  if (allowedTools.length === 0) {
+  if (allowedTools.length === 0 && builtInToolkits.length === 0) {
     return [];
   }
 
   try {
-    const tools = await composio.tools.get(userId, {
-      tools: allowedTools,
-    });
-    return tools;
+    const toolCollections = await Promise.all([
+      allowedTools.length > 0
+        ? composio.tools.get(userId, {
+            tools: allowedTools,
+          })
+        : Promise.resolve([]),
+      builtInToolkits.length > 0
+        ? composio.tools.get(userId, {
+            toolkits: builtInToolkits,
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return toolCollections.flat();
   } catch (error) {
     console.error("[Composio] Failed to get tools:", error);
     return [];
@@ -514,7 +532,7 @@ export async function handleChatToolCalls(
         if (msg.includes("session") || msg.includes("unauthorized") || msg.includes("not found")) {
           console.warn("[Composio] Session appears missing or expired, attempting recreation...", userId);
           const newSession = await composio.create(userId, {
-            toolkits: SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
+            toolkits: COMPOSIO_SESSION_TOOLKITS,
           });
           
           if (newSession) {
