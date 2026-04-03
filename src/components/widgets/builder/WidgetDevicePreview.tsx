@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder } from './WidgetBuilderContext';
 import { getAppUrl } from '@/lib/env';
 import { ExternalLink, MessageSquare } from 'lucide-react';
@@ -13,6 +14,7 @@ type WidgetLoaderWindow = Window &
   };
 
 export function WidgetDevicePreview() {
+  const { t } = useLanguage();
   const { summary, draftPreview, previewStatus } = useWidgetBuilder();
 
   // Inject loader.js into the host page so it displays a true floating bubble
@@ -79,23 +81,23 @@ export function WidgetDevicePreview() {
           <MessageSquare className="h-5 w-5" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-on-surface">Live Widget Preview</h3>
+          <h3 className="text-sm font-bold text-on-surface">{t('widgetBuilder.devicePreviewTitle')}</h3>
           <p className="text-xs text-on-surface-variant/70">
-            Check the bottom right corner of your screen
+            {t('widgetBuilder.devicePreviewDescription')}
           </p>
         </div>
       </div>
 
       <div className="rounded-xl bg-surface-container-lowest p-4 border border-outline-variant/5">
         <p className="text-[13px] leading-relaxed text-on-surface-variant">
-          Your widget is running natively on this page. Any visual changes made on the left will immediately sync with the floating bubble.
+          {t('widgetBuilder.devicePreviewBody')}
         </p>
       </div>
 
       {previewStatus === 'loading' && (
         <div className="flex items-center gap-2 text-xs font-semibold text-primary/70 animate-pulse">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-          Syncing changes...
+          {t('widgetBuilder.devicePreviewSyncing')}
         </div>
       )}
 
@@ -106,10 +108,10 @@ export function WidgetDevicePreview() {
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-full border border-outline-variant/20 bg-background px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-on-surface hover:bg-surface-container-high transition-colors"
-            title="Open raw widget in new tab"
+            title={t('widgetBuilder.openRawWidget')}
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            Open Full Hosted Preview
+            {t('widgetBuilder.openFullHostedPreview')}
           </a>
         </div>
       )}

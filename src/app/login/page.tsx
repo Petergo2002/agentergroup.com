@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { hasSupabaseEnv } from "@/lib/env";
+import { getMessages } from "@/lib/i18n";
+import { getServerLanguage } from "@/lib/i18n-server";
 import { login, signup } from "@/app/login/actions";
 
 interface LoginPageProps {
@@ -16,6 +18,8 @@ function getSearchValue(value: string | string[] | undefined) {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
+  const language = await getServerLanguage();
+  const messages = getMessages(language);
   const error = getSearchValue(params.error);
   const notice = getSearchValue(params.notice);
   const redirectTo = getSearchValue(params.redirectTo) || "/dashboard";
@@ -26,13 +30,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div className="mx-auto flex max-w-2xl flex-col gap-8 rounded-[2.5rem] border border-outline-variant/15 bg-surface-container-lowest p-12 shadow-2xl">
           <div className="space-y-4">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-              System Configuration
+              {messages.login.systemConfiguration}
             </p>
             <h1 className="font-headline text-4xl font-bold tracking-tight">
-              Ready to build?
+              {messages.login.readyToBuild}
             </h1>
             <p className="max-w-2xl text-sm leading-7 text-on-surface-variant">
-              We just need to wire up your database. Add your Supabase credentials to <code>.env.local</code> and you&apos;ll be live in seconds.
+              {messages.login.setupDatabase}
             </p>
           </div>
           <pre className="overflow-x-auto rounded-2xl bg-surface-container-low p-6 text-xs text-on-surface-variant border border-outline-variant/10">
@@ -51,15 +55,15 @@ COMPOSIO_API_KEY=`}
   return (
     <main className="min-h-screen flex flex-col lg:flex-row bg-background overflow-hidden font-body">
       {/* Left Column: Branding & Visuals */}
-      <section className="relative flex-1 bg-on-background p-12 lg:p-20 flex flex-col justify-between overflow-hidden lg:min-h-screen">
+      <section className="relative flex-1 border-b border-outline-variant/10 bg-background p-12 lg:min-h-screen lg:border-b-0 lg:border-r lg:border-outline-variant/10 lg:p-20 flex flex-col justify-between overflow-hidden">
         {/* Abstract Background Elements */}
         <div className="absolute inset-0 opacity-20 pointer-events-none">
-          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary rounded-full blur-[120px] opacity-30" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary-container rounded-full blur-[100px] opacity-20" />
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary rounded-full blur-[120px] opacity-18" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary-container rounded-full blur-[100px] opacity-12" />
           <div
             className="absolute inset-0"
             style={{
-              backgroundImage: "radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0)",
+              backgroundImage: "radial-gradient(circle at 2px 2px, rgba(255,255,255,0.04) 1px, transparent 0)",
               backgroundSize: "32px 32px",
             }}
           />
@@ -67,42 +71,42 @@ COMPOSIO_API_KEY=`}
 
         <div className="relative z-10 flex flex-col gap-12 max-w-xl">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-high shadow-xl shadow-black/20">
               <Image
                 src="/logo.png"
-                alt="Agentergroup Logo"
+                alt={messages.login.logoAlt}
                 width={48}
                 height={48}
                 className="h-full w-full object-contain p-2"
               />
             </div>
-            <h2 className="text-white font-headline text-2xl font-bold tracking-tight">
+            <h2 className="text-on-surface font-headline text-2xl font-bold tracking-tight">
               Agentergroup
             </h2>
           </div>
 
           <div className="space-y-6">
-            <h1 className="text-5xl lg:text-6xl font-headline font-bold text-white leading-[1.1] tracking-tight">
-              The control interface for <span className="text-primary italic">AI Agents.</span>
+            <h1 className="text-5xl lg:text-6xl font-headline font-bold text-on-surface leading-[1.1] tracking-tight">
+              {messages.login.headline}
             </h1>
-            <p className="text-lg text-white/60 leading-relaxed font-medium">
-              Agentergroup lets you architect, deploy, and monitor production-ready agents with effortless precision.
+            <p className="text-lg text-on-surface-variant leading-relaxed font-medium">
+              {messages.login.subheadline}
             </p>
           </div>
         </div>
 
         <div className="relative z-10 flex gap-8 mt-12 lg:mt-0">
           <div className="flex flex-col gap-1">
-            <span className="text-white font-bold text-xl font-headline">Seamless</span>
-            <span className="text-white/40 text-xs font-semibold uppercase tracking-widest">Architecture</span>
+            <span className="text-on-surface font-bold text-xl font-headline">{messages.login.seamless}</span>
+            <span className="text-on-surface-variant text-xs font-semibold uppercase tracking-widest">{messages.login.architecture}</span>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-white font-bold text-xl font-headline">Scalable</span>
-            <span className="text-white/40 text-xs font-semibold uppercase tracking-widest">Deployment</span>
+            <span className="text-on-surface font-bold text-xl font-headline">{messages.login.scalable}</span>
+            <span className="text-on-surface-variant text-xs font-semibold uppercase tracking-widest">{messages.login.deployment}</span>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-white font-bold text-xl font-headline">Secure</span>
-            <span className="text-white/40 text-xs font-semibold uppercase tracking-widest">Runtime</span>
+            <span className="text-on-surface font-bold text-xl font-headline">{messages.login.secure}</span>
+            <span className="text-on-surface-variant text-xs font-semibold uppercase tracking-widest">{messages.login.runtime}</span>
           </div>
         </div>
       </section>
@@ -112,24 +116,24 @@ COMPOSIO_API_KEY=`}
         <div className="w-full max-w-sm space-y-10">
           <div className="space-y-3 text-center lg:text-left">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-              Workspace Portal
+              {messages.login.workspacePortal}
             </p>
             <h2 className="font-headline text-3xl font-bold tracking-tight text-on-background">
-              Sign in to Agentergroup
+              {messages.login.signInTitle}
             </h2>
             <p className="text-sm text-on-surface-variant font-medium">
-              Enter your credentials below to access your workspace.
+              {messages.login.signInSubtitle}
             </p>
           </div>
 
           {error ? (
-            <div className="rounded-2xl border border-error/15 bg-error/5 px-4 py-3 text-sm text-error font-medium">
+            <div className="rounded-2xl border border-error/20 bg-error-container px-4 py-3 text-sm text-error font-medium">
               {error}
             </div>
           ) : null}
 
           {notice ? (
-            <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-primary font-medium">
+            <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary font-medium">
               {notice}
             </div>
           ) : null}
@@ -139,13 +143,13 @@ COMPOSIO_API_KEY=`}
 
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
-                Email Address
+                {messages.login.emailAddress}
               </label>
               <input
-                className="w-full rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5 placeholder:text-on-surface-variant/40"
+                className="w-full rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm text-on-surface outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-on-surface-variant/40"
                 name="email"
                 type="email"
-                placeholder="name@company.com"
+                placeholder={messages.login.emailPlaceholder}
                 required
               />
             </div>
@@ -153,14 +157,14 @@ COMPOSIO_API_KEY=`}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
-                  Password
+                  {messages.login.password}
                 </label>
               </div>
               <input
-                className="w-full rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5 placeholder:text-on-surface-variant/40"
+                className="w-full rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm text-on-surface outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-on-surface-variant/40"
                 name="password"
                 type="password"
-                placeholder="Min. 6 characters"
+                placeholder={messages.login.passwordPlaceholder}
                 minLength={6}
                 required
               />
@@ -169,30 +173,30 @@ COMPOSIO_API_KEY=`}
             <div className="grid gap-3 pt-4 sm:grid-cols-2">
               <button
                 formAction={login}
-                className="rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm font-bold text-on-surface transition-all hover:bg-surface-container hover:shadow-md active:scale-[0.98]"
+                className="rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm font-bold text-on-surface transition-all hover:border-primary/20 hover:bg-surface-container active:scale-[0.98]"
               >
-                Sign In
+                {messages.login.signIn}
               </button>
               <button
                 formAction={signup}
-                className="signature-gradient rounded-2xl px-5 py-4 text-sm font-bold text-white shadow-xl shadow-primary/20 transition-all hover:shadow-2xl hover:brightness-110 active:scale-[0.98]"
+                className="signature-gradient rounded-2xl px-5 py-4 text-sm font-bold shadow-xl shadow-black/20 transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-[0.98]"
               >
-                Create Account
+                {messages.login.createAccount}
               </button>
             </div>
           </form>
 
           <p className="text-[11px] text-center text-on-surface-variant leading-relaxed opacity-60 px-4">
-            Build your future with Agentergroup. By signing in, you agree to our{" "}
+            {messages.login.legalPrefix}{" "}
             <span className="underline-offset-4 hover:text-on-surface">
-              Terms of Service
+              {messages.login.termsOfService}
             </span>{" "}
-            and{" "}
+            {messages.login.legalAnd}{" "}
             <Link
               href="/privacy-policy"
               className="underline underline-offset-4 transition-colors hover:text-on-surface"
             >
-              Privacy Policy
+              {messages.login.privacyPolicy}
             </Link>
             .
           </p>

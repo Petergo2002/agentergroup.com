@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { useModals } from "@/components/ui/ModalProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAppContext } from "@/components/app/AppContext";
@@ -17,6 +18,7 @@ interface DashboardState {
 
 export default function DashboardPage() {
   const { profile } = useAppContext();
+  const { t } = useLanguage();
   const { openCreateAgent } = useModals();
   const { showToast } = useToast();
   const [state, setState] = useState<DashboardState>({
@@ -38,7 +40,7 @@ export default function DashboardPage() {
         const payload = await response.json().catch(() => null);
 
         if (!response.ok || !payload) {
-          throw new Error(payload?.error || "Failed to load dashboard overview.");
+          throw new Error(payload?.error || t("dashboard.loadError"));
         }
 
         if (!isMounted) {
@@ -57,7 +59,7 @@ export default function DashboardPage() {
         showToast(
           error instanceof Error
             ? error.message
-            : "Failed to load dashboard overview.",
+            : t("dashboard.loadError"),
           "error",
         );
         setState({
@@ -73,14 +75,14 @@ export default function DashboardPage() {
       isMounted = false;
       controller.abort();
     };
-  }, [showToast]);
+  }, [showToast, t]);
 
   const stats = {
     activeAgents: state.data?.agents.filter(a => !a.archived_at && a.status === "active").length ?? 0,
     liveWidgets: state.data?.workspaceSummary.liveWidgets ?? 0,
     connectedApps: state.data?.workspaceSummary.connectedApps ?? 0,
     knowledgeSources: state.data?.workspaceSummary.knowledgeSources ?? 0,
-    leads: 0, // Defaulting to 0 as requested by the user
+    leads: state.data?.workspaceSummary.leads ?? 0,
   };
 
   return (
@@ -108,13 +110,13 @@ export default function DashboardPage() {
             
             <button
               onClick={() => openCreateAgent()}
-              className="signature-gradient group relative flex h-[72px] items-center justify-between rounded-[2rem] px-8 text-sm font-bold text-white shadow-xl shadow-primary/15 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="signature-gradient group relative flex h-[72px] items-center justify-between rounded-[2rem] px-8 text-sm font-bold shadow-xl shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98]"
             >
-              <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[20px]">add_circle</span>
-                <span className="uppercase tracking-[0.18em]">Initialize New Agent</span>
+                <span className="uppercase tracking-[0.18em]">{t("dashboard.initializeAgent")}</span>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm group-hover:bg-white/20 transition-colors">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-background/8 backdrop-blur-sm transition-colors group-hover:bg-primary/12">
                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
               </div>
             </button>

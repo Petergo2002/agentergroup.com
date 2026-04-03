@@ -274,7 +274,7 @@ export async function POST(
       agent,
       input,
       history: mapHistory((history ?? []) as MessageRecord[]),
-      toolUserId: buildWorkspaceComposioUserId(agent.workspace_id, user.id),
+      toolUserId: buildWorkspaceComposioUserId(agent.workspace_id),
       audience: "preview",
       knowledgeAccessToken: session?.access_token ?? null,
       calendarTimezone,

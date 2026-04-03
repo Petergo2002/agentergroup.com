@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder, type AttachedAgentState } from '../WidgetBuilderContext';
 
 const fieldLabelClassName = 'text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1';
@@ -8,6 +9,7 @@ const sectionDescClassName = 'text-sm text-on-surface-variant/60 leading-relaxed
 const inputFieldClassName = 'w-full rounded-[14px] border border-outline-variant/10 bg-background px-5 py-3.5 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/20 placeholder:text-on-surface-variant/30';
 
 export function AgentsTab() {
+  const { t } = useLanguage();
   const { summary, attachedAgents, setAttachedAgents, addAgent, removeAgent, moveAgent } = useWidgetBuilder();
 
   if (!summary) return null;
@@ -21,9 +23,9 @@ export function AgentsTab() {
       {/* Attached Specialists */}
       <section className="space-y-6">
         <div className="space-y-1.5">
-          <h2 className="text-lg font-bold font-headline tracking-tight">Active Specialists</h2>
+          <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.agents.activeSpecialists')}</h2>
           <p className={sectionDescClassName}>
-            Configure which agents are available within your widget and define their specific greetings.
+            {t('widgetBuilder.agents.activeSpecialistsDescription')}
           </p>
         </div>
 
@@ -66,7 +68,7 @@ export function AgentsTab() {
 
                   <div className="grid gap-6 sm:grid-cols-2">
                     <label className="block space-y-2.5">
-                      <span className={fieldLabelClassName}>Greeting Prompt</span>
+                      <span className={fieldLabelClassName}>{t('widgetBuilder.agents.greetingPrompt')}</span>
                       <textarea
                         value={item.greeting}
                         onChange={(e) => {
@@ -78,7 +80,7 @@ export function AgentsTab() {
                       />
                     </label>
                     <label className="block space-y-2.5">
-                      <span className={fieldLabelClassName}>Description Snippet</span>
+                      <span className={fieldLabelClassName}>{t('widgetBuilder.agents.descriptionSnippet')}</span>
                       <textarea
                         value={item.description}
                         onChange={(e) => {
@@ -87,7 +89,7 @@ export function AgentsTab() {
                            setAttachedAgents(next);
                         }}
                         className={`${inputFieldClassName} h-24 resize-none`}
-                        placeholder="Explain what this agent does..."
+                        placeholder={t('widgetBuilder.agents.descriptionPlaceholder')}
                       />
                     </label>
                   </div>
@@ -97,7 +99,7 @@ export function AgentsTab() {
                 <div className="w-full shrink-0 border-t border-outline-variant/5 pt-6 md:w-48 md:border-l md:border-t-0 md:pl-6 md:pt-0">
                   <div className="space-y-4">
                     <label className="block space-y-3">
-                      <span className={fieldLabelClassName}>Interaction</span>
+                      <span className={fieldLabelClassName}>{t('widgetBuilder.agents.interaction')}</span>
                       <select
                          value={item.interactionMode}
                          onChange={(e) => {
@@ -108,8 +110,8 @@ export function AgentsTab() {
                          }}
                          className={inputFieldClassName}
                       >
-                        <option value="chat">Real-time Chat</option>
-                        <option value="contact_form">Contact Form</option>
+                        <option value="chat">{t('widgetBuilder.agents.realtimeChat')}</option>
+                        <option value="contact_form">{t('widgetBuilder.agents.contactForm')}</option>
                       </select>
                     </label>
                     
@@ -117,7 +119,7 @@ export function AgentsTab() {
                       onClick={() => removeAgent(item.agentId)}
                       className="w-full rounded-full bg-error/5 py-2.5 text-[11px] font-bold uppercase tracking-[0.2em] text-error transition-all hover:bg-error/10"
                     >
-                      Detach Agent
+                      {t('widgetBuilder.agents.detachAgent')}
                     </button>
                   </div>
                 </div>
@@ -130,9 +132,9 @@ export function AgentsTab() {
               <div className="mx-auto h-16 w-16 mb-6 rounded-full bg-surface-container-low flex items-center justify-center">
                  <span className="text-2xl opacity-20">👤</span>
               </div>
-              <h3 className="text-lg font-bold font-headline">No Specialists Attached</h3>
+              <h3 className="text-lg font-bold font-headline">{t('widgetBuilder.agents.noSpecialists')}</h3>
               <p className="mt-2 text-sm text-on-surface-variant/40 max-w-sm mx-auto">
-                Users will see a generic home screen if no agents are attached to the widget.
+                {t('widgetBuilder.agents.noSpecialistsDescription')}
               </p>
             </div>
           )}
@@ -142,8 +144,8 @@ export function AgentsTab() {
       {/* Specialist Registry (Picker) */}
       <section className="space-y-6 pt-6 border-t border-outline-variant/10">
         <div className="space-y-1.5 text-center">
-          <h2 className="text-lg font-bold font-headline tracking-tight">Expand Your Roster</h2>
-          <p className="text-sm text-on-surface-variant/60">Choose an available specialist from your workspace to attach.</p>
+          <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.agents.expandRoster')}</h2>
+          <p className="text-sm text-on-surface-variant/60">{t('widgetBuilder.agents.expandRosterDescription')}</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -158,10 +160,10 @@ export function AgentsTab() {
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="truncate text-sm font-bold uppercase tracking-[0.1em]">{agent.name}</h4>
-                <p className="mt-1 line-clamp-2 text-xs opacity-60 font-medium">{agent.description || 'Standard AI Specialist'}</p>
+                <p className="mt-1 line-clamp-2 text-xs opacity-60 font-medium">{agent.description || t('widgetBuilder.agents.standardSpecialist')}</p>
               </div>
               <div className="mt-4 flex w-full items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-40 group-hover:opacity-80">Click to Attach</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-40 group-hover:opacity-80">{t('widgetBuilder.agents.clickToAttach')}</span>
                 <span className="text-[10px] font-bold uppercase tracking-[0.12em] bg-surface-container px-2 py-0.5 rounded group-hover:bg-white/20 whitespace-nowrap">
                   {agent.model.split('/').pop()}
                 </span>
@@ -171,12 +173,12 @@ export function AgentsTab() {
 
           {unattachedAgents.length === 0 && (
             <div className="col-span-full py-12 flex flex-col items-center justify-center opacity-40">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] mb-4">No remaining specialists in registry</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] mb-4">{t('widgetBuilder.agents.noRemainingSpecialists')}</p>
               <Link
                 href="/agents/create"
                 className="text-xs font-bold uppercase tracking-[0.12em] text-primary hover:underline"
               >
-                + Create New Agent
+                + {t('widgetBuilder.agents.createNewAgent')}
               </Link>
             </div>
           )}

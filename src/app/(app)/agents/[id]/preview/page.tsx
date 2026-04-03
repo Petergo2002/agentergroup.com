@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
 import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { getEffectiveConnectionStatus } from '@/lib/connections';
 import { extractEndChatPolicyFromDefinition } from '@/lib/end-chat';
@@ -49,6 +50,7 @@ export default function AgentPreviewPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { workspace, user } = useAppContext();
+  const { t, language } = useLanguage();
   const { showToast } = useToast();
   const agentId = params.id;
   const [agent, setAgent] = useState<AgentRecord | null>(null);
@@ -81,9 +83,9 @@ export default function AgentPreviewPage() {
       return;
     }
 
-    showToast('Internal assistants are disabled for this workspace.', 'error');
+    showToast(t('agentBuilder.internalAssistantsDisabled'), 'error');
     router.replace('/dashboard');
-  }, [agent, router, showToast, workspace]);
+  }, [agent, router, showToast, t, workspace]);
 
   const clearPreviewInactivityTimer = useCallback(() => {
     if (previewInactivityTimerId !== null) {
@@ -114,13 +116,13 @@ export default function AgentPreviewPage() {
         agent_id: agentId,
         source: 'preview',
         created_by: user.id,
-        title: title ?? 'New chat',
+        title: title ?? t('assistants.newChat'),
       })
       .select()
       .single();
 
     if (error || !data) {
-      throw error ?? new Error('Failed to create thread.');
+      throw error ?? new Error(t('agentPreview.createThreadError'));
     }
 
     setThreads((current) => [data as ThreadRecord, ...current]);
@@ -129,7 +131,7 @@ export default function AgentPreviewPage() {
     clearPreviewInactivityTimer();
     setMessages([]);
     return data.id;
-  }, [agentId, clearPreviewInactivityTimer, supabase, user.id, workspace.id]);
+  }, [agentId, clearPreviewInactivityTimer, supabase, t, user.id, workspace.id]);
 
   const loadRunDetails = useCallback(async (runId: string | null) => {
     if (!runId) {
@@ -251,7 +253,7 @@ export default function AgentPreviewPage() {
       } catch (error) {
         if (isMounted) {
           const message =
-            error instanceof Error ? error.message : 'Failed to load agent preview.';
+            error instanceof Error ? error.message : t('agentPreview.loadError');
           showToast(message, 'error');
         }
       } finally {
@@ -266,7 +268,7 @@ export default function AgentPreviewPage() {
     return () => {
       isMounted = false;
     };
-  }, [agentId, createThread, loadMessages, loadRunDetails, showToast, supabase, user.id]);
+  }, [agentId, createThread, loadMessages, loadRunDetails, showToast, supabase, t, user.id]);
 
   useEffect(() => {
     return () => {
@@ -319,7 +321,7 @@ export default function AgentPreviewPage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? 'Failed to run agent.');
+        throw new Error(payload.error ?? t('agentPreview.runError'));
       }
 
       setActiveThreadId(payload.threadId);
@@ -361,14 +363,14 @@ export default function AgentPreviewPage() {
     } catch (error) {
       setMessages((current) => current.filter((message) => message.id !== optimisticMessage.id));
       const message =
-        error instanceof Error ? error.message : 'Failed to run agent.';
+        error instanceof Error ? error.message : t('agentPreview.runError');
       showToast(message, 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const surfaceLabel = agent?.surface === 'widget' ? 'Website Widget' : 'Conversation Hub';
+  const surfaceLabel = agent?.surface === 'widget' ? t('agentPreview.websiteWidget') : t('agentPreview.conversationHub');
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -384,11 +386,11 @@ export default function AgentPreviewPage() {
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/60">
-                Blueprint
+                {t('agentPreview.blueprint')}
               </span>
               <span className="text-on-surface-variant/20 text-[10px]">/</span>
               <h1 className="font-headline text-xl font-bold tracking-tight text-on-surface">
-                {agent?.name || 'Agent'}
+                {agent?.name || t('assistants.agentFallback')}
               </h1>
               {agent ? (
                 <div className="ml-3 flex items-center gap-1.5 rounded-full bg-primary/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
@@ -406,11 +408,11 @@ export default function AgentPreviewPage() {
 
         <div className="flex items-center gap-6">
           <div className="hidden flex-col items-end xl:flex">
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 line-clamp-1">Runtime Status</span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 line-clamp-1">{t('agentPreview.runtimeStatus')}</span>
             <div className="flex items-center gap-1.5">
               <div className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(var(--success-rgb),0.5)]" />
               <p className="text-[10px] font-medium tracking-wide text-on-surface-variant whitespace-nowrap">
-                Connected & Ready
+                {t('agentPreview.runtimeReady')}
               </p>
             </div>
           </div>
@@ -421,7 +423,7 @@ export default function AgentPreviewPage() {
             onClick={() => void createThread(agent?.name)}
             className="h-10 px-6 rounded-2xl border border-outline-variant/15 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:bg-surface-container transition-all active:scale-95"
           >
-            New Session
+            {t('agentPreview.newSession')}
           </button>
         </div>
       </header>
@@ -444,10 +446,12 @@ export default function AgentPreviewPage() {
                   <span className="material-symbols-outlined text-3xl text-primary">chat_bubble</span>
                 </div>
                 <h2 className="font-headline text-2xl font-bold text-on-surface tracking-tight">
-                  Start the conversation
+                  {t('agentPreview.startConversation')}
                 </h2>
                 <p className="text-on-surface-variant/60 leading-relaxed text-sm">
-                  Send a message to test the live runtime and see how {agent?.name || 'the assistant'} responds to your blueprint.
+                  {t('agentPreview.startConversationDescription', {
+                    name: agent?.name || t('assistants.agentFallback'),
+                  })}
                 </p>
               </div>
             ) : (
@@ -508,7 +512,7 @@ export default function AgentPreviewPage() {
               {isActiveThreadCompleted && (
                 <div className="text-center py-2">
                   <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">
-                    Session ended. Start a new one to continue.
+                    {t('agentPreview.sessionEnded')}
                   </span>
                 </div>
               )}
@@ -525,7 +529,7 @@ export default function AgentPreviewPage() {
                     }
                   }}
                   className="w-full h-14 pl-6 pr-32 rounded-2xl bg-surface-container-lowest border border-outline-variant/10 shadow-sm outline-none focus:border-primary/30 focus:shadow-lg focus:shadow-primary/5 text-sm placeholder:text-on-surface-variant/40 transition-all disabled:opacity-50"
-                  placeholder={isActiveThreadCompleted ? 'Session completed' : 'Type a message to test the runtime...'}
+                  placeholder={isActiveThreadCompleted ? t('agentPreview.sessionCompleted') : t('agentPreview.typeMessage')}
                 />
                 <div className="absolute right-2 top-2 bottom-2 p-1 flex items-center gap-2">
                   <button
@@ -533,7 +537,7 @@ export default function AgentPreviewPage() {
                     disabled={isSubmitting || isActiveThreadCompleted || !draftMessage.trim()}
                     className="h-full px-6 rounded-xl bg-on-surface text-background text-[11px] font-bold uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
                   >
-                    {isSubmitting ? 'Running...' : 'Send'}
+                    {isSubmitting ? t('agentPreview.running') : t('agentPreview.send')}
                   </button>
                 </div>
               </div>
@@ -546,21 +550,21 @@ export default function AgentPreviewPage() {
           {/* Agent Summary Card */}
           <section className="p-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm hover:shadow-md transition-all">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/60">Registry</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/60">{t('agentPreview.registry')}</span>
               <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
             </div>
             <h2 className="font-headline text-xl font-bold text-on-surface tracking-tight leading-tight">
-              {agent?.name || 'Loading...'}
+              {agent?.name || t('common.loading')}
             </h2>
             <p className="mt-3 text-xs leading-relaxed text-on-surface-variant/70 min-h-[3em]">
-              {agent?.description || 'Evaluating system blueprint and runtime parameters...'}
+              {agent?.description || t('analytics.monitoringSession')}
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               <div className="px-3 py-1.5 rounded-full border border-outline-variant/10 bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 {agent?.model?.split('/').pop() || 'GPT-4o'}
               </div>
               <div className="px-3 py-1.5 rounded-full border border-outline-variant/10 bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Preview Mode
+                {t('agentPreview.previewMode')}
               </div>
             </div>
           </section>
@@ -570,13 +574,13 @@ export default function AgentPreviewPage() {
             {/* Knowledge Sources */}
             <div className="p-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
               <div className="flex items-center justify-between mb-5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">Knowledge</span>
-                <span className="text-[10px] font-bold text-primary">{knowledgeSources.length} Active</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">{t('agentPreview.knowledge')}</span>
+                <span className="text-[10px] font-bold text-primary">{t('agentPreview.activeCount', { count: knowledgeSources.length })}</span>
               </div>
               <div className="space-y-2">
                 {knowledgeSources.length === 0 ? (
                   <p className="text-[11px] text-on-surface-variant/40 text-center py-4 border border-dashed border-outline-variant/20 rounded-2xl">
-                    No sources attached
+                    {t('agentPreview.noSourcesAttached')}
                   </p>
                 ) : (
                   knowledgeSources.map((source) => (
@@ -592,13 +596,13 @@ export default function AgentPreviewPage() {
             {/* Run History */}
             <div className="p-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
               <div className="flex items-center justify-between mb-5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">Recent Activity</span>
-                <span className="text-[10px] font-bold text-on-surface-variant/30">{runs.length} Runs</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">{t('agentPreview.recentActivity')}</span>
+                <span className="text-[10px] font-bold text-on-surface-variant/30">{t('agentPreview.runs', { count: runs.length })}</span>
               </div>
               <div className="space-y-3">
                 {runs.length === 0 ? (
                   <p className="text-[11px] text-on-surface-variant/40 text-center py-4 border border-dashed border-outline-variant/20 rounded-2xl">
-                    No runtime activity
+                    {t('agentPreview.noRuntimeActivity')}
                   </p>
                 ) : (
                   runs.map((run) => (
@@ -619,7 +623,7 @@ export default function AgentPreviewPage() {
                           {run.status}
                         </span>
                         <span className="text-[9px] font-medium text-on-surface-variant/40">
-                          {formatRelativeDate(run.created_at)}
+                          {formatRelativeDate(run.created_at, language)}
                         </span>
                       </div>
                       {run.error_message ? (
@@ -638,13 +642,13 @@ export default function AgentPreviewPage() {
             {/* Run Trace */}
             <div className="p-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
               <div className="flex items-center justify-between mb-5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">Step Trace</span>
-                {runSteps.length > 0 && <span className="text-[10px] font-bold text-primary">Live</span>}
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">{t('agentPreview.stepTrace')}</span>
+                {runSteps.length > 0 && <span className="text-[10px] font-bold text-primary">{t('common.live')}</span>}
               </div>
               <div className="space-y-3">
                 {runSteps.length === 0 ? (
                   <p className="text-[11px] text-on-surface-variant/40 text-center py-4 border border-dashed border-outline-variant/20 rounded-2xl">
-                    Select a run to trace
+                    {t('agentPreview.selectRunToTrace')}
                   </p>
                 ) : (
                   runSteps.map((step) => (

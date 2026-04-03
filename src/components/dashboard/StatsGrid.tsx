@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Users, Activity, BarChart3, Database } from "lucide-react";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface StatsGridProps {
   stats: {
@@ -15,43 +16,44 @@ interface StatsGridProps {
 }
 
 export function StatsGrid({ stats, isLoading }: StatsGridProps) {
+  const { t } = useLanguage();
   const statItems = useMemo(() => [
     { 
-      label: "Customer Leads", 
+      label: t("dashboard.customerLeads"), 
       value: stats.leads ?? 0, 
       icon: Users, 
       color: "text-primary",
-      description: "Incoming reach outs from your active widgets."
+      description: t("dashboard.leadsDescription")
     },
     { 
-      label: "Live Widgets", 
+      label: t("dashboard.liveWidgets"), 
       value: stats.liveWidgets, 
       icon: Activity, 
       color: "text-success",
-      description: "Agents deployed to your public webpages."
+      description: t("dashboard.widgetsDescription")
     },
     { 
-      label: "Connected Apps", 
+      label: t("dashboard.connectedApps"), 
       value: stats.connectedApps, 
       icon: BarChart3, 
-      color: "text-blue-500",
-      description: "Integrations facilitating data-driven conversations."
+      color: "text-on-surface",
+      description: t("dashboard.appsDescription")
     },
     { 
-      label: "Knowledge", 
+      label: t("dashboard.knowledge"), 
       value: stats.knowledgeSources, 
       icon: Database, 
-      color: "text-orange-400",
-      description: "Proprietary sources powering AI comprehension."
+      color: "text-primary",
+      description: t("dashboard.knowledgeDescription")
     },
-  ], [stats]);
+  ], [stats, t]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
       {statItems.map((item, idx) => (
         <div 
           key={item.label} 
-          className="group relative flex flex-col justify-between p-6 rounded-[2rem] bg-surface-container-low/30 ring-1 ring-outline-variant/10 shadow-[0_12px_40px_rgba(15,23,42,0.03)] transition-all hover:bg-white hover:shadow-xl hover:shadow-primary/5 hover:ring-primary/20 animate-in fade-in slide-in-from-bottom-4 duration-500"
+          className="group relative flex flex-col justify-between rounded-[2rem] bg-surface-container-low/55 p-6 ring-1 ring-outline-variant/10 shadow-[0_12px_40px_rgba(0,0,0,0.16)] transition-all hover:bg-surface-container hover:shadow-xl hover:shadow-black/20 hover:ring-primary/20 animate-in fade-in slide-in-from-bottom-4 duration-500"
           style={{ animationDelay: `${idx * 100}ms` }}
         >
           <div className="flex items-start justify-between mb-6">

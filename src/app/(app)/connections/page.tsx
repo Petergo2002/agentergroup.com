@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import type { ConnectionRecord } from '@/lib/types';
 import * as simpleIcons from 'simple-icons';
@@ -38,6 +39,7 @@ interface ToolkitCard {
 }
 
 export default function ConnectionsPage() {
+  const { language, t } = useLanguage();
   const { showToast } = useToast();
   const [toolkits, setToolkits] = useState<ToolkitCard[]>([]);
   const [connections, setConnections] = useState<ConnectionRecord[]>([]);
@@ -53,20 +55,20 @@ export default function ConnectionsPage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? 'Failed to load connections.');
+        throw new Error(payload.error ?? t('connections.loadError'));
       }
 
       setToolkits(payload.toolkits ?? []);
       setConnections(payload.connections ?? []);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to load connections.';
+        error instanceof Error ? error.message : t('connections.loadError');
       showToast(message, 'error');
     } finally {
       setIsLoading(false);
       setIsSyncing(false);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   useEffect(() => {
     void load();
@@ -84,16 +86,16 @@ export default function ConnectionsPage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? 'Failed to start the connection flow.');
+        throw new Error(payload.error ?? t('connections.startFlowError'));
       }
 
       if (payload.redirectUrl) {
         window.open(payload.redirectUrl, '_blank', 'noopener,noreferrer');
-        showToast('Complete the auth flow, then press Sync Status.', 'info');
+        showToast(t('connections.completeAuthFlow'), 'info');
       }
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to start the connection flow.';
+        error instanceof Error ? error.message : t('connections.startFlowError');
       showToast(message, 'error');
     }
   };
@@ -112,15 +114,15 @@ export default function ConnectionsPage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? 'Failed to disconnect the account.');
+        throw new Error(payload.error ?? t('connections.disconnectError'));
       }
 
-      showToast('Account disconnected.', 'success');
+      showToast(t('connections.disconnectSuccess'), 'success');
       setIsSyncing(true);
       await load();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to disconnect the account.';
+        error instanceof Error ? error.message : t('connections.disconnectError');
       showToast(message, 'error');
     } finally {
       setDisconnectingConnectionId(null);
@@ -140,14 +142,13 @@ export default function ConnectionsPage() {
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-            Integration access
+            {t('connections.badge')}
           </p>
           <h1 className="mt-3 font-headline text-[2.15rem] font-bold tracking-tight text-on-surface sm:text-[2.45rem]">
-            Connections
+            {t('connections.title')}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
-            Connect Gmail, Google Calendar, and Google Drive. Gmail and Calendar power live
-            agent actions, while Drive is reserved for knowledge imports.
+            {t('connections.description')}
           </p>
         </div>
         <button
@@ -157,15 +158,15 @@ export default function ConnectionsPage() {
           }}
           className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90"
         >
-          {isSyncing ? 'Syncing...' : 'Sync Status'}
+          {isSyncing ? t('common.syncing') : t('connections.syncStatus')}
         </button>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
-          ['Connected', String(stats.connected)],
-          ['Pending', String(stats.pending)],
-          ['Errors', String(stats.errors)],
+          [t('common.connected'), String(stats.connected)],
+          [t('common.pending'), String(stats.pending)],
+          [t('common.errors'), String(stats.errors)],
         ].map(([label, value]) => (
           <div
             key={label}
@@ -228,8 +229,8 @@ export default function ConnectionsPage() {
                 <div className="mt-8 flex items-center justify-between gap-3 border-t border-outline-variant/10 pt-4">
                   <div className="text-xs text-on-surface-variant">
                     {toolkit.connection?.last_synced_at
-                      ? `Last sync ${new Date(toolkit.connection.last_synced_at).toLocaleString()}`
-                      : 'No sync yet'}
+                      ? t('connections.lastSync', { value: new Date(toolkit.connection.last_synced_at).toLocaleString(language === 'sv' ? 'sv-SE' : 'en-US') })
+                      : t('connections.noSyncYet')}
                   </div>
                   <div className="flex items-center gap-2">
                     {toolkit.connection && toolkit.status === 'connected' ? (
@@ -239,15 +240,15 @@ export default function ConnectionsPage() {
                         className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {disconnectingConnectionId === toolkit.connection.id
-                          ? 'Disconnecting...'
-                          : 'Disconnect'}
+                          ? t('connections.disconnecting')
+                          : t('connections.disconnect')}
                       </button>
                     ) : null}
                     <button
                       onClick={() => handleConnect(toolkit.slug)}
                       className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface"
                     >
-                      {toolkit.status === 'connected' ? 'Reconnect' : 'Connect'}
+                      {toolkit.status === 'connected' ? t('connections.reconnect') : t('connections.connect')}
                     </button>
                   </div>
                 </div>

@@ -1,16 +1,18 @@
 import type { AdminOverviewSummary } from "@/lib/admin/types";
 import { formatAdminNumber } from "@/lib/admin/format";
+import type { PlatformLanguage } from "@/lib/i18n";
 
 interface AdminStatCardsProps {
   summary: AdminOverviewSummary;
+  language: PlatformLanguage;
 }
 
-export function AdminStatCards({ summary }: AdminStatCardsProps) {
+export function AdminStatCards({ summary, language }: AdminStatCardsProps) {
   const items = [
-    ["Total workspaces", summary.totalWorkspaces],
-    ["Total agents", summary.totalAgents],
-    ["Total conversations", summary.totalConversations],
-    ["Total messages", summary.totalMessages],
+    [language === "sv" ? "Totala workspaces" : "Total workspaces", summary.totalWorkspaces],
+    [language === "sv" ? "Totala agenter" : "Total agents", summary.totalAgents],
+    [language === "sv" ? "Totala konversationer" : "Total conversations", summary.totalConversations],
+    [language === "sv" ? "Totala meddelanden" : "Total messages", summary.totalMessages],
   ] as const;
 
   return (
@@ -24,7 +26,7 @@ export function AdminStatCards({ summary }: AdminStatCardsProps) {
             {label}
           </p>
           <p className="mt-5 text-[32px] font-semibold tracking-tight text-white">
-            {formatAdminNumber(value)}
+            {formatAdminNumber(value, language)}
           </p>
         </article>
       ))}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder } from '../WidgetBuilderContext';
 import { useToast } from '@/components/ui/ToastProvider';
 
@@ -9,6 +10,7 @@ const sectionDescClassName = 'text-sm text-on-surface-variant/60 leading-relaxed
 const inputFieldClassName = 'w-full rounded-[14px] border border-outline-variant/10 bg-background px-5 py-3.5 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/20 placeholder:text-on-surface-variant/30';
 
 export function DeploymentTab() {
+  const { t } = useLanguage();
   const { summary, form, addOrigin, removeOrigin } = useWidgetBuilder();
   const { showToast } = useToast();
   const [localOriginInput, setLocalOriginInput] = useState('');
@@ -18,9 +20,9 @@ export function DeploymentTab() {
   const handleCopy = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      showToast(`${label} copied to clipboard.`, 'success');
+      showToast(t('widgetBuilder.copySuccess', { label }), 'success');
     } catch {
-      showToast(`Failed to copy ${label.toLowerCase()}.`, 'error');
+      showToast(t('widgetBuilder.copyError', { label: label.toLowerCase() }), 'error');
     }
   };
 
@@ -29,9 +31,9 @@ export function DeploymentTab() {
       {/* Embed Code Section */}
       <section className="space-y-6">
         <div className="space-y-1.5">
-          <h2 className="text-lg font-bold font-headline tracking-tight">Access & Connectivity</h2>
+          <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.deployment.accessConnectivity')}</h2>
           <p className={sectionDescClassName}>
-             Embed your widget across your ecosystem using these direct snippets and hosted endpoints.
+             {t('widgetBuilder.deployment.accessConnectivityDescription')}
           </p>
         </div>
 
@@ -39,12 +41,12 @@ export function DeploymentTab() {
            {/* Embed Snippet */}
            <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm space-y-6">
              <div className="flex items-center justify-between">
-                <span className={fieldLabelClassName}>Embed Snippet (Copy & Paste)</span>
+                <span className={fieldLabelClassName}>{t('widgetBuilder.deployment.embedSnippet')}</span>
                 <button 
-                  onClick={() => handleCopy(summary.embedSnippet, 'Embed Snippet')}
+                  onClick={() => handleCopy(summary.embedSnippet, t('widgetBuilder.deployment.embedSnippet'))}
                   className="rounded-full bg-on-surface px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-background transition-opacity hover:opacity-90"
                 >
-                   Copy
+                   {t('common.copy')}
                 </button>
              </div>
              <div className="relative overflow-hidden rounded-[1.6rem] border border-outline-variant/15 bg-slate-900 p-6">
@@ -54,26 +56,26 @@ export function DeploymentTab() {
                <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-slate-900 to-transparent" />
              </div>
              <p className="text-[10px] text-on-surface-variant/40 italic leading-relaxed">
-                Paste this script inside the <code>&lt;head&gt;</code> or bottom of the <code>&lt;body&gt;</code> of your website.
+                {t('widgetBuilder.deployment.embedDescription')}
              </p>
            </div>
 
            {/* Hosted Endpoint */}
            <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-low p-8 space-y-6">
              <div className="flex items-center justify-between">
-                <span className={fieldLabelClassName}>Hosted Endpoint (Standalone)</span>
+                <span className={fieldLabelClassName}>{t('widgetBuilder.deployment.hostedEndpoint')}</span>
                 <button 
-                   onClick={() => handleCopy(summary.hostedUrl, 'Link')}
+                   onClick={() => handleCopy(summary.hostedUrl, t('widgetBuilder.deployment.hostedEndpoint'))}
                    className="rounded-full bg-background/50 border border-outline-variant/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors hover:bg-on-surface hover:text-background"
                 >
-                   Copy Link
+                   {t('widgetBuilder.deployment.copyLink')}
                 </button>
              </div>
              <div className="rounded-[1.4rem] border border-outline-variant/10 bg-background px-6 py-4 truncate text-sm font-medium text-on-surface-variant/60">
                  {summary.hostedUrl}
              </div>
              <p className="text-[10px] text-on-surface-variant/40 italic leading-relaxed">
-                Use this link for direct customer support shareable on social, email, or as a dedicated portal.
+                {t('widgetBuilder.deployment.hostedDescription')}
              </p>
            </div>
         </div>
@@ -82,9 +84,9 @@ export function DeploymentTab() {
       {/* Allowed Domains Section */}
       <section className="space-y-6 pt-6 border-t border-outline-variant/10">
         <div className="space-y-1.5">
-          <h2 className="text-lg font-bold font-headline tracking-tight">Security & Domain Access</h2>
+          <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.deployment.securityDomainAccess')}</h2>
           <p className={sectionDescClassName}>
-             Control which websites are allowed to load your widget. This prevents unauthorized usage of your API keys.
+             {t('widgetBuilder.deployment.securityDomainAccessDescription')}
           </p>
         </div>
 
@@ -100,7 +102,7 @@ export function DeploymentTab() {
                        setLocalOriginInput('');
                     }
                  }}
-                 placeholder="e.g. https://agentergroup.com"
+                 placeholder={t('widgetBuilder.deployment.allowedOriginsPlaceholder')}
                  className={`${inputFieldClassName} flex-1`}
               />
               <button
@@ -110,7 +112,7 @@ export function DeploymentTab() {
                 }}
                 className="shrink-0 rounded-full bg-on-surface px-8 py-3.5 text-xs font-bold uppercase tracking-[0.2em] text-background hover:scale-[1.02] transition-transform active:scale-95"
               >
-                + Add Domain
+                + {t('widgetBuilder.deployment.addDomain')}
               </button>
             </div>
 
@@ -119,7 +121,7 @@ export function DeploymentTab() {
             )}
 
             <div className="space-y-3">
-               <span className={fieldLabelClassName}>Authorized Domain Registry</span>
+               <span className={fieldLabelClassName}>{t('widgetBuilder.deployment.authorizedDomainRegistry')}</span>
                {form.allowedOrigins.length > 0 ? (
                  <div className="grid gap-3 sm:grid-cols-2">
                    {form.allowedOrigins.map((origin, idx) => (
@@ -139,8 +141,8 @@ export function DeploymentTab() {
                  </div>
                ) : (
                  <div className="py-12 flex flex-col items-center justify-center border border-dashed border-outline-variant/10 rounded-[2.5rem] bg-surface-container-low opacity-40">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em]">No domain restrictions applied</p>
-                    <p className="text-[9px] mt-1 text-center max-w-[200px]">By default, your widget is accessible from all origins (less secure).</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em]">{t('widgetBuilder.deployment.noDomainRestrictions')}</p>
+                    <p className="text-[9px] mt-1 text-center max-w-[200px]">{t('widgetBuilder.deployment.noDomainRestrictionsDescription')}</p>
                  </div>
                )}
             </div>

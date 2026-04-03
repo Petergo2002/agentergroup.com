@@ -41,7 +41,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
 
               <div
                 aria-hidden={!isSidebarOpen}
-                className={`fixed inset-0 z-40 bg-on-background/30 transition-opacity duration-200 lg:hidden ${
+                className={`fixed inset-0 z-40 bg-black/60 transition-opacity duration-200 lg:hidden ${
                   isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
                 }`}
                 onClick={() => setIsSidebarOpen(false)}

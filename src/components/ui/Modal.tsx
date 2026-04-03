@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface ModalProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface ModalProps {
 }
 
 export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+  const { t } = useLanguage();
+
   // Handle escape key
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -32,7 +35,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-on-background/40 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-black/65 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
       
@@ -41,10 +44,11 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
         {/* Header */}
         <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-low/50">
           <h3 className="text-lg font-headline font-bold text-on-surface">
-            {title || 'Modal Title'}
+            {title || t('modals.defaultTitle')}
           </h3>
           <button 
             onClick={onClose}
+            aria-label={t('common.close')}
             className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
           >
             <span className="material-symbols-outlined text-xl">close</span>

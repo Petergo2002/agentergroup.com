@@ -33,10 +33,7 @@ export async function GET(request: NextRequest) {
 
   const search = request.nextUrl.searchParams.get("search") ?? "";
   const pageToken = request.nextUrl.searchParams.get("pageToken") ?? undefined;
-  const composioUserId = buildWorkspaceComposioUserId(
-    context.workspace.id,
-    user.id,
-  );
+  const composioUserId = buildWorkspaceComposioUserId(context.workspace.id);
 
   try {
     const result = await listDriveImportFiles(

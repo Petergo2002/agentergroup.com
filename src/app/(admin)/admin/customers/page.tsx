@@ -5,6 +5,7 @@ import {
   resolveAdminWorkspaceSortKey,
   sortAdminWorkspaces,
 } from "@/lib/admin/sort";
+import { getServerLanguage } from "@/lib/i18n-server";
 
 interface AdminCustomersPageProps {
   searchParams: Promise<{
@@ -17,6 +18,7 @@ export default async function AdminCustomersPage({
   searchParams,
 }: AdminCustomersPageProps) {
   await requireAdminUser();
+  const language = await getServerLanguage();
 
   const params = await searchParams;
   const sortKey = resolveAdminWorkspaceSortKey(params.sort);
@@ -32,13 +34,15 @@ export default async function AdminCustomersPage({
     <div className="space-y-8 admin-fade-in">
       <header>
         <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
-          Customers
+          {language === "sv" ? "Kunder" : "Customers"}
         </p>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">
-          Workspace directory
+          {language === "sv" ? "Workspace-katalog" : "Workspace directory"}
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-500">
-          A clean workspace-level view of who is using the platform and how active they are.
+          {language === "sv"
+            ? "En tydlig workspace-vy över vem som använder plattformen och hur aktiva de är."
+            : "A clean workspace-level view of who is using the platform and how active they are."}
         </p>
       </header>
 
@@ -47,6 +51,7 @@ export default async function AdminCustomersPage({
         sortKey={sortKey}
         direction={direction}
         basePath="/admin/customers"
+        language={language}
       />
     </div>
   );

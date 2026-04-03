@@ -1,11 +1,13 @@
 "use client";
 
-import React, {
+import {
   useDeferredValue,
   useEffect,
   useMemo,
   useState,
 } from "react";
+import { useSearchParams } from "next/navigation";
+
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatRelativeDate } from "@/lib/utils";
 import type {
@@ -22,6 +24,7 @@ import {
   ChevronRight,
   MessageSquare,
 } from "lucide-react";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface DashboardAnalyticsState {
   isLoading: boolean;
@@ -49,11 +52,13 @@ function buildAnalyticsUrl(
 function AgentFilterSelector({ 
   agents, 
   selectedId, 
-  onSelect 
+  onSelect,
+  allLabel,
 }: { 
   agents: Array<{ id: string; name: string }>; 
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  allLabel: string;
 }) {
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none hide-scrollbar">
@@ -65,7 +70,7 @@ function AgentFilterSelector({
             : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
         }`}
       >
-        All Agents
+        {allLabel}
       </button>
       {agents.map((agent) => (
         <button
@@ -85,6 +90,7 @@ function AgentFilterSelector({
 }
 
 function DebugPanel({ trace }: { trace: DebugTrace }) {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -96,7 +102,7 @@ function DebugPanel({ trace }: { trace: DebugTrace }) {
       >
         <div className="flex items-center gap-2">
           <Bug className="h-3 w-3" />
-          <span>Execution Context — {trace.durationMs}ms</span>
+          <span>{t("analytics.executionContext")} - {trace.durationMs}ms</span>
         </div>
         <ChevronRight
           className={`h-3 w-3 transition-transform duration-200 ${
@@ -114,11 +120,11 @@ function DebugPanel({ trace }: { trace: DebugTrace }) {
               
               const label = (() => {
                 switch (event.type) {
-                  case "tool_call": return `Tool Call: ${event.name}`;
-                  case "tool_result": return `Tool Success: ${event.name}`;
-                  case "tool_error": return `Tool Error: ${event.name}`;
-                  case "knowledge_hit": return "Knowledge Retrieval Match";
-                  case "session_created": return "Operational Session Initialized";
+                  case "tool_call": return t("analytics.toolCall", { name: event.name ?? t("common.unknown") });
+                  case "tool_result": return t("analytics.toolSuccess", { name: event.name ?? t("common.unknown") });
+                  case "tool_error": return t("analytics.toolError", { name: event.name ?? t("common.unknown") });
+                  case "knowledge_hit": return t("analytics.knowledgeRetrievalMatch");
+                  case "session_created": return t("analytics.sessionInitialized");
                   default: return event.type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
                 }
               })();
@@ -158,11 +164,14 @@ function ConversationRow({
   conversation,
   selected,
   onClick,
+  language,
 }: {
   conversation: DashboardAnalyticsConversationListItem;
   selected: boolean;
   onClick: () => void;
+  language: "en" | "sv";
 }) {
+  const { t } = useLanguage();
   return (
     <button
       type="button"
@@ -181,26 +190,26 @@ function ConversationRow({
         <div className="flex items-center gap-2">
           {conversation.hasLead ? (
             <span className="rounded-full bg-primary-container/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-tight text-primary-container">
-              Lead Captured
+              {t("analytics.leadCaptured")}
             </span>
           ) : (
             <span className="rounded-full bg-success/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-tight text-success">
-              Active
+              {t("analytics.active")}
             </span>
           )}
         </div>
         <span className="text-[10px] font-medium text-on-surface-variant/60">
-          {formatRelativeDate(conversation.lastActivityAt)}
+          {formatRelativeDate(conversation.lastActivityAt, language)}
         </span>
       </div>
 
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate font-headline text-[14px] font-bold text-on-surface group-hover:text-primary-container transition-colors">
-            {conversation.agentLabel || conversation.agentName || "Unknown agent"}
+            {conversation.agentLabel || conversation.agentName || t("common.unknownAgent")}
           </p>
           <p className="mt-1 line-clamp-1 text-[12px] leading-relaxed text-on-surface-variant">
-            {conversation.latestSnippet || "Monitoring session parameters..."}
+            {conversation.latestSnippet || t("analytics.monitoringSession")}
           </p>
         </div>
       </div>
@@ -211,7 +220,7 @@ function ConversationRow({
             {conversation.agentName?.[0] || "A"}
           </div>
           <span className="text-[10px] font-medium text-on-surface-variant">
-            {conversation.widgetName || "Global Widget"}
+            {conversation.widgetName || t("analytics.globalWidget")}
           </span>
         </div>
         <div className="flex items-center gap-1.5 opacity-60">
@@ -236,6 +245,7 @@ function ConversationInboxPane({
   onAgentSelect: (id: string | null) => void;
   selectedAgentId: string | null;
 }) {
+  const { t, language } = useLanguage();
   const conversations = state.data?.conversations ?? [];
   const hasMore = Boolean(state.data?.pageInfo.hasMore);
 
@@ -243,15 +253,15 @@ function ConversationInboxPane({
     <section className="flex h-full min-h-0 flex-col bg-surface-container-low/20">
       <div className="px-6 py-8 border-b border-outline-variant/5 surface-container-low/40">
         <h2 className="font-headline text-xl font-bold tracking-tight text-on-surface">
-          Live Intelligence
+          {t("analytics.liveIntelligence")}
         </h2>
         <div className="mt-1.5 flex items-center gap-2 mb-6">
           <span className="text-[11px] font-bold text-primary-container uppercase tracking-widest animate-pulse">
-            Monitoring
+            {t("analytics.monitoring")}
           </span>
           <div className="h-1 w-1 rounded-full bg-outline-variant/30" />
           <span className="text-[11px] font-medium text-on-surface-variant">
-            {conversations.length} active sessions
+            {t("analytics.activeSessions", { count: conversations.length })}
           </span>
         </div>
 
@@ -260,6 +270,7 @@ function ConversationInboxPane({
             agents={state.data.filters.agents}
             selectedId={selectedAgentId}
             onSelect={onAgentSelect}
+            allLabel={t("analytics.allAgents")}
           />
         )}
       </div>
@@ -276,8 +287,8 @@ function ConversationInboxPane({
             <div className="w-12 h-12 bg-surface-container-low rounded-xl flex items-center justify-center text-on-surface-variant/40 mb-4">
               <span className="material-symbols-outlined">analytics</span>
             </div>
-            <p className="text-sm font-medium text-on-surface">No active sessions</p>
-            <p className="text-[12px] text-on-surface-variant mt-1.5">Awaiting live traffic input.</p>
+            <p className="text-sm font-medium text-on-surface">{t("analytics.noActiveSessions")}</p>
+            <p className="text-[12px] text-on-surface-variant mt-1.5">{t("analytics.awaitingTraffic")}</p>
           </div>
         ) : (
           <div className="divide-y divide-outline-variant/5">
@@ -287,6 +298,7 @@ function ConversationInboxPane({
                 conversation={conversation}
                 selected={state.selectedWidgetSessionId === conversation.widgetSessionId}
                 onClick={() => onSelectConversation(conversation.widgetSessionId)}
+                language={language}
               />
             ))}
             {hasMore && (
@@ -297,7 +309,7 @@ function ConversationInboxPane({
                   disabled={state.isLoadingMore}
                   className="rounded-full border border-outline-variant/10 px-4 py-2 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low transition-colors"
                 >
-                  {state.isLoadingMore ? "Loading..." : "Load more signals"}
+                  {state.isLoadingMore ? t("analytics.loading") : t("analytics.loadMoreSignals")}
                 </button>
               </div>
             )}
@@ -317,20 +329,18 @@ function ConversationDetail({
   isLoading: boolean;
   onClose?: () => void;
 }) {
+  const { t, language } = useLanguage();
   return (
     <section className="flex h-full flex-col bg-surface relative overflow-hidden">
       <div className="shrink-0 p-8 pb-4 flex justify-between items-end border-b border-outline-variant/5 lg:border-none">
         <div className="min-w-0">
           <h2 className="font-headline text-3xl font-bold tracking-tight text-on-surface truncate">
-            {detail ? `Session with ${detail.lead?.name || "Anonymous"}` : "Operational Preview"}
+            {detail
+              ? t("analytics.sessionWith", { name: detail.lead?.name || t("analytics.anonymous") })
+              : t("analytics.operationalPreview")}
           </h2>
           {detail && (
             <div className="flex items-center gap-4 mt-2.5">
-              <span className="flex items-center gap-1.5 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">
-                <span className="material-symbols-outlined text-[14px]">schedule</span>
-                04:12 Session Duration
-              </span>
-              <div className="h-1 w-1 rounded-full bg-outline-variant/30" />
               <span className="flex items-center gap-1.5 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">
                 <span className="material-symbols-outlined text-[14px]">hub</span>
                 {detail.conversation.source}
@@ -345,9 +355,6 @@ function ConversationDetail({
               <span className="material-symbols-outlined text-on-surface-variant">close</span>
             </button>
           )}
-          <button className="p-2.5 rounded-xl border border-outline-variant/10 bg-white/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow group">
-            <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary-container transition-colors">download</span>
-          </button>
         </div>
       </div>
 
@@ -362,9 +369,9 @@ function ConversationDetail({
           <div className="w-16 h-16 bg-surface-container-low rounded-2xl flex items-center justify-center text-on-surface-variant/40 mb-6">
             <span className="material-symbols-outlined text-3xl">analytics</span>
           </div>
-          <h3 className="font-headline text-xl font-bold text-on-surface">No session selected</h3>
+          <h3 className="font-headline text-xl font-bold text-on-surface">{t("analytics.noSessionSelected")}</h3>
           <p className="mt-2 text-sm text-on-surface-variant max-w-xs leading-relaxed">
-            Select an active intelligence session from the sidebar to inspect real-time agent responses.
+            {t("analytics.selectSession")}
           </p>
         </div>
       ) : (
@@ -372,12 +379,11 @@ function ConversationDetail({
           {detail.transcript.length === 0 ? (
             <div className="flex flex-col items-center py-20 text-on-surface-variant/40">
               <span className="material-symbols-outlined text-4xl mb-4">forum</span>
-              <p className="text-sm italic">Waiting for initial message capture...</p>
+              <p className="text-sm italic">{t("analytics.waitingInitialMessage")}</p>
             </div>
           ) : (
             detail.transcript.map((message) => (
-              <React.Fragment key={message.id}>
-                <div className={`flex gap-6 ${message.role === "user" ? "max-w-2xl ml-auto flex-row-reverse" : "max-w-3xl"}`}>
+              <div key={message.id} className={`flex gap-6 ${message.role === "user" ? "max-w-2xl ml-auto flex-row-reverse" : "max-w-3xl"}`}>
                   <div className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center font-headline font-bold text-xs ring-4 ring-offset-2 ring-offset-surface ${
                     message.role === "user" 
                       ? "bg-on-surface-variant/10 text-on-surface-variant ring-transparent" 
@@ -389,9 +395,11 @@ function ConversationDetail({
                   <div className={`space-y-3 ${message.role === "user" ? "text-right" : ""}`}>
                     <div className={`flex items-baseline gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
                       <span className={`font-headline font-bold text-[13px] ${message.role === "user" ? "text-on-surface" : "text-primary-container"}`}>
-                        {message.role === "user" ? (detail.lead?.name || "Anonymous User") : (detail.conversation.agentLabel || "AI Agent")}
+                        {message.role === "user"
+                          ? (detail.lead?.name || t("analytics.anonymousUser"))
+                          : (detail.conversation.agentLabel || t("analytics.aiAgent"))}
                       </span>
-                      <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">{formatRelativeDate(message.createdAt)}</span>
+                      <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">{formatRelativeDate(message.createdAt, language)}</span>
                     </div>
 
                     <div className={`p-6 rounded-2xl shadow-sm border border-black/[0.02] ${
@@ -411,7 +419,6 @@ function ConversationDetail({
                   </div>
                 </div>
 
-              </React.Fragment>
             ))
           )}
         </div>
@@ -421,7 +428,10 @@ function ConversationDetail({
 }
 
 export function AnalyticsWorkspaceView() {
+  const { t } = useLanguage();
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
+  const requestedSessionId = searchParams.get("session");
   const [filters, setFilters] = useState<DashboardAnalyticsAppliedFilters>({
     range: "30d",
     widgetId: null,
@@ -465,7 +475,7 @@ export function AnalyticsWorkspaceView() {
         const payload = await response.json().catch(() => null);
 
         if (!response.ok || !payload) {
-          throw new Error(payload?.error || "Failed to load analytics.");
+          throw new Error(payload?.error || t("analytics.loadError"));
         }
 
         if (!isMounted) {
@@ -483,7 +493,7 @@ export function AnalyticsWorkspaceView() {
         }
 
         showToast(
-          error instanceof Error ? error.message : "Failed to load analytics.",
+          error instanceof Error ? error.message : t("analytics.loadError"),
           "error",
         );
         setState((current) => ({
@@ -503,7 +513,7 @@ export function AnalyticsWorkspaceView() {
       isMounted = false;
       controller.abort();
     };
-  }, [effectiveFilters, showToast]);
+  }, [effectiveFilters, showToast, t]);
 
   useEffect(() => {
     const conversations = state.data?.conversations ?? [];
@@ -524,13 +534,32 @@ export function AnalyticsWorkspaceView() {
       (conversation) => conversation.widgetSessionId === state.selectedWidgetSessionId,
     );
 
+    if (
+      requestedSessionId &&
+      conversations.some(
+        (conversation) => conversation.widgetSessionId === requestedSessionId,
+      ) &&
+      state.selectedWidgetSessionId !== requestedSessionId
+    ) {
+      setState((current) => ({
+        ...current,
+        selectedWidgetSessionId: requestedSessionId,
+      }));
+      return;
+    }
+
     if (!selectionStillExists && !state.isLoading) {
       setState((current) => ({
         ...current,
         selectedWidgetSessionId: conversations[0].widgetSessionId,
       }));
     }
-  }, [state.data?.conversations, state.selectedWidgetSessionId, state.isLoading]);
+  }, [
+    requestedSessionId,
+    state.data?.conversations,
+    state.selectedWidgetSessionId,
+    state.isLoading,
+  ]);
 
   useEffect(() => {
     if (!state.selectedWidgetSessionId) {
@@ -577,7 +606,7 @@ export function AnalyticsWorkspaceView() {
         const payload = await response.json().catch(() => null);
 
         if (!response.ok || !payload) {
-          throw new Error(payload?.error || "Failed to load conversation detail.");
+          throw new Error(payload?.error || t("analytics.detailLoadError"));
         }
 
         if (!isMounted) {
@@ -601,7 +630,7 @@ export function AnalyticsWorkspaceView() {
         showToast(
           error instanceof Error
             ? error.message
-            : "Failed to load conversation detail.",
+            : t("analytics.detailLoadError"),
           "error",
         );
         setState((current) => ({
@@ -618,7 +647,7 @@ export function AnalyticsWorkspaceView() {
       isMounted = false;
       controller.abort();
     };
-  }, [showToast, state.detailCache, state.selectedWidgetSessionId]);
+  }, [showToast, state.detailCache, state.selectedWidgetSessionId, t]);
 
   const loadMore = async () => {
     if (!state.data?.pageInfo.nextCursor) {
@@ -640,7 +669,7 @@ export function AnalyticsWorkspaceView() {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok || !payload) {
-        throw new Error(payload?.error || "Failed to load more conversations.");
+        throw new Error(payload?.error || t("analytics.loadMoreError"));
       }
 
       setState((current) => {
@@ -675,7 +704,7 @@ export function AnalyticsWorkspaceView() {
       showToast(
         error instanceof Error
           ? error.message
-          : "Failed to load more conversations.",
+          : t("analytics.loadMoreError"),
         "error",
       );
       setState((current) => ({
@@ -702,18 +731,18 @@ export function AnalyticsWorkspaceView() {
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-outline-variant/10 bg-surface/70 px-8 backdrop-blur-xl">
         <div className="flex items-center gap-6">
           <h1 className="font-headline text-lg font-bold tracking-tight text-on-surface">
-            Operational Console
+            {t("analytics.operationalConsole")}
           </h1>
           <div className="h-4 w-[1px] bg-outline-variant/30" />
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Live</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{t("analytics.live")}</span>
               <span className="text-sm font-headline font-bold text-on-surface">
                 {state.data?.conversations.length ?? 0}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Throughput</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{t("analytics.throughput")}</span>
               <span className="text-sm font-headline font-bold text-on-surface">
                 {state.data?.overview.conversations ?? 0}
               </span>
@@ -723,7 +752,7 @@ export function AnalyticsWorkspaceView() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-success">
             <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
-            <span className="text-[11px] font-bold tracking-tight">System Online</span>
+            <span className="text-[11px] font-bold tracking-tight">{t("analytics.systemOnline")}</span>
           </div>
         </div>
       </header>

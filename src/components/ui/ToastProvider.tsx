@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -25,6 +26,7 @@ export const useToast = () => {
 };
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
+  const { t } = useLanguage();
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
@@ -64,9 +66,9 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             </div>
             <div>
               <p className="text-[13px] font-bold text-on-surface">
-                {toast.type === 'success' ? 'Success' : ''}
-                {toast.type === 'error' ? 'Error' : ''}
-                {toast.type === 'info' ? 'Notice' : ''}
+                {toast.type === 'success' ? t('toast.success') : ''}
+                {toast.type === 'error' ? t('toast.error') : ''}
+                {toast.type === 'info' ? t('toast.notice') : ''}
               </p>
               <p className="text-[11px] text-on-surface-variant font-medium">
                 {toast.message}
@@ -74,6 +76,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             </div>
             <button 
               onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+              aria-label={t('common.close')}
               className="ml-2 text-on-surface-variant/40 hover:text-on-surface"
             >
               <span className="material-symbols-outlined text-sm">close</span>

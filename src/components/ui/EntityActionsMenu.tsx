@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface EntityActionsMenuProps {
   onArchiveToggle?: () => void;
@@ -16,14 +17,15 @@ interface EntityActionsMenuProps {
 
 export function EntityActionsMenu({
   onArchiveToggle,
-  archiveLabel = 'Archive',
+  archiveLabel,
   archiveDisabled = false,
   onDelete,
-  deleteLabel = 'Delete',
+  deleteLabel,
   deleteDisabled = false,
   buttonClassName = "flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant/65 transition-colors hover:bg-surface-container hover:text-on-surface",
   iconClassName = "material-symbols-outlined text-[20px]",
 }: EntityActionsMenuProps) {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -114,7 +116,7 @@ export function EntityActionsMenu({
         ? createPortal(
         <div
           ref={menuRef}
-          className="fixed z-[70] min-w-[188px] rounded-2xl bg-background p-2 shadow-[0_18px_48px_rgba(15,23,42,0.16)] ring-1 ring-black/5"
+          className="fixed z-[70] min-w-[188px] rounded-2xl bg-surface-container-low p-2 shadow-[0_18px_48px_rgba(0,0,0,0.35)] ring-1 ring-outline-variant/10"
           style={{ top: menuPosition.top, left: menuPosition.left }}
         >
           {onArchiveToggle ? (
@@ -128,7 +130,7 @@ export function EntityActionsMenu({
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
             >
               <span className="material-symbols-outlined text-[18px]">archive</span>
-              {archiveLabel}
+              {archiveLabel ?? t('common.archive')}
             </button>
           ) : null}
           {onDelete ? (
@@ -142,7 +144,7 @@ export function EntityActionsMenu({
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-error transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
             >
               <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-              {deleteLabel}
+              {deleteLabel ?? t('common.delete')}
             </button>
           ) : null}
         </div>,

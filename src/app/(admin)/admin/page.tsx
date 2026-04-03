@@ -8,6 +8,7 @@ import {
   resolveAdminWorkspaceSortKey,
   sortAdminWorkspaces,
 } from "@/lib/admin/sort";
+import { getServerLanguage } from "@/lib/i18n-server";
 
 interface AdminOverviewPageProps {
   searchParams: Promise<{
@@ -20,6 +21,7 @@ export default async function AdminOverviewPage({
   searchParams,
 }: AdminOverviewPageProps) {
   await requireAdminUser();
+  const language = await getServerLanguage();
 
   const params = await searchParams;
   const sortKey = resolveAdminWorkspaceSortKey(params.sort);
@@ -35,26 +37,27 @@ export default async function AdminOverviewPage({
     <div className="space-y-8 admin-fade-in">
       <header>
         <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
-          Internal admin
+          {language === "sv" ? "Intern admin" : "Internal admin"}
         </p>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">
-          Overview
+          {language === "sv" ? "Översikt" : "Overview"}
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-500">
-          High-level visibility into customer accounts, what they have built,
-          and how actively the platform is being used.
+          {language === "sv"
+            ? "Övergripande insyn i kundkonton, vad de har byggt och hur aktivt plattformen används."
+            : "High-level visibility into customer accounts, what they have built, and how actively the platform is being used."}
         </p>
       </header>
 
-      <AdminStatCards summary={overview.summary} />
+      <AdminStatCards summary={overview.summary} language={language} />
 
       <section id="customers" className="space-y-4">
         <div>
           <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
-            Workspaces
+            {language === "sv" ? "Workspaces" : "Workspaces"}
           </p>
           <h2 className="mt-2 text-xl font-semibold text-white">
-            Customer activity
+            {language === "sv" ? "Kundaktivitet" : "Customer activity"}
           </h2>
         </div>
         <AdminWorkspaceTable
@@ -62,6 +65,7 @@ export default async function AdminOverviewPage({
           sortKey={sortKey}
           direction={direction}
           basePath="/admin"
+          language={language}
         />
       </section>
     </div>

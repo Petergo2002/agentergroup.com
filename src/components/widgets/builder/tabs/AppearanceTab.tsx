@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder } from '../WidgetBuilderContext';
 
 const fieldLabelClassName = 'text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1';
@@ -102,6 +103,7 @@ function ColorField({
 }
 
 export function AppearanceTab() {
+  const { t } = useLanguage();
   const { form, setForm, isUploadingLogo, handleLogoUpload, logoInputRef } = useWidgetBuilder();
 
   if (!form) return null;
@@ -122,35 +124,35 @@ export function AppearanceTab() {
       {/* Branding Section */}
       <section className="space-y-6">
         <div className="space-y-1.5">
-          <h2 className="text-lg font-bold font-headline tracking-tight">Identity & Branding</h2>
-          <p className="text-sm text-on-surface-variant/60">Define the core personality of your widget experience.</p>
+          <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.appearance.identityBranding')}</h2>
+          <p className="text-sm text-on-surface-variant/60">{t('widgetBuilder.appearance.identityDescription')}</p>
         </div>
 
         <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-[0_8px_32px_rgba(15,23,42,0.04)]">
           <div className="grid gap-10 md:grid-cols-2">
             {/* Logo Upload */}
             <div className="space-y-4">
-              <span className={fieldLabelClassName}>Brand Logo</span>
+              <span className={fieldLabelClassName}>{t('widgetBuilder.appearance.brandLogo')}</span>
               <div className="flex items-center gap-6">
                 <div className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-[1.6rem] border border-outline-variant/15 bg-surface-container-low transition-all hover:border-primary/30">
                   {form.logoUrl ? (
                     <Image
                       src={form.logoUrl}
-                      alt="Logo preview"
+                      alt={t('widgetBuilder.appearance.logoPreviewAlt')}
                       fill
                       sizes="96px"
                       className="object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-surface-container-low">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/30">No Logo</span>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/30">{t('widgetBuilder.appearance.noLogo')}</span>
                     </div>
                   )}
                   <div 
                     onClick={() => logoInputRef.current?.click()}
                     className="absolute inset-0 flex cursor-pointer items-center justify-center bg-background/60 opacity-0 transition-opacity group-hover:opacity-100 backdrop-blur-[2px]"
                   >
-                    <span className="text-[10px] font-bold uppercase tracking-[0.16em]">Change</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em]">{t('widgetBuilder.appearance.change')}</span>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -169,10 +171,10 @@ export function AppearanceTab() {
                     disabled={isUploadingLogo}
                     className="rounded-full border border-outline-variant/15 px-5 py-2 text-[11px] font-bold uppercase tracking-[0.2em] transition-all hover:bg-on-surface hover:text-background"
                   >
-                    {isUploadingLogo ? 'Uploading...' : 'Upload Image'}
+                    {isUploadingLogo ? t('common.uploading') : t('widgetBuilder.appearance.uploadImage')}
                   </button>
                   <p className="text-[10px] text-on-surface-variant/40 leading-relaxed max-w-[160px]">
-                    Optimized for PNG or SVG with transparent background.
+                    {t('widgetBuilder.appearance.optimizedLogo')}
                   </p>
                 </div>
               </div>
@@ -181,11 +183,11 @@ export function AppearanceTab() {
             {/* Brand Name */}
             <div className={inputContainerClassName}>
               <label className="block space-y-3">
-                <span className={fieldLabelClassName}>Brand Name</span>
+                <span className={fieldLabelClassName}>{t('widgetBuilder.appearance.brandName')}</span>
                 <input
                   value={form.brandName}
                   onChange={(e) => setForm(c => c ? { ...c, brandName: e.target.value } : c)}
-                  placeholder="e.g. Agentergroup"
+                  placeholder={t('widgetBuilder.appearance.brandNamePlaceholder')}
                   className={inputFieldClassName}
                 />
               </label>
@@ -197,21 +199,21 @@ export function AppearanceTab() {
       {/* Colors Section */}
       <section className="space-y-6">
         <div className="space-y-1.5">
-          <h2 className="text-lg font-bold font-headline tracking-tight">Visual Tone</h2>
-          <p className="text-sm text-on-surface-variant/60">Color schemes drive interaction states and focus priority.</p>
+          <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.appearance.visualTone')}</h2>
+          <p className="text-sm text-on-surface-variant/60">{t('widgetBuilder.appearance.visualToneDescription')}</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
           <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-[0_8px_32px_rgba(15,23,42,0.04)]">
             <div className="space-y-6">
               <ColorField
-                label="Primary Signature"
+                label={t('widgetBuilder.appearance.primarySignature')}
                 value={form.primaryColor}
                 onChange={(value) => updateColor('primaryColor', value)}
               />
 
               <ColorField
-                label="Secondary Tint"
+                label={t('widgetBuilder.appearance.secondaryTint')}
                 value={form.secondaryColor}
                 onChange={(value) => updateColor('secondaryColor', value)}
               />
@@ -219,7 +221,7 @@ export function AppearanceTab() {
           </div>
 
           <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-low p-8">
-            <span className={fieldLabelClassName}>Surface Theme</span>
+            <span className={fieldLabelClassName}>{t('widgetBuilder.appearance.surfaceTheme')}</span>
             <div className="mt-6 flex gap-4">
               {(['light', 'dark'] as const).map((theme) => (
                 <button
@@ -238,7 +240,7 @@ export function AppearanceTab() {
               ))}
             </div>
             <p className="mt-6 text-[11px] text-on-surface-variant/40 italic leading-relaxed text-center">
-              The surface theme affects backgrounds, text clarity, and shadow depth across the interactive UI.
+              {t('widgetBuilder.appearance.themeDescription')}
             </p>
           </div>
         </div>

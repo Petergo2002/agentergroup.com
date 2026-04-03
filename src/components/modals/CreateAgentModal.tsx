@@ -6,6 +6,7 @@ import { Modal } from '../ui/Modal';
 import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
 import { useToast } from '@/components/ui/ToastProvider';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { buildAgentPayload, buildInitialDefinition } from '@/lib/agents/defaults';
 import type { AgentSurface } from '@/lib/types';
 import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
@@ -24,6 +25,7 @@ export const CreateAgentModal = ({
   const router = useRouter();
   const supabase = createClient();
   const { workspace, user } = useAppContext();
+  const { t } = useLanguage();
   const { showToast } = useToast();
   const internalAssistantsEnabled = hasInternalAssistantsEnabled(workspace);
   const [name, setName] = useState('');
@@ -42,12 +44,12 @@ export const CreateAgentModal = ({
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      showToast('Please enter an agent name.', 'info');
+      showToast(t('agents.createModal.enterName'), 'info');
       return;
     }
 
     if (surface === 'assistant' && !internalAssistantsEnabled) {
-      showToast('Internal assistants are disabled for this workspace.', 'error');
+      showToast(t('agentBuilder.internalAssistantsDisabled'), 'error');
       return;
     }
 
@@ -68,7 +70,7 @@ export const CreateAgentModal = ({
         .single();
 
       if (agentError || !agent) {
-        throw agentError ?? new Error('Failed to create agent.');
+        throw agentError ?? new Error(t('agents.createModal.createError'));
       }
 
       const { error: draftError } = await supabase.from('agent_drafts').insert({
@@ -82,7 +84,7 @@ export const CreateAgentModal = ({
         throw draftError;
       }
 
-      showToast('Agent created.', 'success');
+      showToast(t('agents.createModal.created'), 'success');
       onClose();
       setName('');
       setSurface('widget');
@@ -90,7 +92,7 @@ export const CreateAgentModal = ({
       router.refresh();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to create the agent.';
+        error instanceof Error ? error.message : t('agents.createModal.createError');
       showToast(message, 'error');
     } finally {
       setIsSaving(false);
@@ -98,12 +100,12 @@ export const CreateAgentModal = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Agent">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('agents.createModal.title')}>
       <div className="space-y-6">
         <div className="space-y-4">
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary">
-              Surface
+              {t('agents.createModal.surface')}
             </label>
             <div className={`grid gap-3 ${internalAssistantsEnabled ? 'sm:grid-cols-2' : ''}`}>
               {internalAssistantsEnabled ? (
@@ -116,9 +118,9 @@ export const CreateAgentModal = ({
                       : 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
                   }`}
                 >
-                  <p className="text-sm font-bold text-on-surface">Internal Assistant</p>
+                  <p className="text-sm font-bold text-on-surface">{t('agents.createModal.assistantTitle')}</p>
                   <p className="mt-1 text-xs leading-5">
-                    Shared inside the workspace and available in Assistants after the first save.
+                    {t('agents.createModal.assistantDescription')}
                   </p>
                 </button>
               ) : null}
@@ -131,20 +133,26 @@ export const CreateAgentModal = ({
                     : 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
                 }`}
               >
-                <p className="text-sm font-bold text-on-surface">Website Widget</p>
+                <p className="text-sm font-bold text-on-surface">{t('agents.createModal.widgetTitle')}</p>
                 <p className="mt-1 text-xs leading-5">
-                  Built for hosted and embeddable customer-facing chat surfaces.
+                  {t('agents.createModal.widgetDescription')}
                 </p>
               </button>
             </div>
           </div>
           <div>
             <label className="text-xs font-bold text-secondary uppercase tracking-widest block mb-2">
-              {surface === 'assistant' ? 'Assistant Name' : 'Agent Name'}
+              {surface === 'assistant'
+                ? t('agents.createModal.assistantName')
+                : t('agents.createModal.agentName')}
             </label>
             <input 
               type="text" 
-              placeholder={surface === 'assistant' ? 'e.g. Sales Assistant' : 'e.g. My Custom Agent'}
+              placeholder={
+                surface === 'assistant'
+                  ? t('agents.createModal.assistantNamePlaceholder')
+                  : t('agents.createModal.agentNamePlaceholder')
+              }
               value={name}
               onChange={(event) => setName(event.target.value)}
               className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"
@@ -157,14 +165,18 @@ export const CreateAgentModal = ({
             onClick={onClose}
             className="flex-1 px-4 py-3 border border-outline-variant/30 rounded-xl text-sm font-bold text-on-surface hover:bg-surface-container-high transition-colors"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button 
             onClick={handleCreate}
             disabled={isSaving}
-            className="flex-1 px-4 py-3 signature-gradient text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
+            className="signature-gradient flex-1 rounded-xl px-4 py-3 text-sm font-bold shadow-lg shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-95"
           >
-            {isSaving ? 'Creating...' : surface === 'assistant' ? 'Create Assistant' : 'Create Agent'}
+            {isSaving
+              ? t('agents.createModal.creating')
+              : surface === 'assistant'
+                ? t('agents.createModal.createAssistant')
+                : t('agents.createAgent')}
           </button>
         </div>
       </div>

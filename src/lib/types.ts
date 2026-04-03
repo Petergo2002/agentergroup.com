@@ -478,6 +478,7 @@ export interface DashboardSummaryResponse {
     liveWidgets: number;
     connectedApps: number;
     knowledgeSources: number;
+    leads: number;
   };
 }
 

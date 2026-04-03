@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { getMessages } from "@/lib/i18n";
+import { getServerLanguage } from "@/lib/i18n-server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -19,6 +21,8 @@ export default async function WidgetDraftPreviewPage({
 }) {
   const { id } = await params;
   const { revision, preview_token: previewToken } = await searchParams;
+  const language = await getServerLanguage();
+  const messages = getMessages(language);
   const supabase = await createClient();
   const {
     data: { user },
@@ -62,13 +66,13 @@ export default async function WidgetDraftPreviewPage({
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/55">
-              Preview Mode
+              {messages.widgets.widgetPreview}
             </p>
             <h1 className="mt-3 text-3xl font-headline font-bold tracking-tight sm:text-4xl">
               {loaded.widget.name}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
-              This preview shows the standalone widget link itself, not the docked bubble from widget settings.
+              {messages.widgets.standalonePreviewDescription}
             </p>
           </div>
 
@@ -80,14 +84,14 @@ export default async function WidgetDraftPreviewPage({
                 rel="noreferrer"
                 className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:border-on-surface/15 hover:text-on-surface"
               >
-                Open raw widget
+                {messages.widgets.openRawWidget}
               </a>
             ) : null}
             <Link
               href={`/widgets/${loaded.widget.id}`}
               className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:border-on-surface/15 hover:text-on-surface"
             >
-              Back to widget
+              {messages.widgets.backToWidget}
             </Link>
           </div>
         </div>
@@ -100,7 +104,7 @@ export default async function WidgetDraftPreviewPage({
                 <span className="h-2.5 w-2.5 rounded-full bg-on-surface/15" />
                 <span className="h-2.5 w-2.5 rounded-full bg-on-surface/15" />
                 <div className="ml-2 flex-1 truncate rounded-full border border-outline-variant/10 bg-background px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/60">
-                  Standalone widget link preview
+                  {messages.widgets.standaloneLinkPreview}
                 </div>
               </div>
 
@@ -118,10 +122,10 @@ export default async function WidgetDraftPreviewPage({
                 Status
               </p>
               <p className="mt-4 text-lg font-semibold text-on-surface">
-                Preview expired
+                {messages.widgets.previewExpired}
               </p>
               <p className="mt-3 max-w-xl text-sm leading-7 text-on-surface-variant">
-                Open preview again from the widget page to mint a fresh internal preview URL.
+                {messages.widgets.previewExpiredDescription}
               </p>
             </div>
           )}

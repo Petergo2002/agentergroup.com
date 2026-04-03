@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, Plus, Filter, Activity } from "lucide-react";
 import { canEditAgentRecord } from "@/lib/agents/access";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { useModals } from "@/components/ui/ModalProvider";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -15,6 +16,7 @@ import { hasInternalAssistantsEnabled } from "@/lib/assistants/feature-flags";
 export default function AgentsPage() {
   const supabase = createClient();
   const { workspace, user, membership } = useAppContext();
+  const { t } = useLanguage();
   const internalAssistantsEnabled = hasInternalAssistantsEnabled(workspace);
   const { openCreateAgent } = useModals();
   const { showToast } = useToast();
@@ -48,7 +50,7 @@ export default function AgentsPage() {
         }
       } catch (error) {
         if (isMounted) {
-          showToast(error instanceof Error ? error.message : "Failed to load agents.", "error");
+          showToast(error instanceof Error ? error.message : t("agents.loadError"), "error");
         }
       } finally {
         if (isMounted) setIsLoading(false);
@@ -56,7 +58,7 @@ export default function AgentsPage() {
     };
     void load();
     return () => { isMounted = false; };
-  }, [internalAssistantsEnabled, showToast, supabase, workspace.id]);
+  }, [internalAssistantsEnabled, showToast, supabase, workspace.id, t]);
 
   const filteredAgents = useMemo(() => {
     return agents.filter((agent) => {
@@ -106,9 +108,9 @@ export default function AgentsPage() {
             : item,
         ),
       );
-      showToast(agent.archived_at ? "Agent restored." : "Agent archived.", "success");
+      showToast(agent.archived_at ? t("agents.restored") : t("agents.archived"), "success");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Failed to update archive status.", "error");
+      showToast(error instanceof Error ? error.message : t("agents.updateArchiveError"), "error");
     } finally {
       setPendingAgentId(null);
     }
@@ -116,7 +118,7 @@ export default function AgentsPage() {
 
   const handleStatusToggle = async (agent: AgentRecord) => {
     if (agent.archived_at) {
-      showToast("Restore the agent before changing its status.", "error");
+      showToast(t("agents.restoreBeforeStatus"), "error");
       return;
     }
     const nextStatus = agent.status === "active" ? "paused" : "active";
@@ -128,13 +130,13 @@ export default function AgentsPage() {
         body: JSON.stringify({ status: nextStatus }),
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || "Failed to update agent status.");
+      if (!response.ok) throw new Error(payload?.error || t("agents.updateStatusError"));
       setAgents((current) =>
         current.map((item) => item.id === agent.id ? { ...item, status: nextStatus } : item),
       );
-      showToast(nextStatus === "active" ? "Agent turned on." : "Agent turned off.", "success");
+      showToast(nextStatus === "active" ? t("agents.turnedOn") : t("agents.turnedOff"), "success");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Failed to update agent status.", "error");
+      showToast(error instanceof Error ? error.message : t("agents.updateStatusError"), "error");
     } finally {
       setTogglingAgentId(null);
     }
@@ -142,11 +144,11 @@ export default function AgentsPage() {
 
   const handlePermanentDelete = async (agent: AgentRecord) => {
     if (membership.role !== "owner") {
-      showToast("Only workspace owners can permanently delete an agent.", "error");
+      showToast(t("agents.ownerDeleteOnly"), "error");
       return;
     }
     if (!agent.archived_at) {
-      showToast("Archive the agent first before permanently deleting it.", "error");
+      showToast(t("agents.archiveBeforeDelete"), "error");
       return;
     }
     setAgentToDelete(agent);
@@ -163,13 +165,13 @@ export default function AgentsPage() {
         body: JSON.stringify({ confirmationName: deleteConfirmation }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Failed to delete agent.");
+      if (!response.ok) throw new Error(payload.error ?? t("agents.deleteError"));
       setAgents((current) => current.filter((item) => item.id !== agentToDelete.id));
       setAgentToDelete(null);
       setDeleteConfirmation("");
-      showToast("Agent permanently deleted.", "success");
+      showToast(t("agents.deleted"), "success");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Failed to delete agent.", "error");
+      showToast(error instanceof Error ? error.message : t("agents.deleteError"), "error");
     } finally {
       setDeletingAgentId(null);
     }
@@ -183,26 +185,25 @@ export default function AgentsPage() {
         <div className="max-w-xl">
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-primary/5 text-primary mb-5">
             <Activity className="h-3.5 w-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Agent Library</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em]">{t('agents.agentLibrary')}</span>
           </div>
           <h1 className="font-headline text-[2.75rem] font-bold leading-[1.05] text-on-surface tracking-tight">
-            Deploy your <span className="text-primary-orange">Intelligence</span>.
+            {t('agents.headline')}
           </h1>
           <p className="mt-5 text-[14px] font-medium leading-relaxed text-on-surface-variant/70 max-w-md">
-            Construct, manage, and scale specialized AI agents for your internal processes 
-            and external customer experiences.
+            {t('agents.description')}
           </p>
         </div>
 
         <button
           onClick={() => openCreateAgent()}
-          className="signature-gradient group relative flex h-14 items-center justify-between rounded-full pl-6 pr-2 text-sm font-bold text-white shadow-xl shadow-primary/15 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          className="signature-gradient group relative flex h-14 items-center justify-between rounded-full pl-6 pr-2 text-sm font-bold shadow-xl shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98]"
         >
           <div className="flex items-center gap-3">
             <Plus className="h-5 w-5" />
-            <span className="uppercase tracking-[0.15em] pr-4">Create Agent</span>
+            <span className="uppercase tracking-[0.15em] pr-4">{t('agents.createAgent')}</span>
           </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm group-hover:bg-white/20 transition-colors">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-background/8 backdrop-blur-sm transition-colors group-hover:bg-primary/12">
             <span className="material-symbols-outlined text-sm">arrow_forward</span>
           </div>
         </button>
@@ -221,7 +222,7 @@ export default function AgentsPage() {
                   : "text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container"
               }`}
             >
-              {tab}
+              {t(`agents.filters.${tab}`)}
             </button>
           ))}
         </div>
@@ -231,7 +232,7 @@ export default function AgentsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search the library..."
+            placeholder={t('agents.searchPlaceholder')}
             className="w-full bg-surface-container/30 border-none rounded-full py-3.5 pl-11 pr-4 text-sm font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:ring-1 focus:ring-primary/20 transition-all outline-none"
           />
         </div>
@@ -249,9 +250,9 @@ export default function AgentsPage() {
           <div className="h-20 w-20 rounded-full bg-primary/5 flex items-center justify-center mb-6">
             <Filter className="h-8 w-8 text-primary/30" />
           </div>
-          <h2 className="text-2xl font-headline font-bold text-on-surface">No agents found</h2>
+          <h2 className="text-2xl font-headline font-bold text-on-surface">{t('agents.noAgentsFound')}</h2>
           <p className="mt-3 text-[14px] text-on-surface-variant/60 max-w-sm">
-            We couldn&apos;t find any agents matching your current filters or search criteria.
+            {t('agents.noAgentsFoundDescription')}
           </p>
         </div>
       ) : (
@@ -275,7 +276,10 @@ export default function AgentsPage() {
       {/* ─── Footer ────────────────────────────────────────────── */}
       <footer className="flex items-center justify-between pt-8 border-t border-outline-variant/10">
         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">
-          Showing {pagedAgents.length} of {filteredAgents.length} Intelligence Units
+          {t("agents.showingSummary", {
+            shown: pagedAgents.length,
+            total: filteredAgents.length,
+          })}
         </span>
 
         {totalPages > 1 && (
@@ -300,10 +304,10 @@ export default function AgentsPage() {
       {/* ─── Modals ────────────────────────────────────────────── */}
       <ConfirmDeleteModal
         isOpen={Boolean(agentToDelete)}
-        title="Permanently Delete Agent"
+        title={t("agents.deleteTitle")}
         entityName={agentToDelete?.name ?? ""}
-        entityLabel="Agent"
-        description="This action is irreversible. All drafts, versions, and conversations associated with this agent will be purged."
+        entityLabel={t("agents.deleteEntityLabel")}
+        description={t("agents.deleteDescription")}
         confirmationValue={deleteConfirmation}
         onConfirmationChange={setDeleteConfirmation}
         onClose={() => setAgentToDelete(null)}

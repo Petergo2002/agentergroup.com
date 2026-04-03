@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useParams } from 'next/navigation';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { createClient } from '@/lib/supabase/client';
 import type {
@@ -231,6 +232,7 @@ function buildDraftPreviewPayload(
 export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
   const [supabase] = useState(() => createClient());
   const params = useParams<{ id: string }>();
+  const { t } = useLanguage();
   const { showToast } = useToast();
   const widgetId = params.id;
   const logoInputRef = useRef<HTMLInputElement | null>(null);
@@ -252,17 +254,17 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/widgets/${widgetId}`);
       const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload) throw new Error(payload?.error || 'Failed to load widget.');
+      if (!response.ok || !payload) throw new Error(payload?.error || t('widgetBuilder.loadError'));
       const nextSummary = payload as WidgetDetailResponse;
       setSummary(nextSummary);
       setForm(getInitialFormState(nextSummary));
       setAttachedAgents(getInitialAttachedAgents(nextSummary));
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to load widget.', 'error');
+      showToast(error instanceof Error ? error.message : t('widgetBuilder.loadError'), 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, widgetId]);
+  }, [showToast, widgetId, t]);
 
   useEffect(() => {
     void loadWidget();
@@ -287,7 +289,7 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
           signal: controller.signal,
         });
         const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload) throw new Error(payload?.error || 'Preview unavailable.');
+        if (!response.ok || !payload) throw new Error(payload?.error || t('widgetBuilder.previewUnavailable'));
         if (controller.signal.aborted) return;
 
         setDraftPreview({
@@ -307,7 +309,7 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [draftPreviewPayload, summary, widgetId]);
+  }, [draftPreviewPayload, summary, widgetId, t]);
 
   const persistWidget = async (options?: { showSuccessToast?: boolean; reloadAfterSave?: boolean }) => {
     if (!form) return false;
@@ -354,12 +356,12 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
         }),
       ]);
 
-      if (!identityResponse.ok || !agentsResponse.ok) throw new Error('Failed to save widget.');
+      if (!identityResponse.ok || !agentsResponse.ok) throw new Error(t('widgetBuilder.saveError'));
       if (options?.reloadAfterSave ?? true) await loadWidget();
-      if (options?.showSuccessToast ?? true) showToast('Widget saved.', 'success');
+      if (options?.showSuccessToast ?? true) showToast(t('widgetBuilder.saved'), 'success');
       return true;
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to save widget.', 'error');
+      showToast(error instanceof Error ? error.message : t('widgetBuilder.saveError'), 'error');
       return false;
     } finally {
       setIsSaving(false);
@@ -376,11 +378,11 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      if (!response.ok) throw new Error('Failed to update deployment.');
+      if (!response.ok) throw new Error(t('widgetBuilder.updateDeploymentError'));
       await loadWidget();
-      showToast(status === 'deployed' ? 'Widget deployed.' : 'Widget taken offline.', 'success');
+      showToast(status === 'deployed' ? t('widgetBuilder.deployed') : t('widgetBuilder.takenOffline'), 'success');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to update deployment.', 'error');
+      showToast(error instanceof Error ? error.message : t('widgetBuilder.updateDeploymentError'), 'error');
     } finally {
       setIsUpdatingDeployment(false);
     }
@@ -389,7 +391,7 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
   const handleLogoUpload = async (file: File) => {
     if (!form || !summary) return;
     if (!file.type.startsWith('image/')) {
-      showToast('Please upload an image file.', 'error');
+      showToast(t('widgetBuilder.uploadImageError'), 'error');
       return;
     }
     setIsUploadingLogo(true);
@@ -400,9 +402,9 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from(WIDGET_ASSETS_BUCKET).getPublicUrl(storagePath);
       setForm((current) => current ? { ...current, logoUrl: publicUrl } : current);
-      showToast('Logo uploaded.', 'success');
+      showToast(t('widgetBuilder.logoUploaded'), 'success');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to upload logo.', 'error');
+      showToast(error instanceof Error ? error.message : t('widgetBuilder.uploadLogoError'), 'error');
     } finally {
       setIsUploadingLogo(false);
       if (logoInputRef.current) logoInputRef.current.value = '';
@@ -421,14 +423,14 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
         icon: '',
         sortOrder: current.length,
         interactionMode: 'chat',
-        greeting: 'Hi! How can I help you today?',
-        placeholder: 'Write a message...',
+        greeting: t('widgetBuilder.agents.defaultGreeting'),
+        placeholder: t('widgetBuilder.agents.defaultPlaceholder'),
         showQuickActions: true,
         quickActions: buildQuickActionsFromPrompts(agent.starter_prompts.slice(0, 3)),
         contactFormSettings: {
-          submitButtonText: 'Send',
-          successMessage: "Thanks! We'll get back to you soon.",
-          introText: "Leave your details and we'll contact you.",
+          submitButtonText: t('agentPreview.send'),
+          successMessage: t('widgetBuilder.agents.contactFormSuccess'),
+          introText: t('widgetBuilder.agents.contactFormIntro'),
         },
         publishedVersionId: agent.published_version_id,
         agent,
@@ -458,7 +460,7 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
       if (form.allowedOrigins.includes(origin)) return;
       setForm((current) => current ? { ...current, allowedOrigins: [...current.allowedOrigins, origin], originError: null } : current);
     } catch {
-      setForm((current) => current ? { ...current, originError: 'Invalid URL' } : current);
+      setForm((current) => current ? { ...current, originError: t('widgetBuilder.invalidUrl') } : current);
     }
   };
 

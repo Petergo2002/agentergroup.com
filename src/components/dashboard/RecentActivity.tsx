@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { MessageSquare, ArrowRight, User } from "lucide-react";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { formatRelativeDate } from "@/lib/utils";
 
 interface Conversation {
@@ -19,20 +20,22 @@ interface RecentActivityProps {
 }
 
 export function RecentActivity({ conversations, isLoading }: RecentActivityProps) {
+  const { language, t } = useLanguage();
+
   return (
     <div className="rounded-[2rem] bg-surface-container-low/30 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.06)] ring-1 ring-outline-variant/10">
       <div className="flex items-center justify-between mb-8">
         <div>
           <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-primary/5 text-primary mb-3">
-            <span className="text-[9px] font-bold uppercase tracking-widest">Live Activity</span>
+            <span className="text-[9px] font-bold uppercase tracking-widest">{t("dashboard.liveActivity")}</span>
           </div>
-          <h2 className="font-headline text-2xl font-bold text-on-surface">Recent Conversations</h2>
+          <h2 className="font-headline text-2xl font-bold text-on-surface">{t("dashboard.recentConversations")}</h2>
         </div>
         <Link
           href="/analytics"
           className="group flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-all"
         >
-          View All Analytics
+          {t("dashboard.viewAllAnalytics")}
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
         </Link>
       </div>
@@ -51,7 +54,7 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
               <MessageSquare className="h-5 w-5 text-on-surface-variant/40" />
             </div>
             <p className="text-sm font-bold text-on-surface-variant/60 uppercase tracking-widest">
-              No conversations detected
+              {t("dashboard.noConversationsDetected")}
             </p>
           </div>
         ) : (
@@ -59,7 +62,7 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
             <Link
               key={convo.widgetSessionId}
               href="/analytics"
-              className="group relative block rounded-2xl bg-surface-container-lowest/50 p-5 transition-all hover:bg-white hover:shadow-lg hover:shadow-primary/5 hover:ring-1 hover:ring-primary/10"
+              className="group relative block rounded-2xl bg-surface-container-lowest/65 p-5 transition-all hover:bg-surface-container hover:shadow-lg hover:shadow-black/20 hover:ring-1 hover:ring-primary/10"
             >
               <div className="flex items-start justify-between gap-6">
                 <div className="flex gap-4 min-w-0">
@@ -73,17 +76,17 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
                       </p>
                       <span className="h-1 w-1 rounded-full bg-outline-variant/40" />
                       <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/60">
-                        {convo.agentLabel || convo.agentName || "Unknown agent"}
+                        {convo.agentLabel || convo.agentName || t("common.unknownAgent")}
                       </p>
                     </div>
                     <p className="line-clamp-1 text-[13px] leading-relaxed text-on-surface-variant/80 italic">
-                      &ldquo;{convo.latestSnippet || "Waiting for customer input..."}&rdquo;
+                      &ldquo;{convo.latestSnippet || t("dashboard.noRecentActivity")}&rdquo;
                     </p>
                   </div>
                 </div>
                 <div className="shrink-0 flex flex-col items-end">
                   <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/50">
-                    {formatRelativeDate(convo.lastActivityAt)}
+                    {formatRelativeDate(convo.lastActivityAt, language)}
                   </span>
                   <div className="mt-2 h-1.5 w-1.5 rounded-full bg-success ring-4 ring-success/10 animate-pulse" />
                 </div>

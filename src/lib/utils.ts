@@ -1,3 +1,8 @@
+import {
+  formatLocaleDate,
+  type PlatformLanguage,
+} from "@/lib/i18n";
+
 export function slugify(value: string) {
   return value
     .toLowerCase()
@@ -21,9 +26,12 @@ export function titleFromEmail(email?: string | null) {
     .join(" ");
 }
 
-export function formatRelativeDate(value?: string | null) {
+export function formatRelativeDate(
+  value?: string | null,
+  language: PlatformLanguage = "en",
+) {
   if (!value) {
-    return "Never";
+    return language === "sv" ? "Aldrig" : "Never";
   }
 
   const date = new Date(value);
@@ -31,22 +39,26 @@ export function formatRelativeDate(value?: string | null) {
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
   if (diffMinutes < 1) {
-    return "Just now";
+    return language === "sv" ? "Precis nu" : "Just now";
   }
 
   if (diffMinutes < 60) {
-    return `${diffMinutes}m ago`;
+    return language === "sv" ? `${diffMinutes} min sedan` : `${diffMinutes}m ago`;
   }
 
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) {
-    return `${diffHours}h ago`;
+    return language === "sv" ? `${diffHours} h sedan` : `${diffHours}h ago`;
   }
 
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) {
-    return `${diffDays}d ago`;
+    return language === "sv" ? `${diffDays} d sedan` : `${diffDays}d ago`;
   }
 
-  return date.toLocaleDateString();
+  return formatLocaleDate(date, language, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }

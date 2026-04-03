@@ -5,27 +5,30 @@ import type {
   AdminWorkspaceDetailSummary,
 } from "@/lib/admin/types";
 import { formatAdminNumber } from "@/lib/admin/format";
+import type { PlatformLanguage } from "@/lib/i18n";
 
 interface AdminWorkspaceAnalyticsProps {
   workspace: AdminWorkspaceDetailSummary;
   points: AdminDailyMessageActivityPoint[];
+  language: PlatformLanguage;
 }
 
 export function AdminWorkspaceAnalytics({
   workspace,
   points,
+  language,
 }: AdminWorkspaceAnalyticsProps) {
   const stats = [
     {
-      label: "Total conversations",
-      value: formatAdminNumber(workspace.conversationCount),
+      label: language === "sv" ? "Totala konversationer" : "Total conversations",
+      value: formatAdminNumber(workspace.conversationCount, language),
     },
     {
-      label: "Total messages",
-      value: formatAdminNumber(workspace.messageCount),
+      label: language === "sv" ? "Totala meddelanden" : "Total messages",
+      value: formatAdminNumber(workspace.messageCount, language),
     },
     {
-      label: "Last active",
+      label: language === "sv" ? "Senast aktiv" : "Last active",
       value: null,
     },
   ] as const;
@@ -41,9 +44,9 @@ export function AdminWorkspaceAnalytics({
             <p className="text-[12px] uppercase tracking-[0.14em] text-neutral-500">
               {stat.label}
             </p>
-            {stat.label === "Last active" ? (
+            {stat.label === (language === "sv" ? "Senast aktiv" : "Last active") ? (
               <div className="mt-4 text-lg font-medium text-white">
-                <AdminTimestamp value={workspace.lastActiveAt} />
+                <AdminTimestamp value={workspace.lastActiveAt} language={language} />
               </div>
             ) : (
               <p className="mt-4 text-[28px] font-semibold tracking-tight text-white">
@@ -54,7 +57,7 @@ export function AdminWorkspaceAnalytics({
         ))}
       </div>
 
-      <AdminActivityChart points={points} />
+      <AdminActivityChart points={points} language={language} />
     </div>
   );
 }

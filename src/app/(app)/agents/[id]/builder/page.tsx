@@ -18,6 +18,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppContext } from '@/components/app/AppContext';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/ToastProvider';
@@ -27,6 +28,7 @@ import { buildInitialDefinition } from '@/lib/agents/defaults';
 import { getEffectiveConnectionStatus } from '@/lib/connections';
 import { DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS } from '@/lib/end-chat';
 import { normalizeGmailRecipientEmail } from '@/lib/gmail';
+import { formatLocaleDateTime, type PlatformLanguage } from '@/lib/i18n';
 import type { GoogleCalendarListItem } from '@/lib/google-calendar';
 import { getSupportedIntegration, isChatIntegrationSlug } from '@/lib/integrations';
 import { getKnowledgeStatusTone, isReadyKnowledgeSource } from '@/lib/knowledge';
@@ -70,6 +72,12 @@ type BuilderFlowEdge = Edge;
 type ToolNodeKind = 'gmail' | 'googlecalendar';
 type ToolNodeData = GmailBuilderNodeData | GoogleCalendarBuilderNodeData;
 type LibraryItemKey = 'knowledge' | 'tools' | 'endchat' | 'agent' | 'output';
+type Translate = (key: string, values?: Record<string, string | number>) => string;
+type BuilderStatusNote =
+  | { kind: 'draftInitial' }
+  | { kind: 'lastSaved'; date: string }
+  | { kind: 'publishedAt'; date: string; version: number }
+  | { kind: 'rolledBackAt'; date: string };
 
 interface NodeLibraryItem {
   key: LibraryItemKey;
@@ -92,14 +100,15 @@ const FIXED_NODE_IDS = {
 } as const;
 
 const DEFAULT_EDGE_STYLE = {
-  stroke: 'var(--color-outline-variant)',
+  stroke: 'var(--color-primary)',
   strokeWidth: 2,
-  opacity: 0.4,
+  opacity: 0.9,
 };
 
 const PRIMARY_EDGE_STYLE = {
   stroke: 'var(--color-primary)',
   strokeWidth: 2,
+  opacity: 0.9,
 };
 
 const DEFAULT_POSITIONS: Record<BuilderNodeKind, { x: number; y: number }> = {
@@ -197,6 +206,153 @@ function getStarterPromptFields(prompts: string[]) {
   return Array.from({ length: 3 }, (_, index) => prompts[index] ?? '');
 }
 
+function getNodeLibraryText(key: LibraryItemKey, t: Translate) {
+  switch (key) {
+    case 'agent':
+      return {
+        label: t('agentBuilder.nodeLibrary.agent'),
+        description: t('agentBuilder.nodeLibrary.agentDescription'),
+      };
+    case 'knowledge':
+      return {
+        label: t('agentBuilder.nodeLibrary.knowledge'),
+        description: t('agentBuilder.nodeLibrary.knowledgeDescription'),
+      };
+    case 'tools':
+      return {
+        label: t('agentBuilder.nodeLibrary.tools'),
+        description: t('agentBuilder.nodeLibrary.toolsDescription'),
+      };
+    case 'endchat':
+      return {
+        label: t('agentBuilder.nodeLibrary.endChat'),
+        description: t('agentBuilder.nodeLibrary.endChatDescription'),
+      };
+    case 'output':
+      return {
+        label: t('agentBuilder.nodeLibrary.output'),
+        description: t('agentBuilder.nodeLibrary.outputDescription'),
+      };
+  }
+}
+
+function getBuilderNodeText(kind: BuilderNodeKind, t: Translate) {
+  switch (kind) {
+    case 'trigger':
+      return {
+        label: t('agentBuilder.triggerLabel'),
+        type: t('agentBuilder.triggerType'),
+        description: t('agentBuilder.triggerDescription'),
+      };
+    case 'agent':
+      return {
+        label: t('agentBuilder.agentLabel'),
+        type: t('agentBuilder.coreType'),
+        description: t('agentBuilder.coreDescription'),
+      };
+    case 'knowledge':
+      return {
+        label: t('agentBuilder.nodeLibrary.knowledge'),
+        type: t('agentBuilder.knowledgeType'),
+        description: t('agentBuilder.nodeLibrary.knowledgeDescription'),
+      };
+    case 'gmail':
+      return {
+        label: 'Gmail',
+        type: t('agentBuilder.toolType'),
+        description: t('agentBuilder.gmailDescription'),
+      };
+    case 'googlecalendar':
+      return {
+        label: 'Google Calendar',
+        type: t('agentBuilder.toolType'),
+        description: t('agentBuilder.googleCalendarDescription'),
+      };
+    case 'output':
+      return {
+        label: t('agentBuilder.outputLabel'),
+        type: t('agentBuilder.outputType'),
+        description: t('agentBuilder.outputDescription'),
+      };
+    case 'endchat':
+      return {
+        label: t('agentBuilder.endChatLabel'),
+        type: t('agentBuilder.controlType'),
+        description: t('agentBuilder.endChatNodeDescription'),
+      };
+  }
+}
+
+function translateConnectionStatus(status: string, t: Translate) {
+  switch (status) {
+    case 'connected':
+      return t('statuses.connection.connected');
+    case 'pending':
+      return t('statuses.connection.pending');
+    case 'error':
+      return t('statuses.connection.error');
+    case 'disconnected':
+      return t('statuses.connection.disconnected');
+    default:
+      return status;
+  }
+}
+
+function translateKnowledgeStatus(status: string, t: Translate) {
+  switch (status) {
+    case 'pending':
+      return t('statuses.knowledge.pending');
+    case 'processing':
+      return t('statuses.knowledge.processing');
+    case 'ready':
+      return t('statuses.knowledge.ready');
+    case 'failed':
+      return t('statuses.knowledge.failed');
+    case 'syncing':
+      return t('statuses.knowledge.syncing');
+    default:
+      return status;
+  }
+}
+
+function getToolActionLabels(kind: ToolNodeKind, t: Translate) {
+  if (kind === 'gmail') {
+    return [t('agentBuilder.sendEmailAction')];
+  }
+
+  return [
+    t('agentBuilder.createEventAction'),
+    t('agentBuilder.quickAddAction'),
+    t('agentBuilder.getCurrentDateTimeAction'),
+    t('agentBuilder.findFreeSlotsAction'),
+    t('agentBuilder.listCalendarsAction'),
+  ];
+}
+
+function formatBuilderStatusNote(
+  statusNote: BuilderStatusNote,
+  language: PlatformLanguage,
+  t: Translate,
+) {
+  switch (statusNote.kind) {
+    case 'draftInitial':
+      return t('agentBuilder.draftInitial');
+    case 'lastSaved':
+      return t('agentBuilder.lastSaved', {
+        date: formatLocaleDateTime(statusNote.date, language),
+      });
+    case 'publishedAt':
+      return t('agentBuilder.publishedAt', {
+        version: statusNote.version,
+        date: formatLocaleDateTime(statusNote.date, language),
+      });
+    case 'rolledBackAt':
+      return t('agentBuilder.rolledBackAt', {
+        date: formatLocaleDateTime(statusNote.date, language),
+      });
+  }
+}
+
 function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
   const badgeToneClass = {
     default: 'bg-background text-on-surface-variant',
@@ -204,6 +360,10 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
     warning: 'bg-surface-container-high text-on-surface',
     error: 'bg-error-container text-on-error-container',
   }[data.badgeTone ?? 'default'];
+  const confidenceLabel =
+    'confidenceLabel' in data && typeof data.confidenceLabel === 'string'
+      ? data.confidenceLabel
+      : 'Confidence';
 
   return (
     <div
@@ -214,6 +374,7 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
       <Handle
         type="target"
         position={Position.Left}
+        isConnectable={false}
         className="!h-3.5 !w-3.5 !-left-[8px] !border-[3px] !border-surface !bg-primary !transition-transform group-hover/node:scale-125"
       />
       <div
@@ -272,7 +433,7 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
               />
             </div>
             <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
-              <span>Confidence</span>
+              <span>{confidenceLabel}</span>
               <span>{data.confidenceValue ?? 80}%</span>
             </div>
           </div>
@@ -281,6 +442,7 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
       <Handle
         type="source"
         position={Position.Right}
+        isConnectable={false}
         className="!h-3.5 !w-3.5 !-right-[8px] !border-[3px] !border-surface !bg-primary !transition-transform group-hover/node:scale-125"
       />
     </div>
@@ -392,7 +554,6 @@ function createTriggerNode(
     id: FIXED_NODE_IDS.trigger,
     type: 'agentNode',
     position,
-    draggable: false,
     data: {
       kind: 'trigger',
       label: 'User Message',
@@ -414,7 +575,6 @@ function createAgentCoreNode(
     id: FIXED_NODE_IDS.agent,
     type: 'agentNode',
     position,
-    draggable: false,
     data: {
       kind: 'agent',
       label: 'Agent',
@@ -517,7 +677,6 @@ function createOutputNode(
     id: FIXED_NODE_IDS.output,
     type: 'agentNode',
     position,
-    draggable: false,
     data: {
       kind: 'output',
       label: 'Assistant Response',
@@ -628,6 +787,7 @@ function pickPreferredConnectionId(
 
 function normalizeDefinition(
   definition: BuilderDefinition,
+  surface: AgentRecord['surface'],
   connections: ConnectionRecord[],
   attachedConnectionIds: string[],
   attachedKnowledgeSourceIds: string[],
@@ -776,7 +936,10 @@ function normalizeDefinition(
 function enrichNodeForDisplay(
   node: BuilderFlowNode,
   connections: ConnectionRecord[],
+  t: Translate,
 ): BuilderFlowNode {
+  const localizedText = getBuilderNodeText(node.data.kind, t);
+
   if (node.data.kind === 'knowledge') {
     const sourceCount = node.data.sourceIds.length;
 
@@ -784,7 +947,12 @@ function enrichNodeForDisplay(
       ...node,
       data: {
         ...node.data,
-        badgeText: sourceCount > 0 ? `${sourceCount} attached` : 'No sources',
+        ...localizedText,
+        confidenceLabel: t('agentBuilder.confidence'),
+        badgeText:
+          sourceCount > 0
+            ? t('agentBuilder.attachedBadge', { count: sourceCount })
+            : t('agentBuilder.noSourcesBadge'),
         badgeTone: sourceCount > 0 ? 'success' : 'warning',
       },
     };
@@ -795,14 +963,14 @@ function enrichNodeForDisplay(
       ? connections.find((connection) => connection.id === node.data.connectionId) ?? null
       : null;
 
-    let badgeText = 'Needs setup';
+    let badgeText = t('agentBuilder.needsSetup');
     let badgeTone: BuilderNodeData['badgeTone'] = 'warning';
 
     if (selectedConnection?.status === 'connected') {
-      badgeText = selectedConnection.account_label || 'Connected';
+      badgeText = selectedConnection.account_label || t('statuses.connection.connected');
       badgeTone = 'success';
     } else if (selectedConnection) {
-      badgeText = selectedConnection.status;
+      badgeText = translateConnectionStatus(selectedConnection.status, t);
       badgeTone = 'error';
     }
 
@@ -810,6 +978,8 @@ function enrichNodeForDisplay(
       ...node,
       data: {
         ...node.data,
+        ...localizedText,
+        confidenceLabel: t('agentBuilder.confidence'),
         badgeText,
         badgeTone,
       },
@@ -819,23 +989,34 @@ function enrichNodeForDisplay(
   if (isEndChatNodeData(node.data)) {
     const timeoutLabel =
       typeof node.data.inactivityTimeoutSeconds === 'number'
-        ? `${node.data.inactivityTimeoutSeconds}s timeout`
-        : 'No inactivity timeout';
+        ? t('agentBuilder.timeoutBadge', {
+            count: node.data.inactivityTimeoutSeconds,
+          })
+        : t('agentBuilder.noInactivityTimeout');
     const suggestionLabel = node.data.allowAssistantSuggestion
-      ? 'AI can suggest end'
-      : 'System-only ending';
+      ? t('agentBuilder.aiCanSuggestEnd')
+      : t('agentBuilder.systemOnlyEnding');
 
     return {
       ...node,
       data: {
         ...node.data,
+        ...localizedText,
+        confidenceLabel: t('agentBuilder.confidence'),
         badgeText: `${timeoutLabel} • ${suggestionLabel}`,
         badgeTone: 'success',
       },
     };
   }
 
-  return node;
+  return {
+    ...node,
+    data: {
+      ...node.data,
+      ...localizedText,
+      confidenceLabel: t('agentBuilder.confidence'),
+    },
+  };
 }
 
 function getKnowledgeSourceIdsFromNodes(nodes: BuilderFlowNode[]) {
@@ -890,6 +1071,7 @@ export default function AgentBuilderPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { membership, user, workspace } = useAppContext();
+  const { language, t } = useLanguage();
   const { showToast } = useToast();
   const agentId = params.id;
   const [nodes, setNodes, onNodesChange] = useNodesState<BuilderFlowNode>([]);
@@ -919,7 +1101,7 @@ export default function AgentBuilderPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isRollingBackVersionId, setIsRollingBackVersionId] = useState<string | null>(null);
-  const [statusNote, setStatusNote] = useState<string>('Draft not saved yet.');
+  const [statusNote, setStatusNote] = useState<BuilderStatusNote>({ kind: 'draftInitial' });
   const [isToolPickerOpen, setIsToolPickerOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [pastStates, setPastStates] = useState<{ nodes: BuilderFlowNode[]; edges: BuilderFlowEdge[] }[]>([]);
@@ -1021,12 +1203,15 @@ export default function AgentBuilderPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null;
-  const displayNodes = nodes.map((node) => enrichNodeForDisplay(node, connections));
+  const nodeLibraryItems = NODE_LIBRARY.map((item) => ({
+    ...item,
+    ...getNodeLibraryText(item.key, t),
+  }));
+  const displayNodes = nodes.map((node) => enrichNodeForDisplay(node, connections, t));
+  const selectedNode = displayNodes.find((node) => node.id === selectedNodeId) ?? null;
   const canEditCurrentAgent = agent
     ? canEditAgentRecord(agent, user.id, membership.role)
     : true;
-  const surfaceLabel = agent?.surface === 'assistant' ? 'Internal Assistant' : 'Website Widget';
 
   const syncSelectedConnections = async (nextNodes: BuilderFlowNode[]) => {
     const selectedConnectionIds = getSelectedConnectionIdsFromNodes(nextNodes);
@@ -1060,7 +1245,7 @@ export default function AgentBuilderPage() {
     const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload.error ?? 'Failed to save knowledge sources.');
+      throw new Error(payload.error ?? t('agentBuilder.saveKnowledgeError'));
     }
   };
 
@@ -1113,7 +1298,10 @@ export default function AgentBuilderPage() {
     );
 
     if (!attachedKnowledgeResult.ok) {
-      throw new Error(attachedKnowledgeResult.payload.error ?? 'Failed to load knowledge attachments.');
+      throw new Error(
+        attachedKnowledgeResult.payload.error ??
+          t('agentBuilder.loadKnowledgeAttachmentsError'),
+      );
     }
 
     const attachedKnowledgeSourceIds = (
@@ -1125,6 +1313,7 @@ export default function AgentBuilderPage() {
     const definition = (draftResult.data?.definition ?? fallbackDefinition) as BuilderDefinition;
     const normalized = normalizeDefinition(
       definition,
+      loadedAgent.surface,
       chatConnections,
       attachedConnectionIds,
       attachedKnowledgeSourceIds,
@@ -1148,17 +1337,17 @@ export default function AgentBuilderPage() {
     setConnections(chatConnections);
     setKnowledgeSources((knowledgeSourcesResult.data ?? []) as KnowledgeSourceRecord[]);
     setCurrentUserId(authResult.data.user?.id ?? null);
-    setSelectedNodeId(FIXED_NODE_IDS.agent);
+    setSelectedNodeId(null);
     setStatusNote(
       draftResult.data?.updated_at
-        ? `Last saved ${new Date(draftResult.data.updated_at).toLocaleString()}`
-        : 'Draft not saved yet.',
+        ? { kind: 'lastSaved', date: draftResult.data.updated_at }
+        : { kind: 'draftInitial' },
     );
 
     if (normalized.requiresToolReview) {
-      showToast('Multiple old tool connections were found. Review Gmail and Calendar nodes.', 'error');
+      showToast(t('agentBuilder.multipleOldConnections'), 'error');
     }
-  }, [agentId, setNodes, showToast, supabase]);
+  }, [agentId, setNodes, showToast, supabase, t]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1168,8 +1357,7 @@ export default function AgentBuilderPage() {
         await loadBuilder();
       } catch (error) {
         if (isMounted) {
-          const message =
-            error instanceof Error ? error.message : 'Failed to load the builder.';
+          const message = error instanceof Error ? error.message : t('agentBuilder.loadError');
           showToast(message, 'error');
         }
       } finally {
@@ -1184,16 +1372,16 @@ export default function AgentBuilderPage() {
     return () => {
       isMounted = false;
     };
-  }, [loadBuilder, showToast]);
+  }, [loadBuilder, showToast, t]);
 
   useEffect(() => {
     if (!agent || agent.surface !== 'assistant' || hasInternalAssistantsEnabled(workspace)) {
       return;
     }
 
-    showToast('Internal assistants are disabled for this workspace.', 'error');
+    showToast(t('agentBuilder.internalAssistantsDisabled'), 'error');
     router.replace('/dashboard');
-  }, [agent, router, showToast, workspace]);
+  }, [agent, router, showToast, t, workspace]);
 
   useEffect(() => {
     if (!agent || agent.surface !== 'assistant' || canEditCurrentAgent) {
@@ -1201,11 +1389,11 @@ export default function AgentBuilderPage() {
     }
 
     showToast(
-      'This internal assistant is managed by another workspace editor. Open it from Assistants instead.',
+      t('agentBuilder.managedByAnotherEditor'),
       'info',
     );
     router.replace(`/assistants/${agent.id}`);
-  }, [agent, canEditCurrentAgent, router, showToast]);
+  }, [agent, canEditCurrentAgent, router, showToast, t]);
 
   useEffect(() => {
     if (nodes.length === 0) {
@@ -1253,7 +1441,7 @@ export default function AgentBuilderPage() {
         const payload = await response.json();
 
         if (!response.ok) {
-          throw new Error(payload.error ?? 'Failed to load Google calendars.');
+          throw new Error(payload.error ?? t('agentBuilder.loadCalendarsError'));
         }
 
         if (!isMounted) {
@@ -1301,7 +1489,7 @@ export default function AgentBuilderPage() {
           [connectionId]: 'error',
         }));
         showToast(
-          error instanceof Error ? error.message : 'Failed to load Google calendars.',
+          error instanceof Error ? error.message : t('agentBuilder.loadCalendarsError'),
           'error',
         );
       }
@@ -1318,6 +1506,7 @@ export default function AgentBuilderPage() {
     selectedGoogleCalendarConnectionId,
     selectedNode,
     showToast,
+    t,
     updateGoogleCalendarSettings,
   ]);
 
@@ -1326,14 +1515,14 @@ export default function AgentBuilderPage() {
       return;
     }
 
-    if (!selectedNodeId || !nodes.some((node) => node.id === selectedNodeId)) {
-      setSelectedNodeId(getAgentNodeId(nodes));
+    if (selectedNodeId && !nodes.some((node) => node.id === selectedNodeId)) {
+      setSelectedNodeId(null);
     }
   }, [nodes, selectedNodeId]);
 
   const handleAddKnowledgeNode = () => {
     if (nodes.some((node) => node.data.kind === 'knowledge')) {
-      showToast('Knowledge is already on the canvas.', 'error');
+      showToast(t('agentBuilder.knowledgeAlreadyOnCanvas'), 'error');
       return;
     }
 
@@ -1345,7 +1534,7 @@ export default function AgentBuilderPage() {
 
   const handleAddEndChatNode = () => {
     if (nodes.some((node) => node.data.kind === 'endchat')) {
-      showToast('End Chat is already on the canvas.', 'error');
+      showToast(t('agentBuilder.endChatAlreadyOnCanvas'), 'error');
       return;
     }
 
@@ -1357,7 +1546,12 @@ export default function AgentBuilderPage() {
 
   const handleAddToolNode = (kind: ToolNodeKind) => {
     if (nodes.some((node) => node.data.kind === kind)) {
-      showToast(`${getSupportedIntegration(kind)?.displayName ?? 'This tool'} is already on the canvas.`, 'error');
+      showToast(
+        t('agentBuilder.toolAlreadyOnCanvas', {
+          tool: getSupportedIntegration(kind)?.displayName ?? kind,
+        }),
+        'error',
+      );
       return;
     }
 
@@ -1441,7 +1635,7 @@ export default function AgentBuilderPage() {
   const removeOptionalNode = (kind: BuilderNodeKind) => {
     saveToHistory();
     setNodes((currentNodes) => currentNodes.filter((node) => node.data.kind !== kind));
-    setSelectedNodeId(FIXED_NODE_IDS.agent);
+    setSelectedNodeId(null);
   };
 
   const buildDefinition = (): BuilderDefinition => ({
@@ -1524,11 +1718,10 @@ export default function AgentBuilderPage() {
             }
           : current,
       );
-      setStatusNote(`Last saved ${new Date().toLocaleString()}`);
-      showToast('Draft saved.', 'success');
+      setStatusNote({ kind: 'lastSaved', date: new Date().toISOString() });
+      showToast(t('agentBuilder.draftSaved'), 'success');
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to save draft.';
+      const message = error instanceof Error ? error.message : t('agentBuilder.saveError');
       showToast(message, 'error');
       throw error;
     } finally {
@@ -1569,7 +1762,7 @@ export default function AgentBuilderPage() {
         .single();
 
       if (versionError || !version) {
-        throw versionError ?? new Error('Failed to create version.');
+        throw versionError ?? new Error(t('agentBuilder.publishError'));
       }
 
       const { error: updateError } = await supabase
@@ -1590,12 +1783,15 @@ export default function AgentBuilderPage() {
       }
 
       setDraftVersion(versionNumber + 1);
-      setStatusNote(`Published v${versionNumber} at ${new Date().toLocaleString()}`);
-      showToast(`Published version ${versionNumber}.`, 'success');
+      setStatusNote({
+        kind: 'publishedAt',
+        date: new Date().toISOString(),
+        version: versionNumber,
+      });
+      showToast(t('agentBuilder.publishSuccess', { version: versionNumber }), 'success');
       router.refresh();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to publish agent.';
+      const message = error instanceof Error ? error.message : t('agentBuilder.publishError');
       showToast(message, 'error');
     } finally {
       setIsPublishing(false);
@@ -1618,17 +1814,16 @@ export default function AgentBuilderPage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? 'Failed to rollback version.');
+        throw new Error(payload.error ?? t('agentBuilder.rollbackError'));
       }
 
       await loadBuilder();
-      showToast('Agent rolled back to the selected version.', 'success');
-      setStatusNote(`Rolled back at ${new Date().toLocaleString()}`);
+      showToast(t('agentBuilder.rollbackSuccess'), 'success');
+      setStatusNote({ kind: 'rolledBackAt', date: new Date().toISOString() });
       setIsHistoryOpen(false);
       router.refresh();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to rollback version.';
+      const message = error instanceof Error ? error.message : t('agentBuilder.rollbackError');
       showToast(message, 'error');
     } finally {
       setIsRollingBackVersionId(null);
@@ -1656,13 +1851,20 @@ export default function AgentBuilderPage() {
     return {
       kind,
       displayName: integration?.displayName ?? kind,
-      description: integration?.connectionPurpose ?? '',
+      description:
+        kind === 'gmail'
+          ? t('agentBuilder.gmailDescription')
+          : t('agentBuilder.googleCalendarDescription'),
       icon: integration?.icon ?? 'extension',
       simpleIcon: integration?.simpleIcon,
       simpleIconColor: integration?.simpleIconColor,
       isAdded,
       canAdd: connectedCount > 0 && !isAdded,
-      stateLabel: isAdded ? 'Added' : connectedCount > 0 ? 'Connected' : 'Connect first',
+      stateLabel: isAdded
+        ? t('common.added')
+        : connectedCount > 0
+          ? t('statuses.connection.connected')
+          : t('agentBuilder.connectFirst'),
     };
   });
 
@@ -1675,7 +1877,7 @@ export default function AgentBuilderPage() {
       return (
         <div className="space-y-4">
           <p className="text-sm leading-6 text-on-surface-variant">
-            This is the entry point for the live conversation.
+            {t('agentBuilder.triggerDescription')}
           </p>
         </div>
       );
@@ -1686,32 +1888,32 @@ export default function AgentBuilderPage() {
         <div className="space-y-6">
           <div>
             <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
-              Identity
+              {t('agentBuilder.identity')}
             </label>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               onKeyDown={stopBuilderFieldKeyDown}
-              placeholder="Agent name..."
+              placeholder={t('agents.createModal.agentNamePlaceholder')}
               className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
             />
           </div>
             <div>
               <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
-                Contextual Note
+                {t('agentBuilder.contextualNote')}
               </label>
               <textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 onKeyDown={stopBuilderFieldKeyDown}
                 rows={3}
-                placeholder="Internal description..."
+                placeholder={t('common.description')}
                 className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
               />
             </div>
             <div>
               <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
-                Cognitive Model
+                {t('agentBuilder.cognitiveModel')}
               </label>
               <select
                 value={model}
@@ -1728,23 +1930,23 @@ export default function AgentBuilderPage() {
             </div>
             <div>
               <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
-                Operational Instructions
+                {t('agentBuilder.operationalInstructions')}
               </label>
               <textarea
                 value={instructions}
                 onChange={(event) => setInstructions(event.target.value)}
                 onKeyDown={stopBuilderFieldKeyDown}
                 rows={10}
-                placeholder="System orientation..."
+                placeholder={t('agentBuilder.operationalInstructions')}
                 className="min-h-[300px] w-full resize-y rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-4 text-sm font-medium leading-relaxed outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
               />
               <p className="mt-3 text-[11px] leading-relaxed text-on-surface-variant/60 italic">
-                Focus on live chat behavior, library retrieval, and tool permissions.
+                {t('agentBuilder.operationalInstructionsHelp')}
               </p>
             </div>
             <div>
               <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
-                Temporal Orientation
+                {t('agentBuilder.temporalOrientation')}
               </label>
               <select
                 value={timezone}
@@ -1761,7 +1963,7 @@ export default function AgentBuilderPage() {
             </div>
             <div>
               <label className="mb-3 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
-                Conversation Starters
+                {t('agentBuilder.conversationStarters')}
               </label>
               <div className="space-y-2">
                 {starterPromptFields.map((prompt, index) => (
@@ -1777,7 +1979,9 @@ export default function AgentBuilderPage() {
                     }
                     onKeyDown={stopBuilderFieldKeyDown}
                     className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
-                    placeholder={`Starter Chip ${index + 1}`}
+                    placeholder={t('agentBuilder.starterChipPlaceholder', {
+                      index: index + 1,
+                    })}
                   />
                 ))}
               </div>
@@ -1793,18 +1997,20 @@ export default function AgentBuilderPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm leading-relaxed text-on-surface-variant/80">
-                Choose the semantic sources this builder can retrieve from.
+                {t('agentBuilder.semanticSourcesDescription')}
               </p>
               <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
                 <div className="h-1 w-1 rounded-full bg-primary" />
-                {attachedSourceIds.length} source{attachedSourceIds.length !== 1 ? 's' : ''}
+                {attachedSourceIds.length === 1
+                  ? t('agentBuilder.sourceCount', { count: attachedSourceIds.length })
+                  : t('agentBuilder.sourceCountPlural', { count: attachedSourceIds.length })}
               </div>
             </div>
             <div className="space-y-3">
               {knowledgeSources.length === 0 ? (
                 <div className="flex items-center gap-3 rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-5 text-sm text-on-surface-variant/60 italic">
                   <span className="material-symbols-outlined text-base">info</span>
-                  No library sources indexed yet.
+                  {t('agentBuilder.noIndexedSources')}
                 </div>
               ) : (
                 knowledgeSources.map((source) => {
@@ -1839,11 +2045,13 @@ export default function AgentBuilderPage() {
                           <span
                             className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${getKnowledgeStatusTone(source.status)}`}
                           >
-                            {source.status}
+                            {translateKnowledgeStatus(source.status, t)}
                           </span>
                         </div>
                         <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/40">
-                          {source.chunk_count} cognitive chunks
+                          {t('agentBuilder.knowledgeChunks', {
+                            count: source.chunk_count,
+                          })}
                         </p>
                       </div>
                     </label>
@@ -1857,12 +2065,12 @@ export default function AgentBuilderPage() {
                 href="/knowledge"
                 className="flex-1 rounded-full border border-outline-variant/15 px-4 py-2.5 text-center text-xs font-bold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-[0.98]"
               >
-                Sync Operations
+                {t('agentBuilder.syncOperations')}
               </Link>
               <button
                 onClick={() => removeOptionalNode('knowledge')}
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-all hover:bg-red-500/10 hover:text-red-500 active:scale-[0.98]"
-                title="Remove Node"
+                title={t('agentBuilder.removeNode')}
               >
                 <span className="material-symbols-outlined text-lg focus:outline-none">delete</span>
               </button>
@@ -1908,51 +2116,52 @@ export default function AgentBuilderPage() {
         toolNode.data.kind === 'gmail' &&
         toolNode.data.recipientMode === 'specific_email' &&
         Boolean(normalizeGmailRecipientEmail(toolNode.data.recipientEmail));
-      const lockedActions =
-        toolNode.data.kind === 'gmail'
-          ? ['Send Email']
-          : ['Create Event', 'Quick Add', 'Get Current Date Time', 'Find Free Slots', 'List Calendars'];
+      const lockedActions = getToolActionLabels(toolNode.data.kind, t);
 
       return (
         <div className="space-y-5">
           <p className="text-sm leading-6 text-on-surface-variant">
             {toolNode.data.kind === 'gmail'
-              ? 'Use Gmail during the current conversation.'
-              : 'Check availability and book meetings.'}
+              ? t('agentBuilder.useGmail')
+              : t('agentBuilder.useCalendar')}
           </p>
           {selectedConnection && selectedConnection.status !== 'connected' ? (
             <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-sm text-on-surface-variant">
-              Current account is {selectedConnection.status}. Pick a connected account before publishing.
+              {t('agentBuilder.currentAccountStatus', {
+                status: translateConnectionStatus(selectedConnection.status, t),
+              })}
             </div>
           ) : null}
           {hasConnectedOptions || selectedConnection ? (
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                Connected Account
+                {t('agentBuilder.connectedAccount')}
               </label>
               <select
                 value={toolNode.data.connectionId ?? ''}
                 onChange={(event) => updateToolConnection(toolNode.id, event.target.value || null)}
                 className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
               >
-                <option value="">Select account</option>
+                <option value="">{t('agentBuilder.selectAccount')}</option>
                 {selectableConnections.map((connection) => (
                   <option key={connection.id} value={connection.id}>
                     {connection.account_label || connection.display_name}
-                    {connection.status === 'connected' ? '' : ` (${connection.status})`}
+                    {connection.status === 'connected'
+                      ? ''
+                      : ` (${translateConnectionStatus(connection.status, t)})`}
                   </option>
                 ))}
               </select>
             </div>
           ) : (
             <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-sm text-on-surface-variant">
-              No connected {toolNode.data.label} account yet.
+              {t('agentBuilder.noConnectedAccount', { label: toolNode.data.label })}
               <div className="mt-4">
                 <Link
                   href="/connections"
                   className="inline-flex rounded-full border border-outline-variant/15 px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
                 >
-                  Connect {toolNode.data.label}
+                  {t('agentBuilder.connectLabel', { label: toolNode.data.label })}
                 </Link>
               </div>
             </div>
@@ -1961,7 +2170,7 @@ export default function AgentBuilderPage() {
             <div className="space-y-3">
               <div>
                 <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                  Send Email To
+                  {t('agentBuilder.sendEmailTo')}
                 </label>
                 <select
                   value={toolNode.data.recipientMode}
@@ -1975,20 +2184,20 @@ export default function AgentBuilderPage() {
                   }
                   className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
                 >
-                  <option value="ai_decides">AI decides</option>
-                  <option value="specific_email">Specific email</option>
+                  <option value="ai_decides">{t('agentBuilder.aiDecides')}</option>
+                  <option value="specific_email">{t('agentBuilder.specificEmail')}</option>
                 </select>
               </div>
               <p className="text-sm leading-6 text-on-surface-variant">
                 {toolNode.data.recipientMode === 'specific_email'
-                  ? 'Send every Gmail message to one fixed internal address. The assistant should describe this as notifying the team without revealing the actual email.'
-                  : 'Let the assistant choose who to email based on the conversation and the agent instructions.'}
+                  ? t('agentBuilder.specificEmailDescription')
+                  : t('agentBuilder.aiDecidesDescription')}
               </p>
               {toolNode.data.recipientMode === 'specific_email' && (
                 <div className="space-y-3">
                   <div>
                     <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                      Specific Email
+                      {t('agentBuilder.specificEmailLabel')}
                     </label>
                     <input
                       type="email"
@@ -1998,13 +2207,13 @@ export default function AgentBuilderPage() {
                           recipientEmail: event.target.value || null,
                         })
                       }
-                      placeholder="owner@company.com"
+                      placeholder={t('agentBuilder.specificEmailPlaceholder')}
                       className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
                     />
                   </div>
                   {!hasValidSpecificRecipient ? (
                     <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-sm text-on-surface-variant">
-                      Add a valid internal email address. Until then, Gmail stays unavailable in runtime for this node.
+                      {t('agentBuilder.specificEmailWarning')}
                     </div>
                   ) : null}
                 </div>
@@ -2013,7 +2222,7 @@ export default function AgentBuilderPage() {
           )}
           <div className="space-y-2">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              Allowed Actions
+              {t('agentBuilder.allowedActions')}
             </p>
             <div className="flex flex-wrap gap-2">
               {lockedActions.map((action) => (
@@ -2030,7 +2239,7 @@ export default function AgentBuilderPage() {
             <div className="space-y-5">
               <div>
                 <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                  Booking Calendar
+                  {t('agentBuilder.bookingCalendar')}
                 </label>
                 <select
                   value={(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ?? ''}
@@ -2047,19 +2256,21 @@ export default function AgentBuilderPage() {
                   disabled={!selectedCalendarConnectionId || calendarOptionsStatus === 'loading'}
                   className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <option value="">Primary calendar</option>
+                  <option value="">{t('agentBuilder.primaryCalendar')}</option>
                   {calendarOptions.map((calendar) => (
                     <option key={calendar.id} value={calendar.id}>
-                      {calendar.primary ? `${calendar.summary} (Primary)` : calendar.summary}
+                      {calendar.primary
+                        ? `${calendar.summary} (${t('agentBuilder.primaryCalendarSuffix')})`
+                        : calendar.summary}
                     </option>
                   ))}
                 </select>
                 <p className="mt-2 text-xs text-on-surface-variant">
                   {calendarOptionsStatus === 'loading'
-                    ? 'Loading calendars from the selected Google account...'
+                    ? t('agentBuilder.loadingCalendars')
                     : calendarOptionsStatus === 'error'
-                      ? 'Could not load calendars from this account right now.'
-                      : 'Choose which calendar the agent should check and book against. Leave blank to use the primary calendar.'}
+                      ? t('agentBuilder.loadCalendarsFailed')
+                      : t('agentBuilder.bookingCalendarDescription')}
                 </p>
               </div>
               {(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ? (
@@ -2077,18 +2288,17 @@ export default function AgentBuilderPage() {
                   />
                   <span className="space-y-1">
                     <span className="block text-sm font-semibold text-on-surface">
-                      Also book on primary calendar
+                      {t('agentBuilder.alsoBookPrimary')}
                     </span>
                     <span className="block text-xs leading-5 text-on-surface-variant">
-                      When enabled, the assistant will mirror bookings to the account&apos;s primary
-                      calendar in addition to the selected booking calendar.
+                      {t('agentBuilder.alsoBookPrimaryDescription')}
                     </span>
                   </span>
                 </label>
               ) : null}
               <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                  Booking Timezone
+                  {t('agentBuilder.bookingTimezone')}
                 </p>
                 <p className="mt-2 text-sm font-semibold text-on-surface">
                   {resolvedCalendarTimezone ?? timezone}
@@ -2096,9 +2306,9 @@ export default function AgentBuilderPage() {
                 <p className="mt-2 text-xs leading-5 text-on-surface-variant">
                   {resolvedCalendarTimezone
                     ? resolvedCalendar?.primary && !(toolNode.data as GoogleCalendarBuilderNodeData).calendarId
-                      ? 'Automatically resolved from the primary Google Calendar.'
-                      : 'Automatically resolved from the selected booking calendar.'
-                    : 'Falls back to the core agent timezone until the booking calendar exposes its own timezone.'}
+                      ? t('agentBuilder.primaryCalendarResolved')
+                      : t('agentBuilder.selectedCalendarResolved')
+                    : t('agentBuilder.bookingTimezoneFallback')}
                 </p>
               </div>
             </div>
@@ -2107,7 +2317,7 @@ export default function AgentBuilderPage() {
             onClick={() => removeOptionalNode(toolNode.data.kind)}
             className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
           >
-            Remove Node
+            {t('agentBuilder.removeNode')}
           </button>
         </div>
       );
@@ -2122,7 +2332,7 @@ export default function AgentBuilderPage() {
       return (
         <div className="space-y-5">
           <p className="text-sm leading-6 text-on-surface-variant">
-            Control when the backend should mark the conversation completed.
+            {t('agentBuilder.endChatDescription')}
           </p>
           <label className="flex items-start gap-3 rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
             <input
@@ -2141,16 +2351,16 @@ export default function AgentBuilderPage() {
             />
             <div>
               <p className="text-sm font-semibold text-on-surface">
-                Assistant may suggest ending
+                {t('agentBuilder.assistantMaySuggestEnding')}
               </p>
               <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-                The model can suggest completion, but the backend still owns the final close.
+                {t('agentBuilder.assistantMaySuggestEndingDescription')}
               </p>
             </div>
           </label>
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              Inactivity Timeout (seconds)
+              {t('agentBuilder.inactivityTimeout')}
             </label>
             <input
               type="number"
@@ -2170,18 +2380,18 @@ export default function AgentBuilderPage() {
                 }));
               }}
               onKeyDown={stopBuilderFieldKeyDown}
-              placeholder="120"
+              placeholder={t('agentBuilder.inactivityTimeoutPlaceholder')}
               className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
             />
             <p className="mt-2 text-xs text-on-surface-variant">
-              Leave empty to disable inactivity-based ending.
+              {t('agentBuilder.inactivityTimeoutHelp')}
             </p>
           </div>
           <button
             onClick={() => removeOptionalNode('endchat')}
             className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
           >
-            Remove Node
+            {t('agentBuilder.removeNode')}
           </button>
         </div>
       );
@@ -2190,7 +2400,7 @@ export default function AgentBuilderPage() {
     return (
       <div className="space-y-4">
         <p className="text-sm leading-6 text-on-surface-variant">
-          This is the final message returned to the user.
+          {t('agentBuilder.finalMessageDescription')}
         </p>
       </div>
     );
@@ -2210,18 +2420,12 @@ export default function AgentBuilderPage() {
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/60">
-                Blueprint
+                {t('agentBuilder.blueprint')}
               </span>
               <span className="text-on-surface-variant/20 text-[10px]">/</span>
               <h1 className="font-headline text-xl font-bold tracking-tight text-on-surface">
-                {name || agent?.name || 'Agent' }
+                {name || agent?.name || t('agentBuilder.agentTitleFallback')}
               </h1>
-              {agent ? (
-                <div className="ml-3 flex items-center gap-1.5 rounded-full bg-primary/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-                  <div className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
-                  {surfaceLabel}
-                </div>
-              ) : null}
             </div>
 
             <div className="h-4 w-[1px] bg-outline-variant/20" />
@@ -2233,12 +2437,16 @@ export default function AgentBuilderPage() {
         <div className="hidden items-center gap-6 lg:flex">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">Nodes</span>
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">
+                {t('agentBuilder.nodes')}
+              </span>
               <span className="text-sm font-headline font-bold text-on-surface">{nodes.length}</span>
             </div>
             <div className="h-4 w-[1px] bg-outline-variant/20" />
             <div className="flex items-center gap-2">
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">Connections</span>
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">
+                {t('agentBuilder.connections')}
+              </span>
               <span className="text-sm font-headline font-bold text-on-surface">{edges.length}</span>
             </div>
           </div>
@@ -2246,9 +2454,11 @@ export default function AgentBuilderPage() {
 
         <div className="flex items-center gap-6">
           <div className="hidden flex-col items-end xl:flex">
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 line-clamp-1">Last Update</span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 line-clamp-1">
+              {t('agentBuilder.lastUpdate')}
+            </span>
             <p className="text-[10px] font-medium tracking-wide text-on-surface-variant whitespace-nowrap">
-              {statusNote || 'Draft'}
+              {formatBuilderStatusNote(statusNote, language, t)}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -2257,7 +2467,7 @@ export default function AgentBuilderPage() {
                 onClick={undo}
                 disabled={!canUndo}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface disabled:opacity-20 active:scale-95"
-                title="Undo"
+                title={t('common.undo')}
               >
                 <span className="material-symbols-outlined text-base">undo</span>
               </button>
@@ -2265,7 +2475,7 @@ export default function AgentBuilderPage() {
                 onClick={redo}
                 disabled={!canRedo}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface disabled:opacity-20 active:scale-95"
-                title="Redo"
+                title={t('common.redo')}
               >
                 <span className="material-symbols-outlined text-base">redo</span>
               </button>
@@ -2276,23 +2486,29 @@ export default function AgentBuilderPage() {
               disabled={isSaving || !canEditCurrentAgent}
               className="px-5 py-2.5 text-xs font-bold text-on-surface-variant transition-all hover:text-on-surface disabled:opacity-40"
             >
-              {isSaving ? 'Saving...' : 'Save Draft'}
+              {isSaving ? t('agentBuilder.savingDraft') : t('agentBuilder.saveDraft')}
             </button>
 
             {agent?.surface === 'widget' ? (
               <button
                 onClick={() => void publishVersion()}
                 disabled={isPublishing}
-                className="signature-gradient h-10 rounded-full px-6 text-xs font-bold text-white shadow-xl shadow-primary/20 transition-all hover:shadow-2xl hover:shadow-primary/30 active:scale-95 disabled:opacity-60"
+                className="signature-gradient h-10 rounded-full px-6 text-xs font-bold shadow-xl shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:shadow-2xl active:scale-95 disabled:opacity-60"
               >
-                {isPublishing ? 'Publishing...' : 'Deploy Blueprint'}
+                {isPublishing ? t('agentBuilder.publishing') : t('agentBuilder.deployBlueprint')}
               </button>
             ) : null}
           </div>
         </div>
       </header>
 
-      <div className="relative grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div
+        className={`relative grid min-h-0 flex-1 overflow-hidden ${
+          selectedNode
+            ? 'xl:grid-cols-[minmax(0,1fr)_24rem]'
+            : 'xl:grid-cols-[minmax(0,1fr)]'
+        }`}
+      >
         <div className="group absolute bottom-0 left-0 top-0 z-20 w-80 -translate-x-[calc(100%-1.25rem)] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] hover:translate-x-0">
           <aside className="relative flex h-full flex-col border-r border-outline-variant/10 bg-surface/80 p-8 shadow-[0_0_50px_rgba(0,0,0,0.1)] backdrop-blur-2xl">
             <div className="absolute bottom-0 right-0 top-0 flex w-5 items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
@@ -2301,13 +2517,13 @@ export default function AgentBuilderPage() {
 
             <div className="flex-1 overflow-y-auto opacity-0 transition-opacity duration-300 delay-100 group-hover:opacity-100">
               <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-                Node Library
+                {t('agentBuilder.nodeLibraryTitle')}
               </p>
               <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-                Keep the flow focused. Add knowledge or one live tool at a time.
+                {t('agentBuilder.nodeLibraryDescription')}
               </p>
               <div className="mt-5 space-y-3">
-                {NODE_LIBRARY.map((item) => {
+                {nodeLibraryItems.map((item) => {
                   const isKnowledgeAdded =
                     item.key === 'knowledge' &&
                     nodes.some((node) => node.data.kind === 'knowledge');
@@ -2346,11 +2562,11 @@ export default function AgentBuilderPage() {
                           </p>
                           {isFixed ? (
                             <span className="rounded-full bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                              Fixed
+                              {t('common.fixed')}
                             </span>
                           ) : isKnowledgeAdded || isEndChatAdded ? (
                             <span className="rounded-full bg-background px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                              Added
+                              {t('common.added')}
                             </span>
                           ) : null}
                         </div>
@@ -2366,14 +2582,18 @@ export default function AgentBuilderPage() {
           </aside>
         </div>
 
-        <section className="min-h-0 border-b border-outline-variant/10 xl:border-b-0 xl:border-r">
+        <section
+          className={`min-h-0 border-b border-outline-variant/10 xl:border-b-0 ${
+            selectedNode ? 'xl:border-r' : ''
+          }`}
+        >
           <ReactFlow
             nodes={displayNodes}
             edges={edges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-            onPaneClick={() => setSelectedNodeId(getAgentNodeId(nodes))}
+            onPaneClick={() => setSelectedNodeId(null)}
             onInit={setFlowInstance}
             fitView
             proOptions={{ hideAttribution: true }}
@@ -2384,29 +2604,40 @@ export default function AgentBuilderPage() {
           </ReactFlow>
         </section>
 
-        <aside className="border-l border-outline-variant/10 overflow-y-auto bg-surface/70 p-8 backdrop-blur-xl">
-          {selectedNode ? (
+        {selectedNode ? (
+          <aside className="border-l border-outline-variant/10 overflow-y-auto bg-surface/70 p-8 backdrop-blur-xl">
             <div className="space-y-8">
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
-                  <span className="material-symbols-outlined text-xl">{selectedNode.data.icon}</span>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
+                    <span className="material-symbols-outlined text-xl">{selectedNode.data.icon}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
+                      {selectedNode.data.type}
+                    </p>
+                    <h2 className="mt-1.5 font-headline text-2xl font-bold tracking-tight text-on-surface">
+                      {selectedNode.data.label}
+                    </h2>
+                    <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/80">
+                      {selectedNode.data.description}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
-                    {selectedNode.data.type}
-                  </p>
-                  <h2 className="mt-1.5 font-headline text-2xl font-bold tracking-tight text-on-surface">
-                    {selectedNode.data.label}
-                  </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/80">
-                    {selectedNode.data.description}
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedNodeId(null)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                  aria-label={t('common.close')}
+                  title={t('common.close')}
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
               </div>
               <div className="mt-6">{renderInspectorBody()}</div>
             </div>
-          ) : null}
-        </aside>
+          </aside>
+        ) : null}
       </div>
 
       {isToolPickerOpen ? (
@@ -2415,9 +2646,11 @@ export default function AgentBuilderPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-                  Connected Tools
+                  {t('agentBuilder.nodeLibrary.tools')}
                 </p>
-                <h3 className="mt-2 text-lg font-semibold text-on-surface">Choose a tool node</h3>
+                <h3 className="mt-2 text-lg font-semibold text-on-surface">
+                  {t('agentBuilder.chooseToolNode')}
+                </h3>
               </div>
               <button
                 onClick={() => setIsToolPickerOpen(false)}
@@ -2468,10 +2701,10 @@ export default function AgentBuilderPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-                  Version History
+                  {t('agentBuilder.versionHistory')}
                 </p>
                 <h3 className="mt-2 text-lg font-semibold text-on-surface">
-                  Published versions
+                  {t('agentBuilder.publishedVersions')}
                 </h3>
               </div>
               <button
@@ -2484,7 +2717,7 @@ export default function AgentBuilderPage() {
             <div className="mt-5 flex-1 space-y-3 overflow-y-auto">
               {versions.length === 0 ? (
                 <p className="rounded-2xl bg-background px-4 py-4 text-sm text-on-surface-variant">
-                  No published versions yet.
+                  {t('agentBuilder.noPublishedVersions')}
                 </p>
               ) : (
                 versions.map((version) => {
@@ -2498,14 +2731,16 @@ export default function AgentBuilderPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-on-surface">
-                            Version {version.version}
+                            {t('agentBuilder.versionLabel', { version: version.version })}
                           </p>
                           <p className="mt-1 text-xs text-on-surface-variant">
-                            Published {formatRelativeDate(version.created_at)}
+                            {t('agentBuilder.publishedRelative', {
+                              relative: formatRelativeDate(version.created_at, language),
+                            })}
                           </p>
                         </div>
                         <span className="rounded-full bg-surface-container px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                          {isCurrent ? 'Live' : 'History'}
+                          {isCurrent ? t('common.live') : t('agentBuilder.historyLabel')}
                         </span>
                       </div>
                       <div className="mt-4 flex justify-end">
@@ -2515,10 +2750,10 @@ export default function AgentBuilderPage() {
                           className="rounded-full border border-outline-variant/15 px-3 py-2 text-xs font-semibold text-on-surface-variant disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {isCurrent
-                            ? 'Current Version'
+                            ? t('agentBuilder.currentVersion')
                             : isRollingBackVersionId === version.id
-                              ? 'Rolling Back...'
-                              : 'Rollback'}
+                              ? t('agentBuilder.rollingBack')
+                              : t('agentBuilder.rollback')}
                         </button>
                       </div>
                     </div>

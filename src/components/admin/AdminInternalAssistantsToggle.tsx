@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface AdminInternalAssistantsToggleProps {
   workspaceId: string;
@@ -13,6 +14,7 @@ export function AdminInternalAssistantsToggle({
   enabled,
 }: AdminInternalAssistantsToggleProps) {
   const router = useRouter();
+  const { t } = useLanguage();
   const [isSaving, setIsSaving] = useState(false);
   const [isEnabled, setIsEnabled] = useState(enabled);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -37,7 +39,7 @@ export function AdminInternalAssistantsToggle({
       const payload = await response.json().catch(() => null);
 
       if (!response.ok || !payload?.workspace) {
-        throw new Error(payload?.error || "Failed to update workspace feature.");
+        throw new Error(payload?.error || t("settings.saveError"));
       }
 
       setIsEnabled(payload.workspace.internalAssistantsEnabled === true);
@@ -46,7 +48,7 @@ export function AdminInternalAssistantsToggle({
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Failed to update workspace feature.",
+          : t("settings.saveError"),
       );
     } finally {
       setIsSaving(false);
@@ -58,10 +60,10 @@ export function AdminInternalAssistantsToggle({
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
           <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
-            Internal assistants
+            {t("admin.internalAssistants")}
           </p>
           <p className="text-sm text-neutral-300">
-            Workspace access to the internal Assistants product surface.
+            {t("admin.internalAssistantsDescription")}
           </p>
           <div
             className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
@@ -70,7 +72,7 @@ export function AdminInternalAssistantsToggle({
                 : "bg-neutral-800 text-neutral-400"
             }`}
           >
-            {isEnabled ? "Enabled" : "Disabled"}
+            {isEnabled ? t("common.enabled") : t("common.disabled")}
           </div>
         </div>
 
@@ -85,10 +87,10 @@ export function AdminInternalAssistantsToggle({
           } disabled:cursor-not-allowed disabled:opacity-60`}
         >
           {isSaving
-            ? "Saving..."
+            ? t("common.saving")
             : isEnabled
-              ? "Disable"
-              : "Enable"}
+              ? t("admin.disable")
+              : t("admin.enable")}
         </button>
       </div>
 

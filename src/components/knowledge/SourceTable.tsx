@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText, CheckCircle2, Clock, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 import type { KnowledgeSourceRecord } from "@/lib/types";
 import { formatRelativeDate } from "@/lib/utils";
 
@@ -21,6 +22,8 @@ export function SourceTable({
   processingId,
   deletingId,
 }: SourceTableProps) {
+  const { language, t } = useLanguage();
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -37,9 +40,9 @@ export function SourceTable({
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-container text-on-surface-variant/40">
           <FileText className="h-8 w-8" />
         </div>
-        <h3 className="mt-6 text-lg font-bold text-on-surface">No sources found</h3>
+        <h3 className="mt-6 text-lg font-bold text-on-surface">{t("knowledge.noSourcesFound")}</h3>
         <p className="mt-2 max-w-sm text-sm text-on-surface-variant/70 text-balance">
-          You haven&apos;t added any knowledge yet. Use the bento grid above to add your first source.
+          {t("knowledge.connectDriveStatus")}
         </p>
       </div>
     );
@@ -51,11 +54,11 @@ export function SourceTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container/60 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
-              <th className="px-6 py-5">Source Name</th>
-              <th className="px-6 py-5">Type</th>
-              <th className="px-6 py-5 text-center">Status</th>
-              <th className="px-6 py-5">Last Modified</th>
-              <th className="px-6 py-5 text-right">Actions</th>
+              <th className="px-6 py-5">{t("knowledge.sourceName")}</th>
+              <th className="px-6 py-5">{t("knowledge.type")}</th>
+              <th className="px-6 py-5 text-center">{t("common.status")}</th>
+              <th className="px-6 py-5">{t("knowledge.lastModified")}</th>
+              <th className="px-6 py-5 text-right">{t("knowledge.actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/5">
@@ -79,7 +82,7 @@ export function SourceTable({
                           {source.name}
                         </p>
                         <p className="mt-0.5 truncate text-[11px] text-on-surface-variant/60">
-                          {source.chunk_count} chunks • {source.description || "No description"}
+                          {source.chunk_count} chunks • {source.description || t("assistants.noDescription")}
                         </p>
                       </div>
                     </div>
@@ -94,25 +97,25 @@ export function SourceTable({
                       {status === "ready" && (
                         <>
                           <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                          <span className="text-success uppercase tracking-wider">Ready</span>
+                          <span className="text-success uppercase tracking-wider">{t("statuses.knowledge.ready")}</span>
                         </>
                       )}
                       {status === "processing" && (
                         <>
                           <Clock className="h-3.5 w-3.5 text-primary animate-pulse" />
-                          <span className="text-primary uppercase tracking-wider">Syncing</span>
+                          <span className="text-primary uppercase tracking-wider">{t("statuses.knowledge.syncing")}</span>
                         </>
                       )}
                       {status === "failed" && (
                         <>
                           <AlertCircle className="h-3.5 w-3.5 text-error" />
-                          <span className="text-error uppercase tracking-wider">Failed</span>
+                          <span className="text-error uppercase tracking-wider">{t("statuses.knowledge.failed")}</span>
                         </>
                       )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-on-surface-variant/80 font-medium">
-                    {formatRelativeDate(source.updated_at)}
+                    {formatRelativeDate(source.updated_at, language)}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -120,7 +123,7 @@ export function SourceTable({
                         onClick={() => onProcess(source.id)}
                         disabled={isProcessing}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary disabled:opacity-50 transition-colors"
-                        title="Reprocess source"
+                        title={t("knowledge.queuedForProcessing")}
                       >
                         <RefreshCw className={`h-4 w-4 ${isProcessing ? "animate-spin" : ""}`} />
                       </button>
@@ -128,7 +131,7 @@ export function SourceTable({
                         onClick={() => onDelete(source)}
                         disabled={isDeleting}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-error/10 hover:text-error disabled:opacity-50 transition-colors"
-                        title="Delete source"
+                        title={t("common.delete")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

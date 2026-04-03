@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Upload, RefreshCw, Cloud, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
   SUPPORTED_KNOWLEDGE_EXTENSIONS,
@@ -41,6 +42,7 @@ type InputTab = "text" | "file" | "drive" | null;
 
 export default function KnowledgePage() {
   const [supabase] = useState(() => createClient());
+  const { language, t } = useLanguage();
   const { showToast } = useToast();
   const [sources, setSources] = useState<KnowledgeSourceRecord[]>([]);
   const [sourceSearch, setSourceSearch] = useState("");
@@ -60,7 +62,7 @@ export default function KnowledgePage() {
   const [isLoadingDriveFiles, setIsLoadingDriveFiles] = useState(false);
   const [isImportingDriveFileId, setIsImportingDriveFileId] = useState<string | null>(null);
   const [driveStatus, setDriveStatus] = useState<string>(
-    "Connect Google Drive to browse and import files into the workspace library.",
+    t("knowledge.connectDriveStatus"),
   );
   const [activeTab, setActiveTab] = useState<InputTab>(null);
 
@@ -89,7 +91,7 @@ export default function KnowledgePage() {
     const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload.error ?? "Failed to load knowledge sources.");
+      throw new Error(payload.error ?? t("knowledge.loadError"));
     }
 
     setSources(payload.sources ?? []);
@@ -116,26 +118,26 @@ export default function KnowledgePage() {
         const payload = await response.json();
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Failed to load Google Drive files.");
+          throw new Error(payload.error ?? t("knowledge.loadDriveError"));
         }
 
         const nextFiles = (payload.files ?? []) as DriveImportFileRecord[];
         setDriveFiles((current) => (reset ? nextFiles : [...current, ...nextFiles]));
         setDriveStatus(
           nextFiles.length > 0 || (!reset && driveFiles.length > 0)
-            ? "Browse supported Google Drive files and import them into Supabase."
-            : "No supported Google Drive files were found for this search.",
+            ? t("knowledge.browseDriveStatus")
+            : t("knowledge.noDriveFilesStatus"),
         );
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Failed to load Google Drive files.";
+          error instanceof Error ? error.message : t("knowledge.loadDriveError");
         setDriveStatus(message);
         showToast(message, "error");
       } finally {
         setIsLoadingDriveFiles(false);
       }
     },
-    [driveFiles.length, driveSearch, showToast],
+    [driveFiles.length, driveSearch, showToast, t],
   );
 
   useEffect(() => {
@@ -147,7 +149,7 @@ export default function KnowledgePage() {
       } catch (error) {
         if (mounted) {
           showToast(
-            error instanceof Error ? error.message : "Failed to load knowledge sources.",
+            error instanceof Error ? error.message : t("knowledge.loadError"),
             "error",
           );
         }
@@ -163,14 +165,14 @@ export default function KnowledgePage() {
     return () => {
       mounted = false;
     };
-  }, [loadSources, showToast]);
+  }, [loadSources, showToast, t]);
 
   const handleCreateTextSource = async () => {
     const trimmedName = textName.trim();
     const trimmedText = rawText.trim();
 
     if (!trimmedName || !trimmedText) {
-      showToast("Give the source a name and some content first.", "error");
+      showToast(t("knowledge.missingTextNameOrContent"), "error");
       return;
     }
 
@@ -192,17 +194,17 @@ export default function KnowledgePage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to create text knowledge source.");
+        throw new Error(payload.error ?? t("knowledge.createTextError"));
       }
 
       setTextName("");
       setTextDescription("");
       setRawText("");
       await loadSources();
-      showToast("Text source created and queued for processing.", "success");
+      showToast(t("knowledge.textCreated"), "success");
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "Failed to create text knowledge source.",
+        error instanceof Error ? error.message : t("knowledge.createTextError"),
         "error",
       );
     } finally {
@@ -215,7 +217,7 @@ export default function KnowledgePage() {
     const trimmedName = fileName.trim();
 
     if (!trimmedName || !file) {
-      showToast("Choose a file and give it a name first.", "error");
+      showToast(t("knowledge.missingFileNameOrFile"), "error");
       return;
     }
 
@@ -239,7 +241,7 @@ export default function KnowledgePage() {
       const createPayload = await createResponse.json();
 
       if (!createResponse.ok) {
-        throw new Error(createPayload.error ?? "Failed to create file knowledge source.");
+        throw new Error(createPayload.error ?? t("knowledge.createFileError"));
       }
 
       const upload = createPayload.upload as { bucket: string; path: string };
@@ -261,17 +263,17 @@ export default function KnowledgePage() {
       const processPayload = await processResponse.json();
 
       if (!processResponse.ok) {
-        throw new Error(processPayload.error ?? "Failed to start knowledge processing.");
+        throw new Error(processPayload.error ?? t("knowledge.processStartError"));
       }
 
       setSelectedFile(null);
       setFileName("");
       setFileDescription("");
       await loadSources();
-      showToast("File uploaded and queued for processing.", "success");
+      showToast(t("knowledge.fileUploaded"), "success");
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "Failed to upload file knowledge source.",
+        error instanceof Error ? error.message : t("knowledge.createFileError"),
         "error",
       );
     } finally {
@@ -296,14 +298,14 @@ export default function KnowledgePage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to import Google Drive file.");
+        throw new Error(payload.error ?? t("knowledge.importDriveError"));
       }
 
       await loadSources();
-      showToast("Google Drive file imported and queued for processing.", "success");
+      showToast(t("knowledge.driveImported"), "success");
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "Failed to import Google Drive file.",
+        error instanceof Error ? error.message : t("knowledge.importDriveError"),
         "error",
       );
     } finally {
@@ -321,14 +323,14 @@ export default function KnowledgePage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to process knowledge source.");
+        throw new Error(payload.error ?? t("knowledge.processError"));
       }
 
       await loadSources();
-      showToast("Knowledge source queued for processing.", "success");
+      showToast(t("knowledge.queuedForProcessing"), "success");
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "Failed to process knowledge source.",
+        error instanceof Error ? error.message : t("knowledge.processError"),
         "error",
       );
     } finally {
@@ -338,7 +340,7 @@ export default function KnowledgePage() {
 
   const handleDelete = async (source: KnowledgeSourceRecord) => {
     const confirmed = window.confirm(
-      `Delete "${source.name}"? This will remove the source, its chunks, and any agent attachments.`,
+      t("knowledge.deleteConfirm", { name: source.name }),
     );
 
     if (!confirmed) {
@@ -354,14 +356,14 @@ export default function KnowledgePage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to delete knowledge source.");
+        throw new Error(payload.error ?? t("knowledge.deleteError"));
       }
 
       await loadSources();
-      showToast("Knowledge source removed.", "success");
+      showToast(t("knowledge.removed"), "success");
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "Failed to delete knowledge source.",
+        error instanceof Error ? error.message : t("knowledge.deleteError"),
         "error",
       );
     } finally {
@@ -386,22 +388,21 @@ export default function KnowledgePage() {
         <div className="max-w-xl">
           <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-primary-container/10 text-primary-container mb-4">
             <span className="material-symbols-outlined text-[14px]">auto_stories</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest">Workspace Library</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest">{t("knowledge.badge")}</span>
           </div>
           <h1 className="font-headline text-[2.5rem] font-bold leading-[1.1] text-on-surface tracking-tight">
-            Knowledge Source Library
+            {t("knowledge.title")}
           </h1>
           <p className="mt-4 text-[13px] font-medium leading-relaxed text-on-surface-variant/80 max-w-lg">
-            A centralized hub for your workspace&apos;s proprietary data. Connect and process documents 
-            to provide your agents with deep domain expertise.
+            {t("knowledge.description")}
           </p>
         </div>
         
         <div className="flex rounded-2xl bg-surface-container-low/40 p-1 ring-1 ring-outline-variant/5">
-          {renderStatPill("folder_open", "Total", stats.total, "text-on-surface-variant")}
-          {renderStatPill("check_circle", "Ready", stats.ready, "text-success")}
-          {renderStatPill("sync", "Syncing", stats.processing, "text-primary")}
-          {renderStatPill("error", "Failed", stats.failed, "text-error")}
+          {renderStatPill("folder_open", t("knowledge.total"), stats.total, "text-on-surface-variant")}
+          {renderStatPill("check_circle", t("knowledge.ready"), stats.ready, "text-success")}
+          {renderStatPill("sync", t("knowledge.syncing"), stats.processing, "text-primary")}
+          {renderStatPill("error", t("knowledge.failed"), stats.failed, "text-error")}
         </div>
       </header>
 
@@ -409,7 +410,7 @@ export default function KnowledgePage() {
       <section className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">
-            Add Knowledge Source
+            {t("knowledge.addKnowledgeSource")}
           </h2>
           <div className="h-[1px] flex-1 bg-outline-variant/10 ml-4" />
         </div>
@@ -425,9 +426,9 @@ export default function KnowledgePage() {
                   <span className="material-symbols-outlined text-[20px]">arrow_back</span>
                 </button>
                 <h3 className="font-headline text-lg font-bold text-on-surface">
-                  {activeTab === "text" && "Write New Knowledge Source"}
-                  {activeTab === "file" && "Upload Document"}
-                  {activeTab === "drive" && "Import from Cloud"}
+                  {activeTab === "text" && t("knowledge.writeNewKnowledgeSource")}
+                  {activeTab === "file" && t("knowledge.uploadDocument")}
+                  {activeTab === "drive" && t("knowledge.importFromCloud")}
                 </h3>
               </div>
             </div>
@@ -436,31 +437,31 @@ export default function KnowledgePage() {
               <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5 focus-within:text-primary transition-colors">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Source Name</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.sourceName")}</label>
                     <input
                       value={textName}
                       onChange={(event) => setTextName(event.target.value)}
-                      placeholder="e.g., Q3 Marketing Strategy"
+                      placeholder={t("knowledge.sourceNamePlaceholder")}
                       className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/20"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Description (Optional)</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.descriptionOptional")}</label>
                     <input
                       value={textDescription}
                       onChange={(event) => setTextDescription(event.target.value)}
-                      placeholder="Internal strategy docs"
+                      placeholder={t("knowledge.sourceDescriptionPlaceholder")}
                       className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
                     />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Knowledge Content</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.content")}</label>
                   <textarea
                     value={rawText}
                     onChange={(event) => setRawText(event.target.value)}
                     rows={12}
-                    placeholder="Paste the documentation here..."
+                    placeholder={t("knowledge.contentPlaceholder")}
                     className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-4 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-primary/20"
                   />
                 </div>
@@ -468,9 +469,9 @@ export default function KnowledgePage() {
                   <button
                     onClick={() => void handleCreateTextSource()}
                     disabled={isCreatingText || !textName || !rawText}
-                    className="signature-gradient h-11 px-8 rounded-full text-xs font-bold text-white shadow-lg shadow-primary/20 disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
+                    className="signature-gradient h-11 rounded-full px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-105 active:scale-95 disabled:opacity-50"
                   >
-                    {isCreatingText ? "Processing..." : "Finish and Sync"}
+                    {isCreatingText ? t("common.processing") : t("knowledge.finishAndSync")}
                   </button>
                 </div>
               </div>
@@ -480,20 +481,20 @@ export default function KnowledgePage() {
               <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Source Name</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.sourceName")}</label>
                     <input
                       value={fileName}
                       onChange={(event) => setFileName(event.target.value)}
-                      placeholder="Support Handbook V2"
+                      placeholder={t("knowledge.fileNamePlaceholder")}
                       className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">Description</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.fileDescription")}</label>
                     <input
                       value={fileDescription}
                       onChange={(event) => setFileDescription(event.target.value)}
-                      placeholder="Customer service guidelines"
+                      placeholder={t("knowledge.fileDescriptionPlaceholder")}
                       className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
                     />
                   </div>
@@ -503,10 +504,10 @@ export default function KnowledgePage() {
                     <Upload className="h-5 w-5 text-on-surface-variant" />
                   </div>
                   <p className="text-sm font-bold text-on-surface">
-                    {selectedFile ? selectedFile.name : "Drop your file here"}
+                    {selectedFile ? selectedFile.name : t("knowledge.dropFileHere")}
                   </p>
                   <p className="mt-1 text-xs text-on-surface-variant/60">
-                    {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : "PDF, Markdown, or Text files supported"}
+                    {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : t("knowledge.supportedFileTypes")}
                   </p>
                   <input
                     type="file"
@@ -523,9 +524,9 @@ export default function KnowledgePage() {
                   <button
                     onClick={() => void handleUploadFileSource()}
                     disabled={isUploadingFile || !selectedFile || !fileName}
-                    className="signature-gradient h-11 px-8 rounded-full text-xs font-bold text-white shadow-lg shadow-primary/20 disabled:opacity-50 transition-all hover:scale-105"
+                    className="signature-gradient h-11 rounded-full px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-105 disabled:opacity-50"
                   >
-                    {isUploadingFile ? "Uploading..." : "Import Document"}
+                    {isUploadingFile ? t("common.uploading") : t("knowledge.importDocument")}
                   </button>
                 </div>
               </div>
@@ -539,7 +540,7 @@ export default function KnowledgePage() {
                     <input
                       value={driveSearch}
                       onChange={(event) => setDriveSearch(event.target.value)}
-                      placeholder="Search Drive files..."
+                      placeholder={t("knowledge.driveSearchPlaceholder")}
                       className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest pl-11 pr-4 py-2.5 text-sm outline-none"
                     />
                   </div>
@@ -562,7 +563,7 @@ export default function KnowledgePage() {
                     driveFiles.map((file) => (
                       <div
                         key={file.id}
-                        className="group/item flex items-center justify-between rounded-xl bg-surface-container-lowest p-3 ring-1 ring-outline-variant/10 transition-all hover:bg-white hover:ring-primary/20 hover:shadow-sm"
+                        className="group/item flex items-center justify-between rounded-xl bg-surface-container-lowest p-3 ring-1 ring-outline-variant/10 transition-all hover:bg-surface-container hover:ring-primary/20 hover:shadow-sm"
                       >
                         <div className="flex items-center gap-3 truncate">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container group-hover/item:bg-primary/10 group-hover/item:text-primary transition-colors">
@@ -571,16 +572,16 @@ export default function KnowledgePage() {
                           <div className="truncate">
                             <p className="truncate text-xs font-bold text-on-surface">{file.name}</p>
                             <p className="mt-0.5 text-[10px] text-on-surface-variant/50">
-                              {formatRelativeDate(file.modifiedTime)}
+                              {formatRelativeDate(file.modifiedTime, language)}
                             </p>
                           </div>
                         </div>
                         <button
                           onClick={() => void handleDriveImport(file)}
                           disabled={isImportingDriveFileId === file.id}
-                          className="rounded-full bg-primary/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-white transition-all disabled:opacity-50"
+                          className="rounded-full bg-primary/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary/18 hover:text-on-surface disabled:opacity-50"
                         >
-                          {isImportingDriveFileId === file.id ? "..." : "Import"}
+                          {isImportingDriveFileId === file.id ? "..." : t("common.import")}
                         </button>
                       </div>
                     ))
@@ -603,10 +604,10 @@ export default function KnowledgePage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">
-              Active Knowledge Sources
+              {t("knowledge.activeKnowledgeSources")}
             </h2>
             <div className="flex items-center gap-2 rounded-full bg-surface-container-high px-2 py-0.5 text-[9px] font-bold text-on-surface-variant">
-              {sources.length} Total
+              {t("knowledge.totalSuffix", { count: sources.length })}
             </div>
           </div>
           
@@ -615,8 +616,8 @@ export default function KnowledgePage() {
             <input
               value={sourceSearch}
               onChange={(event) => setSourceSearch(event.target.value)}
-              placeholder="Filter library..."
-              className="w-full rounded-full border border-outline-variant/10 bg-surface-container-low px-10 py-2 text-[12px] outline-none transition-all focus:bg-white focus:ring-1 focus:ring-primary/10 sm:w-64"
+              placeholder={t("knowledge.filterPlaceholder")}
+              className="w-full rounded-full border border-outline-variant/10 bg-surface-container-low px-10 py-2 text-[12px] text-on-surface outline-none transition-all focus:bg-surface-container focus:ring-1 focus:ring-primary/10 sm:w-64"
             />
           </div>
         </div>

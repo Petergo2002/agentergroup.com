@@ -86,6 +86,12 @@ const COMPOSIO_SESSION_TOOLKITS = [
   ...SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
   ...getInternalAssistantToolkitSlugs(),
 ];
+const CONNECTION_STATUS_PRIORITY: Record<SyncedConnectedAccount["status"], number> = {
+  connected: 4,
+  pending: 3,
+  error: 2,
+  disconnected: 1,
+};
 
 function normalizeConnectionStatus(value?: string | null) {
   const status = (value ?? "").toUpperCase();
@@ -111,6 +117,117 @@ function normalizeConnectionStatus(value?: string | null) {
 
 function pickString(value: unknown) {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function normalizeAccountLabel(label: string | null | undefined) {
+  return label?.trim() || "default";
+}
+
+function preferConnectedAccount(
+  current: SyncedConnectedAccount,
+  next: SyncedConnectedAccount,
+) {
+  const currentPriority = CONNECTION_STATUS_PRIORITY[current.status] ?? 0;
+  const nextPriority = CONNECTION_STATUS_PRIORITY[next.status] ?? 0;
+
+  if (nextPriority !== currentPriority) {
+    return nextPriority > currentPriority;
+  }
+
+  const currentHasRouterSession = Boolean(current.toolkitData.toolRouterSessionId);
+  const nextHasRouterSession = Boolean(next.toolkitData.toolRouterSessionId);
+
+  if (nextHasRouterSession !== currentHasRouterSession) {
+    return nextHasRouterSession;
+  }
+
+  const currentPayloadSize = Object.keys(current.toolkitData).length;
+  const nextPayloadSize = Object.keys(next.toolkitData).length;
+
+  return nextPayloadSize > currentPayloadSize;
+}
+
+function buildUniqueAccountLabel(
+  account: SyncedConnectedAccount,
+  usedLabels: Set<string>,
+) {
+  const baseLabel = normalizeAccountLabel(account.accountLabel);
+  const baseKey = `${account.toolkitSlug}::${baseLabel.toLowerCase()}`;
+
+  if (!usedLabels.has(baseKey)) {
+    usedLabels.add(baseKey);
+    return baseLabel;
+  }
+
+  const externalSuffix = account.externalId?.slice(-6);
+  if (externalSuffix) {
+    const candidate = `${baseLabel} · ${externalSuffix}`;
+    const candidateKey = `${account.toolkitSlug}::${candidate.toLowerCase()}`;
+
+    if (!usedLabels.has(candidateKey)) {
+      usedLabels.add(candidateKey);
+      return candidate;
+    }
+  }
+
+  let attempt = 2;
+  while (attempt < 100) {
+    const candidate = `${baseLabel} (${attempt})`;
+    const candidateKey = `${account.toolkitSlug}::${candidate.toLowerCase()}`;
+
+    if (!usedLabels.has(candidateKey)) {
+      usedLabels.add(candidateKey);
+      return candidate;
+    }
+
+    attempt += 1;
+  }
+
+  return `${baseLabel} (${Date.now()})`;
+}
+
+function prepareAccountsForSync(accounts: SyncedConnectedAccount[]) {
+  const dedupedByIdentity = new Map<string, SyncedConnectedAccount>();
+
+  for (const account of accounts) {
+    const identityKey = account.externalId
+      ? `${account.toolkitSlug}::${account.externalId}`
+      : `${account.toolkitSlug}::${normalizeAccountLabel(account.accountLabel).toLowerCase()}`;
+    const existing = dedupedByIdentity.get(identityKey);
+
+    if (!existing || preferConnectedAccount(existing, account)) {
+      dedupedByIdentity.set(identityKey, account);
+    }
+  }
+
+  const usedLabels = new Set<string>();
+
+  return Array.from(dedupedByIdentity.values())
+    .sort((left, right) => {
+      if (left.toolkitSlug !== right.toolkitSlug) {
+        return left.toolkitSlug.localeCompare(right.toolkitSlug);
+      }
+
+      const priorityDelta =
+        (CONNECTION_STATUS_PRIORITY[right.status] ?? 0) -
+        (CONNECTION_STATUS_PRIORITY[left.status] ?? 0);
+      if (priorityDelta !== 0) {
+        return priorityDelta;
+      }
+
+      const labelCompare = normalizeAccountLabel(left.accountLabel).localeCompare(
+        normalizeAccountLabel(right.accountLabel),
+      );
+      if (labelCompare !== 0) {
+        return labelCompare;
+      }
+
+      return (left.externalId ?? "").localeCompare(right.externalId ?? "");
+    })
+    .map((account) => ({
+      ...account,
+      accountLabel: buildUniqueAccountLabel(account, usedLabels),
+    }));
 }
 
 function buildDriveSearchQuery(search: string) {
@@ -340,7 +457,7 @@ export async function listConnectedAccounts(composioUserId: string) {
 
   const toolRouterSession = toolRouterSessionCache.get(composioUserId);
 
-  return items
+  const normalizedAccounts = items
     .map((item) =>
       normalizeConnectedAccount(
         item,
@@ -349,6 +466,8 @@ export async function listConnectedAccounts(composioUserId: string) {
       ),
     )
     .filter(Boolean) as SyncedConnectedAccount[];
+
+  return prepareAccountsForSync(normalizedAccounts);
 }
 
 export async function syncConnectedAccountsToDatabase(
@@ -360,7 +479,7 @@ export async function syncConnectedAccountsToDatabase(
   workspaceId: string,
   userId: string,
 ) {
-  const composioUserId = buildWorkspaceComposioUserId(workspaceId, userId);
+  const composioUserId = buildWorkspaceComposioUserId(workspaceId);
   const connectedAccounts = await listConnectedAccounts(composioUserId);
 
   if (connectedAccounts.length === 0) {
@@ -409,7 +528,7 @@ export async function createConnectionRequest(
     throw new Error("Unsupported integration.");
   }
 
-  const composioUserId = buildWorkspaceComposioUserId(workspaceId, userId);
+  const composioUserId = buildWorkspaceComposioUserId(workspaceId);
   const session = await getComposioSession(composioUserId);
   const authConfig = await composio.authConfigs.create(toolkitSlug, {
     name: `${integration.displayName} Managed Auth`,

@@ -13,6 +13,7 @@ import {
   getWorkspaceDetail,
   getWorkspaceWidgets,
 } from "@/lib/admin/queries";
+import { getServerLanguage } from "@/lib/i18n-server";
 
 interface AdminWorkspaceDetailPageProps {
   params: Promise<{ id: string }>;
@@ -32,6 +33,7 @@ export default async function AdminWorkspaceDetailPage({
   searchParams,
 }: AdminWorkspaceDetailPageProps) {
   await requireAdminUser();
+  const language = await getServerLanguage();
 
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const currentTab = resolveTab(resolvedSearchParams.tab);
@@ -62,38 +64,40 @@ export default async function AdminWorkspaceDetailPage({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-      <AdminWorkspaceSummaryPanel workspace={workspace} />
+      <AdminWorkspaceSummaryPanel workspace={workspace} language={language} />
 
       <section className="min-w-0 space-y-6">
         <header className="admin-fade-in">
           <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
-            Customer detail
+            {language === "sv" ? "Kunddetalj" : "Customer detail"}
           </p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white">
             {workspace.name}
           </h2>
           <p className="mt-3 text-sm leading-6 text-neutral-500">
-            Read-only activity, build, and widget usage for this workspace.
+            {language === "sv"
+              ? "Skrivskyddad aktivitet, byggdata och widgetanvändning för detta workspace."
+              : "Read-only activity, build, and widget usage for this workspace."}
           </p>
         </header>
 
         <AdminTabs currentTab={currentTab} workspaceId={id} />
 
         {currentTab === "analytics" ? (
-          <AdminWorkspaceAnalytics workspace={workspace} points={activityPoints} />
+          <AdminWorkspaceAnalytics workspace={workspace} points={activityPoints} language={language} />
         ) : null}
 
         {currentTab === "agents" ? (
           <div className="space-y-4 admin-fade-in">
             <div>
               <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
-                Agents
+                {language === "sv" ? "Agenter" : "Agents"}
               </p>
               <h3 className="mt-2 text-xl font-semibold text-white">
-                Workspace agents
+                {language === "sv" ? "Workspace-agenter" : "Workspace agents"}
               </h3>
             </div>
-            <AdminAgentsTable agents={workspaceDetail.agents} />
+            <AdminAgentsTable agents={workspaceDetail.agents} language={language} />
           </div>
         ) : null}
 
@@ -101,13 +105,13 @@ export default async function AdminWorkspaceDetailPage({
           <div className="space-y-4 admin-fade-in">
             <div>
               <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
-                Widgets
+                {language === "sv" ? "Widgets" : "Widgets"}
               </p>
               <h3 className="mt-2 text-xl font-semibold text-white">
-                Workspace widgets
+                {language === "sv" ? "Workspace-widgets" : "Workspace widgets"}
               </h3>
             </div>
-            <AdminWidgetsTable widgets={widgets} />
+            <AdminWidgetsTable widgets={widgets} language={language} />
           </div>
         ) : null}
       </section>

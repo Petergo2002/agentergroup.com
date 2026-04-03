@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 type AgentViewTab = "builder" | "preview";
 
@@ -9,15 +10,16 @@ interface AgentViewTabsProps {
   current: AgentViewTab;
 }
 
-const TABS: Array<{ key: AgentViewTab; label: string }> = [
-  { key: "builder", label: "Builder" },
-  { key: "preview", label: "Preview" },
-];
-
 export function AgentViewTabs({ agentId, current }: AgentViewTabsProps) {
+  const { t } = useLanguage();
+  const tabs: Array<{ key: AgentViewTab; label: string }> = [
+    { key: "builder", label: t("agents.builder") },
+    { key: "preview", label: t("agents.preview") },
+  ];
+
   return (
     <nav className="inline-flex items-center gap-1 rounded-[14px] border border-outline-variant/10 bg-surface-container-low p-1 shadow-sm">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const href = `/agents/${agentId}/${tab.key}`;
         const isCurrent = tab.key === current;
 

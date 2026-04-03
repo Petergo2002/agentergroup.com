@@ -1,6 +1,10 @@
 'use client';
 
+import { useLanguage } from '@/components/i18n/LanguageProvider';
+
 export default function BuilderLoading() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex h-[calc(100vh-64px)] w-full">
       <aside className="w-80 border-r border-outline-variant/10 bg-surface-container-lowest p-4">
@@ -15,7 +19,7 @@ export default function BuilderLoading() {
         <div className="flex h-full w-full items-center justify-center bg-background">
           <div className="flex flex-col items-center gap-3">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-on-surface-variant">Loading builder...</p>
+            <p className="text-sm text-on-surface-variant">{t('agentBuilder.loadingBuilder')}</p>
           </div>
         </div>
       </main>

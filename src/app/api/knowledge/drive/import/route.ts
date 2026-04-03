@@ -180,10 +180,7 @@ export async function POST(request: NextRequest) {
   const driveAccount = syncedAccounts.find(
     (account) => account.toolkitSlug === "googledrive" && account.status === "connected",
   );
-  const composioUserId = buildWorkspaceComposioUserId(
-    context.workspace.id,
-    user.id,
-  );
+  const composioUserId = buildWorkspaceComposioUserId(context.workspace.id);
 
   if (!driveAccount) {
     return NextResponse.json(

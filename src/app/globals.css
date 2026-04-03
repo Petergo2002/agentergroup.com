@@ -4,38 +4,38 @@
 @plugin "@tailwindcss/container-queries";
 
 @theme inline {
-  --color-primary: #a04100;
-  --color-primary-container: #ff6b00;
+  --color-primary: #8c4920;
+  --color-primary-container: #b86734;
   --color-on-primary: #ffffff;
-  --color-on-primary-container: #572000;
+  --color-on-primary-container: #fff5ee;
   
-  --color-secondary: #96481e;
-  --color-secondary-container: #fe9a69;
-  --color-on-secondary: #ffffff;
+  --color-secondary: #6a5a4e;
+  --color-secondary-container: #2a211c;
+  --color-on-secondary: #f7f3ef;
   
-  --color-surface: #f9f9f8;
-  --color-surface-bright: #f9f9f8;
-  --color-surface-dim: #dadad9;
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f3f4f3;
-  --color-surface-container: #eeeeed;
-  --color-surface-container-high: #e8e8e7;
-  --color-surface-container-highest: #e2e2e2;
+  --color-surface: #090909;
+  --color-surface-bright: #161616;
+  --color-surface-dim: #050505;
+  --color-surface-container-lowest: #0e0e0e;
+  --color-surface-container-low: #141414;
+  --color-surface-container: #1b1b1b;
+  --color-surface-container-high: #232323;
+  --color-surface-container-highest: #2d2d2d;
   
-  --color-on-surface: #1a1c1c;
-  --color-on-surface-variant: #5a4136;
-  --color-on-background: #1a1c1c;
-  --color-background: #f9f9f8;
+  --color-on-surface: #f5f1eb;
+  --color-on-surface-variant: #9d948a;
+  --color-on-background: #f5f1eb;
+  --color-background: #050505;
   
-  --color-outline: #8e7164;
-  --color-outline-variant: rgba(226, 191, 176, 0.2);
+  --color-outline: #3a312b;
+  --color-outline-variant: rgba(255, 255, 255, 0.08);
   
-  --color-error: #ba1a1a;
-  --color-error-container: #ffdad6;
+  --color-error: #df6d60;
+  --color-error-container: rgba(223, 109, 96, 0.14);
   --color-on-error: #ffffff;
   
-  --color-success: #008955;
-  --color-success-container: #d6f6e7;
+  --color-success: #4fa17c;
+  --color-success-container: rgba(79, 161, 124, 0.14);
   
   --font-headline: var(--font-manrope);
   --font-body: var(--font-inter);
@@ -50,15 +50,19 @@
 
 @layer utilities {
   .signature-gradient {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-container) 100%);
+    background: linear-gradient(180deg, #f8f3ed 0%, #ffffff 100%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: var(--color-background);
   }
   .glass-panel {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
+    background: rgba(10, 10, 10, 0.82);
+    backdrop-filter: blur(18px);
     border: 1px solid var(--color-outline-variant);
   }
   .app-shell-gradient {
-    background: var(--color-surface);
+    background:
+      radial-gradient(circle at top right, rgba(184, 103, 52, 0.08), transparent 28%),
+      linear-gradient(180deg, #080808 0%, #050505 100%);
   }
   .skeleton {
     background: linear-gradient(90deg, var(--color-surface-container-low) 25%, var(--color-surface-container) 50%, var(--color-surface-container-low) 75%);
@@ -97,7 +101,7 @@
 
 body {
   font-family: var(--font-inter), sans-serif;
-  background-color: var(--color-surface);
+  background-color: var(--color-background);
   color: var(--color-on-surface);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

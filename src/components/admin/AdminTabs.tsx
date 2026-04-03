@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 export type AdminWorkspaceTab = "analytics" | "agents" | "widgets";
 
@@ -7,13 +10,14 @@ interface AdminTabsProps {
   workspaceId: string;
 }
 
-const tabs: Array<{ key: AdminWorkspaceTab; label: string }> = [
-  { key: "analytics", label: "Analytics" },
-  { key: "agents", label: "Agents" },
-  { key: "widgets", label: "Widgets" },
-];
-
 export function AdminTabs({ currentTab, workspaceId }: AdminTabsProps) {
+  const { t } = useLanguage();
+  const tabs: Array<{ key: AdminWorkspaceTab; label: string }> = [
+    { key: "analytics", label: t("admin.analytics") },
+    { key: "agents", label: t("admin.agents") },
+    { key: "widgets", label: t("admin.widgets") },
+  ];
+
   return (
     <nav className="flex items-center gap-6 border-b border-[#1a1a1a]">
       {tabs.map((tab) => {

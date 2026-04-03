@@ -6,14 +6,9 @@ import type { ConnectionRecord } from "@/lib/types";
  * Builds the canonical Composio user id for a workspace.
  *
  * @param workspaceId The workspace that owns the connection.
- * @param actorUserId Optional actor id preserved for call-site compatibility.
  * @returns The workspace-scoped Composio user id.
  */
-export function buildWorkspaceComposioUserId(
-  workspaceId: string,
-  actorUserId?: string,
-): string {
-  void actorUserId;
+export function buildWorkspaceComposioUserId(workspaceId: string): string {
   return `workspace:${workspaceId}`;
 }
 

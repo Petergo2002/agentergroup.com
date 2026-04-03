@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAppContext } from '@/components/app/AppContext';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import type { PlatformLanguage } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/client';
 import type { PrivacySubjectLookupResponse } from '@/lib/types';
 
@@ -11,6 +13,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const supabase = createClient();
   const { profile, user, workspace, membership, workspaces } = useAppContext();
+  const { language, setLanguage, t } = useLanguage();
   const { showToast } = useToast();
   const [fullName, setFullName] = useState(profile.full_name ?? '');
   const [companyName, setCompanyName] = useState(workspace.name);
@@ -32,6 +35,7 @@ export default function SettingsPage() {
   const canEditWorkspace =
     membership.role === 'owner' || membership.role === 'admin';
   const canManagePrivacy = membership.role === 'owner';
+  const roleLabel = t(`roles.${membership.role}Lower`);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -71,15 +75,15 @@ export default function SettingsPage() {
         const workspacePayload = await workspaceResponse.json().catch(() => null);
 
         if (!workspaceResponse.ok) {
-          throw new Error(workspacePayload?.error ?? 'Failed to save company settings.');
+          throw new Error(workspacePayload?.error ?? t('settings.saveError'));
         }
       }
 
       router.refresh();
-      showToast('Settings saved.', 'success');
+      showToast(t('settings.saved'), 'success');
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to save settings.';
+        error instanceof Error ? error.message : t('settings.saveError');
       showToast(message, 'error');
     } finally {
       setIsSaving(false);
@@ -88,22 +92,22 @@ export default function SettingsPage() {
 
   const handleDeleteWorkspace = async () => {
     if (membership.role !== 'owner') {
-      showToast('Only workspace owners can delete a workspace.', 'error');
+      showToast(t('settings.ownerDeleteOnly'), 'error');
       return;
     }
 
     if (workspaces.length <= 1) {
-      showToast('You must keep at least one workspace.', 'error');
+      showToast(t('settings.mustKeepOneWorkspace'), 'error');
       return;
     }
 
     const confirmation = window.prompt(
-      `Type "${workspace.name}" to permanently delete this workspace.`,
+      t('settings.deletePrompt', { name: workspace.name }),
     );
 
     if (confirmation !== workspace.name) {
       if (confirmation !== null) {
-        showToast('Workspace name did not match.', 'error');
+        showToast(t('settings.workspaceNameMismatch'), 'error');
       }
       return;
     }
@@ -117,14 +121,14 @@ export default function SettingsPage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? 'Failed to delete workspace.');
+        throw new Error(payload.error ?? t('settings.deleteWorkspaceError'));
       }
 
-      showToast('Workspace deleted.', 'success');
+      showToast(t('settings.workspaceDeleted'), 'success');
       window.location.assign('/dashboard');
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to delete workspace.';
+        error instanceof Error ? error.message : t('settings.deleteWorkspaceError');
       showToast(message, 'error');
     } finally {
       setIsDeletingWorkspace(false);
@@ -150,14 +154,14 @@ export default function SettingsPage() {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok || !payload) {
-        throw new Error(payload?.error ?? 'Failed to preview subject data.');
+        throw new Error(payload?.error ?? t('settings.privacyLookupError'));
       }
 
       setPrivacyLookupResult(payload as PrivacySubjectLookupResponse);
-      showToast('Subject data preview loaded.', 'success');
+      showToast(t('settings.privacyLookupLoaded'), 'success');
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to preview subject data.';
+        error instanceof Error ? error.message : t('settings.privacyLookupError');
       showToast(message, 'error');
     } finally {
       setIsLookingUpPrivacyData(false);
@@ -178,7 +182,7 @@ export default function SettingsPage() {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? 'Failed to export subject data.');
+        throw new Error(payload?.error ?? t('settings.privacyExportError'));
       }
 
       const blob = await response.blob();
@@ -194,10 +198,10 @@ export default function SettingsPage() {
       link.remove();
       window.URL.revokeObjectURL(downloadUrl);
 
-      showToast('Subject data export downloaded.', 'success');
+      showToast(t('settings.privacyExportDownloaded'), 'success');
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to export subject data.';
+        error instanceof Error ? error.message : t('settings.privacyExportError');
       showToast(message, 'error');
     } finally {
       setIsExportingPrivacyData(false);
@@ -223,17 +227,17 @@ export default function SettingsPage() {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok || !payload) {
-        throw new Error(payload?.error ?? 'Failed to delete subject data.');
+        throw new Error(payload?.error ?? t('settings.privacyDeleteError'));
       }
 
       setPrivacyLookupResult(null);
       setPrivacyRequestReference('');
       setPrivacyDeleteConfirmation('');
       setIncludeTranscriptMatches(false);
-      showToast('Subject data deleted.', 'success');
+      showToast(t('settings.privacyDeleted'), 'success');
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to delete subject data.';
+        error instanceof Error ? error.message : t('settings.privacyDeleteError');
       showToast(message, 'error');
     } finally {
       setIsDeletingPrivacyData(false);
@@ -245,13 +249,13 @@ export default function SettingsPage() {
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-            Profile and workspace
+            {t('settings.badge')}
           </p>
           <h1 className="mt-3 font-headline text-[2.15rem] font-bold tracking-tight text-on-surface sm:text-[2.45rem]">
-            Settings
+            {t('settings.title')}
           </h1>
           <p className="mt-3 text-sm leading-7 text-on-surface-variant">
-            Manage your personal profile and workspace settings.
+            {t('settings.description')}
           </p>
         </div>
         <button
@@ -259,19 +263,19 @@ export default function SettingsPage() {
           disabled={isSaving}
           className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90"
         >
-          {isSaving ? 'Saving...' : 'Save Changes'}
+          {isSaving ? t('common.saving') : t('common.saveChanges')}
         </button>
       </div>
 
       <div className="space-y-6">
         <div className="rounded-[1.7rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-            Profile
+            {t('settings.profile')}
           </p>
           <div className="mt-6 space-y-5">
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                Full Name
+                {t('settings.fullName')}
               </label>
               <input
                 value={fullName}
@@ -281,7 +285,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                Company Name
+                {t('settings.companyName')}
               </label>
               <input
                 value={companyName}
@@ -290,12 +294,12 @@ export default function SettingsPage() {
                 className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:text-on-surface-variant"
               />
               <p className="mt-2 text-xs text-on-surface-variant">
-                This name is the current workspace name and is used as your company name in the app.
+                {t('settings.companyNameHelp')}
               </p>
             </div>
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                Email
+                {t('common.email')}
               </label>
               <input
                 readOnly
@@ -308,14 +312,41 @@ export default function SettingsPage() {
 
         <div className="rounded-[1.7rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-            Active Workspace
+            {t('settings.languageSection')}
+          </p>
+          <div className="mt-6 space-y-4">
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                {t('common.language')}
+              </label>
+              <select
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as PlatformLanguage)}
+                className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-3 text-sm outline-none"
+              >
+                <option value="en">{t('common.english')}</option>
+                <option value="sv">{t('common.swedish')}</option>
+              </select>
+            </div>
+            <p className="text-sm leading-7 text-on-surface-variant">
+              {t('settings.languageDescription')}
+            </p>
+            <p className="text-xs text-on-surface-variant">
+              {t('settings.languageHelp')}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-[1.7rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
+            {t('settings.activeWorkspace')}
           </p>
           <div className="mt-6 space-y-5">
             <div className="rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-4">
               <div className="grid gap-5">
                 <div>
                   <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                    Workspace Slug
+                    {t('settings.workspaceSlug')}
                   </label>
                   <input
                     readOnly
@@ -325,7 +356,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                    Workspace Description
+                    {t('settings.workspaceDescription')}
                   </label>
                   <textarea
                     value={workspaceDescription}
@@ -336,7 +367,9 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">
-                  {membership.role} access · {canEditWorkspace ? 'Can edit company settings' : 'View only'}
+                  {canEditWorkspace
+                    ? t('settings.accessCanEdit', { role: roleLabel })
+                    : t('settings.accessViewOnly', { role: roleLabel })}
                 </div>
               </div>
             </div>
@@ -344,10 +377,9 @@ export default function SettingsPage() {
             <div className="rounded-2xl border border-error/15 bg-error/5 px-4 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-on-surface">Delete workspace</p>
+                  <p className="text-sm font-semibold text-on-surface">{t('settings.deleteWorkspace')}</p>
                   <p className="mt-1 text-xs text-on-surface-variant">
-                    This permanently removes the workspace and all agents, knowledge, connections,
-                    chats, and runs inside it.
+                    {t('settings.deleteWorkspaceDescription')}
                   </p>
                 </div>
                 <button
@@ -357,15 +389,15 @@ export default function SettingsPage() {
                   }
                   className="rounded-2xl border border-error/20 bg-background px-4 py-2.5 text-sm font-semibold text-error transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isDeletingWorkspace ? 'Deleting...' : 'Delete workspace'}
+                  {isDeletingWorkspace ? t('common.deleting') : t('settings.deleteWorkspace')}
                 </button>
               </div>
               <div className="mt-4 text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">
                 {membership.role !== 'owner'
-                  ? 'Owner access required'
+                  ? t('settings.ownerRequired')
                   : workspaces.length <= 1
-                    ? 'Create another workspace before deleting this one'
-                    : 'Permanent action'}
+                    ? t('settings.createAnotherBeforeDelete')
+                    : t('settings.permanentAction')}
               </div>
             </div>
           </div>
@@ -374,16 +406,15 @@ export default function SettingsPage() {
         {canManagePrivacy ? (
           <div className="rounded-[1.7rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-              Privacy &amp; Compliance
+              {t('settings.privacyCompliance')}
             </p>
             <div className="mt-6 space-y-6">
               <div className="rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-on-surface">Retention</p>
+                    <p className="text-sm font-semibold text-on-surface">{t('settings.retention')}</p>
                     <p className="mt-1 text-xs leading-6 text-on-surface-variant">
-                      Widget sessions, widget messages, and widget leads are removed after 180 days.
-                      Imported knowledge stays in place until your workspace deletes it manually.
+                      {t('settings.retentionDescription')}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
@@ -393,19 +424,19 @@ export default function SettingsPage() {
                       rel="noreferrer"
                       className="rounded-full border border-outline-variant/15 bg-background px-3 py-1.5 text-on-surface-variant transition-colors hover:text-on-surface"
                     >
-                      Privacy policy
+                      {t('settings.privacyPolicy')}
                     </a>
                     <a
                       href="/settings/subprocessors"
                       className="rounded-full border border-outline-variant/15 bg-background px-3 py-1.5 text-on-surface-variant transition-colors hover:text-on-surface"
                     >
-                      Subprocessors
+                      {t('settings.subprocessors')}
                     </a>
                     <a
                       href="/settings/data-processing"
                       className="rounded-full border border-outline-variant/15 bg-background px-3 py-1.5 text-on-surface-variant transition-colors hover:text-on-surface"
                     >
-                      Data processing
+                      {t('settings.dataProcessing')}
                     </a>
                   </div>
                 </div>
@@ -413,33 +444,32 @@ export default function SettingsPage() {
 
               <div className="rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-4">
                 <div className="flex flex-col gap-2">
-                  <p className="text-sm font-semibold text-on-surface">Subject data requests</p>
+                  <p className="text-sm font-semibold text-on-surface">{t('settings.subjectRequests')}</p>
                   <p className="text-xs leading-6 text-on-surface-variant">
-                    Use one exact identifier at a time. Email is the primary path. Session ID is the
-                    fallback for anonymous support cases.
+                    {t('settings.subjectRequestDescription')}
                   </p>
                 </div>
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                      Exact email
+                      {t('settings.exactEmail')}
                     </label>
                     <input
                       value={privacyEmail}
                       onChange={(event) => setPrivacyEmail(event.target.value)}
-                      placeholder="person@example.com"
+                      placeholder={t('settings.privacyEmailPlaceholder')}
                       className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
                     />
                   </div>
                   <div>
                     <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                      Exact session ID
+                      {t('settings.exactSessionId')}
                     </label>
                     <input
                       value={privacySessionId}
                       onChange={(event) => setPrivacySessionId(event.target.value)}
-                      placeholder="session_123"
+                      placeholder={t('settings.privacySessionPlaceholder')}
                       className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
                     />
                   </div>
@@ -451,14 +481,14 @@ export default function SettingsPage() {
                     disabled={isLookingUpPrivacyData}
                     className="rounded-2xl bg-on-surface px-4 py-2.5 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
-                    {isLookingUpPrivacyData ? 'Loading…' : 'Preview data'}
+                    {isLookingUpPrivacyData ? t('common.loading') : t('settings.previewData')}
                   </button>
                   <button
                     onClick={handlePrivacyExport}
                     disabled={isExportingPrivacyData}
                     className="rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:opacity-50"
                   >
-                    {isExportingPrivacyData ? 'Exporting…' : 'Export JSON'}
+                    {isExportingPrivacyData ? t('common.loading') : t('settings.exportJson')}
                   </button>
                 </div>
 
@@ -466,25 +496,25 @@ export default function SettingsPage() {
                   <div className="mt-6 space-y-5">
                     <div className="grid gap-3 sm:grid-cols-4">
                       <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">Leads</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.leads')}</p>
                         <p className="mt-2 text-xl font-semibold text-on-surface">
                           {privacyLookupResult.summary.leadCount}
                         </p>
                       </div>
                       <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">Sessions</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.sessions')}</p>
                         <p className="mt-2 text-xl font-semibold text-on-surface">
                           {privacyLookupResult.summary.sessionCount}
                         </p>
                       </div>
                       <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">Messages</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.messages')}</p>
                         <p className="mt-2 text-xl font-semibold text-on-surface">
                           {privacyLookupResult.summary.messageCount}
                         </p>
                       </div>
                       <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">Transcript matches</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.transcriptMatches')}</p>
                         <p className="mt-2 text-xl font-semibold text-on-surface">
                           {privacyLookupResult.summary.transcriptMatchSessionCount}
                         </p>
@@ -493,17 +523,17 @@ export default function SettingsPage() {
 
                     <div className="grid gap-4 lg:grid-cols-3">
                       <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
-                        <p className="text-sm font-semibold text-on-surface">Exact lead matches</p>
+                        <p className="text-sm font-semibold text-on-surface">{t('settings.exactLeadMatches')}</p>
                         <div className="mt-3 space-y-3 text-sm text-on-surface-variant">
                           {privacyLookupResult.leadMatches.length === 0 ? (
-                            <p>No exact lead rows matched.</p>
+                            <p>{t('settings.noExactLeadMatches')}</p>
                           ) : (
                             privacyLookupResult.leadMatches.map((lead) => (
                               <div key={lead.id} className="rounded-xl border border-outline-variant/10 bg-surface-container px-3 py-3">
                                 <p className="font-medium text-on-surface">{lead.name}</p>
                                 <p className="mt-1 break-all">{lead.email}</p>
                                 <p className="mt-1 text-xs uppercase tracking-[0.16em]">
-                                  {lead.widgetName ?? 'Unknown widget'}
+                                  {lead.widgetName ?? t('common.unknownWidget')}
                                 </p>
                               </div>
                             ))
@@ -512,19 +542,19 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
-                        <p className="text-sm font-semibold text-on-surface">Structured session matches</p>
+                        <p className="text-sm font-semibold text-on-surface">{t('settings.structuredSessionMatches')}</p>
                         <div className="mt-3 space-y-3 text-sm text-on-surface-variant">
                           {privacyLookupResult.sessionMatches.length === 0 ? (
-                            <p>No exact session rows matched.</p>
+                            <p>{t('settings.noExactSessionMatches')}</p>
                           ) : (
                             privacyLookupResult.sessionMatches.map((session) => (
                               <div key={session.widgetSessionId} className="rounded-xl border border-outline-variant/10 bg-surface-container px-3 py-3">
                                 <p className="font-medium text-on-surface">{session.sessionId}</p>
                                 <p className="mt-1">
-                                  {session.widgetName ?? 'Unknown widget'} · {session.messageCount} messages
+                                  {session.widgetName ?? t('common.unknownWidget')} · {t('settings.messagesCount', { count: session.messageCount })}
                                 </p>
                                 <p className="mt-1 text-xs uppercase tracking-[0.16em]">
-                                  {session.matchSource === 'session_id' ? 'Direct session match' : 'Linked from lead'}
+                                  {session.matchSource === 'session_id' ? t('settings.directSessionMatch') : t('settings.linkedFromLead')}
                                 </p>
                               </div>
                             ))
@@ -533,16 +563,16 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
-                        <p className="text-sm font-semibold text-on-surface">Transcript-only matches</p>
+                        <p className="text-sm font-semibold text-on-surface">{t('settings.transcriptOnlyMatches')}</p>
                         <div className="mt-3 space-y-3 text-sm text-on-surface-variant">
                           {privacyLookupResult.transcriptMatches.length === 0 ? (
-                            <p>No transcript-only matches found.</p>
+                            <p>{t('settings.noTranscriptMatches')}</p>
                           ) : (
                             privacyLookupResult.transcriptMatches.map((session) => (
                               <div key={session.widgetSessionId} className="rounded-xl border border-outline-variant/10 bg-surface-container px-3 py-3">
                                 <p className="font-medium text-on-surface">{session.sessionId}</p>
                                 <p className="mt-1">
-                                  {session.widgetName ?? 'Unknown widget'} · {session.messageCount} messages
+                                  {session.widgetName ?? t('common.unknownWidget')} · {t('settings.messagesCount', { count: session.messageCount })}
                                 </p>
                                 {session.matchedSnippet ? (
                                   <p className="mt-2 text-xs leading-5">{session.matchedSnippet}</p>
@@ -557,10 +587,9 @@ export default function SettingsPage() {
                     <div className="rounded-2xl border border-error/15 bg-error/5 px-4 py-4">
                       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_180px_auto]">
                         <div>
-                          <p className="text-sm font-semibold text-on-surface">Delete matched data</p>
+                          <p className="text-sm font-semibold text-on-surface">{t('settings.deleteMatchedData')}</p>
                           <p className="mt-1 text-xs leading-6 text-on-surface-variant">
-                            This is permanent. Email deletion removes exact lead rows by default. Transcript-only
-                            sessions are only deleted if you explicitly include them.
+                            {t('settings.deleteMatchedDescription')}
                           </p>
                           <label className="mt-3 flex items-center gap-2 text-sm text-on-surface-variant">
                             <input
@@ -569,23 +598,23 @@ export default function SettingsPage() {
                               onChange={(event) => setIncludeTranscriptMatches(event.target.checked)}
                               className="h-4 w-4 rounded border-outline-variant/30"
                             />
-                            Include transcript-only session matches
+                            {t('settings.includeTranscriptMatches')}
                           </label>
                         </div>
                         <div>
                           <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                            Request reference
+                            {t('settings.requestReference')}
                           </label>
                           <input
                             value={privacyRequestReference}
                             onChange={(event) => setPrivacyRequestReference(event.target.value)}
-                            placeholder="ticket-123"
+                            placeholder={t('settings.requestReferencePlaceholder')}
                             className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
                           />
                         </div>
                         <div>
                           <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                            Type DELETE
+                            {t('settings.typeDelete')}
                           </label>
                           <input
                             value={privacyDeleteConfirmation}
@@ -600,7 +629,7 @@ export default function SettingsPage() {
                             disabled={isDeletingPrivacyData}
                             className="rounded-2xl border border-error/20 bg-background px-4 py-2.5 text-sm font-semibold text-error transition-colors hover:bg-error/5 disabled:opacity-50"
                           >
-                            {isDeletingPrivacyData ? 'Deleting…' : 'Delete data'}
+                            {isDeletingPrivacyData ? t('common.deleting') : t('settings.deleteData')}
                           </button>
                         </div>
                       </div>

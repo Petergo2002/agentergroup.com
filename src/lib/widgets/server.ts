@@ -73,6 +73,10 @@ interface WidgetMutationBuilder<TData> extends PromiseLike<WidgetQueryResult<TDa
   };
 }
 
+interface WidgetUpdateBuilder<TData> {
+  eq: (column: string, value: string) => Promise<WidgetQueryResult<TData>>;
+}
+
 interface WidgetTableQuery {
   select: <TData = unknown>(columns?: string) => WidgetOrderedInSelectBuilder<TData>;
   upsert: (
@@ -82,6 +86,7 @@ interface WidgetTableQuery {
   insert: (
     values: Record<string, unknown> | Record<string, unknown>[],
   ) => WidgetMutationBuilder<unknown>;
+  update: (values: Record<string, unknown>) => WidgetUpdateBuilder<unknown>;
 }
 
 export interface WidgetAdminSupabase {

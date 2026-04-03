@@ -399,10 +399,7 @@ export async function POST(
                   ? item.metadata.tool_call_id
                   : null,
             })),
-            toolUserId: buildWorkspaceComposioUserId(
-              selected!.agent.workspace_id,
-              selected!.agent.created_by,
-            ),
+            toolUserId: buildWorkspaceComposioUserId(selected!.agent.workspace_id),
             audience: "widget",
             widgetPublicKey: loaded.widget.widget_public_key,
             calendarTimezone,
