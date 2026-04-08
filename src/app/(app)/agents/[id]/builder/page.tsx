@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -1091,6 +1091,9 @@ export default function AgentBuilderPage() {
   const [calendarOptionsStatusByConnectionId, setCalendarOptionsStatusByConnectionId] = useState<
     Record<string, 'idle' | 'loading' | 'ready' | 'error'>
   >({});
+  const calendarOptionsStatusRef = useRef<Record<string, 'idle' | 'loading' | 'ready' | 'error'>>(
+    {},
+  );
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
@@ -1403,6 +1406,10 @@ export default function AgentBuilderPage() {
     setEdges(buildEdges(nodes));
   }, [nodes]);
 
+  useEffect(() => {
+    calendarOptionsStatusRef.current = calendarOptionsStatusByConnectionId;
+  }, [calendarOptionsStatusByConnectionId]);
+
   const selectedGoogleCalendarConnectionId =
     selectedNode?.data.kind === 'googlecalendar' ? selectedNode.data.connectionId : null;
 
@@ -1411,18 +1418,17 @@ export default function AgentBuilderPage() {
       return;
     }
 
-    const selectedCalendarNode = selectedNode.data as GoogleCalendarBuilderNodeData;
+    const selectedCalendarNodeId = selectedNode.id;
     const connectionId = selectedGoogleCalendarConnectionId;
     if (!connectionId) {
       return;
     }
 
-    const currentStatus = calendarOptionsStatusByConnectionId[connectionId];
+    const currentStatus = calendarOptionsStatusRef.current[connectionId];
     if (currentStatus === 'ready' || currentStatus === 'loading') {
       return;
     }
 
-    let isMounted = true;
     setCalendarOptionsStatusByConnectionId((current) => ({
       ...current,
       [connectionId]: 'loading',
@@ -1444,17 +1450,9 @@ export default function AgentBuilderPage() {
           throw new Error(payload.error ?? t('agentBuilder.loadCalendarsError'));
         }
 
-        if (!isMounted) {
-          return;
-        }
-
         const calendars = Array.isArray(payload.calendars)
           ? (payload.calendars as GoogleCalendarListItem[])
           : [];
-        const selectedCalendar = resolveCalendarOption(
-          calendars,
-          selectedCalendarNode.calendarId,
-        );
 
         setCalendarOptionsByConnectionId((current) => ({
           ...current,
@@ -1465,25 +1463,34 @@ export default function AgentBuilderPage() {
           [connectionId]: 'ready',
         }));
 
-        const nextTimezone = selectedCalendar?.timezone ?? null;
-        const nextCalendarLabel = selectedCalendarNode.calendarId
-          ? selectedCalendar?.summary ?? null
-          : null;
+        updateNode(selectedCalendarNodeId, (node) => {
+          if (node.data.kind !== 'googlecalendar' || node.data.connectionId !== connectionId) {
+            return node;
+          }
 
-        if (
-          selectedCalendarNode.timezone !== nextTimezone ||
-          selectedCalendarNode.calendarLabel !== nextCalendarLabel
-        ) {
-          updateGoogleCalendarSettings(selectedNode.id, {
-            timezone: nextTimezone,
-            calendarLabel: nextCalendarLabel,
-          });
-        }
+          const selectedCalendar = resolveCalendarOption(calendars, node.data.calendarId);
+          const nextTimezone = selectedCalendar?.timezone ?? null;
+          const nextCalendarLabel = node.data.calendarId
+            ? selectedCalendar?.summary ?? null
+            : null;
+
+          if (
+            node.data.timezone === nextTimezone &&
+            node.data.calendarLabel === nextCalendarLabel
+          ) {
+            return node;
+          }
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              timezone: nextTimezone,
+              calendarLabel: nextCalendarLabel,
+            },
+          };
+        });
       } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
         setCalendarOptionsStatusByConnectionId((current) => ({
           ...current,
           [connectionId]: 'error',
@@ -1496,18 +1503,13 @@ export default function AgentBuilderPage() {
     };
 
     void loadCalendars();
-
-    return () => {
-      isMounted = false;
-    };
   }, [
-    calendarOptionsStatusByConnectionId,
     resolveCalendarOption,
     selectedGoogleCalendarConnectionId,
     selectedNode,
     showToast,
     t,
-    updateGoogleCalendarSettings,
+    updateNode,
   ]);
 
   useEffect(() => {

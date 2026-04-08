@@ -4,14 +4,14 @@
 @plugin "@tailwindcss/container-queries";
 
 @theme inline {
-  --color-primary: #8c4920;
-  --color-primary-container: #b86734;
+  --color-primary: #ff5c00;
+  --color-primary-container: #ff7a29;
   --color-on-primary: #ffffff;
-  --color-on-primary-container: #fff5ee;
+  --color-on-primary-container: #fff4eb;
   
-  --color-secondary: #6a5a4e;
-  --color-secondary-container: #2a211c;
-  --color-on-secondary: #f7f3ef;
+  --color-secondary: #ff5c00;
+  --color-secondary-container: #34170a;
+  --color-on-secondary: #fff4eb;
   
   --color-surface: #090909;
   --color-surface-bright: #161616;
@@ -61,7 +61,7 @@
   }
   .app-shell-gradient {
     background:
-      radial-gradient(circle at top right, rgba(184, 103, 52, 0.08), transparent 28%),
+      radial-gradient(circle at top right, rgba(255, 92, 0, 0.1), transparent 28%),
       linear-gradient(180deg, #080808 0%, #050505 100%);
   }
   .skeleton {

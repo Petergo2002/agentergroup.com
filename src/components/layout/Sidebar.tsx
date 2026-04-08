@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -57,19 +58,16 @@ export function Sidebar({
           : "sticky top-0 h-screen w-64 shrink-0 border-r border-outline-variant/10 bg-surface-container-low"
       }`}
     >
-      <div className="px-6 py-8">
-        <Link href="/dashboard" className="group relative flex items-center gap-3 px-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/20 bg-surface-container-high shadow-sm transition-all duration-200 group-hover:border-primary/30 group-hover:bg-surface-container-highest">
-            <Bot className="h-5 w-5 text-on-surface" strokeWidth={2.5} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="font-headline text-xl font-bold leading-none tracking-tight text-on-surface">
-              Agentergroup
-            </h1>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/60">
-              {t("nav.aiWorkspace")}
-            </p>
-          </div>
+      <div className="px-5 pt-6 pb-4">
+        <Link href="/dashboard" className="group relative flex items-center px-3">
+          <Image
+            src="/dashboardlogo.svg"
+            alt="Agentergroup"
+            width={220}
+            height={73}
+            priority
+            className="h-[124px] w-auto shrink-0 object-contain object-left transition-opacity duration-200 group-hover:opacity-90"
+          />
           {mobile ? (
             <button
               aria-label={t("common.close")}
@@ -82,7 +80,7 @@ export function Sidebar({
         </Link>
       </div>
       
-      <nav className="mt-2 flex-1 space-y-1.5 px-4 font-label">
+      <nav className="mt-1 flex-1 space-y-1.5 px-4 font-label">
         {navItems.map((item) => {
           const isActive = pathname?.startsWith(item.href);
           const Icon = item.icon;
