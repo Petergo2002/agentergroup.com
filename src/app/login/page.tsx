@@ -70,19 +70,15 @@ COMPOSIO_API_KEY=`}
         </div>
 
         <div className="relative z-10 flex flex-col gap-12 max-w-xl">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-high shadow-xl shadow-black/20">
-              <Image
-                src="/logo.png"
-                alt={messages.login.logoAlt}
-                width={48}
-                height={48}
-                className="h-full w-full object-contain p-2"
-              />
-            </div>
-            <h2 className="text-on-surface font-headline text-2xl font-bold tracking-tight">
-              Agentergroup
-            </h2>
+          <div className="flex items-center">
+            <Image
+              src="/dashboardlogo.svg"
+              alt={messages.login.logoAlt}
+              width={220}
+              height={73}
+              priority
+              className="h-[72px] w-auto object-contain object-left"
+            />
           </div>
 
           <div className="space-y-6">

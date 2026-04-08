@@ -78,11 +78,11 @@ export default function DashboardPage() {
   }, [showToast, t]);
 
   const stats = {
+    totalAgents: state.data?.agents.filter((agent) => !agent.archived_at).length ?? 0,
     activeAgents: state.data?.agents.filter(a => !a.archived_at && a.status === "active").length ?? 0,
     liveWidgets: state.data?.workspaceSummary.liveWidgets ?? 0,
     connectedApps: state.data?.workspaceSummary.connectedApps ?? 0,
     knowledgeSources: state.data?.workspaceSummary.knowledgeSources ?? 0,
-    leads: state.data?.workspaceSummary.leads ?? 0,
   };
 
   return (

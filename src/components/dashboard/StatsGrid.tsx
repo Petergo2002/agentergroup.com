@@ -1,16 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import { Users, Activity, BarChart3, Database } from "lucide-react";
+import { Bot, Activity, BarChart3, Database } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface StatsGridProps {
   stats: {
+    totalAgents: number;
     activeAgents: number;
     liveWidgets: number;
     connectedApps: number;
     knowledgeSources: number;
-    leads?: number;
   };
   isLoading: boolean;
 }
@@ -19,11 +19,11 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
   const { t } = useLanguage();
   const statItems = useMemo(() => [
     { 
-      label: t("dashboard.customerLeads"), 
-      value: stats.leads ?? 0, 
-      icon: Users, 
+      label: t("dashboard.agentStatus"), 
+      value: stats.totalAgents, 
+      icon: Bot, 
       color: "text-primary",
-      description: t("dashboard.leadsDescription")
+      description: t("dashboard.agentsDescription", { active: stats.activeAgents })
     },
     { 
       label: t("dashboard.liveWidgets"), 
@@ -46,7 +46,7 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
       color: "text-primary",
       description: t("dashboard.knowledgeDescription")
     },
-  ], [stats, t]);
+  ], [stats.activeAgents, stats.connectedApps, stats.knowledgeSources, stats.liveWidgets, stats.totalAgents, t]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
