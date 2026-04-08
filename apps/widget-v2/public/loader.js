@@ -853,12 +853,14 @@
         max-width: none;
         max-height: none;
         border-radius: 0;
-        transform: translateY(16px);
-        transform-origin: center;
+        transform: none;
+        transform-origin: initial;
+        transition: opacity 0.18s ease, visibility 0.18s ease;
+        will-change: opacity;
       }
 
       .ag-widget-iframe-container.open {
-        transform: translateY(0);
+        transform: none;
       }
 
       .ag-widget-bubble {
