@@ -738,6 +738,8 @@ export const sv = {
       activeSpecialists: "Aktiva specialister",
       activeSpecialistsDescription:
         "Konfigurera vilka agenter som är tillgängliga i widgeten och definiera deras specifika hälsningar.",
+      displayName: "Visningsnamn",
+      displayNamePlaceholder: "Hur specialisten visas i widgeten",
       greetingPrompt: "Hälsningsprompt",
       descriptionSnippet: "Beskrivningssnutt",
       descriptionPlaceholder: "Förklara vad denna agent gör...",
@@ -838,6 +840,7 @@ export const sv = {
       "Bläddra bland stödda Google Drive-filer och importera dem till Supabase.",
     noDriveFilesStatus:
       "Inga stödda Google Drive-filer hittades för denna sökning.",
+    selectDriveAccount: "Välj Google Drive-konto",
     noSourcesFound: "Inga källor hittades",
     sourceName: "Källnamn",
     type: "Typ",

@@ -70,20 +70,22 @@ export function HomeTab({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.25 }}
-        className="absolute inset-0 flex flex-col overflow-hidden bg-[var(--widget-bg)]"
+        className="absolute inset-0 flex flex-col overflow-hidden bg-transparent"
       >
         {/* Header title */}
-        <div className="px-6 pt-8 pb-4 shrink-0 z-10">
-          <h1 className="text-[1.35rem] font-bold tracking-tight text-widget-fg leading-tight">
+        <div className="px-6 pt-8 pb-6 shrink-0 z-10 w-full max-w-lg mx-auto text-center">
+          <h1 className="text-[1.6rem] font-extrabold tracking-tight text-widget-fg leading-tight">
             {config.home.title || t.openSpecialist}
           </h1>
           {config.home.subtitle ? (
-            <p className="mt-1.5 text-[13px] text-widget-muted">{config.home.subtitle}</p>
+            <p className="mt-2 text-[13px] text-widget-muted leading-relaxed">{config.home.subtitle}</p>
           ) : null}
         </div>
 
-        {/* Agent rows */}
-        <div className="flex-1 overflow-y-auto widget-scroll px-5 pb-8 pt-2 space-y-3">
+        {/* Agent list — borderless clean rows */}
+        <div
+          className="flex-1 overflow-y-auto widget-scroll px-4 pb-8 flex flex-col w-full max-w-lg mx-auto"
+        >
           {config.agents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[200px] text-center px-6">
               <div className="w-12 h-12 rounded-full bg-[var(--widget-border)] mb-4 flex items-center justify-center opacity-50">
@@ -98,55 +100,54 @@ export function HomeTab({
               </p>
             </div>
           ) : (
-            config.agents.map((agent, idx) => {
-              // Extract initials for the avatar fallback
-              const initials = agent.label
-                ? agent.label.substring(0, 2).toUpperCase()
-                : "AI";
+            config.agents.map((agent, idx) => (
+              <motion.button
+                key={agent.widgetAgentId}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.06 + 0.08, duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+                onClick={() => onSelectAgent(agent.widgetAgentId)}
+                className="group w-full flex items-center justify-between gap-4 px-4 py-4 text-left transition-colors duration-200 hover:text-[var(--widget-secondary)]"
+                style={{
+                  borderBottom: idx < config.agents.length - 1
+                    ? '1px solid var(--widget-border)'
+                    : 'none'
+                }}
+              >
+                {/* Left: name + description */}
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[15px] font-semibold text-widget-fg group-hover:text-[var(--widget-secondary)] transition-colors duration-200 leading-snug">
+                    {agent.label}
+                  </span>
+                  {config.agents.length > 1 && (agent.description) && (
+                    <span className="mt-0.5 text-[12px] text-widget-muted leading-snug line-clamp-2">
+                      {agent.description}
+                    </span>
+                  )}
+                </div>
 
-              return (
-                <motion.button
-                  key={agent.widgetAgentId}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 + 0.1, duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-                  onClick={() => onSelectAgent(agent.widgetAgentId)}
-                  className="group relative flex w-full items-center gap-4 rounded-[1.25rem] bg-[var(--widget-bg)] p-4 text-left shadow-[0_2px_12px_rgba(0,0,0,0.06)] ring-1 ring-[var(--widget-border)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.1)] hover:ring-[var(--widget-primary)] transition-all duration-300 overflow-hidden"
+                {/* Right: chevron */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4 shrink-0 text-widget-muted group-hover:text-[var(--widget-secondary)] transition-colors duration-200"
                 >
-                  {/* Subtle active state background glow */}
-                  <div className="absolute inset-0 bg-[var(--widget-primary)] opacity-0 group-hover:opacity-5 transition-opacity duration-300" />
-                  
-                  {/* Avatar */}
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--widget-primary)] text-white font-bold text-[13px] tracking-wider shadow-sm ring-4 ring-[var(--widget-bg)] z-10">
-                    {initials}
-                  </div>
-
-                  {/* Text Content */}
-                  <div className="flex-1 min-w-0 pr-4 z-10">
-                    <p className="text-[15px] font-bold text-widget-fg truncate group-hover:text-[var(--widget-primary)] transition-colors">
-                      {agent.label}
-                    </p>
-                    <p className="text-[13px] text-widget-muted mt-0.5 leading-snug line-clamp-2 opacity-80">
-                      {agent.description || "In conversation..."}
-                    </p>
-                  </div>
-                  
-                  {/* Arrow Indicator */}
-                  <div className="shrink-0 opacity-0 -translate-x-3 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-[var(--widget-primary)] z-10">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                       <path d="m9 18 6-6-6-6"/>
-                    </svg>
-                  </div>
-                </motion.button>
-              );
-            })
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </motion.button>
+            ))
           )}
         </div>
       </motion.div>
     );
   }
 
-  const quickActions = Array.isArray(selectedAgent.quickActions)
+  const quickActions = selectedAgent.showQuickActions !== false && Array.isArray(selectedAgent.quickActions)
     ? selectedAgent.quickActions
     : [];
 
@@ -167,11 +168,6 @@ export function HomeTab({
           <p className="mt-4 max-w-full truncate px-4 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-widget-muted sm:text-[11px] sm:tracking-[0.18em]">
             {selectedAgent.label}
           </p>
-          {selectedAgent.description ? (
-            <p className="mt-4 max-w-lg text-sm leading-7 text-widget-muted">
-              {selectedAgent.description}
-            </p>
-          ) : null}
 
           <form
             onSubmit={(event) => {
@@ -196,7 +192,7 @@ export function HomeTab({
             />
             <button
               type="submit"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-widget-primary p-2.5 text-widget-primary-fg shadow-btn-glow transition-all hover:scale-105 hover:opacity-100 active:scale-95"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl bg-transparent p-2 text-widget-muted transition-colors hover:text-[var(--widget-secondary)] active:scale-95 disabled:opacity-50"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -216,16 +212,34 @@ export function HomeTab({
         </div>
 
         {quickActions.length > 0 ? (
-          <div className="mb-16 flex w-full max-w-xl flex-col items-center gap-3">
+          <div className="mb-16 flex w-full max-w-xl flex-col items-center">
             {quickActions.map((action, index) => (
               <button
                 key={`${action.label}-${index}`}
                 onClick={() => handleQuickAction(action.prompt)}
-                className="widget-surface-button group relative flex w-full max-w-[34rem] items-center justify-center overflow-hidden rounded-full px-5 py-3 text-widget-fg"
+                className="group flex w-full max-w-[34rem] items-center justify-between gap-3 px-1 py-3.5 text-left transition-colors duration-200"
+                style={{
+                  borderBottom:
+                    index < quickActions.length - 1
+                      ? "1px solid var(--widget-border)"
+                      : "none",
+                }}
               >
-                <span className="text-center text-sm font-semibold leading-6">
+                <span className="text-[14px] font-medium text-widget-fg group-hover:text-[var(--widget-secondary)] transition-colors duration-200 leading-snug">
                   {action.label}
                 </span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4 shrink-0 text-widget-muted group-hover:text-[var(--widget-secondary)] transition-colors duration-200"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
               </button>
             ))}
           </div>

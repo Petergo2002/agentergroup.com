@@ -43,10 +43,21 @@ Use `data-widget`. `data-id` is still accepted for backward compatibility, but i
 - `bootstrap` validates whether the request is hosted, embedded, or preview and returns a short-lived signed widget access token.
 - The widget access token currently uses a 15-minute TTL.
 - Widget styling is intentionally simplified to `theme`, `primaryColor`, and `secondaryColor`.
+- Runtime agent presentation comes from persisted widget-agent config supplied by the Next.js app, including specialist display labels, greetings, placeholders, quick-action visibility, and quick actions.
 - Hosted widget requests refresh bootstrap directly when they get `WIDGET_ACCESS_TOKEN_INVALID`.
 - Embedded widget requests ask the loader to refetch bootstrap through the parent-page origin via `ag:widget-bootstrap:refresh`.
 - Public chat is serialized per session. If the same session sends overlapping turns, the second request is rejected with `409 SESSION_BUSY`.
 - Runtime requests are accepted only from the widget runtime origin set, not from arbitrary reflected origins.
+
+## Config Contract
+
+The widget runtime expects the public bootstrap/config payload to include:
+
+- widget branding and theme from the current `widgets` row
+- per-specialist config from the current `widget_agents` row
+- `showQuickActions` plus `quickActions` for each specialist
+
+Preview and deployed runtime should now render the same saved specialist configuration.
 
 ## Load Testing
 

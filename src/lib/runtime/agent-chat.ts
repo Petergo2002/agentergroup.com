@@ -7,6 +7,7 @@ import {
   buildDisabledEndChatPolicy,
   buildEndChatMetadata,
 } from "@/lib/end-chat";
+import { buildPersistedDebugTrace } from "@/lib/debug-trace-security";
 import {
   buildDefaultGmailRecipientPolicy,
   normalizeGmailRecipientEmail,
@@ -976,20 +977,22 @@ export async function runAgentChat({
     hadError,
     errorSummary
   };
+  // DEV_ONLY: retain full tool traces locally for debugging, but never persist them in production.
+  const persistedDebugTrace = buildPersistedDebugTrace(debugTrace);
 
   return {
     assistantContent: assistantContent.trim(),
     assistantMetadata: {
       ...(finalAssistantMessage ?? {}),
       knowledgeMatches: getKnowledgeCitationSummary(knowledgeMatches),
-      debugTrace,
+      ...(persistedDebugTrace ? { debugTrace: persistedDebugTrace } : {}),
       ...(endChat ? { endChat } : {}),
     },
     finalCompletion,
     toolMessages,
     knowledgeMatches,
     connectedToolkits: enabledToolkits,
-    debugTrace,
+    debugTrace: persistedDebugTrace ?? undefined,
     endChat,
   };
 }

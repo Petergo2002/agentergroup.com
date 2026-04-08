@@ -190,11 +190,6 @@ export async function POST(
     );
   }
 
-  draft.agents = draft.agents.map((item) => ({
-    ...item,
-    label: availableAgentMap.get(item.agentId)?.name ?? item.label,
-  }));
-
   const revision = crypto.randomUUID();
   const previewPayload = buildWidgetPreviewPayload({
     widgetPublicKey: loaded.widget.widget_public_key,

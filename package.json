@@ -7,23 +7,38 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --experimental-strip-types --test tests/security/*.test.ts",
     "widget:load-test": "node scripts/widget-load-test.mjs",
     "widget:dev": "npm --prefix apps/widget-v2 run dev",
     "widget:build": "npm --prefix apps/widget-v2 run build"
   },
   "dependencies": {
     "@composio/core": "^0.6.6",
-    "@supabase/ssr": "^0.7.0",
-    "@supabase/supabase-js": "^2.57.4",
+    "@supabase/ssr": "^0.10.0",
+    "@supabase/supabase-js": "^2.102.0",
     "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/forms": "^0.5.11",
     "@xyflow/react": "^12.10.1",
     "framer-motion": "^12.36.0",
     "lucide-react": "^0.577.0",
-    "next": "^16.2.1",
+    "next": "^16.2.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "simple-icons": "^16.12.0"
+  },
+  "overrides": {
+    "flat-cache": {
+      "flatted": "3.4.2"
+    },
+    "tinyglobby": {
+      "picomatch": "4.0.4"
+    },
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.13"
+    },
+    "minimatch@10.2.4": {
+      "brace-expansion": "5.0.5"
+    }
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

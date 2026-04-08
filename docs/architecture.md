@@ -470,6 +470,13 @@ Important current behavior:
 
 - live widget chat is bound to `widget_agents.published_version_id`, not the current mutable `agents` row
 - widget branding and surface configuration still come from the current `widgets` and `widget_agents` rows
+- specialist presentation config also comes from the current `widget_agents` row, including:
+  - `label`
+  - `description`
+  - `greeting`
+  - `placeholder`
+  - `show_quick_actions`
+  - `quick_actions`
 - deploy status is therefore mixed:
   - chat execution is version-snapshotted
   - visual/config metadata remains live and can drift until redeployed
@@ -934,7 +941,8 @@ Current behavior:
 - analytics is built from widget session, message, lead, and failure data
 - the primary UI is split between a chat/inbox view and a KPI overview view
 - analytics excludes preview sessions and focuses on customer-facing widget traffic
-- assistant `debugTrace` metadata is exposed in conversation detail for operator debugging
+- production does not persist raw tool debug payloads into stored assistant/widget traces
+- conversation-detail `debugTrace` remains available only to workspace owners and admins
 
 ## OpenRouter Integration
 
@@ -1275,18 +1283,21 @@ The preview page uses this to show which sources informed the answer.
 
 1. User connects Google Drive in Connections
 2. User opens `/knowledge`
-3. User browses Drive-importable files
-4. User chooses a supported file
-5. Backend downloads the file through Composio
-6. Backend creates a `knowledge_sources` row
-7. Backend uploads the raw file to Supabase Storage
-8. Backend invokes `process-knowledge-source`
-9. Source becomes a normal Supabase-backed knowledge source
+3. If multiple Drive accounts exist, user selects the target Drive connection first
+4. User browses Drive-importable files for that exact connection
+5. User chooses a supported file
+6. Backend downloads the file through Composio using the selected connected account id
+7. Backend creates a `knowledge_sources` row
+8. Backend uploads the raw file to Supabase Storage
+9. Backend invokes `process-knowledge-source`
+10. Source becomes a normal Supabase-backed knowledge source
 
 Download hardening:
 
 - the backend accepts inline content directly
-- remote file fetches are restricted to vetted `https` object-download hosts
+- remote file fetches are restricted to vetted `http/https` object-download hosts
+- DNS resolution happens before fetch and blocks private, loopback, and link-local destinations
+- redirect destinations are re-validated against the same rules
 - local file-path reads and arbitrary remote URLs are rejected
 
 ### Important architectural rule
@@ -1332,7 +1343,7 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/workspaces/active` | Switch the active workspace for the current session |
 | `DELETE /api/workspaces/[id]` | Permanently delete an owned workspace, verify the delete actually happened, and move the active cookie to another workspace |
 | `POST /api/workspaces/[id]/privacy/dsar/lookup` | Owner-only subject-data preview for public widget records |
-| `POST /api/workspaces/[id]/privacy/dsar/export` | Owner-only JSON export for public widget subject data |
+| `POST /api/workspaces/[id]/privacy/dsar/export` | Owner-only JSON export for public widget subject data with sanitized export filename tokens |
 | `POST /api/workspaces/[id]/privacy/dsar/delete` | Owner-only subject-data deletion for public widget records |
 
 ### Internal privacy APIs
@@ -1349,8 +1360,8 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/knowledge/sources` | Create a text source or reserve file source upload |
 | `DELETE /api/knowledge/sources/[id]` | Delete a source and associated file/chunks |
 | `POST /api/knowledge/sources/[id]/process` | Reprocess an existing source |
-| `GET /api/knowledge/drive/files` | List importable Google Drive files |
-| `POST /api/knowledge/drive/import` | Import a supported Drive file into the knowledge base |
+| `GET /api/knowledge/drive/files` | List importable Google Drive files for a selected connected account |
+| `POST /api/knowledge/drive/import` | Import a supported Drive file into the knowledge base from a selected connected account |
 
 ### Widget management APIs
 
@@ -1361,7 +1372,7 @@ After import, the source behaves like any other workspace knowledge source.
 | `GET /api/widgets/[id]` | Load widget detail, attached agents, runtime summary, and available agents |
 | `PATCH /api/widgets/[id]` | Update widget identity, theming, access, and settings |
 | `DELETE /api/widgets/[id]` | Permanently delete a widget |
-| `POST /api/widgets/[id]/agents` | Replace the widget's attached agents and their ordering/config |
+| `POST /api/widgets/[id]/agents` | Replace the widget's attached agents and persist their runtime-facing specialist config |
 | `POST /api/widgets/[id]/deploy` | Deploy the widget and snapshot attached published agent versions |
 | `POST /api/widgets/[id]/status` | Toggle deployment state between `draft` and `deployed` |
 | `POST /api/widgets/[id]/preview` | Create/update a preview draft and return preview access data |
@@ -1382,7 +1393,7 @@ After import, the source behaves like any other workspace knowledge source.
 | Route | Purpose |
 | --- | --- |
 | `GET /api/dashboard/analytics` | Return workspace analytics overview, filters, and paginated conversation inbox data |
-| `GET /api/dashboard/analytics/conversations/[widgetSessionId]` | Return one widget conversation detail transcript, lead info, and debug metadata |
+| `GET /api/dashboard/analytics/conversations/[widgetSessionId]` | Return one widget conversation detail transcript, lead info, and role-gated debug metadata |
 
 ## Environment Variables
 

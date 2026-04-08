@@ -49,7 +49,7 @@ export interface WidgetFormState {
   primaryColor: string;
   secondaryColor: string;
   theme: 'dark' | 'light';
-  language: string;
+  language: 'en' | 'sv';
   homeTitle: string;
   homeSubtitle: string;
   hostedEnabled: boolean;
@@ -62,6 +62,7 @@ export interface WidgetFormState {
 
 export interface AttachedAgentState {
   agentId: string;
+  label: string;
   description: string;
   icon: string;
   sortOrder: number;
@@ -156,7 +157,7 @@ function getInitialFormState(summary: WidgetDetailResponse): WidgetFormState {
     primaryColor: summary.widget.primary_color,
     secondaryColor: summary.widget.secondary_color || summary.widget.primary_color,
     theme: summary.widget.theme,
-    language: summary.widget.language || 'en',
+    language: (['en', 'sv'].includes(summary.widget.language) ? summary.widget.language : 'en') as 'en' | 'sv',
     homeTitle: summary.widget.home_title || '',
     homeSubtitle: summary.widget.home_subtitle || '',
     hostedEnabled: summary.widget.hosted_enabled,
@@ -173,6 +174,7 @@ function getInitialAttachedAgents(summary: WidgetDetailResponse): AttachedAgentS
     .sort((left, right) => left.widgetAgent.sort_order - right.widgetAgent.sort_order)
     .map(({ widgetAgent, agent }, index) => ({
       agentId: widgetAgent.agent_id,
+      label: widgetAgent.label,
       description: widgetAgent.description,
       icon: widgetAgent.icon ?? '',
       sortOrder: index,
@@ -211,7 +213,7 @@ function buildDraftPreviewPayload(
     },
     agents: attachedAgents.map((item, index) => ({
       agentId: item.agentId,
-      label: item.agent.name,
+      label: item.label,
       description: item.description,
       icon: item.icon || null,
       sortOrder: index,
@@ -341,7 +343,7 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({
             agents: attachedAgents.map((item, index) => ({
               agentId: item.agentId,
-              label: item.agent.name,
+              label: item.label,
               description: item.description,
               icon: item.icon || null,
               sortOrder: index,
@@ -419,6 +421,7 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
       ...current,
       {
         agentId: agent.id,
+        label: agent.name,
         description: agent.description || '',
         icon: '',
         sortOrder: current.length,

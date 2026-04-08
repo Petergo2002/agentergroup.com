@@ -4,8 +4,8 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 
 ## Packages
 
-- `.`: Main dashboard app built with Next.js 16, React 19, and Tailwind CSS v4.
-- `apps/widget-v2`: Standalone hosted/embedded widget built with Vite and React 18.
+- `.`: Main dashboard app built with Next.js 16.2.2, React 19, and Tailwind CSS v4.
+- `apps/widget-v2`: Standalone hosted/embedded widget built with Vite 8 and React 18.
 
 ## What The Platform Does
 
@@ -16,6 +16,14 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 - Deploy widgets for hosted usage or third-party site embedding.
 - Track widget sessions, transcripts, leads, and analytics inside each workspace.
 - Run owner-only privacy workflows for lookup, export, deletion, and retention cleanup.
+
+## Current Product Guarantees
+
+- Widget specialist settings are durable across save, preview, bootstrap, and deploy. Saved widget-agent labels, quick-action visibility, and quick actions are now treated as the runtime source of truth.
+- Google Drive imports are account-specific. If a workspace has multiple connected Drive accounts, operators must select which account to browse and import from.
+- Public remote downloads are SSRF-hardened. Assistant downloads and Drive imports only allow vetted `http/https` hosts, reject private/loopback destinations, and re-validate redirects.
+- DSAR email lookups use normalized exact matching, not wildcard matching. Session ids used in export filenames are sanitized before being written into headers.
+- Production chat persistence does not store raw debug traces or raw tool payloads. Conversation-detail debug traces are only returned to workspace owners/admins.
 
 ## Local Development
 
@@ -80,6 +88,7 @@ npm run dev
 npm run build
 npm run start
 npm run lint
+npm test
 npm run widget:dev
 npm run widget:build
 npm run widget:load-test -- --help
@@ -135,6 +144,26 @@ The widget loader is built from `apps/widget-v2/public/loader.js` and expects a 
 
 The loader and hosted runtime talk to the public API routes under `/api/public/widgets/`.
 
+## Widget Configuration Model
+
+- `widgets` stores the surface-level widget identity, branding, deployment, and access settings.
+- `widget_agents` stores the ordered specialist list and the runtime-facing specialist configuration:
+  - display label
+  - description
+  - greeting
+  - placeholder
+  - quick-action visibility
+  - quick actions
+  - contact-form settings
+- Deploy snapshots `widget_agents.published_version_id` for chat execution, while current widget/widget-agent config remains the live source for branding and specialist presentation.
+- Internal widget preview uses `widget_preview_drafts` and signed preview tokens, but no longer rewrites specialist labels during preview generation.
+
+## Google Drive Imports
+
+- Drive remains a knowledge-import source only. Imported files become normal `knowledge_sources` rows after upload and processing.
+- The `/knowledge` UI now loads connected Drive accounts and requires an explicit account choice when more than one Drive connection is available.
+- The backend passes the selected connection through list, metadata, and download calls so imports never silently fall back to the first connected account.
+
 ## Operational Notes
 
 - Widget bootstrap currently issues a signed access token with a 15-minute TTL.
@@ -143,6 +172,8 @@ The loader and hosted runtime talk to the public API routes under `/api/public/w
 - Internal assistant chat is serialized per `chat_threads` row; overlapping turns return `409 THREAD_BUSY`.
 - Internal assistants become usable after the first normal builder save; publish remains widget-only in v1.
 - `scripts/widget-load-test.mjs` exercises bootstrap/chat flows and the same-session lock path.
+- The security regression suite lives under `tests/security/*.test.ts` and currently covers SSRF blocking, workspace ownership guards, DSAR normalization/sanitization, debug-trace redaction, and multi-account Drive selection.
+- `npm audit --audit-level=moderate` currently passes in both the root app and `apps/widget-v2`.
 - The top-level `/data-processing` and `/subprocessors` routes are compatibility redirects into `/settings/...`.
 
 ## License

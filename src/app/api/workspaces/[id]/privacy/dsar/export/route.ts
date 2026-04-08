@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { buildWorkspaceSubjectExport } from "@/lib/privacy";
+import { sanitizeContentDispositionToken } from "@/lib/privacy-security";
 import { createAuditLog } from "@/lib/runtime/observability";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -65,7 +66,7 @@ export async function POST(
     const identifier =
       payload.query.mode === "email"
         ? (payload.query.email ?? "subject").replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()
-        : payload.query.sessionId ?? "session";
+        : sanitizeContentDispositionToken(payload.query.sessionId, "session");
 
     return new NextResponse(JSON.stringify(payload, null, 2), {
       status: 200,

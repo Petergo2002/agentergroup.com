@@ -24,6 +24,7 @@ export async function GET(
     const detail = await getDashboardConversationDetail(admin, {
       workspaceId: context.workspace.id,
       widgetSessionId,
+      viewerRole: context.membership.role,
     });
 
     if (!detail) {

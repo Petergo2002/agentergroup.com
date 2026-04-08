@@ -85,36 +85,6 @@ export async function updateWidgetAction(
   return { success: true };
 }
 
-export async function deleteWidgetAction(widgetId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Unauthorized' };
-  }
-
-  const context = await ensureWorkspaceContext(supabase as never, user);
-  const admin = await import('@/lib/supabase/admin').then((m) => m.createAdminClient());
-
-  await admin.from('widget_agents').delete().eq('widget_id', widgetId);
-
-  const { error } = await admin
-    .from('widgets')
-    .delete()
-    .eq('id', widgetId)
-    .eq('workspace_id', context.workspace.id);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath('/widgets');
-
-  return { success: true };
-}
-
 export async function toggleWidgetStatusAction(widgetId: string) {
   const supabase = await createClient();
   const {
@@ -154,3 +124,6 @@ export async function toggleWidgetStatusAction(widgetId: string) {
 
   return { success: true, newStatus };
 }
+
+// Legacy delete server actions were removed because they were unused and
+// duplicated authenticated route-handler logic with service-role drift.

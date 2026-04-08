@@ -715,8 +715,8 @@
       position: absolute;
       bottom: 76px;
       right: 0;
-      width: 440px;
-      height: 680px;
+      width: 420px;
+      height: 700px;
       max-height: 85vh;
       max-width: calc(100vw - 48px);
       border-radius: 18px;
@@ -746,15 +746,15 @@
 
     @media (max-width: 900px) {
       .ag-widget-iframe-container {
-        width: 380px;
-        height: 560px;
+        width: 360px;
+        height: 580px;
         max-height: calc(100vh - 100px);
       }
     }
 
     @media (max-width: 680px) {
       .ag-widget-iframe-container {
-        width: 340px;
+        width: 320px;
         height: 520px;
         max-height: calc(100vh - 96px);
       }

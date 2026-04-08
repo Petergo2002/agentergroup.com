@@ -1,4 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  buildEscapedIlikeContainsPattern,
+  matchesExactNormalizedEmail,
+  normalizePrivacyEmail,
+} from "@/lib/privacy-security";
 import { createAuditLog } from "@/lib/runtime/observability";
 import type {
   PrivacyDeleteSummary,
@@ -82,7 +87,7 @@ function ensureSingleQuery(input: { email?: string | null; sessionId?: string | 
   }
 
   return email
-    ? ({ mode: "email", email } satisfies PrivacySubjectLookupQuery)
+    ? ({ mode: "email", email: normalizePrivacyEmail(email) } satisfies PrivacySubjectLookupQuery)
     : ({ mode: "sessionId", sessionId } satisfies PrivacySubjectLookupQuery);
 }
 
@@ -114,17 +119,22 @@ async function fetchLeadsByExactEmail(
   if (widgetIds.length === 0) return [] as WidgetLeadRecord[];
 
   const rows: WidgetLeadRecord[] = [];
+  const normalizedEmail = normalizePrivacyEmail(email);
 
   for (const widgetIdChunk of chunkArray(widgetIds, 200)) {
     const { data, error } = await supabase
       .from("widget_leads")
       .select("*")
       .in("widget_id", widgetIdChunk)
-      .ilike("email", email)
+      .eq("email", normalizedEmail)
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
-    rows.push(...((data ?? []) as WidgetLeadRecord[]));
+    rows.push(
+      ...((data ?? []) as WidgetLeadRecord[]).filter((lead) =>
+        matchesExactNormalizedEmail(lead.email, normalizedEmail),
+      ),
+    );
   }
 
   return rows;
@@ -205,7 +215,7 @@ async function fetchTranscriptMessageMatches(
   if (widgetIds.length === 0) return [] as WidgetSessionMessageRecord[];
 
   const rows: WidgetSessionMessageRecord[] = [];
-  const pattern = `%${email}%`;
+  const pattern = buildEscapedIlikeContainsPattern(email);
 
   for (const widgetIdChunk of chunkArray(widgetIds, 100)) {
     const { data, error } = await supabase

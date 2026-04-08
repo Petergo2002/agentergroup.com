@@ -7,6 +7,7 @@ import {
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createAuditLog } from "@/lib/runtime/observability";
 import { createClient } from "@/lib/supabase/server";
+import { WorkspaceAccessError, assertOwnedWorkspaceResource } from "@/lib/workspace-security";
 
 export async function DELETE(
   request: NextRequest,
@@ -41,6 +42,20 @@ export async function DELETE(
 
   if (!agent) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  }
+
+  try {
+    assertOwnedWorkspaceResource(
+      agent,
+      context.workspace.id,
+      "You do not have access to delete this agent.",
+    );
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    throw error;
   }
 
   const targetWorkspace = context.workspaces.find(

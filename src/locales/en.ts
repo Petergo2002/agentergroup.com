@@ -732,6 +732,8 @@ export const en = {
       activeSpecialists: "Active Specialists",
       activeSpecialistsDescription:
         "Configure which agents are available within your widget and define their specific greetings.",
+      displayName: "Display Name",
+      displayNamePlaceholder: "How this specialist appears in the widget",
       greetingPrompt: "Greeting Prompt",
       descriptionSnippet: "Description Snippet",
       descriptionPlaceholder: "Explain what this agent does...",
@@ -831,6 +833,7 @@ export const en = {
       "Browse supported Google Drive files and import them into Supabase.",
     noDriveFilesStatus:
       "No supported Google Drive files were found for this search.",
+    selectDriveAccount: "Select Google Drive account",
     noSourcesFound: "No sources found",
     sourceName: "Source Name",
     type: "Type",

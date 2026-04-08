@@ -238,13 +238,17 @@ export function buildWidgetRuntimeConfig(
     agents: orderedAgents.map(({ widgetAgent, agent }) => ({
       widgetAgentId: widgetAgent.id,
       agentId: widgetAgent.agent_id,
-      label: agent.name,
+      label: widgetAgent.label || agent.name,
       description: widgetAgent.description,
       icon: widgetAgent.icon,
       interactionMode: widgetAgent.interaction_mode,
       greeting: widgetAgent.greeting || getGreetingDefault(widget.language),
       placeholder: widgetAgent.placeholder || getPlaceholderDefault(widget.language),
-      quickActions: getDefaultWidgetQuickActions(agent),
+      showQuickActions: widgetAgent.show_quick_actions,
+      quickActions: normalizeQuickActions(
+        widgetAgent.quick_actions,
+        getDefaultWidgetQuickActions(agent),
+      ),
       contactFormSettings: normalizeContactFormSettings(
         widgetAgent.contact_form_settings,
       ),
@@ -307,6 +311,7 @@ export function buildWidgetRuntimeConfigFromDraft(
       interactionMode: agent.interactionMode,
       greeting: agent.greeting.trim() || getGreetingDefault(draft.widget.language || "en"),
       placeholder: agent.placeholder.trim() || getPlaceholderDefault(draft.widget.language || "en"),
+      showQuickActions: agent.showQuickActions,
       quickActions: normalizeQuickActions(agent.quickActions, []),
       contactFormSettings: normalizeContactFormSettings(agent.contactFormSettings),
       endChatPolicy:

@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { buildWorkspaceComposioUserId } from "@/lib/connections";
+import {
+  getEffectiveConnectionStatus,
+  isConnectionScopedToExpectedComposioUser,
+} from "@/lib/connections";
 import { listDriveImportFiles, syncConnectedAccountsToDatabase } from "@/lib/composio";
+import {
+  getDriveConnectedAccountId,
+  getDriveComposioUserId,
+  resolveDriveConnection,
+} from "@/lib/drive-connections";
+import type { ConnectionRecord } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -15,36 +24,53 @@ export async function GET(request: NextRequest) {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  const syncedAccounts = await syncConnectedAccountsToDatabase(
+  await syncConnectedAccountsToDatabase(
     supabase as never,
     context.workspace.id,
     user.id,
   );
-  const driveAccount = syncedAccounts.find(
-    (account) => account.toolkitSlug === "googledrive" && account.status === "connected",
-  );
-
-  if (!driveAccount) {
-    return NextResponse.json(
-      { error: "Google Drive must be connected before you can import files." },
-      { status: 400 },
-    );
-  }
 
   const search = request.nextUrl.searchParams.get("search") ?? "";
   const pageToken = request.nextUrl.searchParams.get("pageToken") ?? undefined;
-  const composioUserId = buildWorkspaceComposioUserId(context.workspace.id);
+  const connectionId = request.nextUrl.searchParams.get("connectionId") ?? "";
+
+  const { data, error } = await supabase
+    .from("connections")
+    .select("id, workspace_id, toolkit_slug, status, external_id, toolkit_data")
+    .eq("workspace_id", context.workspace.id)
+    .eq("toolkit_slug", "googledrive")
+    .order("account_label", { ascending: true });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const driveConnections = ((data ?? []) as ConnectionRecord[])
+    .filter((connection) => isConnectionScopedToExpectedComposioUser(connection))
+    .filter((connection) => getEffectiveConnectionStatus(connection) === "connected");
 
   try {
+    const driveConnection = resolveDriveConnection(driveConnections, connectionId);
+    const connectedAccountId = getDriveConnectedAccountId(driveConnection);
+    const composioUserId = getDriveComposioUserId(driveConnection);
+
+    if (!connectedAccountId || !composioUserId) {
+      throw new Error(
+        "Google Drive must be reconnected in this workspace before files can be loaded.",
+      );
+    }
+
     const result = await listDriveImportFiles(
       composioUserId,
       search,
       pageToken,
+      connectedAccountId,
     );
 
     return NextResponse.json({
       files: result.files,
       nextPageToken: result.nextPageToken,
+      selectedConnectionId: driveConnection.id,
     });
   } catch (error) {
     return NextResponse.json(

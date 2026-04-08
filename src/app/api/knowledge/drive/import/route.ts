@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { buildWorkspaceComposioUserId } from "@/lib/connections";
+import {
+  getEffectiveConnectionStatus,
+  isConnectionScopedToExpectedComposioUser,
+} from "@/lib/connections";
 import {
   downloadDriveFile,
   getDriveFileMetadata,
   syncConnectedAccountsToDatabase,
 } from "@/lib/composio";
+import {
+  getDriveConnectedAccountId,
+  getDriveComposioUserId,
+  resolveDriveConnection,
+} from "@/lib/drive-connections";
 import { KNOWLEDGE_BUCKET } from "@/lib/knowledge";
 import { getDriveImportMimeTypes } from "@/lib/integrations";
+import { fetchSafeDownloadBytes } from "@/lib/safe-fetch";
+import type { ConnectionRecord } from "@/lib/types";
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
@@ -20,96 +30,6 @@ function getString(value: unknown) {
 
 function getNestedRecord(value: unknown) {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
-}
-
-function isPrivateIpv4Hostname(hostname: string) {
-  const match = hostname.match(/^(\d{1,3})(?:\.(\d{1,3})){3}$/);
-  if (!match) {
-    return false;
-  }
-
-  const octets = hostname.split(".").map((part) => Number(part));
-  if (octets.some((part) => Number.isNaN(part) || part < 0 || part > 255)) {
-    return true;
-  }
-
-  const [first, second] = octets;
-  return (
-    first === 10 ||
-    first === 127 ||
-    first === 0 ||
-    (first === 169 && second === 254) ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 168)
-  );
-}
-
-function isSafeDownloadHost(hostname: string) {
-  const normalized = hostname.trim().toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-
-  if (
-    normalized === "localhost" ||
-    normalized.endsWith(".localhost") ||
-    normalized.endsWith(".local") ||
-    normalized.endsWith(".internal")
-  ) {
-    return false;
-  }
-
-  if (normalized === "::1" || normalized === "[::1]" || isPrivateIpv4Hostname(normalized)) {
-    return false;
-  }
-
-  return [
-    "amazonaws.com",
-    "drive.usercontent.google.com",
-    "googleusercontent.com",
-    "googleapis.com",
-    "storage.googleapis.com",
-  ].some(
-    (suffix) => normalized === suffix || normalized.endsWith(`.${suffix}`),
-  );
-}
-
-async function fetchSafeDownloadBytes(urlString: string, redirectCount = 0): Promise<Uint8Array> {
-  let url: URL;
-
-  try {
-    url = new URL(urlString);
-  } catch {
-    throw new Error("Google Drive download returned an invalid file URL.");
-  }
-
-  if (url.protocol !== "https:" || !isSafeDownloadHost(url.hostname)) {
-    throw new Error("Google Drive download returned an unsafe file URL.");
-  }
-
-  const response = await fetch(url, {
-    redirect: "manual",
-  });
-
-  if (
-    response.status >= 300 &&
-    response.status < 400 &&
-    redirectCount < 5
-  ) {
-    const location = response.headers.get("location");
-    if (!location) {
-      throw new Error("Google Drive download returned an invalid redirect.");
-    }
-
-    const nextUrl = new URL(location, url);
-    return fetchSafeDownloadBytes(nextUrl.toString(), redirectCount + 1);
-  }
-
-  if (!response.ok) {
-    throw new Error("Google Drive download returned an unreadable file URL.");
-  }
-
-  return new Uint8Array(await response.arrayBuffer());
 }
 
 async function getFilePayloadBytes(payload: Record<string, unknown>) {
@@ -167,30 +87,49 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const fileId = String(body.fileId ?? "").trim();
   const overrideName = String(body.name ?? "").trim();
+  const connectionId = String(body.connectionId ?? "").trim();
 
   if (!fileId) {
     return NextResponse.json({ error: "fileId is required." }, { status: 400 });
   }
 
-  const syncedAccounts = await syncConnectedAccountsToDatabase(
+  await syncConnectedAccountsToDatabase(
     supabase as never,
     context.workspace.id,
     user.id,
   );
-  const driveAccount = syncedAccounts.find(
-    (account) => account.toolkitSlug === "googledrive" && account.status === "connected",
-  );
-  const composioUserId = buildWorkspaceComposioUserId(context.workspace.id);
 
-  if (!driveAccount) {
-    return NextResponse.json(
-      { error: "Google Drive must be connected before importing files." },
-      { status: 400 },
-    );
+  const { data, error } = await supabase
+    .from("connections")
+    .select("id, workspace_id, toolkit_slug, status, external_id, toolkit_data")
+    .eq("workspace_id", context.workspace.id)
+    .eq("toolkit_slug", "googledrive")
+    .order("account_label", { ascending: true });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const driveConnections = ((data ?? []) as ConnectionRecord[])
+    .filter((connection) => isConnectionScopedToExpectedComposioUser(connection))
+    .filter((connection) => getEffectiveConnectionStatus(connection) === "connected");
+
   try {
-    const metadata = await getDriveFileMetadata(composioUserId, fileId);
+    const driveConnection = resolveDriveConnection(driveConnections, connectionId);
+    const connectedAccountId = getDriveConnectedAccountId(driveConnection);
+    const composioUserId = getDriveComposioUserId(driveConnection);
+
+    if (!connectedAccountId || !composioUserId) {
+      throw new Error(
+        "Google Drive must be reconnected in this workspace before files can be imported.",
+      );
+    }
+
+    const metadata = await getDriveFileMetadata(
+      composioUserId,
+      fileId,
+      connectedAccountId,
+    );
     const supportedMimeTypes = new Set<string>(getDriveImportMimeTypes());
 
     if (!supportedMimeTypes.has(metadata.mimeType)) {
@@ -200,7 +139,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const downloadPayload = await downloadDriveFile(composioUserId, fileId);
+    const downloadPayload = await downloadDriveFile(
+      composioUserId,
+      fileId,
+      connectedAccountId,
+    );
     const fileBytes = await getFilePayloadBytes(downloadPayload);
     const fileName = overrideName || metadata.name;
 

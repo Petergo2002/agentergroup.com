@@ -694,6 +694,7 @@ export interface WidgetRuntimeConfig {
     interactionMode: "chat" | "contact_form";
     greeting: string;
     placeholder: string;
+    showQuickActions: boolean;
     quickActions: WidgetQuickAction[];
     contactFormSettings: WidgetContactFormSettingsRecord;
     endChatPolicy: EndChatPolicy;

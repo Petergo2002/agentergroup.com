@@ -7,6 +7,7 @@ import { buildWidgetSummary, loadWidgetById } from "@/lib/widgets/server";
 
 interface AgentPayload {
   agentId: string;
+  label?: string;
   description?: string;
   icon?: string | null;
   sortOrder?: number;
@@ -106,7 +107,10 @@ export async function POST(
         widget_id: id,
         agent_id: agent.id,
         published_version_id: existing?.published_version_id ?? null,
-        label: agent.name,
+        label:
+          typeof item.label === "string" && item.label.trim()
+            ? item.label.trim()
+            : existing?.label ?? defaults.label,
         description:
           typeof item.description === "string"
             ? item.description.trim()

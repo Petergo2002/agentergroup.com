@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildConversationDetailForViewer } from "@/lib/debug-trace-security";
 import type {
   DashboardAnalyticsAppliedFilters,
   DashboardAnalyticsConversationListItem,
   DashboardAnalyticsOverview,
   DashboardAnalyticsRange,
   DashboardConversationDetailResponse,
+  WorkspaceMemberRecord,
 } from "@/lib/types";
 
 type AdminSupabase = Pick<SupabaseClient, "from">;
@@ -667,6 +669,7 @@ export async function getDashboardConversationDetail(
   input: {
     workspaceId: string;
     widgetSessionId: string;
+    viewerRole: WorkspaceMemberRecord["role"];
   },
 ): Promise<DashboardConversationDetailResponse | null> {
   const { data: sessionData, error: sessionError } = await supabase
@@ -751,7 +754,7 @@ export async function getDashboardConversationDetail(
 
   const agent = (agentResult.data ?? null) as AnalyticsAgentRow | null;
 
-  return {
+  return buildConversationDetailForViewer({
     conversation: {
       widgetSessionId: session.id,
       sessionId: session.session_id,
@@ -787,5 +790,5 @@ export async function getDashboardConversationDetail(
         debugTrace: message.metadata?.debugTrace ?? null,
       }),
     ),
-  };
+  }, input.viewerRole);
 }

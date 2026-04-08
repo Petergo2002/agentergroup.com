@@ -1,5 +1,9 @@
 import { NextRequest } from "next/server";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
+import {
+  buildPersistedAssistantMetadata,
+  buildPersistedToolMessages,
+} from "@/lib/debug-trace-security";
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
@@ -423,6 +427,9 @@ export async function POST(
             }
           });
           const assistantMessageTimestamp = new Date().toISOString();
+          const persistedToolMessages = buildPersistedToolMessages(
+            result.toolMessages,
+          );
 
           await insertWidgetMessages(supabase, {
             widgetSessionId: widgetSession.id,
@@ -430,7 +437,7 @@ export async function POST(
             widgetAgentId: selected!.persistedWidgetAgentId,
             agentId: selected!.agent.id,
             messages: [
-              ...result.toolMessages.map((toolMessage) => ({
+              ...persistedToolMessages.map((toolMessage) => ({
                 role: "tool" as const,
                 content: String(toolMessage.content ?? ""),
                 metadata: toolMessage,
@@ -438,10 +445,9 @@ export async function POST(
               {
                 role: "assistant" as const,
                 content: result.assistantContent,
-                metadata: {
-                  ...result.assistantMetadata,
-                  ...(result.debugTrace ? { debugTrace: result.debugTrace } : {})
-                },
+                metadata: buildPersistedAssistantMetadata(
+                  result.assistantMetadata,
+                ),
               },
             ],
           });

@@ -30,15 +30,11 @@ export function BehaviorTab() {
               <span className={fieldLabelClassName}>{t('widgetBuilder.behavior.primaryLanguage')}</span>
               <select
                  value={form.language}
-                 onChange={(e) => setForm(c => c ? { ...c, language: e.target.value } : c)}
+                 onChange={(e) => setForm(c => c ? { ...c, language: e.target.value as 'en' | 'sv' } : c)}
                  className={inputFieldClassName}
               >
                 <option value="en">{`${t('common.english')} (${t('common.defaultLabel')})`}</option>
-                <option value="es">{t('common.spanish')}</option>
-                <option value="fr">{t('common.french')}</option>
-                <option value="de">{t('common.german')}</option>
-                <option value="it">{t('common.italian')}</option>
-                <option value="pt">{t('common.portuguese')}</option>
+                <option value="sv">Svenska</option>
               </select>
             </label>
 

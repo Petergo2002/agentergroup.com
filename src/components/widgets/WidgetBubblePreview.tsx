@@ -33,6 +33,7 @@ export function WidgetBubblePreview({
     const script = document.createElement("script");
     script.src = `${widgetOrigin}/loader.js`;
     script.async = true;
+    script.crossOrigin = "anonymous";
     script.setAttribute("data-widget", widgetPublicKey);
     script.setAttribute("data-preview", "1");
     script.setAttribute("data-preview-token", previewToken);

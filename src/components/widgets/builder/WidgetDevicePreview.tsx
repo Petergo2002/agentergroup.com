@@ -34,6 +34,7 @@ export function WidgetDevicePreview() {
     const script = document.createElement('script');
     script.id = scriptId;
     script.src = `${widgetOrigin}/loader.js`;
+    script.crossOrigin = "anonymous";
     script.setAttribute('data-widget', summary.widget.widget_public_key);
     script.setAttribute('data-preview', '1');
     script.setAttribute('data-preview-token', draftPreview.previewToken);

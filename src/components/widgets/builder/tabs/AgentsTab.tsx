@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Bot, UserCircle2 } from 'lucide-react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder, type AttachedAgentState } from '../WidgetBuilderContext';
 
@@ -40,11 +41,14 @@ export function AgentsTab() {
                 <div className="flex-1 space-y-6">
                   <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-[1.2rem] bg-surface-container-low flex items-center justify-center border border-outline-variant/10">
-                      <span className="text-xl">🤖</span>
+                      <Bot className="w-5 h-5 text-on-surface-variant/50" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold font-headline">{item.agent.name}</h3>
+                      <h3 className="text-base font-bold font-headline">{item.label}</h3>
                       <p className="text-xs text-on-surface-variant/50 uppercase tracking-[0.12em] font-bold">
+                        {item.agent.name}
+                      </p>
+                      <p className="mt-1 text-[11px] text-on-surface-variant/45 uppercase tracking-[0.12em] font-bold">
                         {item.agent.model}
                       </p>
                     </div>
@@ -68,6 +72,19 @@ export function AgentsTab() {
 
                   <div className="grid gap-6 sm:grid-cols-2">
                     <label className="block space-y-2.5">
+                      <span className={fieldLabelClassName}>{t('widgetBuilder.agents.displayName')}</span>
+                      <input
+                        value={item.label}
+                        onChange={(e) => {
+                           const next = [...attachedAgents];
+                           next[index].label = e.target.value;
+                           setAttachedAgents(next);
+                        }}
+                        className={inputFieldClassName}
+                        placeholder={t('widgetBuilder.agents.displayNamePlaceholder')}
+                      />
+                    </label>
+                    <label className="block space-y-2.5">
                       <span className={fieldLabelClassName}>{t('widgetBuilder.agents.greetingPrompt')}</span>
                       <textarea
                         value={item.greeting}
@@ -79,7 +96,7 @@ export function AgentsTab() {
                         className={`${inputFieldClassName} h-24 resize-none`}
                       />
                     </label>
-                    <label className="block space-y-2.5">
+                    <label className="block space-y-2.5 sm:col-span-2">
                       <span className={fieldLabelClassName}>{t('widgetBuilder.agents.descriptionSnippet')}</span>
                       <textarea
                         value={item.description}
@@ -130,7 +147,7 @@ export function AgentsTab() {
           {attachedAgents.length === 0 && (
             <div className="rounded-[2.5rem] border border-dashed border-outline-variant/20 bg-surface-container-lowest p-16 text-center">
               <div className="mx-auto h-16 w-16 mb-6 rounded-full bg-surface-container-low flex items-center justify-center">
-                 <span className="text-2xl opacity-20">👤</span>
+                 <UserCircle2 className="w-7 h-7 opacity-20 text-on-surface-variant" />
               </div>
               <h3 className="text-lg font-bold font-headline">{t('widgetBuilder.agents.noSpecialists')}</h3>
               <p className="mt-2 text-sm text-on-surface-variant/40 max-w-sm mx-auto">
@@ -156,7 +173,7 @@ export function AgentsTab() {
                className="group flex flex-col items-start gap-4 rounded-[1.8rem] border border-outline-variant/10 bg-surface-container-low p-6 transition-all hover:bg-on-surface hover:text-background text-left"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-outline-variant/20 bg-background transition-colors group-hover:border-background/20 group-hover:bg-white/10">
-                 <span className="text-xl">🤖</span>
+                 <Bot className="w-4 h-4 text-on-surface-variant/50 group-hover:text-background/70" />
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="truncate text-sm font-bold uppercase tracking-[0.1em]">{agent.name}</h4>

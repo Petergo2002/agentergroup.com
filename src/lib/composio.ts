@@ -1134,60 +1134,53 @@ export async function listDriveImportFiles(
   composioUserId: string,
   search = "",
   pageToken?: string,
+  connectedAccountId?: string | null,
 ) {
-  const composio = createComposioClient();
-
-  if (!composio) {
-    throw new Error("COMPOSIO_API_KEY is missing.");
-  }
-
-  const result = await composio.tools.execute("GOOGLEDRIVE_FIND_FILE", {
-    userId: composioUserId,
-    arguments: {
+  const result = await executeToolCall(
+    composioUserId,
+    "GOOGLEDRIVE_FIND_FILE",
+    {
       q: buildDriveSearchQuery(search),
       corpora: "user",
       pageSize: 20,
       pageToken,
     },
-  });
+    {
+      connectedAccountId,
+    },
+  );
 
-  if (!result.successful) {
-    throw new Error(result.error ?? "Failed to list Google Drive files.");
-  }
-
-  const files = extractDriveFileArray(result.data);
-  const nextPageToken = pickString(result.data.nextPageToken) ?? pickString(result.data.pageToken);
+  const files = extractDriveFileArray(result);
+  const nextPageToken = pickString(result.nextPageToken) ?? pickString(result.pageToken);
 
   return {
     files,
     nextPageToken,
-    raw: result.data,
+    raw: result,
   };
 }
 
-export async function getDriveFileMetadata(composioUserId: string, fileId: string) {
-  const composio = createComposioClient();
-
-  if (!composio) {
-    throw new Error("COMPOSIO_API_KEY is missing.");
-  }
-
-  const result = await composio.tools.execute("GOOGLEDRIVE_GET_FILE_METADATA", {
-    userId: composioUserId,
-    arguments: {
+export async function getDriveFileMetadata(
+  composioUserId: string,
+  fileId: string,
+  connectedAccountId?: string | null,
+) {
+  const result = await executeToolCall(
+    composioUserId,
+    "GOOGLEDRIVE_GET_FILE_METADATA",
+    {
       fileId,
     },
-  });
-
-  if (!result.successful) {
-    throw new Error(result.error ?? "Failed to load Google Drive file metadata.");
-  }
+    {
+      connectedAccountId,
+    },
+  );
 
   const record =
-    createDriveFileRecord(result.data) ??
+    createDriveFileRecord(result) ??
     createDriveFileRecord(
-      (typeof result.data.file === "object" && result.data.file !== null
-        ? result.data.file
+      (typeof result.file === "object" && result.file !== null
+        ? result.file
         : {}) as Record<string, unknown>,
     );
 
@@ -1197,28 +1190,24 @@ export async function getDriveFileMetadata(composioUserId: string, fileId: strin
 
   return {
     ...record,
-    webViewLink: record.webViewLink ?? pickString(result.data.webViewLink),
-    raw: result.data,
+    webViewLink: record.webViewLink ?? pickString(result.webViewLink),
+    raw: result,
   };
 }
 
-export async function downloadDriveFile(composioUserId: string, fileId: string) {
-  const composio = createComposioClient();
-
-  if (!composio) {
-    throw new Error("COMPOSIO_API_KEY is missing.");
-  }
-
-  const result = await composio.tools.execute("GOOGLEDRIVE_DOWNLOAD_FILE", {
-    userId: composioUserId,
-    arguments: {
+export async function downloadDriveFile(
+  composioUserId: string,
+  fileId: string,
+  connectedAccountId?: string | null,
+) {
+  return executeToolCall(
+    composioUserId,
+    "GOOGLEDRIVE_DOWNLOAD_FILE",
+    {
       file_id: fileId,
     },
-  });
-
-  if (!result.successful) {
-    throw new Error(result.error ?? "Failed to download Google Drive file.");
-  }
-
-  return result.data;
+    {
+      connectedAccountId,
+    },
+  );
 }

@@ -5,6 +5,11 @@ import {
   isInternalAssistantBlocked,
 } from "@/lib/assistants/feature-flags";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
+import {
+  buildPersistedAssistantMetadata,
+  buildPersistedRunOutput,
+  buildPersistedToolMessages,
+} from "@/lib/debug-trace-security";
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
@@ -293,10 +298,19 @@ export async function POST(
         knowledgeMatchCount: result.knowledgeMatches.length,
       },
     );
+    const persistedToolMessages = buildPersistedToolMessages(result.toolMessages);
+    const persistedAssistantMetadata = buildPersistedAssistantMetadata(
+      result.assistantMetadata,
+    );
+    const persistedRunOutput = buildPersistedRunOutput({
+      finalCompletion: result.finalCompletion,
+      toolMessages: result.toolMessages,
+      knowledgeMatches: result.knowledgeMatches,
+    });
 
     if (result.toolMessages.length > 0) {
       await supabase.from("messages").insert(
-        result.toolMessages.map((message) => ({
+        persistedToolMessages.map((message) => ({
           thread_id: threadId,
           workspace_id: agent.workspace_id,
           role: "tool",
@@ -326,7 +340,7 @@ export async function POST(
         workspace_id: agent.workspace_id,
         role: "assistant",
         content: result.assistantContent,
-        metadata: result.assistantMetadata,
+        metadata: persistedAssistantMetadata,
         created_by: user.id,
       })
       .select()
@@ -349,11 +363,7 @@ export async function POST(
         .from("runs")
         .update({
           status: "succeeded",
-          output: {
-            finalCompletion: result.finalCompletion,
-            toolMessages: result.toolMessages,
-            knowledgeMatches: result.assistantMetadata.knowledgeMatches ?? [],
-          },
+          output: persistedRunOutput,
           completed_at: new Date().toISOString(),
         })
         .eq("id", run.id),

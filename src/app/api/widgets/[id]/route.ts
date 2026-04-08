@@ -9,6 +9,7 @@ import {
   loadWidgetById,
   signWidgetPreviewToken,
 } from "@/lib/widgets/server";
+import { WorkspaceAccessError, assertOwnedWorkspaceResource } from "@/lib/workspace-security";
 import type { AgentRecord } from "@/lib/types";
 
 function parseString(value: unknown) {
@@ -36,8 +37,22 @@ export async function GET(
   const context = await ensureWorkspaceContext(supabase as never, user);
   const loaded = await loadWidgetById(supabase as never, id);
 
-  if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {
+  if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
+  }
+
+  try {
+    assertOwnedWorkspaceResource(
+      loaded.widget,
+      context.workspace.id,
+      "You do not have access to this widget.",
+    );
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    throw error;
   }
 
   const { data: availableAgents, error: agentsError } = await supabase
@@ -91,8 +106,22 @@ export async function PATCH(
   const context = await ensureWorkspaceContext(supabase as never, user);
   const loaded = await loadWidgetById(supabase as never, id);
 
-  if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {
+  if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
+  }
+
+  try {
+    assertOwnedWorkspaceResource(
+      loaded.widget,
+      context.workspace.id,
+      "You do not have access to this widget.",
+    );
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    throw error;
   }
 
   const body = await request.json().catch(() => ({}));
@@ -174,8 +203,22 @@ export async function DELETE(
   const context = await ensureWorkspaceContext(supabase as never, user);
   const loaded = await loadWidgetById(supabase as never, id);
 
-  if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {
+  if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
+  }
+
+  try {
+    assertOwnedWorkspaceResource(
+      loaded.widget,
+      context.workspace.id,
+      "You do not have access to delete this widget.",
+    );
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    throw error;
   }
 
   if (context.membership.role !== "owner") {

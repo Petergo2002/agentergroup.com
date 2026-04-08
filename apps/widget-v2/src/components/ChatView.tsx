@@ -7,7 +7,6 @@ import type {
   WidgetConfig,
   WidgetEndChatReason,
 } from "../types";
-import { WidgetMark } from "./WidgetMark";
 
 // Typing cursor component - Gemini style
 function TypingCursor() {
@@ -316,7 +315,7 @@ export function ChatView({
       {/* Messages Area */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 widget-scroll touch-pan-y md:px-10 md:py-8 lg:px-14"
+        className="flex-1 overflow-y-auto px-4 py-6 widget-scroll touch-pan-y"
       >
         <div className="mx-auto max-w-4xl space-y-6 pb-4">
           {messages.map((msg, idx) => (
@@ -328,20 +327,15 @@ export function ChatView({
             >
               {msg.role === "user" ? (
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-widget-primary px-4 py-3 text-widget-primary-fg shadow-btn-glow">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words font-medium">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-[var(--widget-primary)] px-4 py-3 text-[var(--widget-primary-fg)] shadow-sm">
+                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words font-medium">
                       {msg.content}
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-3 pr-2">
-                  {/* AI Avatar */}
-                  <div className="shrink-0 pt-0.5">
-                    <WidgetMark className="w-8 h-8 shadow-sm ring-1 ring-widget-border" />
-                  </div>
-
-                  {/* Message Content */}
+                <div className="flex flex-col gap-1.5">
+                  {/* Message Content — no avatar, full width */}
                   <div className="flex-1 space-y-1.5 min-w-0">
                     <AgentMessageContent
                       content={msg.content}
@@ -368,30 +362,32 @@ export function ChatView({
             </motion.div>
           ))}
 
-          {/* Loading indicator */}
+          {/* Typing indicator — premium minimal style */}
           {isLoading && messages[messages.length - 1]?.role !== "agent" && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex gap-3 pr-2"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-2 pl-1"
             >
-              <div className="shrink-0 pt-0.5">
-                <WidgetMark className="w-8 h-8 shadow-sm ring-1 ring-widget-border" />
+              {/* Three dots with staggered fade-pulse */}
+              <div className="flex items-center gap-[3px]">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="block w-[5px] h-[5px] rounded-full bg-widget-muted"
+                    style={{
+                      animation: "typingPulse 1.2s ease-in-out infinite",
+                      animationDelay: `${i * 0.18}s`,
+                    }}
+                  />
+                ))}
               </div>
-              <div className="flex h-10 items-center gap-1 px-3.5 py-2.5 rounded-2xl rounded-tl-sm bg-widget-card border border-widget-border">
-                <span
-                  className="w-1.5 h-1.5 bg-widget-primary rounded-full animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <span
-                  className="w-1.5 h-1.5 bg-widget-primary rounded-full animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <span
-                  className="w-1.5 h-1.5 bg-widget-primary rounded-full animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
-              </div>
+              {/* Agent name + status */}
+              <span className="text-[12px] text-widget-muted font-medium">
+                {selectedAgent.label}
+                {config.widget.language === "sv" ? " skriver..." : " is typing..."}
+              </span>
             </motion.div>
           )}
 
@@ -430,10 +426,10 @@ export function ChatView({
               placeholder={
                 isConversationCompleted
                   ? t.completedPlaceholder
-                  : selectedAgent.placeholder
+                  : selectedAgent.placeholder || "Enter your message..."
               }
               disabled={isConversationCompleted}
-              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-widget-fg placeholder:text-widget-muted py-3.5 min-h-12 text-base px-3 widget-chat-input"
+              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-widget-fg placeholder:text-widget-muted py-3 min-h-12 text-[15px] px-4 widget-chat-input"
               inputMode="text"
               enterKeyHint="send"
             />
@@ -445,9 +441,9 @@ export function ChatView({
                 isLoading ||
                 isStreaming
               }
-              className="p-2.5 rounded-xl bg-widget-primary text-widget-primary-fg hover:opacity-90 disabled:bg-widget-border disabled:text-widget-muted disabled:cursor-not-allowed transition-all shrink-0"
+              className="p-2.5 rounded-xl bg-transparent text-widget-muted hover:text-[var(--widget-secondary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 mr-1"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-5 h-5" />
             </button>
           </div>
 

@@ -1,6 +1,6 @@
 # Privacy Operations
 
-Last updated: 2026-03-23
+Last updated: 2026-04-07
 
 ## Purpose
 
@@ -106,6 +106,12 @@ Supported lookup inputs:
 
 The app rejects requests that provide both or neither.
 
+Lookup behavior:
+
+- email lookups are normalized with `trim().toLowerCase()` and matched exactly
+- `%` and `_` are not treated as DSAR wildcards for lead lookup
+- transcript-only matching remains best-effort content search, but wildcard characters are escaped before the search pattern is built
+
 ## Identity Verification Expectations
 
 The product does not verify public requesters directly in v1.
@@ -138,6 +144,7 @@ Notes:
 
 - transcript-only matches are best-effort
 - email lookup may surface transcript matches even if no lead record exists
+- export filenames sanitize session ids to `[a-zA-Z0-9_-]` before writing `Content-Disposition`
 
 ## Delete Procedure
 
@@ -168,6 +175,17 @@ Each delete action writes an audit log using `privacy.dsar.delete`.
 - the product does not currently verify identity automatically
 - imported knowledge is not automatically expired
 - this does not yet cover authenticated preview chat or internal assistant chat end-to-end
+
+## Security Notes
+
+- Public widget DSAR tooling is owner-only.
+- Production chat persistence no longer stores raw tool arguments/results in assistant/widget `debugTrace` payloads.
+- Analytics conversation-detail debug traces are only visible to workspace owners and admins.
+- Remote file downloads used by assistant-generated downloads and Drive imports are SSRF-hardened:
+  - only `http` and `https` are allowed
+  - private, loopback, and link-local addresses are blocked after DNS resolution
+  - redirect destinations are re-validated
+  - downloads are restricted to vetted object-download hosts
 
 ## Incident Escalation
 

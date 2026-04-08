@@ -296,18 +296,25 @@ const WIDGET_DEFAULTS: Record<"sv" | "en", {
   },
 };
 
-function getLocalizedDefault(
+function getLocalizedText(
   value: string | null | undefined,
   key: keyof typeof WIDGET_DEFAULTS["en"],
-  language: "sv" | "en",
+  language: "sv" | "en"
 ): string {
   const trimmed = value?.trim() ?? "";
-  const defaults = WIDGET_DEFAULTS[language];
-  const opposite = WIDGET_DEFAULTS[language === "sv" ? "en" : "sv"];
-  // If empty or still holds the opposite language default, return localized default
-  if (!trimmed || trimmed === opposite[key]) return defaults[key];
+  const targetDefault = WIDGET_DEFAULTS[language][key];
+  const enDefault = WIDGET_DEFAULTS["en"][key];
+  const svDefault = WIDGET_DEFAULTS["sv"][key];
+  
+  // If empty, or matches ANY of the standard defaults, replace with the target language's default
+  if (!trimmed || trimmed === enDefault || trimmed === svDefault) {
+    return targetDefault;
+  }
+  
+  // Otherwise it's custom admin text, keep it!
   return trimmed;
 }
+
 
 function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
   const language = resolveWidgetLanguage(config);
@@ -333,8 +340,11 @@ function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
               agent.interactionMode === "contact_form"
                 ? "contact_form"
                 : "chat",
-            greeting: getLocalizedDefault(agent.greeting, "greeting", language),
-            placeholder: getLocalizedDefault(agent.placeholder, "placeholder", language),
+            // Use smart localized text: if admin didn't change it from the default strings,
+            // it will translate automatically. If they wrote custom text, it stays.
+            greeting: getLocalizedText(agent.greeting, "greeting", language),
+            placeholder: getLocalizedText(agent.placeholder, "placeholder", language),
+            showQuickActions: agent.showQuickActions !== false,
             quickActions: Array.isArray(agent.quickActions)
               ? agent.quickActions
               : [],
@@ -376,7 +386,8 @@ function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
         config.home?.mode === "single_auto" && normalizedAgents.length === 1
           ? "single_auto"
           : "chooser",
-      title: getLocalizedDefault(config.home?.title, "homeTitle", language),
+      // Smart localized text for home title
+      title: getLocalizedText(config.home?.title, "homeTitle", language),
       subtitle: config.home?.subtitle ?? null,
     },
     agents: normalizedAgents,
@@ -1369,7 +1380,7 @@ export default function Widget({
     <div
       className={`relative h-screen w-full flex flex-col overflow-hidden selection:bg-widget-primary/30 ${
         themeMode === "dark" ? "dark bg-stitch-gradient" : "bg-widget-bg"
-      }`}
+      } ${widgetContext === "hosted" ? "lg:items-center lg:justify-center" : ""}`}
       style={
         {
           "--widget-bg": palette.bg,
@@ -1378,6 +1389,7 @@ export default function Widget({
           "--widget-border": palette.border,
           "--widget-brand-primary": palette.primary,
           "--widget-primary": palette.accentStrong,
+          "--widget-secondary": palette.secondary,
           "--widget-primary-rgb": primaryRgb,
           "--widget-primary-fg": palette.accentStrongFg,
           "--widget-muted": palette.muted,
@@ -1404,28 +1416,47 @@ export default function Widget({
         />
       )}
 
+      {/* Desktop hosted: full-screen background with subtle pattern/glow behind the centered card */}
+      {widgetContext === "hosted" && (
+        <div
+          aria-hidden="true"
+          className="hidden lg:block fixed inset-0 pointer-events-none z-0"
+          style={{
+            background: themeMode === "dark"
+              ? `radial-gradient(ellipse 80% 60% at 50% 0%, ${palette.secondary}25 0%, transparent 70%)`
+              : `radial-gradient(ellipse 80% 60% at 50% 0%, ${palette.secondary}18 0%, transparent 70%)`,
+          }}
+        />
+      )}
+
       <div
-        className={`relative z-10 flex h-full flex-col ${
-          widgetContext === "hosted" ? "w-full" : ""
+        className={`relative z-10 flex flex-col overflow-hidden ${
+          widgetContext === "hosted"
+            ? "w-full h-full lg:w-[440px] lg:h-[760px] lg:max-h-[90vh] lg:rounded-3xl lg:shadow-2xl lg:ring-1 lg:ring-[var(--widget-border)]"
+            : "w-full h-full"
         }`}
       >
-        <header className="relative flex items-center justify-between px-6 pb-4 pt-12 shrink-0 md:px-10 lg:px-14">
+        {/* Top Hero Gradient using Secondary Color (only on home tab) */}
+        {activeTab === "home" && (
+          <div 
+            className="absolute top-0 left-0 right-0 h-[45%] pointer-events-none z-0"
+            style={{
+              background: `linear-gradient(to bottom, var(--widget-secondary) 0%, transparent 100%)`,
+              opacity: themeMode === "dark" ? 0.40 : 0.30
+            }}
+          />
+        )}
+
+        <header className="relative flex items-center justify-between px-6 pb-4 pt-12 shrink-0">
           <div className="flex items-center gap-2">
             <AnimatePresence mode="wait">
-              {((activeTab === "messages" && selectedAgent) ||
-                (activeTab === "home" && selectedAgent && config.home.mode === "chooser" && !hasStarted)) && (
+              {(activeTab === "home" && selectedAgent && config.home.mode === "chooser" && !hasStarted) && (
                 <motion.button
                   key="back-button"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
-                  onClick={() => {
-                    if (activeTab === "messages") {
-                      setActiveTab("home");
-                    } else {
-                      setSelectedWidgetAgentId(null);
-                    }
-                  }}
+                  onClick={() => setSelectedWidgetAgentId(null)}
                   className="widget-icon-button mr-1 p-1"
                   aria-label={navLabelHome}
                 >
@@ -1450,17 +1481,12 @@ export default function Widget({
           </div>
 
           <div
-            className={`absolute inset-x-0 top-[3.75rem] flex justify-center pointer-events-none select-none z-0 ${
-              activeTab === "messages" ? "px-28" : "px-20"
-            }`}
+            className="absolute inset-x-0 top-[3.75rem] flex justify-center pointer-events-none select-none z-0"
           >
             <span
-              className={`block max-w-full truncate text-center font-semibold uppercase text-widget-fg opacity-45 ${
-                activeTab === "messages"
-                  ? "text-[9px] tracking-[0.12em] sm:text-[10px] sm:tracking-[0.14em]"
-                  : "text-[10px] tracking-[0.16em] sm:text-[11px] sm:tracking-[0.18em]"
-              }`}
+              className="block text-center font-semibold uppercase text-widget-fg opacity-40 text-[10px] tracking-[0.16em] sm:text-[11px] sm:tracking-[0.18em] truncate"
               style={{
+                maxWidth: "min(220px, calc(100% - 5rem))",
                 textShadow:
                   themeMode === "dark"
                     ? "0px 1px 1px rgba(255,255,255,0.05), 0px -1px 1px rgba(0,0,0,0.4)"
@@ -1485,7 +1511,7 @@ export default function Widget({
             {isEmbedded ? (
               <button
                 onClick={handleClose}
-                className="widget-icon-button widget-icon-button-outlined flex h-10 w-10 items-center justify-center rounded-full shadow-sm"
+                className="widget-icon-button p-2"
                 aria-label={widgetLanguage === "sv" ? "Stäng" : "Close"}
               >
                 <X className="h-5 w-5" />
@@ -1555,16 +1581,8 @@ export default function Widget({
                 <button
                   onClick={() => setActiveTab("home")}
                   data-active={activeTab === "home" ? "true" : "false"}
-                  className="widget-nav-button relative z-10 flex h-full w-1/2 flex-col items-center justify-center gap-0.5"
-                  style={
-                    activeTab === "home"
-                      ? {
-                          backgroundColor: palette.stateSelected,
-                          color: palette.stateSelectedText,
-                          boxShadow: `inset 0 0 0 1px ${palette.stateSelectedBorder}`,
-                        }
-                      : undefined
-                  }
+                  className="widget-nav-button relative z-10 flex h-full w-1/2 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
+                  style={activeTab === "home" ? { color: palette.secondary } : undefined}
                 >
                   <Home className="w-5 h-5" />
                   <span className="text-[11px] font-medium">
@@ -1575,16 +1593,8 @@ export default function Widget({
                 <button
                   onClick={() => setActiveTab("messages")}
                   data-active={activeTab === "messages" ? "true" : "false"}
-                  className="widget-nav-button relative z-10 flex h-full w-1/2 flex-col items-center justify-center gap-0.5"
-                  style={
-                    activeTab === "messages"
-                      ? {
-                          backgroundColor: palette.stateSelected,
-                          color: palette.stateSelectedText,
-                          boxShadow: `inset 0 0 0 1px ${palette.stateSelectedBorder}`,
-                        }
-                      : undefined
-                  }
+                  className="widget-nav-button relative z-10 flex h-full w-1/2 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
+                  style={activeTab === "messages" ? { color: palette.secondary } : undefined}
                 >
                   <div className="relative">
                     <MessageSquare className="w-5 h-5" />

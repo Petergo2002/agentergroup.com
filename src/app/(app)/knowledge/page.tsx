@@ -9,7 +9,11 @@ import {
   SUPPORTED_KNOWLEDGE_EXTENSIONS,
   SUPPORTED_KNOWLEDGE_MIME_TYPES,
 } from "@/lib/knowledge";
-import type { DriveImportFileRecord, KnowledgeSourceRecord } from "@/lib/types";
+import type {
+  ConnectionRecord,
+  DriveImportFileRecord,
+  KnowledgeSourceRecord,
+} from "@/lib/types";
 import { SourceBentoGrid } from "@/components/knowledge/SourceBentoGrid";
 import { SourceTable } from "@/components/knowledge/SourceTable";
 import { formatRelativeDate } from "@/lib/utils";
@@ -58,6 +62,8 @@ export default function KnowledgePage() {
   const [processingSourceId, setProcessingSourceId] = useState<string | null>(null);
   const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null);
   const [driveSearch, setDriveSearch] = useState("");
+  const [driveConnections, setDriveConnections] = useState<ConnectionRecord[]>([]);
+  const [selectedDriveConnectionId, setSelectedDriveConnectionId] = useState("");
   const [driveFiles, setDriveFiles] = useState<DriveImportFileRecord[]>([]);
   const [isLoadingDriveFiles, setIsLoadingDriveFiles] = useState(false);
   const [isImportingDriveFileId, setIsImportingDriveFileId] = useState<string | null>(null);
@@ -97,6 +103,32 @@ export default function KnowledgePage() {
     setSources(payload.sources ?? []);
   }, []);
 
+  const loadDriveConnections = useCallback(async () => {
+    const response = await fetch("/api/connections/toolkits", {
+      next: { revalidate: 30 },
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error ?? t("knowledge.loadDriveError"));
+    }
+
+    const nextConnections = ((payload.connections ?? []) as ConnectionRecord[]).filter(
+      (connection) =>
+        connection.toolkit_slug === "googledrive" &&
+        connection.status === "connected",
+    );
+
+    setDriveConnections(nextConnections);
+    setSelectedDriveConnectionId((current) => {
+      if (current && nextConnections.some((connection) => connection.id === current)) {
+        return current;
+      }
+
+      return nextConnections.length === 1 ? nextConnections[0]?.id ?? "" : "";
+    });
+  }, [t]);
+
   const loadDriveFiles = useCallback(
     async ({ reset, pageToken }: { reset: boolean; pageToken?: string }) => {
       setIsLoadingDriveFiles(true);
@@ -106,6 +138,10 @@ export default function KnowledgePage() {
 
         if (driveSearch.trim()) {
           query.set("search", driveSearch.trim());
+        }
+
+        if (selectedDriveConnectionId) {
+          query.set("connectionId", selectedDriveConnectionId);
         }
 
         if (pageToken) {
@@ -137,7 +173,7 @@ export default function KnowledgePage() {
         setIsLoadingDriveFiles(false);
       }
     },
-    [driveFiles.length, driveSearch, showToast, t],
+    [driveFiles.length, driveSearch, selectedDriveConnectionId, showToast, t],
   );
 
   useEffect(() => {
@@ -146,6 +182,7 @@ export default function KnowledgePage() {
     const run = async () => {
       try {
         await loadSources();
+        await loadDriveConnections();
       } catch (error) {
         if (mounted) {
           showToast(
@@ -165,7 +202,7 @@ export default function KnowledgePage() {
     return () => {
       mounted = false;
     };
-  }, [loadSources, showToast, t]);
+  }, [loadDriveConnections, loadSources, showToast, t]);
 
   const handleCreateTextSource = async () => {
     const trimmedName = textName.trim();
@@ -293,6 +330,7 @@ export default function KnowledgePage() {
         body: JSON.stringify({
           fileId: file.id,
           name: file.name,
+          connectionId: selectedDriveConnectionId || null,
         }),
       });
       const payload = await response.json();
@@ -535,6 +573,23 @@ export default function KnowledgePage() {
             {activeTab === "drive" && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between gap-4">
+                  {driveConnections.length > 1 ? (
+                    <select
+                      value={selectedDriveConnectionId}
+                      onChange={(event) => {
+                        setSelectedDriveConnectionId(event.target.value);
+                        setDriveFiles([]);
+                      }}
+                      className="min-w-[220px] rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-2.5 text-sm outline-none"
+                    >
+                      <option value="">{t("knowledge.selectDriveAccount")}</option>
+                      {driveConnections.map((connection) => (
+                        <option key={connection.id} value={connection.id}>
+                          {connection.account_label || connection.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
                   <div className="relative flex-1">
                     <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[20px] text-on-surface-variant/40">search</span>
                     <input
@@ -546,7 +601,7 @@ export default function KnowledgePage() {
                   </div>
                   <button
                     onClick={() => void loadDriveFiles({ reset: true })}
-                    disabled={isLoadingDriveFiles}
+                    disabled={isLoadingDriveFiles || (driveConnections.length > 1 && !selectedDriveConnectionId)}
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
                   >
                     <RefreshCw className={`h-4.5 w-4.5 ${isLoadingDriveFiles ? "animate-spin" : ""}`} />
@@ -578,7 +633,10 @@ export default function KnowledgePage() {
                         </div>
                         <button
                           onClick={() => void handleDriveImport(file)}
-                          disabled={isImportingDriveFileId === file.id}
+                          disabled={
+                            isImportingDriveFileId === file.id ||
+                            (driveConnections.length > 1 && !selectedDriveConnectionId)
+                          }
                           className="rounded-full bg-primary/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary/18 hover:text-on-surface disabled:opacity-50"
                         >
                           {isImportingDriveFileId === file.id ? "..." : t("common.import")}

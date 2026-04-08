@@ -78,38 +78,6 @@ export async function updateAgentAction(
   return { success: true };
 }
 
-export async function deleteAgentAction(agentId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Unauthorized' };
-  }
-
-  const context = await ensureWorkspaceContext(supabase as never, user);
-  const admin = createAdminClient();
-
-  await admin.from('agent_connections').delete().eq('agent_id', agentId);
-  await admin.from('knowledge_sources').delete().eq('agent_id', agentId);
-  await admin.from('widget_agents').delete().eq('agent_id', agentId);
-
-  const { error } = await admin
-    .from('agents')
-    .delete()
-    .eq('id', agentId)
-    .eq('workspace_id', context.workspace.id);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath('/agents');
-
-  return { success: true };
-}
-
 export async function toggleAgentStatusAction(agentId: string) {
   const supabase = await createClient();
   const {
@@ -156,6 +124,8 @@ export async function toggleAgentStatusAction(agentId: string) {
   return { success: true, newStatus };
 }
 
+// Legacy delete server actions were removed because they were unused and
+// duplicated authenticated route-handler logic with service-role drift.
 export async function archiveAgentAction(agentId: string) {
   const supabase = await createClient();
   const {

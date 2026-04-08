@@ -11,6 +11,7 @@ import {
 } from "@/lib/assistants/downloads";
 import { loadAssistantById, loadAssistantThread } from "@/lib/assistants/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { SafeFetchError, fetchSafeRemoteResource } from "@/lib/safe-fetch";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -127,17 +128,20 @@ export async function GET(
       });
     }
 
-    const remoteUrl = new URL(download.url);
+    let upstream: Response;
 
-    if (remoteUrl.protocol !== "https:" && remoteUrl.protocol !== "http:") {
-      return NextResponse.json({ error: "Unsafe download URL." }, { status: 400 });
+    try {
+      upstream = await fetchSafeRemoteResource(download.url, {
+        method: "GET",
+        cache: "no-store",
+      });
+    } catch (error) {
+      if (error instanceof SafeFetchError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+
+      throw error;
     }
-
-    const upstream = await fetch(remoteUrl, {
-      method: "GET",
-      cache: "no-store",
-      redirect: "follow",
-    });
 
     if (!upstream.ok || !upstream.body) {
       return NextResponse.json(
