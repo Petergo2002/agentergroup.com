@@ -115,6 +115,7 @@
   let isOpen = false;
   let container = null;
   let bubble = null;
+  let closeButton = null;
   let iframe = null;
   let styleSheet = null;
   let messageListener = null;
@@ -122,7 +123,6 @@
   let keydownListener = null;
   let viewportListener = null;
   let focusListener = null;
-  let touchBlockListener = null;
   let previewOverrideMessage = null;
   let bootstrapPayload = null;
   let previousFocusedElement = null;
@@ -556,20 +556,6 @@
     body.style.width = "100%";
     body.style.overscrollBehavior = "none";
 
-    touchBlockListener = (event) => {
-      if (!isOpen) return;
-      if (!shouldLockBackgroundScroll()) return;
-
-      const target = event.target;
-      if (target && container && container.contains(target)) {
-        return;
-      }
-      event.preventDefault();
-    };
-    document.addEventListener("touchmove", touchBlockListener, {
-      passive: false,
-    });
-
     scrollLockState.active = true;
   }
 
@@ -588,11 +574,6 @@
     body.style.right = scrollLockState.bodyRight;
     body.style.width = scrollLockState.bodyWidth;
     body.style.overscrollBehavior = scrollLockState.bodyOverscrollBehavior;
-
-    if (touchBlockListener) {
-      document.removeEventListener("touchmove", touchBlockListener);
-      touchBlockListener = null;
-    }
 
     window.scrollTo(0, scrollLockState.scrollY);
     scrollLockState.active = false;
@@ -626,6 +607,10 @@
       opacity: 1;
     }
 
+    .ag-widget-container.ag-is-open {
+      pointer-events: auto;
+    }
+
     .ag-widget-bubble {
       position: relative;
       z-index: 2;
@@ -656,6 +641,44 @@
     .ag-widget-bubble:hover {
       transform: translateY(-2px);
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+    }
+
+    .ag-widget-close-button {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.94);
+      color: rgba(17, 17, 17, 0.92);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+      transform: scale(0.92);
+      z-index: 3;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .ag-widget-close-button.open {
+      transform: scale(1);
+    }
+
+    .ag-widget-close-button svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     .ag-widget-bubble.open {
@@ -785,6 +808,8 @@
       height: 100%;
       border: none;
       background: #0a0e1a;
+      pointer-events: auto;
+      touch-action: auto;
     }
 
     @media (max-width: 900px) {
@@ -856,12 +881,28 @@
       }
 
       .ag-widget-container.ag-is-open .ag-widget-bubble {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: scale(0.92);
+      }
+
+      .ag-widget-container.ag-is-open .ag-widget-close-button {
         position: fixed;
-        top: calc(env(safe-area-inset-top, 0px) + 12px);
-        right: 12px;
-        z-index: 3;
-        touch-action: manipulation;
-        -webkit-tap-highlight-color: transparent;
+        top: calc(env(safe-area-inset-top, 0px) + 18px);
+        right: 14px;
+        width: 40px;
+        height: 40px;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        color: rgba(17, 17, 17, 0.92);
+      }
+
+      .ag-widget-close-button.open {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
       }
 
       .ag-widget-bubble:hover {
@@ -924,6 +965,12 @@
       bubble.classList.toggle("open", isOpen);
       bubble.setAttribute("aria-label", isOpen ? "Stäng chatt" : "Öppna chatt");
       bubble.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    }
+
+    if (closeButton) {
+      closeButton.classList.toggle("open", isOpen);
+      closeButton.setAttribute("aria-hidden", isOpen ? "false" : "true");
+      closeButton.tabIndex = isOpen ? 0 : -1;
     }
   }
 
@@ -1024,6 +1071,7 @@
     // Create bubble button
     bubble = document.createElement("button");
     bubble.className = "ag-widget-bubble";
+    bubble.type = "button";
     const brandName = bootstrapPayload?.config?.brand?.name || "Agent";
     const logoUrl = bootstrapPayload?.config?.brand?.logoUrl;
     iframeContainer.setAttribute("aria-label", `${brandName} chat`);
@@ -1045,58 +1093,69 @@
     bubble.setAttribute("aria-expanded", "false");
     bubble.onclick = toggleWidget;
 
-    // Touchend fallback — iOS Safari can fail to synthesize click from touch
-    bubble.addEventListener('touchend', (e) => {
-      if (e.cancelable) e.preventDefault();
-      toggleWidget();
-    }, { passive: false });
+    closeButton = document.createElement("button");
+    closeButton.className = "ag-widget-close-button";
+    closeButton.type = "button";
+    closeButton.innerHTML = closeIconSvg;
+    closeButton.setAttribute("aria-label", "Stäng chatt");
+    closeButton.setAttribute("aria-hidden", "true");
+    closeButton.tabIndex = -1;
+    closeButton.onclick = closeWidget;
 
     // Append elements
     container.appendChild(iframeContainer);
     container.appendChild(bubble);
+    container.appendChild(closeButton);
     document.body.appendChild(container);
 
     syncWidgetOpenState();
     applyWidgetTheme();
   }
 
-  // Toggle widget open/close
-  function toggleWidget() {
-    isOpen = !isOpen;
+  function openWidget() {
+    if (isOpen) return;
+
     const iframeContainer = container?.querySelector(
       ".ag-widget-iframe-container",
     );
-    if (!iframeContainer || !bubble) {
-      if (!isOpen) {
-        unlockBackgroundScroll();
-      }
-      return;
-    }
+    if (!iframeContainer || !bubble) return;
 
-    if (isOpen) {
-      previousFocusedElement =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
-      syncWidgetOpenState();
-      lockBackgroundScroll();
-      focusWidgetSurface();
-    } else {
-      syncWidgetOpenState();
-      unlockBackgroundScroll();
-      if (
-        previousFocusedElement &&
-        document.contains(previousFocusedElement) &&
-        typeof previousFocusedElement.focus === "function"
-      ) {
-        previousFocusedElement.focus();
-      } else if (bubble && typeof bubble.focus === "function") {
-        bubble.focus();
-      }
-      previousFocusedElement = null;
-    }
-
+    isOpen = true;
+    previousFocusedElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    syncWidgetOpenState();
+    lockBackgroundScroll();
+    focusWidgetSurface();
     postWidgetStateToIframe();
+  }
+
+  function closeWidget() {
+    if (!isOpen) return;
+
+    isOpen = false;
+    syncWidgetOpenState();
+    unlockBackgroundScroll();
+    if (
+      previousFocusedElement &&
+      document.contains(previousFocusedElement) &&
+      typeof previousFocusedElement.focus === "function"
+    ) {
+      previousFocusedElement.focus();
+    } else if (bubble && typeof bubble.focus === "function") {
+      bubble.focus();
+    }
+    previousFocusedElement = null;
+    postWidgetStateToIframe();
+  }
+
+  function toggleWidget() {
+    if (isOpen) {
+      closeWidget();
+    } else {
+      openWidget();
+    }
   }
 
   function destroy() {
@@ -1126,6 +1185,7 @@
       container = null;
     }
     bubble = null;
+    closeButton = null;
     iframe = null;
     isOpen = false;
     unlockBackgroundScroll();
@@ -1150,7 +1210,7 @@
   // Listen for messages from iframe
   messageListener = (event) => {
     if (isTrustedIframeMessage(event) && parseCloseRequestMessage(event.data)) {
-      if (isOpen) toggleWidget();
+      if (isOpen) closeWidget();
       return;
     }
 
@@ -1204,7 +1264,7 @@
 
   keydownListener = (event) => {
     if (event.key === "Escape" && isOpen) {
-      toggleWidget();
+      closeWidget();
     }
   };
   window.addEventListener("keydown", keydownListener);
@@ -1234,12 +1294,8 @@
 
   // Expose API for advanced usage
   window.AgenterWidget = {
-    open: () => {
-      if (!isOpen) toggleWidget();
-    },
-    close: () => {
-      if (isOpen) toggleWidget();
-    },
+    open: openWidget,
+    close: closeWidget,
     toggle: toggleWidget,
     destroy,
   };
