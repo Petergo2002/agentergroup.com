@@ -77,6 +77,7 @@ The harness exercises `bootstrap` and `chat`, records latency, and includes a sa
 
 - `VITE_API_BASE` - Base URL for the API (build-time, optional)
 - `AG_WIDGET_API_URL` - Runtime override (set on `window`) for debugging local API from loader/widget
+- `data-api-url` - Per-script runtime override for embedding the loader into another local repo/site
 
 ### Local debug override example
 
@@ -85,6 +86,16 @@ The harness exercises `bootstrap` and `chat`, records latency, and includes a sa
   window.AG_WIDGET_API_URL = "http://localhost:3000";
 </script>
 <script src="https://widget.agentergroup.com/loader.js" data-widget="CUSTOMER_WIDGET_PUBLIC_KEY"></script>
+```
+
+### Preferred localhost embed example for another repo
+
+```html
+<script
+  src="http://localhost:5173/loader.js"
+  data-widget="CUSTOMER_WIDGET_PUBLIC_KEY"
+  data-api-url="http://localhost:3000"
+></script>
 ```
 
 ## File Structure

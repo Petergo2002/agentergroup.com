@@ -59,6 +59,10 @@
     currentScript?.getAttribute("data-preview-source") || "builder_widget_tab";
   const previewRevision =
     currentScript?.getAttribute("data-preview-revision") || "";
+  const apiBaseUrlInput =
+    currentScript?.getAttribute("data-api-url") ||
+    currentScript?.getAttribute("data-api-base-url") ||
+    "";
   const parentOrigin =
     currentScript?.getAttribute("data-parent-origin") || window.location.origin;
   const initialPrimaryColorInput =
@@ -74,12 +78,17 @@
   // In production: https://dashboard.agentergroup.com
   // For local development: http://localhost:3000
   let apiBaseUrl = "https://dashboard.agentergroup.com";
+  const scriptApiBaseUrl = normalizeHttpBaseUrl(apiBaseUrlInput);
   if (typeof window !== "undefined") {
-    // Check for dev API override (for local testing)
-    if (window.AG_WIDGET_API_URL) {
-      apiBaseUrl = window.AG_WIDGET_API_URL;
+    // Per-script override is preferred when embedding the loader in other local repos.
+    if (scriptApiBaseUrl) {
+      apiBaseUrl = scriptApiBaseUrl;
+    } else if (window.AG_WIDGET_API_URL) {
+      apiBaseUrl =
+        normalizeHttpBaseUrl(window.AG_WIDGET_API_URL) || apiBaseUrl;
     } else if (
       window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
       window.location.port === "3001"
     ) {
       apiBaseUrl = "http://localhost:3000";
@@ -197,6 +206,22 @@
   }
 
   function normalizeOriginValue(value) {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return null;
+      }
+      return parsed.origin;
+    } catch {
+      return null;
+    }
+  }
+
+  function normalizeHttpBaseUrl(value) {
     if (typeof value !== "string") return null;
     const trimmed = value.trim();
     if (!trimmed) return null;
@@ -445,11 +470,18 @@
     });
 
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
+      const payload = await response
+        .json()
+        .catch(async () => {
+          const text = await response.text().catch(() => "");
+          return text ? { error: text.slice(0, 240) } : null;
+        });
       throw new Error(
-        typeof payload?.error === "string"
-          ? payload.error
-          : "Failed to bootstrap widget.",
+        `[${response.status}] ${
+          typeof payload?.error === "string"
+            ? payload.error
+            : "Failed to bootstrap widget."
+        } (${bootstrapUrl})`,
       );
     }
 
