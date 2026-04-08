@@ -21,6 +21,7 @@
 
 (() => {
   const GLOBAL_INSTANCE_KEY = "__AG_WIDGET_LOADER_INSTANCE__";
+  const MOBILE_WIDGET_BREAKPOINT = 640;
   const PREVIEW_OVERRIDE_WINDOW_KEY = "__AG_WIDGET_PREVIEW_OVERRIDE__";
   const PREVIEW_UPDATE_MESSAGE_TYPE = "ag:widget-preview:update-config";
   const PREVIEW_RESET_MESSAGE_TYPE = "ag:widget-preview:reset-chat";
@@ -474,7 +475,7 @@
 
   function shouldLockBackgroundScroll() {
     if (typeof window === "undefined") return false;
-    return window.matchMedia("(max-width: 768px)").matches;
+    return window.innerWidth < MOBILE_WIDGET_BREAKPOINT;
   }
 
   function focusWidgetSurface() {
@@ -575,7 +576,10 @@
       position: fixed;
       bottom: 20px;
       right: 20px;
-      height: 56px;
+      width: max-content;
+      height: auto;
+      min-height: 56px;
+      max-width: calc(100vw - 40px);
       display: flex;
       justify-content: flex-end;
       align-items: flex-end;
@@ -585,6 +589,8 @@
       --ag-widget-primary-fg: #ffffff;
       opacity: 0;
       transition: opacity 0.15s ease;
+      overflow: visible;
+      isolation: isolate;
       pointer-events: none;
     }
 
@@ -593,7 +599,10 @@
     }
 
     .ag-widget-bubble {
+      position: relative;
+      z-index: 2;
       pointer-events: auto;
+      touch-action: manipulation;
     }
 
     .ag-widget-bubble {
@@ -634,6 +643,7 @@
       align-items: center;
       gap: 12px;
       transition: opacity 0.2s ease, transform 0.3s ease;
+      pointer-events: none;
     }
 
     .ag-widget-bubble.open .ag-widget-bubble-content {
@@ -653,13 +663,17 @@
       align-items: center;
       justify-content: center;
       opacity: 0;
+      visibility: hidden;
       transform: scale(0.8) rotate(-45deg);
       transition: all 0.3s ease;
+      pointer-events: none;
     }
 
     .ag-widget-bubble.open .ag-widget-bubble-close {
       opacity: 1;
+      visibility: visible;
       transform: scale(1) rotate(0);
+      pointer-events: auto;
     }
 
     .ag-widget-bubble-logo-icon {
@@ -728,6 +742,7 @@
       transform-origin: bottom right;
       transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       pointer-events: none;
+      z-index: 1;
     }
 
     .ag-widget-iframe-container.open {
@@ -760,37 +775,67 @@
       }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 639px) {
       .ag-widget-container {
         bottom: 8px;
         right: 8px;
+        max-width: calc(100vw - 16px);
+      }
+
+      .ag-widget-container.ag-is-open {
+        inset: 0;
+        width: auto;
+        height: auto;
+        min-height: 0;
+        max-width: none;
       }
 
       .ag-widget-iframe-container {
         position: fixed;
+        inset: 0;
         width: 100vw;
         height: 100dvh;
-        bottom: 0;
-        right: 0;
-        left: 0;
-        top: 0;
+        bottom: auto;
+        right: auto;
         max-width: none;
         max-height: none;
         border-radius: 0;
-        padding-bottom: env(safe-area-inset-bottom);
-        padding-top: env(safe-area-inset-top);
+        transform: translateY(16px);
+        transform-origin: center;
+      }
+
+      .ag-widget-iframe-container.open {
+        transform: translateY(0);
       }
 
       .ag-widget-bubble {
-        width: 52px;
-        height: 52px;
+        width: 56px;
+        height: 56px;
+        min-width: 56px;
+        max-width: 56px;
+        padding: 0;
+        border-radius: 50%;
+        justify-content: center;
       }
 
-      .ag-widget-bubble.open {
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-        transform: scale(0.92);
+      .ag-widget-bubble-divider,
+      .ag-widget-bubble-text {
+        display: none;
+      }
+
+      .ag-widget-bubble-content {
+        gap: 0;
+      }
+
+      .ag-widget-container.ag-is-open .ag-widget-bubble {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        right: 12px;
+        z-index: 3;
+      }
+
+      .ag-widget-bubble:hover {
+        transform: none;
       }
     }
   `;
@@ -827,6 +872,27 @@
       params.set("_ts", String(Date.now()));
     }
     return params.toString();
+  }
+
+  function syncWidgetOpenState() {
+    const iframeContainer = container?.querySelector(
+      ".ag-widget-iframe-container",
+    );
+
+    if (container) {
+      container.classList.toggle("ag-is-open", isOpen);
+    }
+
+    if (iframeContainer) {
+      iframeContainer.classList.toggle("open", isOpen);
+      iframeContainer.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    }
+
+    if (bubble) {
+      bubble.classList.toggle("open", isOpen);
+      bubble.setAttribute("aria-label", isOpen ? "Stäng chatt" : "Öppna chatt");
+      bubble.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    }
   }
 
   function applyWidgetTheme() {
@@ -944,6 +1010,7 @@
     `;
     bubble.innerHTML = contentHtml;
     bubble.setAttribute("aria-label", "Öppna chatt");
+    bubble.setAttribute("aria-expanded", "false");
     bubble.onclick = toggleWidget;
 
     // Append elements
@@ -951,6 +1018,7 @@
     container.appendChild(bubble);
     document.body.appendChild(container);
 
+    syncWidgetOpenState();
     applyWidgetTheme();
   }
 
@@ -972,17 +1040,11 @@
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
-      iframeContainer.classList.add("open");
-      iframeContainer.setAttribute("aria-hidden", "false");
-      bubble.classList.add("open");
-      bubble.setAttribute("aria-label", "Stäng chatt");
+      syncWidgetOpenState();
       lockBackgroundScroll();
       focusWidgetSurface();
     } else {
-      iframeContainer.classList.remove("open");
-      iframeContainer.setAttribute("aria-hidden", "true");
-      bubble.classList.remove("open");
-      bubble.setAttribute("aria-label", "Öppna chatt");
+      syncWidgetOpenState();
       unlockBackgroundScroll();
       if (
         previousFocusedElement &&
