@@ -129,7 +129,6 @@
     bodyRight: "",
     bodyWidth: "",
     bodyOverscrollBehavior: "",
-    bodyTouchAction: "",
   };
 
   function normalizeHexColor(value, fallback) {
@@ -514,7 +513,6 @@
     scrollLockState.bodyRight = body.style.right;
     scrollLockState.bodyWidth = body.style.width;
     scrollLockState.bodyOverscrollBehavior = body.style.overscrollBehavior;
-    scrollLockState.bodyTouchAction = body.style.touchAction;
 
     html.style.overflow = "hidden";
     html.style.overscrollBehavior = "none";
@@ -525,7 +523,6 @@
     body.style.right = "0";
     body.style.width = "100%";
     body.style.overscrollBehavior = "none";
-    body.style.touchAction = "none";
 
     touchBlockListener = (event) => {
       if (!isOpen) return;
@@ -559,7 +556,6 @@
     body.style.right = scrollLockState.bodyRight;
     body.style.width = scrollLockState.bodyWidth;
     body.style.overscrollBehavior = scrollLockState.bodyOverscrollBehavior;
-    body.style.touchAction = scrollLockState.bodyTouchAction;
 
     if (touchBlockListener) {
       document.removeEventListener("touchmove", touchBlockListener);
@@ -832,6 +828,8 @@
         top: calc(env(safe-area-inset-top, 0px) + 12px);
         right: 12px;
         z-index: 3;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
       }
 
       .ag-widget-bubble:hover {
@@ -848,15 +846,17 @@
     </svg>
   `;
 
-  // Close icon SVG
+  // Close icon SVG — uses stroke-based lines for proper visibility with fill:none CSS
   const closeIconSvg = `
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   `;
 
   function buildRuntimeParams() {
     const params = new URLSearchParams();
+    params.set("embedded_by", "loader");
     if (parentOrigin) {
       params.set("parent_origin", parentOrigin);
     }
@@ -1012,6 +1012,12 @@
     bubble.setAttribute("aria-label", "Öppna chatt");
     bubble.setAttribute("aria-expanded", "false");
     bubble.onclick = toggleWidget;
+
+    // Touchend fallback — iOS Safari can fail to synthesize click from touch
+    bubble.addEventListener('touchend', (e) => {
+      if (e.cancelable) e.preventDefault();
+      toggleWidget();
+    }, { passive: false });
 
     // Append elements
     container.appendChild(iframeContainer);

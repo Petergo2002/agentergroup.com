@@ -22,6 +22,7 @@ const previewSource = urlParams.get("preview_source") || "widget_preview";
 const parentOrigin = urlParams.get("parent_origin") || undefined;
 const previewToken = urlParams.get("preview_token") || undefined;
 const previewRevision = urlParams.get("preview_revision") || undefined;
+const embeddedBy = urlParams.get("embedded_by") || undefined;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -32,6 +33,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       parentOrigin={parentOrigin}
       previewToken={previewToken}
       previewRevision={previewRevision}
+      embeddedBy={embeddedBy}
     />
   </React.StrictMode>,
 );

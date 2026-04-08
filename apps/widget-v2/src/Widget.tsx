@@ -48,6 +48,7 @@ interface WidgetProps {
   parentOrigin?: string;
   previewToken?: string;
   previewRevision?: string;
+  embeddedBy?: string;
 }
 
 const PREVIEW_MESSAGE_TYPE = "ag:widget-preview:update-config";
@@ -455,6 +456,7 @@ export default function Widget({
   parentOrigin,
   previewToken,
   previewRevision,
+  embeddedBy,
 }: WidgetProps) {
   const isEmbedded =
     typeof window !== "undefined" && window.parent !== window;
@@ -1497,7 +1499,7 @@ export default function Widget({
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className={`flex items-center gap-1 ${embeddedBy === "loader" ? "pr-[60px] sm:pr-0" : ""}`}>
             {hasStarted && (
               <button
                 onClick={() => resetConversation()}
@@ -1511,7 +1513,7 @@ export default function Widget({
             {isEmbedded ? (
               <button
                 onClick={handleClose}
-                className="widget-icon-button p-2"
+                className={`widget-icon-button p-2 ${embeddedBy === "loader" ? "hidden sm:flex" : ""}`}
                 aria-label={widgetLanguage === "sv" ? "Stäng" : "Close"}
               >
                 <X className="h-5 w-5" />
