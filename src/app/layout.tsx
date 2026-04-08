@@ -18,6 +18,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Agent Platform",
   description: "Manage your platform preferences and workspace configuration.",
+  icons: {
+    icon: "/2.svg",
+    shortcut: "/2.svg",
+    apple: "/2.svg",
+  },
 };
 
 export default async function RootLayout({
@@ -34,6 +39,8 @@ export default async function RootLayout({
   return (
     <html lang={language}>
       <head>
+        <link rel="icon" type="image/svg+xml" href="/2.svg" />
+        <link rel="shortcut icon" href="/2.svg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
