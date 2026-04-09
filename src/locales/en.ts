@@ -789,8 +789,16 @@ export const en = {
       embedDescription:
         "Paste this script inside the <head> or bottom of the <body> of your website.",
       hostedEndpoint: "Hosted Endpoint (Standalone)",
+      hostedAccess: "Hosted access",
+      hostedEnabledTitle: "Hosted link is enabled",
+      hostedEnabledDescription:
+        "Customers can open the standalone hosted URL directly.",
+      hostedDisabledTitle: "Hosted link is disabled",
+      hostedDisabledDescription:
+        "Turn this on if you want to share a standalone hosted page outside embedded placements.",
       hostedDescription:
         "Use this link for direct customer support shareable on social, email, or as a dedicated portal.",
+      hostedSaveHint: "Save or go live to apply hosted access changes.",
       securityDomainAccess: "Security & Domain Access",
       securityDomainAccessDescription:
         "Control which websites are allowed to load your widget. This prevents unauthorized usage of your API keys.",

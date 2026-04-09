@@ -1444,7 +1444,7 @@ export default function Widget({
   const navLabelHome = widgetLanguage === "sv" ? "Hem" : "Home";
   const navLabelMessages = widgetLanguage === "sv" ? "Meddelanden" : "Messages";
   const newChatLabel = widgetLanguage === "sv" ? "Starta ny chatt" : "Start a new chat";
-  const showStandaloneDesktopShell = widgetContext === "hosted";
+  const showStandaloneDesktopShell = !isEmbedded;
   const showSurfaceNav =
     Boolean(selectedAgent) &&
     !isChooserMode &&
@@ -1487,7 +1487,7 @@ export default function Widget({
     <div
       className={`relative h-screen w-full flex flex-col overflow-hidden selection:bg-widget-primary/30 ${
         themeMode === "dark" ? "dark bg-stitch-gradient" : "bg-widget-bg"
-      } ${showStandaloneDesktopShell ? "lg:px-6 lg:py-6 lg:items-center lg:justify-center" : ""}`}
+      }`}
       style={
         {
           "--widget-bg": palette.bg,
@@ -1523,32 +1523,8 @@ export default function Widget({
         />
       )}
 
-      {/* Desktop hosted: full-screen background with subtle pattern/glow behind the centered card */}
-      {widgetContext === "hosted" && (
-        <div
-          aria-hidden="true"
-          className="hidden lg:block fixed inset-0 pointer-events-none z-0"
-          style={{
-            background: themeMode === "dark"
-              ? `radial-gradient(ellipse 80% 60% at 50% 0%, ${palette.secondary}25 0%, transparent 70%)`
-              : `radial-gradient(ellipse 80% 60% at 50% 0%, ${palette.secondary}18 0%, transparent 70%)`,
-          }}
-        />
-      )}
-
       <div
-        className={`relative z-10 flex flex-col overflow-hidden ${
-          showStandaloneDesktopShell
-            ? "w-full h-full lg:mx-auto lg:w-full lg:max-w-[1180px] lg:h-[min(920px,calc(100vh-3rem))] lg:rounded-[2rem] lg:border lg:border-[var(--widget-border)] lg:shadow-[0_32px_100px_rgba(15,23,42,0.14)]"
-            : "w-full h-full"
-        }`}
-        style={
-          showStandaloneDesktopShell
-            ? {
-                backgroundColor: palette.bg,
-              }
-            : undefined
-        }
+        className="relative z-10 flex h-full w-full flex-col overflow-hidden"
       >
         {/* Top Hero Gradient using Secondary Color (only on home tab) */}
         {activeTab === "home" && (

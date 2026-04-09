@@ -795,8 +795,16 @@ export const sv = {
       embedDescription:
         "Klistra in detta script i <head> eller längst ned i <body> på din webbplats.",
       hostedEndpoint: "Hostad endpoint (fristående)",
+      hostedAccess: "Hostad åtkomst",
+      hostedEnabledTitle: "Hostad länk är aktiverad",
+      hostedEnabledDescription:
+        "Kunder kan öppna den fristående hostade länken direkt.",
+      hostedDisabledTitle: "Hostad länk är avstängd",
+      hostedDisabledDescription:
+        "Slå på detta om du vill dela en fristående hostad sida utanför inbäddade placeringar.",
       hostedDescription:
         "Använd denna länk för direkt kundsupport som kan delas i sociala medier, e-post eller som en dedikerad portal.",
+      hostedSaveHint: "Spara eller gå live för att tillämpa ändringar för hostad åtkomst.",
       securityDomainAccess: "Säkerhet och domänåtkomst",
       securityDomainAccessDescription:
         "Styr vilka webbplatser som får ladda din widget. Detta förhindrar obehörig användning av dina API-nycklar.",
