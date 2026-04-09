@@ -42,13 +42,13 @@ export function Sidebar({
     { name: t("nav.analytics"), href: "/analytics", icon: BarChart3 },
     { name: t("nav.agents"), href: "/agents", icon: Bot },
     ...(internalAssistantsEnabled
-      ? [{ name: t("nav.assistants"), href: "/assistants", icon: MessageCircle }]
+      ? [{ name: t("nav.assistants"), href: "/assistants", icon: MessageCircle, beta: true }]
       : []),
     { name: t("nav.widgets"), href: "/widgets", icon: MessageSquare },
     { name: t("nav.knowledge"), href: "/knowledge", icon: Database },
     { name: t("nav.connections"), href: "/connections", icon: Network },
     { name: t("nav.settings"), href: "/settings", icon: Settings },
-  ] satisfies Array<{ name: string; href: string; icon: LucideIcon }>;
+  ] satisfies Array<{ name: string; href: string; icon: LucideIcon; beta?: boolean }>;
 
   return (
     <aside
@@ -106,6 +106,17 @@ export function Sidebar({
               <span className={`text-sm tracking-tight ${isActive ? "font-bold" : "font-medium"}`}>
                 {item.name}
               </span>
+              {item.beta ? (
+                <span
+                  className={`ml-auto rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${
+                    isActive
+                      ? "bg-primary/12 text-primary"
+                      : "bg-surface-container-high text-on-surface-variant"
+                  }`}
+                >
+                  {t("common.beta")}
+                </span>
+              ) : null}
             </Link>
           );
         })}

@@ -75,10 +75,25 @@ async function parseError(response: Response) {
     typeof payload?.error === "string"
       ? payload.error
       : `Request failed with status ${response.status}.`;
-  const error = new Error(message) as Error & { code?: string };
+  const retryAfterHeader = response.headers.get("Retry-After");
+  const error = new Error(message) as Error & {
+    code?: string;
+    retryAfterSeconds?: number;
+    status?: number;
+  };
   if (typeof payload?.code === "string") {
     error.code = payload.code;
   }
+  const retryAfterSeconds =
+    typeof payload?.retryAfterSeconds === "number"
+      ? payload.retryAfterSeconds
+      : retryAfterHeader
+        ? Number.parseInt(retryAfterHeader, 10)
+        : null;
+  if (typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    error.retryAfterSeconds = retryAfterSeconds;
+  }
+  error.status = response.status;
   throw error;
 }
 
@@ -129,11 +144,13 @@ export async function sendWidgetMessage(
     referrer?: string;
   },
   context: WidgetRequestContext,
+  options?: { signal?: AbortSignal },
 ): Promise<Response> {
   return fetch(buildWidgetUrl(widgetPublicKey, "/chat"), {
     method: "POST",
     headers: buildWidgetHeaders(context),
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
 }
 

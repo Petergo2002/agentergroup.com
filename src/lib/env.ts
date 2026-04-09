@@ -159,3 +159,35 @@ export function getGdprRetentionCronSecret(): string {
 export function hasGdprRetentionCronSecret(): boolean {
   return Boolean(process.env.GDPR_RETENTION_CRON_SECRET);
 }
+
+/**
+ * Returns the secret used to hash public rate-limit identities.
+ *
+ * Prefers a dedicated rate-limit secret, but falls back to existing server-side
+ * secrets so production does not require an extra setup step.
+ *
+ * @returns The configured rate-limit secret.
+ */
+export function getRateLimitSecret(): string {
+  const explicitSecret = process.env.RATE_LIMIT_SECRET?.trim();
+  if (explicitSecret) {
+    return explicitSecret;
+  }
+
+  const widgetSecret = process.env.WIDGET_ACCESS_SECRET?.trim();
+  if (widgetSecret) {
+    return widgetSecret;
+  }
+
+  if (hasSupabaseServiceRoleEnv()) {
+    return getSupabaseServiceRoleKey();
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return "local-rate-limit-secret";
+  }
+
+  throw new Error(
+    "RATE_LIMIT_SECRET is missing. Set RATE_LIMIT_SECRET or WIDGET_ACCESS_SECRET in production.",
+  );
+}

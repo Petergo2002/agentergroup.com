@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -21,6 +21,7 @@ import {
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import { consumeChatStream, createChatRequestError } from '@/lib/chat-stream';
 import { formatRelativeDate } from '@/lib/utils';
 import type {
   AssistantConversationMessage,
@@ -63,6 +64,7 @@ export default function AssistantDetailPage() {
   const [isAttachmentOpen, setIsAttachmentOpen] = useState(false);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingThreadTitle, setEditingThreadTitle] = useState('');
+  const turnInFlightRef = useRef(false);
 
   const loadAssistant = useCallback(
     async (threadId?: string | null) => {
@@ -185,10 +187,11 @@ export default function AssistantDetailPage() {
 
     const content = value.trim();
 
-    if (!content || isPaused) {
+    if (!content || isPaused || turnInFlightRef.current) {
       return;
     }
 
+    turnInFlightRef.current = true;
     const optimisticMessage: AssistantConversationMessage = {
       id: `optimistic-${Date.now()}`,
       threadId: activeThreadId ?? 'pending',
@@ -202,6 +205,10 @@ export default function AssistantDetailPage() {
       senderName: profile.full_name || profile.email || null,
       downloads: [],
     };
+
+    const streamingAssistantId = `streaming-assistant-${Date.now()}`;
+    let requestAccepted = false;
+    let resolvedThreadId = activeThreadId ?? null;
 
     setIsSending(true);
     setDetail((current) =>
@@ -225,30 +232,138 @@ export default function AssistantDetailPage() {
           message: content,
         }),
       });
-      const payload = await response.json().catch(() => null);
 
-      if (!response.ok || !payload?.threadId) {
-        throw new Error(payload?.error || t('assistants.sendMessageError'));
+      if (!response.ok) {
+        throw await createChatRequestError(
+          response,
+          t('assistants.sendMessageError'),
+        );
       }
 
-      await loadAssistant(payload.threadId);
-      setIsMobileThreadsOpen(false);
-    } catch (error) {
+      requestAccepted = true;
       setDetail((current) =>
         current
           ? {
               ...current,
-              messages: current.messages.filter(
-                (message) => message.id !== optimisticMessage.id,
-              ),
+              messages: [
+                ...current.messages,
+                {
+                  id: streamingAssistantId,
+                  threadId: resolvedThreadId ?? 'pending',
+                  role: 'assistant',
+                  content: '',
+                  toolName: null,
+                  toolCallId: null,
+                  metadata: {},
+                  createdBy: null,
+                  createdAt: new Date().toISOString(),
+                  senderName: current.assistant.name ?? null,
+                  downloads: [],
+                },
+              ],
             }
           : current,
       );
+
+      await consumeChatStream(response, (event) => {
+        if (event.type === 'meta') {
+          resolvedThreadId = event.threadId;
+          return;
+        }
+
+        if (event.type === 'complete') {
+          resolvedThreadId = event.threadId;
+          return;
+        }
+
+        if (event.type === 'delta') {
+          setDetail((current) =>
+            current
+              ? {
+                  ...current,
+                  messages: current.messages.map((message) =>
+                    message.id === streamingAssistantId
+                      ? {
+                          ...message,
+                          content: message.content + event.delta,
+                        }
+                      : message,
+                  ),
+                }
+              : current,
+          );
+        }
+      });
+
+      if (!resolvedThreadId) {
+        throw new Error(t('assistants.sendMessageError'));
+      }
+
+      try {
+        await loadAssistant(resolvedThreadId);
+      } catch (syncError) {
+        showToast(
+          syncError instanceof Error
+            ? syncError.message
+            : t('assistants.detailLoadError'),
+          'error',
+        );
+      }
+
+      setIsMobileThreadsOpen(false);
+    } catch (error) {
+      if (!requestAccepted) {
+        setDetail((current) =>
+          current
+            ? {
+                ...current,
+                messages: current.messages.filter(
+                  (message) => message.id !== optimisticMessage.id,
+                ),
+              }
+            : current,
+        );
+      } else {
+        if (resolvedThreadId) {
+          await loadAssistant(resolvedThreadId).catch(() => null);
+        }
+
+        setDetail((current) =>
+          current
+            ? {
+                ...current,
+                messages: [
+                  ...current.messages.filter(
+                    (message) => message.id !== streamingAssistantId,
+                  ),
+                  {
+                    id: `stream-error-${Date.now()}`,
+                    threadId: resolvedThreadId ?? activeThreadId ?? 'pending',
+                    role: 'assistant',
+                    content:
+                      error instanceof Error
+                        ? error.message
+                        : t('assistants.sendMessageError'),
+                    toolName: null,
+                    toolCallId: null,
+                    metadata: {},
+                    createdBy: null,
+                    createdAt: new Date().toISOString(),
+                    senderName: current.assistant.name ?? null,
+                    downloads: [],
+                  },
+                ],
+              }
+            : current,
+        );
+      }
+
       showToast(
         error instanceof Error ? error.message : t('assistants.sendMessageError'),
         'error',
       );
     } finally {
+      turnInFlightRef.current = false;
       setIsSending(false);
     }
   };
@@ -774,7 +889,10 @@ export default function AssistantDetailPage() {
                                       }`}
                                   >
                                       <div className="whitespace-pre-wrap selection:bg-white/20">
-                                      {message.content}
+                                      {message.content ||
+                                        (message.id.startsWith('streaming-assistant-')
+                                          ? t('assistants.thinkingPlaceholder')
+                                          : '')}
                                       </div>
                                   </div>
                                   {(message.downloads ?? []).length > 0 ? (

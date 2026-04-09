@@ -87,6 +87,7 @@ Supported behavior:
 - accepts `dryRun: true`
 - returns deletion counts
 - on live runs, writes workspace-scoped audit logs using `privacy.retention.run`
+- on live runs, also prunes expired operational `rate_limit_windows` rows used by the public widget rate limiter
 
 ## Owner Workflow for Subject Requests
 

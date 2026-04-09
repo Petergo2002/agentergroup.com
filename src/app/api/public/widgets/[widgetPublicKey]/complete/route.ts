@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  buildPublicWidgetRateLimitContext,
+  buildRateLimitErrorPayload,
+  enforceRateLimits,
+  getPublicWidgetRateLimitRules,
+} from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildWidgetRuntimeCorsHeaders,
@@ -22,6 +28,28 @@ function buildErrorResponse(
   return NextResponse.json(
     code ? { error, code } : { error },
     { status, headers: buildWidgetRuntimeCorsHeaders(request) },
+  );
+}
+
+function buildRateLimitedResponse(
+  request: NextRequest,
+  error: string,
+  code: string,
+  retryAfterSeconds: number,
+) {
+  return NextResponse.json(
+    {
+      error,
+      code,
+      retryAfterSeconds,
+    },
+    {
+      status: 429,
+      headers: {
+        ...buildWidgetRuntimeCorsHeaders(request),
+        "Retry-After": String(retryAfterSeconds),
+      },
+    },
   );
 }
 
@@ -107,6 +135,30 @@ export async function POST(
         "Unsupported completion reason.",
         "INVALID_END_REASON",
       );
+    }
+
+    if (access.source !== "preview") {
+      const rateLimitDecision = await enforceRateLimits(
+        supabase,
+        getPublicWidgetRateLimitRules(
+          "complete",
+          buildPublicWidgetRateLimitContext({
+            request,
+            widgetId: loaded.widget.id,
+            sessionId,
+          }),
+        ),
+      );
+
+      if (!rateLimitDecision.allowed) {
+        const payload = buildRateLimitErrorPayload(rateLimitDecision);
+        return buildRateLimitedResponse(
+          request,
+          payload.error,
+          payload.code,
+          payload.retryAfterSeconds,
+        );
+      }
     }
 
     const session = await loadWidgetSession(supabase, loaded.widget.id, sessionId);

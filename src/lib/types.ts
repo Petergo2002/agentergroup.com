@@ -406,6 +406,7 @@ export interface PrivacyRetentionRunSummary {
     leadCount: number;
     sessionCount: number;
     messageCount: number;
+    rateLimitWindowCount?: number;
   };
 }
 

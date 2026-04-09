@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
 import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
+import { consumeChatStream, createChatRequestError } from '@/lib/chat-stream';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
@@ -77,6 +78,7 @@ export default function AgentPreviewPage() {
     ? completedThreadIds.includes(activeThreadId)
     : false;
   const [previewInactivityTimerId, setPreviewInactivityTimerId] = useState<number | null>(null);
+  const turnInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!agent || agent.surface !== 'assistant' || hasInternalAssistantsEnabled(workspace)) {
@@ -108,7 +110,7 @@ export default function AgentPreviewPage() {
     setMessages((data ?? []) as MessageRecord[]);
   }, [supabase]);
 
-  const createThread = useCallback(async (title?: string) => {
+  const createThreadRecord = useCallback(async (title?: string) => {
     const { data, error } = await supabase
       .from('chat_threads')
       .insert({
@@ -125,13 +127,26 @@ export default function AgentPreviewPage() {
       throw error ?? new Error(t('agentPreview.createThreadError'));
     }
 
-    setThreads((current) => [data as ThreadRecord, ...current]);
-    setActiveThreadId(data.id);
-    setCompletedThreadIds((current) => current.filter((id) => id !== data.id));
+    return data as ThreadRecord;
+  }, [agentId, supabase, t, user.id, workspace.id]);
+
+  const createThread = useCallback(async (
+    title?: string,
+    options?: { resetMessages?: boolean },
+  ) => {
+    const nextThread = await createThreadRecord(title);
+
+    setThreads((current) => [nextThread, ...current]);
+    setActiveThreadId(nextThread.id);
+    setCompletedThreadIds((current) => current.filter((id) => id !== nextThread.id));
     clearPreviewInactivityTimer();
-    setMessages([]);
-    return data.id;
-  }, [agentId, clearPreviewInactivityTimer, supabase, t, user.id, workspace.id]);
+
+    if (options?.resetMessages !== false) {
+      setMessages([]);
+    }
+
+    return nextThread.id;
+  }, [clearPreviewInactivityTimer, createThreadRecord]);
 
   const loadRunDetails = useCallback(async (runId: string | null) => {
     if (!runId) {
@@ -165,6 +180,32 @@ export default function AgentPreviewPage() {
     setRunSteps((stepData ?? []) as RunStepRecord[]);
     setRunApprovals((approvalData ?? []) as RunApprovalRecord[]);
   }, [supabase]);
+
+  const syncPreviewTurnState = useCallback(async (
+    threadId: string,
+    preferredRunId: string | null,
+  ) => {
+    await Promise.all([
+      loadMessages(threadId),
+      supabase
+        .from('runs')
+        .select('*')
+        .eq('agent_id', agentId)
+        .order('created_at', { ascending: false })
+        .limit(6)
+        .then(async ({ data, error }) => {
+          if (error) {
+            throw error;
+          }
+
+          const nextRuns = (data ?? []) as RunRecord[];
+          const nextSelectedRunId = preferredRunId ?? nextRuns[0]?.id ?? null;
+          setRuns(nextRuns);
+          setSelectedRunId(nextSelectedRunId);
+          await loadRunDetails(nextSelectedRunId);
+        }),
+    ]);
+  }, [agentId, loadMessages, loadRunDetails, supabase]);
 
   useEffect(() => {
     let isMounted = true;
@@ -214,10 +255,15 @@ export default function AgentPreviewPage() {
         }
 
         const loadedAgent = agentResult.data as AgentRecord;
-        const threadRows = (threadResult.data ?? []) as ThreadRecord[];
+        let threadRows = (threadResult.data ?? []) as ThreadRecord[];
         const runRows = (runResult.data ?? []) as RunRecord[];
-        const firstThreadId =
-          threadRows[0]?.id ?? (await createThread(loadedAgent.name));
+
+        if (threadRows.length === 0) {
+          const createdThread = await createThreadRecord(loadedAgent.name);
+          threadRows = [createdThread];
+        }
+
+        const firstThreadId = threadRows[0]?.id ?? null;
 
         setAgent(loadedAgent);
         setThreads(threadRows);
@@ -248,7 +294,9 @@ export default function AgentPreviewPage() {
           extractEndChatPolicyFromDefinition(draftResult.data?.definition ?? null),
         );
         setActiveThreadId(firstThreadId);
-        await loadMessages(firstThreadId);
+        if (firstThreadId) {
+          await loadMessages(firstThreadId);
+        }
         await loadRunDetails(runRows[0]?.id ?? null);
       } catch (error) {
         if (isMounted) {
@@ -268,7 +316,7 @@ export default function AgentPreviewPage() {
     return () => {
       isMounted = false;
     };
-  }, [agentId, createThread, loadMessages, loadRunDetails, showToast, supabase, t, user.id]);
+  }, [agentId, createThreadRecord, loadMessages, loadRunDetails, showToast, supabase, t, user.id]);
 
   useEffect(() => {
     return () => {
@@ -283,31 +331,42 @@ export default function AgentPreviewPage() {
       return;
     }
 
-    if (isActiveThreadCompleted) {
+    if (isActiveThreadCompleted || turnInFlightRef.current) {
       return;
     }
 
+    turnInFlightRef.current = true;
     clearPreviewInactivityTimer();
-
     setIsSubmitting(true);
-    const optimisticMessage: MessageRecord = {
-      id: `optimistic-${Date.now()}`,
-      thread_id: activeThreadId ?? 'pending',
-      workspace_id: workspace.id,
-      role: 'user',
-      content,
-      tool_name: null,
-      tool_call_id: null,
-      metadata: {},
-      created_by: user.id,
-      created_at: new Date().toISOString(),
-    };
-
-    setMessages((current) => [...current, optimisticMessage]);
-    setDraftMessage('');
+    let optimisticMessageId = '';
+    let streamingAssistantId = '';
+    let requestAccepted = false;
+    let resolvedThreadId = activeThreadId ?? null;
+    let resolvedRunId: string | null = null;
+    let sessionCompleted = false;
 
     try {
-      const threadId = activeThreadId ?? (await createThread(agent?.name));
+      const threadId =
+        activeThreadId ?? (await createThread(agent?.name, { resetMessages: false }));
+      const optimisticMessage: MessageRecord = {
+        id: `optimistic-${Date.now()}`,
+        thread_id: threadId,
+        workspace_id: workspace.id,
+        role: 'user',
+        content,
+        tool_name: null,
+        tool_call_id: null,
+        metadata: {},
+        created_by: user.id,
+        created_at: new Date().toISOString(),
+      };
+
+      optimisticMessageId = optimisticMessage.id;
+      streamingAssistantId = `streaming-assistant-${Date.now()}`;
+      resolvedThreadId = threadId;
+      setMessages((current) => [...current, optimisticMessage]);
+      setDraftMessage('');
+
       const response = await fetch(`/api/agents/${agentId}/chat`, {
         method: 'POST',
         headers: {
@@ -318,54 +377,128 @@ export default function AgentPreviewPage() {
           message: content,
         }),
       });
-      const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? t('agentPreview.runError'));
+        throw await createChatRequestError(response, t('agentPreview.runError'));
       }
 
-      setActiveThreadId(payload.threadId);
-      if (payload.sessionCompleted) {
+      requestAccepted = true;
+      setMessages((current) => [
+        ...current,
+        {
+          id: streamingAssistantId,
+          thread_id: resolvedThreadId ?? 'pending',
+          workspace_id: workspace.id,
+          role: 'assistant',
+          content: '',
+          tool_name: null,
+          tool_call_id: null,
+          metadata: {},
+          created_by: null,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      await consumeChatStream(response, (event) => {
+        if (event.type === 'meta') {
+          resolvedThreadId = event.threadId;
+          resolvedRunId = event.runId;
+          setActiveThreadId(event.threadId);
+          return;
+        }
+
+        if (event.type === 'complete') {
+          resolvedThreadId = event.threadId;
+          resolvedRunId = event.runId;
+          sessionCompleted = event.sessionCompleted;
+          setActiveThreadId(event.threadId);
+          return;
+        }
+
+        if (event.type === 'delta') {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === streamingAssistantId
+                ? {
+                    ...message,
+                    content: message.content + event.delta,
+                  }
+                : message,
+            ),
+          );
+        }
+      });
+
+      if (!resolvedThreadId) {
+        throw new Error(t('agentPreview.runError'));
+      }
+
+      const completedThreadId = resolvedThreadId;
+
+      if (sessionCompleted) {
         setCompletedThreadIds((current) =>
-          current.includes(payload.threadId)
+          current.includes(completedThreadId)
             ? current
-            : [...current, payload.threadId],
+            : [...current, completedThreadId],
         );
       } else if (
         endChatPolicy.enabled &&
         endChatPolicy.inactivityTimeoutSeconds &&
-        payload.threadId
+        completedThreadId
       ) {
         const timerId = window.setTimeout(() => {
           setCompletedThreadIds((current) =>
-            current.includes(payload.threadId)
+            current.includes(completedThreadId)
               ? current
-              : [...current, payload.threadId],
+              : [...current, completedThreadId],
           );
         }, endChatPolicy.inactivityTimeoutSeconds * 1000);
         setPreviewInactivityTimerId(timerId);
       }
-      await Promise.all([
-        loadMessages(payload.threadId),
-        supabase
-          .from('runs')
-          .select('*')
-          .eq('agent_id', agentId)
-          .order('created_at', { ascending: false })
-          .limit(6)
-          .then(async ({ data }) => {
-            const nextRuns = (data ?? []) as RunRecord[];
-            setRuns(nextRuns);
-            setSelectedRunId(payload.runId ?? nextRuns[0]?.id ?? null);
-            await loadRunDetails(payload.runId ?? nextRuns[0]?.id ?? null);
-          }),
-      ]);
+
+      try {
+        await syncPreviewTurnState(completedThreadId, resolvedRunId);
+      } catch (syncError) {
+        showToast(
+          syncError instanceof Error
+            ? syncError.message
+            : t('agentPreview.loadError'),
+          'error',
+        );
+      }
     } catch (error) {
-      setMessages((current) => current.filter((message) => message.id !== optimisticMessage.id));
+      if (!requestAccepted) {
+        setMessages((current) =>
+          current.filter((message) => message.id !== optimisticMessageId),
+        );
+      } else {
+        if (resolvedThreadId) {
+          await syncPreviewTurnState(resolvedThreadId, resolvedRunId).catch(() => null);
+        }
+
+        setMessages((current) => [
+          ...current.filter((message) => message.id !== streamingAssistantId),
+          {
+            id: `stream-error-${Date.now()}`,
+            thread_id: resolvedThreadId ?? activeThreadId ?? 'pending',
+            workspace_id: workspace.id,
+            role: 'assistant',
+            content:
+              error instanceof Error ? error.message : t('agentPreview.runError'),
+            tool_name: null,
+            tool_call_id: null,
+            metadata: {},
+            created_by: null,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      }
+
       const message =
         error instanceof Error ? error.message : t('agentPreview.runError');
       showToast(message, 'error');
     } finally {
+      turnInFlightRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -466,7 +599,10 @@ export default function AgentPreviewPage() {
                             : 'bg-surface-container-lowest border border-outline-variant/10 text-on-surface'
                         }`}
                       >
-                        {message.content}
+                        {message.content ||
+                          (message.id.startsWith('streaming-assistant-')
+                            ? t('agentPreview.running')
+                            : '')}
                       </div>
                       
                       {message.role === 'assistant' && getKnowledgeMatches(message).length > 0 && (

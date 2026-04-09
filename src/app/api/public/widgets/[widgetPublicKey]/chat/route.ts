@@ -7,6 +7,12 @@ import {
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
+import {
+  buildPublicWidgetRateLimitContext,
+  buildRateLimitErrorPayload,
+  enforceRateLimits,
+  getPublicWidgetRateLimitRules,
+} from "@/lib/rate-limit";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -39,6 +45,13 @@ function sseChunk(payload: Record<string, unknown>) {
   return `data: ${JSON.stringify(payload)}\n\n`;
 }
 
+function isAbortError(error: unknown) {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
 function buildErrorResponse(
   request: NextRequest,
   status: number,
@@ -48,6 +61,28 @@ function buildErrorResponse(
   return Response.json(
     code ? { error, code } : { error },
     { status, headers: buildWidgetRuntimeCorsHeaders(request) },
+  );
+}
+
+function buildRateLimitedResponse(
+  request: NextRequest,
+  error: string,
+  code: string,
+  retryAfterSeconds: number,
+) {
+  return Response.json(
+    {
+      error,
+      code,
+      retryAfterSeconds,
+    },
+    {
+      status: 429,
+      headers: {
+        ...buildWidgetRuntimeCorsHeaders(request),
+        "Retry-After": String(retryAfterSeconds),
+      },
+    },
   );
 }
 
@@ -234,6 +269,30 @@ export async function POST(
       return buildErrorResponse(request, 400, bodyValidation.error);
     }
 
+    if (access.source !== "preview") {
+      const rateLimitDecision = await enforceRateLimits(
+        supabase,
+        getPublicWidgetRateLimitRules(
+          "chat",
+          buildPublicWidgetRateLimitContext({
+            request,
+            widgetId: loaded.widget.id,
+            sessionId: bodyValidation.value.sessionId,
+          }),
+        ),
+      );
+
+      if (!rateLimitDecision.allowed) {
+        const payload = buildRateLimitErrorPayload(rateLimitDecision);
+        return buildRateLimitedResponse(
+          request,
+          payload.error,
+          payload.code,
+          payload.retryAfterSeconds,
+        );
+      }
+    }
+
     const {
       sessionId,
       message,
@@ -335,35 +394,31 @@ export async function POST(
     turnLockHeld = true;
 
     const userMessageTimestamp = new Date().toISOString();
-    await upsertWidgetSession(supabase, {
-      widgetId: loaded.widget.id,
-      sessionId,
-      source: widgetSession.source,
-      pageUrl: widgetSession.page_url,
-      referrer: widgetSession.referrer,
-      origin: widgetSession.origin,
-      activeWidgetAgentId: widgetSession.active_widget_agent_id,
-      activeAgentId: widgetSession.active_agent_id,
-      lastUserMessageAt: userMessageTimestamp,
-    });
+    await Promise.all([
+      upsertWidgetSession(supabase, {
+        widgetId: loaded.widget.id,
+        sessionId,
+        source: widgetSession.source,
+        pageUrl: widgetSession.page_url,
+        referrer: widgetSession.referrer,
+        origin: widgetSession.origin,
+        activeWidgetAgentId: widgetSession.active_widget_agent_id,
+        activeAgentId: widgetSession.active_agent_id,
+        lastUserMessageAt: userMessageTimestamp,
+      }),
+      insertWidgetMessages(supabase, {
+        widgetSessionId: widgetSession.id,
+        widgetId: loaded.widget.id,
+        widgetAgentId: selected!.persistedWidgetAgentId,
+        agentId: selected!.agent.id,
+        messages: [{ role: "user", content: message }],
+      }),
+    ]);
 
-    await insertWidgetMessages(supabase, {
-      widgetSessionId: widgetSession.id,
-      widgetId: loaded.widget.id,
-      widgetAgentId: selected!.persistedWidgetAgentId,
-      agentId: selected!.agent.id,
-      messages: [{ role: "user", content: message }],
-    });
-
-    const history = await loadOrderedWidgetSessionHistory(
-      supabase,
-      widgetSession.id,
-    );
-
-    const publishedVersion = await getPublishedAgentVersion(
-      supabase,
-      selectedVersionId,
-    );
+    const [history, publishedVersion] = await Promise.all([
+      loadOrderedWidgetSessionHistory(supabase, widgetSession.id),
+      getPublishedAgentVersion(supabase, selectedVersionId),
+    ]);
     const runtimeAgent = getWidgetRuntimeAgent(selected!.agent, publishedVersion);
     const previewRuntimeAgent = preview.runtimeConfig?.agents.find(
       (agentConfig) => agentConfig.agentId === selected!.agent.id,
@@ -382,9 +437,23 @@ export async function POST(
       : extractGoogleCalendarSelectionFromDefinition(publishedVersion?.definition);
 
     const calendarTimezone = googleCalendarSelection.timezone;
+    const streamAbortController = new AbortController();
 
     const stream = new ReadableStream({
       async start(controller) {
+        const abortStream = () => {
+          if (!streamAbortController.signal.aborted) {
+            streamAbortController.abort();
+          }
+        };
+        const handleRequestAbort = () => {
+          abortStream();
+        };
+
+        request.signal.addEventListener("abort", handleRequestAbort, {
+          once: true,
+        });
+
         try {
           const result = await runAgentChat({
             supabase: supabase as never,
@@ -410,21 +479,11 @@ export async function POST(
             googleCalendarSelection,
             endChatPolicy,
             gmailRecipientPolicy,
-            onToken: (() => {
-              let cumulativeContent = "";
-              return (token: string) => {
-                cumulativeContent += token;
-                const encoder = new TextEncoder();
-                controller.enqueue(encoder.encode(sseChunk({ content: cumulativeContent })));
-              };
-            })(),
-            onStatus: (statusMessage) => {
-              // Optionally emit status updates as specialized chunks, or simple debug info
-              // Let's send a status chunk so frontend could handle 'searching...'
+            abortSignal: streamAbortController.signal,
+            onToken: (token) => {
               const encoder = new TextEncoder();
-              // Example payload frontend can parse if they want
-              controller.enqueue(encoder.encode(sseChunk({ status: statusMessage })));
-            }
+              controller.enqueue(encoder.encode(sseChunk({ delta: token })));
+            },
           });
           const assistantMessageTimestamp = new Date().toISOString();
           const persistedToolMessages = buildPersistedToolMessages(
@@ -488,6 +547,10 @@ export async function POST(
 
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } catch (error) {
+          if (streamAbortController.signal.aborted || isAbortError(error)) {
+            return;
+          }
+
           console.error("Stream generation error:", error);
           const message =
             error instanceof Error ? error.message : "Stream error occurred.";
@@ -498,8 +561,18 @@ export async function POST(
           );
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } finally {
+          request.signal.removeEventListener("abort", handleRequestAbort);
           await releaseTurnLock(loaded.widget.id, sessionId);
-          controller.close();
+          try {
+            controller.close();
+          } catch {
+            // Ignore close errors after client cancellation.
+          }
+        }
+      },
+      cancel() {
+        if (!streamAbortController.signal.aborted) {
+          streamAbortController.abort();
         }
       },
     });

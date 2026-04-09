@@ -68,9 +68,14 @@ export default function AssistantsPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
             {t('assistants.badge')}
           </p>
-          <h1 className="mt-3 text-[2.15rem] font-headline font-bold tracking-tight text-on-surface sm:text-[2.45rem]">
-            {t('assistants.title')}
-          </h1>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <h1 className="text-[2.15rem] font-headline font-bold tracking-tight text-on-surface sm:text-[2.45rem]">
+              {t('assistants.title')}
+            </h1>
+            <span className="rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+              {t('common.beta')}
+            </span>
+          </div>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
             {t('assistants.description')}
           </p>

@@ -9,6 +9,7 @@ interface OpenRouterChatOptions {
   messages: Array<Record<string, unknown>>;
   tools?: Array<Record<string, unknown>>;
   stream?: boolean;
+  signal?: AbortSignal;
 }
 
 export async function createOpenRouterChatCompletion({
@@ -16,6 +17,7 @@ export async function createOpenRouterChatCompletion({
   messages,
   tools = [],
   stream = false,
+  signal,
 }: OpenRouterChatOptions) {
   if (!hasOpenRouterEnv()) {
     throw new Error("OPENROUTER_API_KEY is missing.");
@@ -37,6 +39,7 @@ export async function createOpenRouterChatCompletion({
       provider: getOpenRouterProviderPreferences(),
       stream,
     }),
+    signal,
   });
 
   if (!response.ok) {

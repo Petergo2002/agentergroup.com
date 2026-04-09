@@ -287,10 +287,6 @@ async function runChatTurn({
 
       for (const line of eventBlock.split("\n")) {
         if (!line.startsWith("data: ")) continue;
-        if (firstChunkMs === null) {
-          firstChunkMs = performance.now() - requestStartedAt;
-        }
-
         const data = line.slice(6).trim();
         if (data === "[DONE]") {
           done = true;
@@ -299,6 +295,15 @@ async function runChatTurn({
 
         try {
           const parsed = JSON.parse(data);
+          if (
+            firstChunkMs === null &&
+            (typeof parsed?.delta === "string" || typeof parsed?.content === "string")
+          ) {
+            firstChunkMs = performance.now() - requestStartedAt;
+          }
+          if (typeof parsed?.delta === "string") {
+            assistantContent += parsed.delta;
+          }
           if (typeof parsed?.content === "string") {
             assistantContent = parsed.content;
           }

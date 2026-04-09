@@ -75,6 +75,7 @@ export const sv = {
     live: "Live",
     fixed: "Fast",
     added: "Tillagd",
+    beta: "Beta",
   },
   nav: {
     dashboard: "Översikt",

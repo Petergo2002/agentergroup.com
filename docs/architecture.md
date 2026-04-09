@@ -719,6 +719,14 @@ The internal assistant runtime lives in:
 
 These are the main authenticated chat backends in the product.
 
+Current behavior:
+
+- both authenticated chat backends now stream assistant output incrementally instead of waiting for one final buffered response
+- preview chat persists against `chat_threads.source = 'preview'`
+- internal assistants persist against `chat_threads.source = 'assistant'`
+- internal assistants reject overlapping same-thread turns with `409 THREAD_BUSY`
+- preview chat currently relies on client-side duplicate-submit prevention instead of the assistant-thread lock RPC
+
 ### Runtime inputs
 
 Given:
@@ -751,6 +759,8 @@ the route builds one conversational run.
 10. Persist tool messages
 11. Persist the final assistant message
 12. Update `runs`, `chat_threads`, and `audit_logs`
+
+The authenticated preview and assistant routes both stream token deltas to the client while this sequence is running, then resync durable state from Postgres at the end of the turn.
 
 ### Why the multi-step tool loop matters
 
@@ -881,6 +891,9 @@ Current behavior:
 - the widget runtime shows a lightweight first-message consent gate before the first real chat turn and links it to the public `/privacy-policy` route
 - consent is currently remembered client-side per widget public key so returning visitors are not blocked on every new session
 - widget session/activity data, widget messages, and widget leads are currently covered by a 180 day retention policy enforced by an internal purge route
+- public widget POST endpoints now enforce volumetric rate limiting for hosted and embedded traffic
+- preview-token traffic is intentionally excluded from the public widget rate limiter
+- the current rollout design and thresholds are documented in `docs/implementation-plans/20260409-widget-rate-limits-plan.md`
 
 Important token rules:
 
@@ -922,9 +935,11 @@ Current behavior:
 - widget sessions store `active_turn_request_id` and `active_turn_started_at` to serialize live turns
 - public chat acquires a per-session turn lock before running agent/tool work
 - overlapping turns for the same session are rejected with `409 SESSION_BUSY` instead of being queued
+- public widget chat, events, completion, and lead submission routes are also protected by dedicated rate limits with `429` responses and `Retry-After`
 - user, assistant, and tool messages are persisted
 - lead submissions are stored against the active widget session where possible
 - session completion can happen through explicit public completion calls, including inactivity-timeout completion
+- widget chat streams token deltas over SSE and client-triggered aborts are propagated through the server runtime to the upstream model request
 
 ## Analytics Architecture
 
@@ -1383,10 +1398,10 @@ After import, the source behaves like any other workspace knowledge source.
 | --- | --- |
 | `GET /api/public/widgets/[widgetPublicKey]/bootstrap` | Validate runtime access, return config bootstrap, and issue widget access token |
 | `GET /api/public/widgets/[widgetPublicKey]/config` | Return current public widget runtime config |
-| `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a public widget chat message and reject overlapping same-session turns with `409 SESSION_BUSY` |
-| `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout, and refuse completion while a live turn is active |
-| `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events |
-| `POST /api/public/widgets/[widgetPublicKey]/leads` | Persist a lead submission from the widget |
+| `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a public widget chat message, reject overlapping same-session turns with `409 SESSION_BUSY`, and rate-limit abusive hosted/embed traffic with `429` |
+| `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout, refuse completion while a live turn is active, and apply public runtime rate limits |
+| `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events under public runtime rate limits |
+| `POST /api/public/widgets/[widgetPublicKey]/leads` | Persist a lead submission from the widget under public runtime rate limits |
 
 ### Analytics APIs
 

@@ -21,7 +21,7 @@ import type {
   WorkspaceRecord,
 } from "@/lib/types";
 
-type AdminSupabase = Pick<SupabaseClient, "from">;
+type AdminSupabase = Pick<SupabaseClient, "from" | "rpc">;
 
 const GDPR_RETENTION_DAYS = 180;
 
@@ -634,8 +634,23 @@ export async function purgeExpiredWidgetData(
     expiredSessionIds.length > 0
       ? (await fetchMessagesBySessionIds(supabase, expiredSessionIds)).length
       : 0;
+  let rateLimitWindowCount = 0;
 
   if (!input?.dryRun) {
+    const { data: expiredRateLimitCount, error: expiredRateLimitCountError } =
+      await supabase.rpc("prune_expired_rate_limit_windows", {
+        p_expires_before: now.toISOString(),
+      });
+
+    if (expiredRateLimitCountError) {
+      throw new Error(expiredRateLimitCountError.message);
+    }
+
+    rateLimitWindowCount =
+      typeof expiredRateLimitCount === "number"
+        ? expiredRateLimitCount
+        : 0;
+
     if (expiredLeadIds.length > 0) {
       for (const idChunk of chunkArray(expiredLeadIds, 200)) {
         const { error } = await supabase.from("widget_leads").delete().in("id", idChunk);
@@ -715,6 +730,7 @@ export async function purgeExpiredWidgetData(
       leadCount: expiredLeadIds.length,
       sessionCount: expiredSessionIds.length,
       messageCount,
+      rateLimitWindowCount,
     },
   };
 }

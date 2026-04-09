@@ -136,6 +136,7 @@ export interface AgentRuntimeInput {
   googleCalendarSelection?: GoogleCalendarSelection | null;
   endChatPolicy?: EndChatPolicy | null;
   gmailRecipientPolicy?: GmailRecipientPolicy | null;
+  abortSignal?: AbortSignal;
 }
 
 export interface AgentRuntimeResult {
@@ -512,6 +513,7 @@ export async function runAgentChat({
   googleCalendarSelection,
   endChatPolicy,
   gmailRecipientPolicy,
+  abortSignal,
   onToken,
   onStatus,
 }: AgentRuntimeInput & {
@@ -602,6 +604,7 @@ export async function runAgentChat({
     });
   }
 
+  const toolsPromise = getWrappedTools(toolUserId, enabledToolkits);
   let knowledgeMatches: KnowledgeMatchRecord[] = [];
 
   if (readyKnowledgeSources.length > 0) {
@@ -634,7 +637,7 @@ export async function runAgentChat({
     }
   }
 
-  const tools = await getWrappedTools(toolUserId, enabledToolkits);
+  const tools = await toolsPromise;
   const toolDefinitions: ToolDefinitionLike[] = [
     ...(tools as unknown as ToolDefinitionLike[]),
     ...(audience === "assistant" && agent.surface === "assistant"
@@ -670,6 +673,7 @@ export async function runAgentChat({
       messages: conversationMessages,
       tools: toolDefinitions,
       stream: true,
+      signal: abortSignal,
     }).catch(error => {
       hadError = true;
       errorSummary = "LLM completion failed";
@@ -943,6 +947,7 @@ export async function runAgentChat({
         },
       ],
       stream: true,
+      signal: abortSignal,
     }) as AsyncGenerator<StreamChunk, void, unknown>;
 
     finalCompletion = { choices: [{ message: { role: "assistant", content: "" } }] };

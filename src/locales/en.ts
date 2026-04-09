@@ -73,6 +73,7 @@ export const en = {
     live: "Live",
     fixed: "Fixed",
     added: "Added",
+    beta: "Beta",
   },
   nav: {
     dashboard: "Dashboard",

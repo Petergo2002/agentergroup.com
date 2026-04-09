@@ -60,7 +60,7 @@ const BOOTSTRAP_REFRESH_MESSAGE_TYPE = "ag:widget-bootstrap:refresh";
 const BOOTSTRAP_ERROR_MESSAGE_TYPE = "ag:widget-bootstrap:error";
 const WIDGET_CLOSE_REQUEST_MESSAGE_TYPE = "ag:widget:close-request";
 const WIDGET_STATE_MESSAGE_TYPE = "ag:widget:state";
-const MIN_INTERIM_STREAM_RENDER_DELAY_MS = 250;
+const MIN_INTERIM_STREAM_RENDER_DELAY_MS = 0;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const PRESENCE_DEDUPE_MS = 1_500;
 type SessionPresenceEvent =
@@ -269,6 +269,13 @@ function parseWidgetBootstrapErrorMessage(
   };
 }
 
+function isAbortError(error: unknown) {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
 
 
 const WIDGET_DEFAULTS: Record<"sv" | "en", {
@@ -422,12 +429,23 @@ function resolveSelectedAgent(
 
 async function createJsonError(response: Response, fallback: string) {
   const payload = await response.json().catch(() => null);
+  const retryAfterHeader = response.headers.get("Retry-After");
   const error = new Error(
     typeof payload?.error === "string" ? payload.error : fallback,
-  ) as Error & { code?: string };
+  ) as Error & { code?: string; retryAfterSeconds?: number; status?: number };
   if (typeof payload?.code === "string") {
     error.code = payload.code;
   }
+  const retryAfterSeconds =
+    typeof payload?.retryAfterSeconds === "number"
+      ? payload.retryAfterSeconds
+      : retryAfterHeader
+        ? Number.parseInt(retryAfterHeader, 10)
+        : null;
+  if (typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    error.retryAfterSeconds = retryAfterSeconds;
+  }
+  error.status = response.status;
   return error;
 }
 
@@ -437,6 +455,49 @@ function hasErrorCode(error: unknown, code: string) {
     "code" in error &&
     (error as Error & { code?: string }).code === code
   );
+}
+
+function getRetryAfterSeconds(error: unknown) {
+  if (!(error instanceof Error) || !("retryAfterSeconds" in error)) {
+    return null;
+  }
+
+  const retryAfterSeconds = (error as Error & { retryAfterSeconds?: number }).retryAfterSeconds;
+  return typeof retryAfterSeconds === "number" && retryAfterSeconds > 0
+    ? retryAfterSeconds
+    : null;
+}
+
+function formatRetryAfterDelay(
+  language: "sv" | "en",
+  retryAfterSeconds: number,
+) {
+  if (retryAfterSeconds >= 60) {
+    const minutes = Math.ceil(retryAfterSeconds / 60);
+    return language === "sv"
+      ? `${minutes} ${minutes === 1 ? "minut" : "minuter"}`
+      : `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+
+  return language === "sv"
+    ? `${retryAfterSeconds} ${retryAfterSeconds === 1 ? "sekund" : "sekunder"}`
+    : `${retryAfterSeconds} second${retryAfterSeconds === 1 ? "" : "s"}`;
+}
+
+function buildChatRateLimitMessage(
+  language: "sv" | "en",
+  retryAfterSeconds: number | null,
+) {
+  if (retryAfterSeconds && retryAfterSeconds > 0) {
+    const delay = formatRetryAfterDelay(language, retryAfterSeconds);
+    return language === "sv"
+      ? `Det går lite för snabbt just nu. Vänta ${delay} och försök igen.`
+      : `You're sending messages too quickly right now. Please wait ${delay} and try again.`;
+  }
+
+  return language === "sv"
+    ? "Det går lite för snabbt just nu. Vänta en stund och försök igen."
+    : "You're sending messages too quickly right now. Please wait a moment and try again.";
 }
 
 function buildRequestContextFromBootstrap(
@@ -496,6 +557,7 @@ export default function Widget({
   const previousWidgetOpenRef = useRef<boolean | null>(null);
   const inactivityTimerRef = useRef<number | null>(null);
   const bootstrapRefreshPromiseRef = useRef<Promise<WidgetBootstrapResponse> | null>(null);
+  const activeStreamAbortControllerRef = useRef<AbortController | null>(null);
 
   const bootstrapContext = useMemo<WidgetRequestContext>(
     () => ({
@@ -649,14 +711,17 @@ export default function Widget({
   );
 
   const sendMessageRequestWithRetry = useCallback(
-    async (body: {
-      sessionId: string;
-      message: string;
-      widgetAgentId?: string;
-      language: "sv" | "en";
-      pageUrl?: string;
-      referrer?: string;
-    }) => {
+    async (
+      body: {
+        sessionId: string;
+        message: string;
+        widgetAgentId?: string;
+        language: "sv" | "en";
+        pageUrl?: string;
+        referrer?: string;
+      },
+      options?: { signal?: AbortSignal },
+    ) => {
       let activeContext = requestContext;
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -664,6 +729,7 @@ export default function Widget({
           widgetPublicKey,
           body,
           activeContext,
+          options,
         );
 
         if (response.ok) {
@@ -740,6 +806,10 @@ export default function Widget({
 
   const resetConversation = useCallback(
     (nextPreviewRevision?: string | number) => {
+      if (activeStreamAbortControllerRef.current) {
+        activeStreamAbortControllerRef.current.abort();
+        activeStreamAbortControllerRef.current = null;
+      }
       clearInactivityTimer();
       resetWidgetSession();
       setMessages([]);
@@ -1031,6 +1101,10 @@ export default function Widget({
 
   useEffect(() => {
     return () => {
+      if (activeStreamAbortControllerRef.current) {
+        activeStreamAbortControllerRef.current.abort();
+        activeStreamAbortControllerRef.current = null;
+      }
       clearInactivityTimer();
     };
   }, [clearInactivityTimer]);
@@ -1147,6 +1221,8 @@ export default function Widget({
       { role: "user", content: userMessage },
     ]);
     setIsLoading(true);
+    const streamAbortController = new AbortController();
+    activeStreamAbortControllerRef.current = streamAbortController;
 
     try {
       const response = await sendMessageRequestWithRetry({
@@ -1158,7 +1234,7 @@ export default function Widget({
           typeof window !== "undefined" ? window.location.href : undefined,
         referrer:
           typeof document !== "undefined" ? document.referrer : undefined,
-      });
+      }, { signal: streamAbortController.signal });
 
       if (!response.body) {
         throw new Error("No response stream from server.");
@@ -1252,7 +1328,10 @@ export default function Widget({
                 : null;
             markConversationCompleted(streamEndReason);
           }
-          if (typeof parsed?.content === "string") {
+          if (typeof parsed?.delta === "string") {
+            fullText += parsed.delta;
+            scheduleRenderedFlush();
+          } else if (typeof parsed?.content === "string") {
             fullText = parsed.content;
             scheduleRenderedFlush();
           }
@@ -1316,6 +1395,24 @@ export default function Widget({
         setConversationEndReason(streamEndReason);
       }
     } catch (nextError) {
+      if (isAbortError(nextError)) {
+        return;
+      }
+
+      if (hasErrorCode(nextError, "RATE_LIMITED_CHAT")) {
+        setMessages((previous) =>
+          applyStreamFailureToMessages(
+            previous,
+            buildChatRateLimitMessage(
+              activeLanguage,
+              getRetryAfterSeconds(nextError),
+            ),
+          ),
+        );
+        setIsStreaming(false);
+        return;
+      }
+
       console.error("Chat error:", nextError);
       const isSessionCompletedError = hasErrorCode(nextError, "SESSION_COMPLETED");
 
@@ -1334,6 +1431,9 @@ export default function Widget({
       }
       setIsStreaming(false);
     } finally {
+      if (activeStreamAbortControllerRef.current === streamAbortController) {
+        activeStreamAbortControllerRef.current = null;
+      }
       setIsLoading(false);
     }
   };
@@ -1503,7 +1603,8 @@ export default function Widget({
             {hasStarted && (
               <button
                 onClick={() => resetConversation()}
-                className="widget-icon-button p-2"
+                disabled={isLoading || isStreaming}
+                className="widget-icon-button p-2 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={newChatLabel}
                 title={newChatLabel}
               >
