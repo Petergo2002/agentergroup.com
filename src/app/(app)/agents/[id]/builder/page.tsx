@@ -481,10 +481,6 @@ function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
   );
 }
 
-function getAgentNodeId(nodes: BuilderFlowNode[]) {
-  return nodes.find((node) => node.data.kind === 'agent')?.id ?? FIXED_NODE_IDS.agent;
-}
-
 function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
   const hasKnowledge = nodes.some((node) => node.data.kind === 'knowledge');
   const hasGmail = nodes.some((node) => node.data.kind === 'gmail');
@@ -1270,7 +1266,9 @@ export default function AgentBuilderPage() {
         .select('*')
         .eq('agent_id', agentId)
         .order('version', { ascending: false }),
-      supabase.from('connections').select('*').order('updated_at', { ascending: false }),
+      fetch('/api/connections/toolkits', {
+        cache: 'no-store',
+      }).then((response) => response.json().then((payload) => ({ ok: response.ok, payload }))),
       supabase.from('agent_connections').select('connection_id').eq('agent_id', agentId),
       supabase.auth.getUser(),
       supabase
@@ -1290,7 +1288,11 @@ export default function AgentBuilderPage() {
       throw knowledgeSourcesResult.error;
     }
 
-    const chatConnections = ((connectionsResult.data ?? []) as ConnectionRecord[])
+    if (!connectionsResult.ok) {
+      throw new Error(connectionsResult.payload.error ?? t('connections.loadError'));
+    }
+
+    const chatConnections = ((connectionsResult.payload.connections ?? []) as ConnectionRecord[])
       .map((connection) => ({
         ...connection,
         status: getEffectiveConnectionStatus(connection),
@@ -1412,6 +1414,9 @@ export default function AgentBuilderPage() {
 
   const selectedGoogleCalendarConnectionId =
     selectedNode?.data.kind === 'googlecalendar' ? selectedNode.data.connectionId : null;
+  const selectedGoogleCalendarConnection = selectedGoogleCalendarConnectionId
+    ? connections.find((connection) => connection.id === selectedGoogleCalendarConnectionId) ?? null
+    : null;
 
   useEffect(() => {
     if (!selectedGoogleCalendarConnectionId || selectedNode?.data.kind !== 'googlecalendar') {
@@ -1421,6 +1426,18 @@ export default function AgentBuilderPage() {
     const selectedCalendarNodeId = selectedNode.id;
     const connectionId = selectedGoogleCalendarConnectionId;
     if (!connectionId) {
+      return;
+    }
+
+    if (!selectedGoogleCalendarConnection || selectedGoogleCalendarConnection.status !== 'connected') {
+      setCalendarOptionsByConnectionId((current) => ({
+        ...current,
+        [connectionId]: [],
+      }));
+      setCalendarOptionsStatusByConnectionId((current) => ({
+        ...current,
+        [connectionId]: 'idle',
+      }));
       return;
     }
 
@@ -1505,6 +1522,7 @@ export default function AgentBuilderPage() {
     void loadCalendars();
   }, [
     resolveCalendarOption,
+    selectedGoogleCalendarConnection,
     selectedGoogleCalendarConnectionId,
     selectedNode,
     showToast,
@@ -2585,25 +2603,27 @@ export default function AgentBuilderPage() {
         </div>
 
         <section
-          className={`min-h-0 border-b border-outline-variant/10 xl:border-b-0 ${
+          className={`h-full min-h-0 border-b border-outline-variant/10 xl:border-b-0 ${
             selectedNode ? 'xl:border-r' : ''
           }`}
         >
-          <ReactFlow
-            nodes={displayNodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-            onPaneClick={() => setSelectedNodeId(null)}
-            onInit={setFlowInstance}
-            fitView
-            proOptions={{ hideAttribution: true }}
-            className="bg-background"
-          >
-            <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
-            <Controls className="!bottom-4 !left-4 !top-auto !right-auto" />
-          </ReactFlow>
+          <div className="h-full w-full">
+            <ReactFlow
+              nodes={displayNodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+              onPaneClick={() => setSelectedNodeId(null)}
+              onInit={setFlowInstance}
+              fitView
+              proOptions={{ hideAttribution: true }}
+              className="bg-background"
+            >
+              <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
+              <Controls className="!bottom-4 !left-4 !top-auto !right-auto" />
+            </ReactFlow>
+          </div>
         </section>
 
         {selectedNode ? (

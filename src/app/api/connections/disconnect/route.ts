@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { getEffectiveConnectionStatus } from "@/lib/connections";
-import { deleteConnectedAccount } from "@/lib/composio";
+import { isConnectedAccountMissingError } from "@/lib/composio-errors";
+import {
+  deleteConnectedAccount,
+  syncConnectedAccountsToDatabase,
+} from "@/lib/composio";
 import { createClient } from "@/lib/supabase/server";
 import type { ConnectionStatus } from "@/lib/types";
 
@@ -32,6 +36,13 @@ export async function POST(request: NextRequest) {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+
+  try {
+    await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id);
+  } catch (error) {
+    console.warn("[Connections] Failed to sync connected accounts before disconnect:", error);
+  }
+
   const { data, error } = await supabase
     .from("connections")
     .select("id, workspace_id, toolkit_slug, status, external_id, toolkit_data")
@@ -56,14 +67,24 @@ export async function POST(request: NextRequest) {
       await deleteConnectedAccount(connection.external_id);
     }
   } catch (error) {
-    return NextResponse.json(
+    if (!isConnectedAccountMissingError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to disconnect the external account.",
+        },
+        { status: 500 },
+      );
+    }
+
+    console.warn(
+      "[Connections] External account was already missing during disconnect; deleting the local row only.",
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to disconnect the external account.",
+        connectionId: connection.id,
+        externalId: connection.external_id,
       },
-      { status: 500 },
     );
   }
 

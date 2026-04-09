@@ -504,9 +504,10 @@ export async function POST(
               {
                 role: "assistant" as const,
                 content: result.assistantContent,
-                metadata: buildPersistedAssistantMetadata(
-                  result.assistantMetadata,
-                ),
+                metadata: {
+                  ...buildPersistedAssistantMetadata(result.assistantMetadata),
+                  ...(result.debugTrace ? { debugTrace: result.debugTrace } : {}),
+                },
               },
             ],
           });

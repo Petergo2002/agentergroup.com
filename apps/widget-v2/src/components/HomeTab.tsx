@@ -73,7 +73,7 @@ export function HomeTab({
         className="absolute inset-0 flex flex-col overflow-hidden bg-transparent"
       >
         {/* Header title */}
-        <div className="px-6 pt-8 pb-6 shrink-0 z-10 w-full max-w-lg mx-auto text-center">
+        <div className="px-6 pt-8 pb-6 shrink-0 z-10 w-full max-w-lg mx-auto text-center lg:max-w-3xl">
           <h1 className="text-[1.6rem] font-extrabold tracking-tight text-widget-fg leading-tight">
             {config.home.title || t.openSpecialist}
           </h1>
@@ -84,7 +84,7 @@ export function HomeTab({
 
         {/* Agent list — borderless clean rows */}
         <div
-          className="flex-1 overflow-y-auto widget-scroll px-4 pb-8 flex flex-col w-full max-w-lg mx-auto"
+          className="flex-1 overflow-y-auto widget-scroll px-4 pb-8 flex flex-col w-full max-w-lg mx-auto lg:max-w-3xl"
         >
           {config.agents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[200px] text-center px-6">
@@ -160,7 +160,7 @@ export function HomeTab({
       transition={{ duration: 0.25 }}
       className="absolute inset-0 flex flex-col items-center overflow-y-auto px-6 pb-24 pt-16 widget-scroll md:px-10 md:justify-center md:pt-8 lg:px-14 lg:pt-10"
     >
-      <div className="flex w-full max-w-4xl flex-col items-center text-center">
+      <div className="flex w-full max-w-5xl flex-col items-center text-center">
         <div className="mb-8 flex flex-col items-center">
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-widget-fg">
             {selectedAgent.greeting || "Welcome."}
@@ -182,7 +182,7 @@ export function HomeTab({
 
               onSwitchToMessages();
             }}
-            className="relative mt-8 w-full max-w-sm shadow-lg shadow-black/5"
+            className="relative mt-8 w-full max-w-sm shadow-lg shadow-black/5 sm:max-w-xl lg:max-w-2xl"
           >
             <input
               type="text"
@@ -212,12 +212,12 @@ export function HomeTab({
         </div>
 
         {quickActions.length > 0 ? (
-          <div className="mb-16 flex w-full max-w-xl flex-col items-center">
+          <div className="mb-16 flex w-full max-w-xl flex-col items-center lg:max-w-3xl">
             {quickActions.map((action, index) => (
               <button
                 key={`${action.label}-${index}`}
                 onClick={() => handleQuickAction(action.prompt)}
-                className="group flex w-full max-w-[34rem] items-center justify-between gap-3 px-1 py-3.5 text-left transition-colors duration-200"
+                className="group flex w-full max-w-[34rem] items-center justify-between gap-3 px-1 py-3.5 text-left transition-colors duration-200 lg:max-w-3xl"
                 style={{
                   borderBottom:
                     index < quickActions.length - 1

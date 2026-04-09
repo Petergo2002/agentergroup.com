@@ -142,9 +142,11 @@ Important current behavior:
   - `specific_email`
 - when Gmail uses `specific_email`, the node stores the hidden fixed recipient on the draft definition and runtime enforces it server-side
 - Google Calendar exposes one selected booking calendar and resolves the booking timezone from that calendar
+- the builder now loads connection inventory from `/api/connections/toolkits` so stale Composio rows are downgraded before the tool inspector renders
 - the builder loads selectable Google Calendars from the connected Composio account through `/api/connections/googlecalendar/calendars`
 - the selected Google Calendar is stored on the node as `calendarId` plus `calendarLabel`
 - the Google Calendar node also stores the resolved calendar timezone returned by the selected booking calendar
+- if the stored Google Calendar connected account no longer exists in Composio, the calendar-list route marks the row disconnected and asks the operator to reconnect instead of surfacing a 500
 - the calendar-list route is backed by a manual `GOOGLECALENDAR_LIST_CALENDARS` Composio tool execution, so the app must define Composio toolkit versions centrally for Google Calendar to keep the selector stable
 
 ### End Chat inspector

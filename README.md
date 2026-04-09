@@ -144,6 +144,8 @@ The widget loader is built from `apps/widget-v2/public/loader.js` and expects a 
 
 The loader and hosted runtime talk to the public API routes under `/api/public/widgets/`.
 
+Hosted standalone links such as `https://widget.agentergroup.com/?widget=...` are served by the separate `apps/widget-v2` runtime deployment, not by the Next.js dashboard bundle itself.
+
 ## Widget Configuration Model
 
 - `widgets` stores the surface-level widget identity, branding, deployment, and access settings.
@@ -168,7 +170,10 @@ The loader and hosted runtime talk to the public API routes under `/api/public/w
 
 - Widget bootstrap currently issues a signed access token with a 15-minute TTL.
 - Hosted and embedded widget clients both retry bootstrap once when the runtime token expires.
+- Hosted standalone widget mode is desktop-first on large breakpoints and keeps the compact shell only for smaller screens.
 - Widget chat is serialized per session; overlapping turns return `409 SESSION_BUSY`.
+- Public widget rate limits are enforced through a Supabase RPC backed by a named uniqueness constraint on `rate_limit_windows`; do not switch that upsert back to a bare column-list conflict target or Postgres can reintroduce ambiguous `window_started_at` errors.
+- Changes under `apps/widget-v2` require a separate widget-runtime deploy; pushing or deploying only the dashboard app does not update `widget.agentergroup.com`.
 - Internal assistant chat is serialized per `chat_threads` row; overlapping turns return `409 THREAD_BUSY`.
 - Internal assistants become usable after the first normal builder save; publish remains widget-only in v1.
 - `scripts/widget-load-test.mjs` exercises bootstrap/chat flows and the same-session lock path.

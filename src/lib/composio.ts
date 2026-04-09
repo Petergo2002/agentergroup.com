@@ -1,6 +1,9 @@
 import { Composio } from "@composio/core";
 import type OpenAI from "openai";
-import { buildWorkspaceComposioUserId } from "@/lib/connections";
+import {
+  buildWorkspaceComposioUserId,
+  getConnectionComposioUserId,
+} from "@/lib/connections";
 import { hasComposioEnv } from "@/lib/env";
 import { normalizeGmailRecipientEmail } from "@/lib/gmail";
 import { extractGoogleCalendarListItems } from "@/lib/google-calendar";
@@ -63,6 +66,40 @@ export interface SyncedConnectedAccount {
 interface MCPSessionInfo {
   url: string;
   headers: Record<string, string>;
+}
+
+interface ConnectionSyncRow {
+  id: string;
+  external_id: string | null;
+  status: SyncedConnectedAccount["status"];
+  toolkit_data: Record<string, unknown> | null;
+  last_synced_at: string | null;
+}
+
+interface ConnectionSyncSupabaseTable {
+  select: (columns: string) => {
+    eq: (column: string, value: string) => {
+      eq: (
+        column: string,
+        value: string,
+      ) => Promise<{
+        data: ConnectionSyncRow[] | null;
+        error: { message: string } | null;
+      }>;
+    };
+  };
+  update: (values: Record<string, unknown>) => {
+    eq: (column: string, value: string) => {
+      in: (
+        column: string,
+        values: string[],
+      ) => Promise<{ error: { message: string } | null }>;
+    };
+  };
+  upsert: (
+    values: unknown,
+    options?: Record<string, unknown>,
+  ) => Promise<{ error: { message: string } | null }>;
 }
 
 const GMAIL_SEND_EMAIL_TOOL = "GMAIL_SEND_EMAIL";
@@ -471,22 +508,63 @@ export async function listConnectedAccounts(composioUserId: string) {
 }
 
 export async function syncConnectedAccountsToDatabase(
-  supabase: {
-    from: (table: string) => {
-      upsert: (values: unknown, options?: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-    };
-  },
+  supabase: { from: (table: string) => unknown },
   workspaceId: string,
   userId: string,
 ) {
+  if (!createComposioClient()) {
+    return [];
+  }
+
   const composioUserId = buildWorkspaceComposioUserId(workspaceId);
   const connectedAccounts = await listConnectedAccounts(composioUserId);
+  const syncTimestamp = new Date().toISOString();
+  const connectedExternalIds = new Set(
+    connectedAccounts
+      .map((account) => account.externalId)
+      .filter((externalId): externalId is string => Boolean(externalId)),
+  );
+
+  const connectionsTable = supabase.from("connections") as ConnectionSyncSupabaseTable;
+  const { data: existingConnections, error: existingConnectionsError } = await connectionsTable
+    .select("id, external_id, status, toolkit_data, last_synced_at")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", "composio");
+
+  if (existingConnectionsError) {
+    throw new Error(existingConnectionsError.message);
+  }
+
+  const staleConnectionIds = ((existingConnections ?? []) as ConnectionSyncRow[])
+    .filter(
+      (connection) =>
+        getConnectionComposioUserId(connection) === composioUserId &&
+        Boolean(connection.last_synced_at) &&
+        Boolean(connection.external_id) &&
+        !connectedExternalIds.has(connection.external_id as string) &&
+        connection.status !== "disconnected",
+    )
+    .map((connection) => connection.id);
+
+  if (staleConnectionIds.length > 0) {
+    const { error: staleConnectionError } = await connectionsTable
+      .update({
+        status: "disconnected",
+        last_synced_at: syncTimestamp,
+      })
+      .eq("workspace_id", workspaceId)
+      .in("id", staleConnectionIds);
+
+    if (staleConnectionError) {
+      throw new Error(staleConnectionError.message);
+    }
+  }
 
   if (connectedAccounts.length === 0) {
     return [];
   }
 
-  const { error } = await supabase.from("connections").upsert(
+  const { error } = await connectionsTable.upsert(
     connectedAccounts.map((account) => ({
       workspace_id: workspaceId,
       provider: "composio",
@@ -497,7 +575,7 @@ export async function syncConnectedAccountsToDatabase(
       account_label: account.accountLabel ?? "default",
       toolkit_data: account.toolkitData,
       created_by: userId,
-      last_synced_at: new Date().toISOString(),
+      last_synced_at: syncTimestamp,
     })),
     {
       onConflict: "workspace_id,toolkit_slug,account_label",

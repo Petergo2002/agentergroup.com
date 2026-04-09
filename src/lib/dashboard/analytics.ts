@@ -6,6 +6,8 @@ import type {
   DashboardAnalyticsOverview,
   DashboardAnalyticsRange,
   DashboardConversationDetailResponse,
+  DebugEvent,
+  DebugTrace,
   WorkspaceMemberRecord,
 } from "@/lib/types";
 
@@ -56,9 +58,7 @@ interface AnalyticsTranscriptRow {
   role: string;
   content: string;
   created_at: string;
-  metadata?: {
-    debugTrace?: DashboardConversationDetailResponse["transcript"][number]["debugTrace"];
-  } | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface AnalyticsWidgetLeadRow {
@@ -195,6 +195,134 @@ export function decodeAnalyticsCursor(cursor: string | null) {
   } catch {
     return null;
   }
+}
+
+function buildSyntheticDebugTraceFromToolMessages(
+  toolMessages: AnalyticsTranscriptRow[],
+  assistantCreatedAt: string,
+): DebugTrace | null {
+  if (toolMessages.length === 0) {
+    return null;
+  }
+
+  const firstToolTimestamp = Date.parse(toolMessages[0].created_at);
+  const assistantTimestamp = Date.parse(assistantCreatedAt);
+  const hasValidTimeline =
+    Number.isFinite(firstToolTimestamp) &&
+    Number.isFinite(assistantTimestamp) &&
+    assistantTimestamp >= firstToolTimestamp;
+
+  const events: DebugEvent[] = toolMessages.map((message, index) => {
+    const metadata = message.metadata ?? {};
+    const toolName =
+      typeof metadata.name === "string" && metadata.name.trim()
+        ? metadata.name.trim()
+        : "unknown";
+    const metadataError =
+      typeof metadata.error === "string" && metadata.error.trim()
+        ? metadata.error.trim()
+        : null;
+    const createdAtTimestamp = Date.parse(message.created_at);
+    const eventTimestamp =
+      hasValidTimeline && Number.isFinite(createdAtTimestamp)
+        ? Math.max(0, createdAtTimestamp - firstToolTimestamp)
+        : index * 50;
+    const redactedResult =
+      typeof message.content === "string" && message.content.trim()
+        ? message.content.trim()
+        : undefined;
+
+    if (metadataError) {
+      return {
+        type: "tool_error",
+        ts: eventTimestamp,
+        name: toolName,
+        error: metadataError,
+      };
+    }
+
+    return {
+      type: "tool_result",
+      ts: eventTimestamp,
+      name: toolName,
+      result: redactedResult,
+    };
+  });
+
+  const firstErrorEvent = events.find(
+    (event): event is DebugEvent & { error: string } =>
+      event.type === "tool_error" && typeof event.error === "string",
+  );
+
+  return {
+    durationMs: hasValidTimeline ? assistantTimestamp - firstToolTimestamp : 0,
+    iterationsUsed: 1,
+    toolsAvailable: Array.from(
+      new Set(
+        toolMessages
+          .map((message) => {
+            const name = message.metadata?.name;
+            return typeof name === "string" && name.trim() ? name.trim() : null;
+          })
+          .filter((name): name is string => Boolean(name)),
+      ),
+    ),
+    knowledgeHits: 0,
+    events,
+    hadError: Boolean(firstErrorEvent),
+    errorSummary: firstErrorEvent?.error,
+  };
+}
+
+function buildTranscriptWithDebugTrace(messages: AnalyticsTranscriptRow[]) {
+  const transcript: DashboardConversationDetailResponse["transcript"] = [];
+  let pendingToolMessages: AnalyticsTranscriptRow[] = [];
+
+  for (const message of messages) {
+    if (message.role === "tool") {
+      pendingToolMessages.push(message);
+      continue;
+    }
+
+    if (message.role === "user") {
+      pendingToolMessages = [];
+      transcript.push({
+        id: message.id,
+        role: "user",
+        content: message.content,
+        createdAt: message.created_at,
+        debugTrace: null,
+      });
+      continue;
+    }
+
+    if (message.role !== "assistant") {
+      pendingToolMessages = [];
+      continue;
+    }
+
+    const debugTraceFromMetadata =
+      message.metadata?.debugTrace &&
+      typeof message.metadata.debugTrace === "object"
+        ? (message.metadata.debugTrace as DebugTrace)
+        : null;
+
+    transcript.push({
+      id: message.id,
+      role: "assistant",
+      content: message.content,
+      createdAt: message.created_at,
+      debugTrace:
+        debugTraceFromMetadata ??
+        buildSyntheticDebugTraceFromToolMessages(
+          pendingToolMessages,
+          message.created_at,
+        ),
+    });
+    pendingToolMessages = [];
+  }
+
+  return transcript;
 }
 
 export async function listWorkspaceWidgetsForAnalytics(
@@ -721,7 +849,7 @@ export async function getDashboardConversationDetail(
       .from("widget_session_messages")
       .select("id, role, content, metadata, created_at")
       .eq("widget_session_id", session.id)
-      .in("role", ["user", "assistant"])
+      .in("role", ["user", "assistant", "tool"])
       .order("created_at", { ascending: true }),
     supabase
       .from("widget_leads")
@@ -781,14 +909,8 @@ export async function getDashboardConversationDetail(
           createdAt: leadData.data.created_at,
         }
       : null,
-    transcript: ((transcriptData.data ?? []) as AnalyticsTranscriptRow[]).map(
-      (message) => ({
-        id: message.id,
-        role: message.role === "assistant" ? "assistant" : "user",
-        content: message.content,
-        createdAt: message.created_at,
-        debugTrace: message.metadata?.debugTrace ?? null,
-      }),
+    transcript: buildTranscriptWithDebugTrace(
+      (transcriptData.data ?? []) as AnalyticsTranscriptRow[],
     ),
   }, input.viewerRole);
 }

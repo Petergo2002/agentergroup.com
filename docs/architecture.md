@@ -861,6 +861,7 @@ Important current behavior:
 - widget management is no longer centered inside `/agents/[id]/builder`
 - the legacy agent-widget route redirects into `/widgets?agent=...`
 - a widget can attach multiple agents and can require a specific `widgetAgentId` at runtime when more than one is attached
+- hosted standalone runtime routes now use a dedicated desktop shell on large breakpoints instead of reusing the old narrow mobile-card proportions
 
 ### Public runtime contract
 
@@ -894,6 +895,7 @@ Current behavior:
 - public widget POST endpoints now enforce volumetric rate limiting for hosted and embedded traffic
 - preview-token traffic is intentionally excluded from the public widget rate limiter
 - the current rollout design and thresholds are documented in `docs/implementation-plans/20260409-widget-rate-limits-plan.md`
+- the rate-limit RPC must upsert with `ON CONFLICT ON CONSTRAINT rate_limit_windows_scope_window_constraint`; using a bare column-list conflict target can reintroduce ambiguous `window_started_at` failures in Postgres
 
 Important token rules:
 
@@ -908,6 +910,7 @@ Current deployment behavior is intentionally mixed:
 - live widget chat executes against the `published_version_id` snapshotted into each `widget_agent`
 - public config and branding still come from the current `widgets` and `widget_agents` rows
 - `needs_redeploy` is used to tell operators when the current widget config has drifted from the last deployment event
+- the public widget frontend is deployed separately from the Next.js dashboard app, so `apps/widget-v2` changes require their own widget-runtime deploy before `widget.agentergroup.com` updates
 
 This is not a fully immutable deployment model, but it prevents live widget chat from silently running an unpublished agent version.
 
@@ -1128,6 +1131,7 @@ Important runtime rule:
 
 - connected accounts are keyed to the workspace-scoped Composio identity
 - stale legacy rows without the expected scoped identity are treated as disconnected until reconnected
+- previously synced Composio rows whose `external_id` no longer exists upstream are downgraded to `disconnected` on the next sync instead of being left as false-positive connected rows
 
 ### Google Calendar selector flow
 
@@ -1135,13 +1139,15 @@ The Google Calendar node in the builder supports choosing a specific booking cal
 
 Current flow:
 
-1. the builder selects a connected Google Calendar account
-2. the builder calls `GET /api/connections/googlecalendar/calendars`
-3. the route performs a best-effort connection sync from Composio
-4. the route resolves the Composio connected account id from the stored connection row
-5. the route executes `GOOGLECALENDAR_LIST_CALENDARS`
-6. the returned calendars populate the node-level booking-calendar selector and expose each calendar's timezone when available
-7. the selected booking calendar becomes the source of truth for Google Calendar scheduling timezone
+1. the builder loads chat-tool connection state from `GET /api/connections/toolkits`
+2. the operator selects a connected Google Calendar account
+3. the builder calls `GET /api/connections/googlecalendar/calendars`
+4. the route performs a best-effort connection sync from Composio and marks previously synced missing accounts as disconnected
+5. the route resolves the Composio connected account id from the stored connection row
+6. the route executes `GOOGLECALENDAR_LIST_CALENDARS`
+7. the returned calendars populate the node-level booking-calendar selector and expose each calendar's timezone when available
+8. if the connected account has been deleted in Composio between syncs, the route downgrades the row to `disconnected` and returns a reconnect-required error instead of a 500
+9. the selected booking calendar becomes the source of truth for Google Calendar scheduling timezone
 
 This flow depends on the centralized Composio toolkit-version configuration described above.
 
@@ -1347,6 +1353,7 @@ After import, the source behaves like any other workspace knowledge source.
 | --- | --- |
 | `GET /api/connections/toolkits` | Return supported integrations and merged connection status |
 | `POST /api/connections/authorize` | Start Composio authorization for one allowed integration |
+| `POST /api/connections/disconnect` | Remove a local connection row and best-effort delete the upstream Composio connected account |
 | `GET /api/connections/googlecalendar/calendars` | List selectable calendars for one connected Google Calendar account in the builder |
 
 ### Workspace APIs
@@ -1399,8 +1406,8 @@ After import, the source behaves like any other workspace knowledge source.
 | `GET /api/public/widgets/[widgetPublicKey]/bootstrap` | Validate runtime access, return config bootstrap, and issue widget access token |
 | `GET /api/public/widgets/[widgetPublicKey]/config` | Return current public widget runtime config |
 | `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a public widget chat message, reject overlapping same-session turns with `409 SESSION_BUSY`, and rate-limit abusive hosted/embed traffic with `429` |
-| `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout, refuse completion while a live turn is active, and apply public runtime rate limits |
-| `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events under public runtime rate limits |
+| `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout, refuse completion while a live turn is active, and apply public runtime rate limits backed by the named `rate_limit_windows_scope_window_constraint` upsert path |
+| `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events under public runtime rate limits without surfacing SQL ambiguity errors from the rate-limit RPC |
 | `POST /api/public/widgets/[widgetPublicKey]/leads` | Persist a lead submission from the widget under public runtime rate limits |
 
 ### Analytics APIs

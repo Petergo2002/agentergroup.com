@@ -997,7 +997,7 @@ export async function runAgentChat({
     toolMessages,
     knowledgeMatches,
     connectedToolkits: enabledToolkits,
-    debugTrace: persistedDebugTrace ?? undefined,
+    debugTrace,
     endChat,
   };
 }

@@ -1444,6 +1444,11 @@ export default function Widget({
   const navLabelHome = widgetLanguage === "sv" ? "Hem" : "Home";
   const navLabelMessages = widgetLanguage === "sv" ? "Meddelanden" : "Messages";
   const newChatLabel = widgetLanguage === "sv" ? "Starta ny chatt" : "Start a new chat";
+  const showStandaloneDesktopShell = widgetContext === "hosted";
+  const showSurfaceNav =
+    Boolean(selectedAgent) &&
+    !isChooserMode &&
+    !(activeTab === "messages" && hasStarted);
 
 
 
@@ -1482,7 +1487,7 @@ export default function Widget({
     <div
       className={`relative h-screen w-full flex flex-col overflow-hidden selection:bg-widget-primary/30 ${
         themeMode === "dark" ? "dark bg-stitch-gradient" : "bg-widget-bg"
-      } ${widgetContext === "hosted" ? "lg:items-center lg:justify-center" : ""}`}
+      } ${showStandaloneDesktopShell ? "lg:px-6 lg:py-6 lg:items-center lg:justify-center" : ""}`}
       style={
         {
           "--widget-bg": palette.bg,
@@ -1533,10 +1538,17 @@ export default function Widget({
 
       <div
         className={`relative z-10 flex flex-col overflow-hidden ${
-          widgetContext === "hosted"
-            ? "w-full h-full lg:w-[440px] lg:h-[760px] lg:max-h-[90vh] lg:rounded-3xl lg:shadow-2xl lg:ring-1 lg:ring-[var(--widget-border)]"
+          showStandaloneDesktopShell
+            ? "w-full h-full lg:mx-auto lg:w-full lg:max-w-[1180px] lg:h-[min(920px,calc(100vh-3rem))] lg:rounded-[2rem] lg:border lg:border-[var(--widget-border)] lg:shadow-[0_32px_100px_rgba(15,23,42,0.14)]"
             : "w-full h-full"
         }`}
+        style={
+          showStandaloneDesktopShell
+            ? {
+                backgroundColor: palette.bg,
+              }
+            : undefined
+        }
       >
         {/* Top Hero Gradient using Secondary Color (only on home tab) */}
         {activeTab === "home" && (
@@ -1549,7 +1561,13 @@ export default function Widget({
           />
         )}
 
-        <header className="relative flex items-center justify-between px-6 pb-4 pt-12 shrink-0">
+        <header
+          className={`relative flex items-center justify-between px-6 pb-4 pt-12 shrink-0 ${
+            showStandaloneDesktopShell
+              ? "lg:border-b lg:border-[var(--widget-border)] lg:px-10 lg:pb-5 lg:pt-10"
+              : ""
+          }`}
+        >
           <div className="flex items-center gap-2">
             <AnimatePresence mode="wait">
               {(activeTab === "home" && selectedAgent && config.home.mode === "chooser" && !hasStarted) && (
@@ -1599,7 +1617,27 @@ export default function Widget({
             </span>
           </div>
 
-          <div className={`flex items-center gap-1 ${embeddedBy === "loader" ? "pr-[60px] sm:pr-0" : ""}`}>
+          <div className={`flex items-center gap-3 ${embeddedBy === "loader" ? "pr-[60px] sm:pr-0" : ""}`}>
+            {showStandaloneDesktopShell && showSurfaceNav ? (
+              <div className="hidden lg:flex items-center rounded-full border border-[var(--widget-border)] bg-[color:var(--widget-input-surface)] p-1 shadow-sm">
+                <button
+                  onClick={() => setActiveTab("home")}
+                  data-active={activeTab === "home" ? "true" : "false"}
+                  className="widget-nav-button rounded-full px-4 py-2 text-xs font-semibold"
+                  style={activeTab === "home" ? { color: palette.secondary } : undefined}
+                >
+                  {navLabelHome}
+                </button>
+                <button
+                  onClick={() => setActiveTab("messages")}
+                  data-active={activeTab === "messages" ? "true" : "false"}
+                  className="widget-nav-button rounded-full px-4 py-2 text-xs font-semibold"
+                  style={activeTab === "messages" ? { color: palette.secondary } : undefined}
+                >
+                  {navLabelMessages}
+                </button>
+              </div>
+            ) : null}
             {hasStarted && (
               <button
                 onClick={() => resetConversation()}
@@ -1667,7 +1705,9 @@ export default function Widget({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 50 }}
-              className="px-6 pb-6 shrink-0"
+              className={`px-6 pb-6 shrink-0 ${
+                showStandaloneDesktopShell ? "lg:hidden" : ""
+              }`}
             >
               <div className="glass-navbar rounded-2xl h-16 w-full flex items-center justify-around relative overflow-hidden">
                 <motion.div

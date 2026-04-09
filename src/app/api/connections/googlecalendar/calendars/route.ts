@@ -4,7 +4,11 @@ import {
   getConnectionComposioUserId,
   getEffectiveConnectionStatus,
 } from "@/lib/connections";
-import { listGoogleCalendars, syncConnectedAccountsToDatabase } from "@/lib/composio";
+import { isConnectedAccountMissingError } from "@/lib/composio-errors";
+import {
+  listGoogleCalendars,
+  syncConnectedAccountsToDatabase,
+} from "@/lib/composio";
 import { createClient } from "@/lib/supabase/server";
 import type { ConnectionStatus } from "@/lib/types";
 
@@ -71,19 +75,15 @@ export async function GET(request: NextRequest) {
     pickString(connection.toolkit_data?.id) ??
     pickString(connection.toolkit_data?.connectedAccountId);
   const composioUserId = getConnectionComposioUserId(connection);
+  const reconnectError =
+    "Google Calendar must be reconnected in this workspace before calendars can be loaded.";
 
   if (
     getEffectiveConnectionStatus(connection) !== "connected" ||
     !connectedAccountId ||
     !composioUserId
   ) {
-    return NextResponse.json(
-      {
-        error:
-          "Google Calendar must be reconnected in this workspace before calendars can be loaded.",
-      },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: reconnectError }, { status: 400 });
   }
 
   try {
@@ -94,6 +94,35 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ calendars });
   } catch (error) {
+    if (isConnectedAccountMissingError(error)) {
+      console.warn(
+        "[Google Calendar] Stored connected account is stale; marking the local row disconnected.",
+        {
+          connectionId: connection.id,
+          connectedAccountId,
+          composioUserId,
+        },
+      );
+
+      const { error: disconnectError } = await supabase
+        .from("connections")
+        .update({
+          status: "disconnected",
+          last_synced_at: new Date().toISOString(),
+        })
+        .eq("id", connection.id)
+        .eq("workspace_id", context.workspace.id);
+
+      if (disconnectError) {
+        console.warn(
+          "[Google Calendar] Failed to persist disconnected status after stale connected account detection:",
+          disconnectError,
+        );
+      }
+
+      return NextResponse.json({ error: reconnectError }, { status: 400 });
+    }
+
     console.error("[Google Calendar] Failed to load calendars:", {
       connectionId: connection.id,
       connectedAccountId,
