@@ -311,11 +311,11 @@ export function ChatView({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-transparent">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent">
       {/* Messages Area */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 widget-scroll touch-pan-y"
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-6 widget-scroll touch-pan-y"
       >
         <div className="mx-auto max-w-4xl space-y-6 pb-4">
           {messages.map((msg, idx) => (
@@ -396,7 +396,7 @@ export function ChatView({
       </div>
 
       {/* Chat Input */}
-      <div className="shrink-0 bg-transparent px-6 pb-6 pt-2 peer group md:px-10 lg:px-14">
+      <div className="relative z-10 shrink-0 bg-[color:var(--widget-bg)]/96 px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-2 backdrop-blur-sm peer group md:px-10 lg:px-14">
         <div className="relative mx-auto max-w-4xl">
           {isConversationCompleted && (
             <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-widget-border bg-widget-card px-4 py-3 text-sm text-widget-fg">

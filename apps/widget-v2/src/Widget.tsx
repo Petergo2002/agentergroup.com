@@ -534,10 +534,6 @@ export default function Widget({
   const [activeTab, setActiveTab] = useState<"home" | "messages">("home");
   const [hasUnread, setHasUnread] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [widgetContext, setWidgetContext] =
-    useState<WidgetBootstrapResponse["source"]>(
-      previewMode ? "preview" : "hosted",
-    );
   const [isConversationCompleted, setIsConversationCompleted] = useState(false);
   const [conversationEndReason, setConversationEndReason] =
     useState<WidgetEndChatReason | null>(null);
@@ -589,7 +585,6 @@ export default function Widget({
   const applyBootstrapPayload = useCallback((payload: WidgetBootstrapResponse) => {
     setConfig(normalizeWidgetConfig(payload.config));
     setAccessToken(payload.accessToken ?? null);
-    setWidgetContext(payload.source);
     setError(null);
   }, []);
 
@@ -1538,7 +1533,7 @@ export default function Widget({
         )}
 
         <header
-          className={`relative flex items-center justify-between px-6 pb-4 pt-12 shrink-0 ${
+          className={`relative flex items-center justify-between px-6 pb-4 pt-[calc(env(safe-area-inset-top,0px)+3rem)] shrink-0 ${
             showStandaloneDesktopShell
               ? "lg:border-b lg:border-[var(--widget-border)] lg:px-10 lg:pb-5 lg:pt-10"
               : ""
@@ -1637,7 +1632,7 @@ export default function Widget({
           </div>
         </header>
 
-        <main className="flex-1 overflow-hidden relative">
+        <main className="relative min-h-0 flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
             {activeTab === "home" || !selectedAgent ? (
               <HomeTab
