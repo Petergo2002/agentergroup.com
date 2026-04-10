@@ -15,7 +15,9 @@ import {
   createWidgetPreviewDraft,
   loadWidgetAgentsByIds,
   loadWidgetById,
+  loadWidgetPreviewDraft,
   signWidgetPreviewToken,
+  updateWidgetPreviewDraft,
   type WidgetAdminSupabase,
 } from "@/lib/widgets/server";
 
@@ -190,7 +192,11 @@ export async function POST(
     );
   }
 
-  const revision = crypto.randomUUID();
+  const requestedRevision =
+    typeof body.previewRevision === "string" && body.previewRevision.trim()
+      ? body.previewRevision.trim()
+      : null;
+  let revision = requestedRevision ?? crypto.randomUUID();
   const previewPayload = buildWidgetPreviewPayload({
     widgetPublicKey: loaded.widget.widget_public_key,
     widgetId: loaded.widget.id,
@@ -199,16 +205,37 @@ export async function POST(
     revision,
   });
 
-  await createWidgetPreviewDraft(admin, {
-    widgetId: loaded.widget.id,
-    workspaceId: context.workspace.id,
-    createdBy: user.id,
-    revision,
-    payload: draft,
-    expiresAt: new Date(previewPayload.expiresAt).toISOString(),
-  });
+  const expiresAt = new Date(previewPayload.expiresAt).toISOString();
+  const existingDraft =
+    requestedRevision
+      ? await loadWidgetPreviewDraft(admin, loaded.widget.id, requestedRevision)
+      : null;
 
-  const previewToken = await signWidgetPreviewToken(previewPayload);
+  if (existingDraft && existingDraft.created_by === user.id) {
+    await updateWidgetPreviewDraft(admin, {
+      draftId: existingDraft.id,
+      payload: draft,
+      expiresAt,
+    });
+  } else {
+    if (existingDraft && existingDraft.created_by !== user.id) {
+      revision = crypto.randomUUID();
+    }
+
+    await createWidgetPreviewDraft(admin, {
+      widgetId: loaded.widget.id,
+      workspaceId: context.workspace.id,
+      createdBy: user.id,
+      revision,
+      payload: draft,
+      expiresAt,
+    });
+  }
+
+  const previewToken = await signWidgetPreviewToken({
+    ...previewPayload,
+    revision,
+  });
   const previewUrl = `${getAppUrl()}/widgets/${loaded.widget.id}/preview?revision=${encodeURIComponent(
     revision,
   )}&preview_token=${encodeURIComponent(previewToken)}`;

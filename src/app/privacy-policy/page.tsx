@@ -23,7 +23,7 @@ export default async function PrivacyPolicyPage({
   const language: PlatformLanguage = lang
     ? resolvePlatformLanguage(lang)
     : defaultLanguage;
-  const copy = getMessages(language).privacyPolicy;
+  const copy = (await getMessages(language)).privacyPolicy;
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f7f8fb_0%,#eef2f6_100%)] text-on-surface">

@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { AppIcon } from '@/components/icons/AppIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface ModalProps {
@@ -51,7 +52,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
             aria-label={t('common.close')}
             className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
           >
-            <span className="material-symbols-outlined text-xl">close</span>
+            <AppIcon name="close" className="h-5 w-5" />
           </button>
         </div>
         

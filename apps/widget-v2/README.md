@@ -12,6 +12,8 @@ npm run widget:dev
 
 The widget will be available at `http://localhost:5173/`.
 
+For a static local embed page, use `apps/widget-v2/examples/local-loader-test.html`.
+
 ## Testing with Widget Key
 
 Add `?widget=YOUR_WIDGET_PUBLIC_KEY` to the URL:
@@ -123,4 +125,7 @@ src/
 
 public/
 └── loader.js         # Customer embed script and embedded bootstrap handoff
+
+examples/
+└── local-loader-test.html  # Manual local test page for the hosted loader
 ```

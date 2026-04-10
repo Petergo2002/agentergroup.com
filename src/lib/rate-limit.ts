@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
-import { isIP } from "node:net";
 import type { NextRequest } from "next/server";
 import { getRateLimitSecret } from "@/lib/env";
+import { resolveTrustedClientIp } from "@/lib/trusted-client-ip";
 
 interface RateLimitRpcResult {
   allowed?: boolean | null;
@@ -59,19 +59,6 @@ export interface PublicWidgetRateLimitContext {
   widgetIpHash: string;
   widgetSessionHash: string | null;
 }
-
-const CLIENT_IP_HEADERS = [
-  "cf-connecting-ip",
-  "x-forwarded-for",
-  "x-real-ip",
-  "x-client-ip",
-  "fly-client-ip",
-  "fastly-client-ip",
-  "true-client-ip",
-  "x-vercel-forwarded-for",
-];
-
-const FORWARDED_FOR_PATTERN = /for=(?:"?\[?([^;\],"]+)\]?"?)/i;
 
 const PUBLIC_WIDGET_RATE_LIMITS: Record<
   PublicWidgetRateLimitEndpoint,
@@ -193,69 +180,8 @@ const PUBLIC_WIDGET_RATE_LIMITS: Record<
   ],
 };
 
-function firstForwardedToken(value: string) {
-  return value.split(",")[0]?.trim() ?? "";
-}
-
-function trimIpDecorators(candidate: string) {
-  const trimmed = candidate.trim().replace(/^"|"$/g, "");
-
-  if (!trimmed) {
-    return null;
-  }
-
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    return trimmed.slice(1, -1);
-  }
-
-  if (isIP(trimmed)) {
-    return trimmed;
-  }
-
-  const ipv4WithoutPort = trimmed.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
-  if (ipv4WithoutPort?.[1] && isIP(ipv4WithoutPort[1])) {
-    return ipv4WithoutPort[1];
-  }
-
-  return trimmed;
-}
-
-function normalizeIpCandidate(candidate: string | null | undefined) {
-  if (!candidate) {
-    return null;
-  }
-
-  const normalized = trimIpDecorators(candidate);
-  if (!normalized) {
-    return null;
-  }
-
-  return isIP(normalized) ? normalized.toLowerCase() : null;
-}
-
 export function resolveClientIp(request: NextRequest) {
-  for (const header of CLIENT_IP_HEADERS) {
-    const raw = request.headers.get(header);
-    if (!raw) continue;
-
-    const candidate =
-      header === "x-forwarded-for" ? firstForwardedToken(raw) : raw.trim();
-    const normalized = normalizeIpCandidate(candidate);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  const forwarded = request.headers.get("forwarded");
-  if (forwarded) {
-    const forwardedMatch = forwarded.match(FORWARDED_FOR_PATTERN);
-    const normalized = normalizeIpCandidate(forwardedMatch?.[1]);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return null;
+  return resolveTrustedClientIp(request.headers);
 }
 
 function hashRateLimitValue(value: string) {

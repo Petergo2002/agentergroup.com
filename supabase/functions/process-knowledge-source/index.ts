@@ -1,19 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { buildClientSafeError, json } from "../_shared/http.ts";
 import { chunkKnowledgeText, extractTextFromFile, normalizeKnowledgeText } from "../_shared/knowledge.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const model = new Supabase.ai.Session("gte-small");
-
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-}
 
 Deno.serve(async (request) => {
   const authHeader = request.headers.get("Authorization");
@@ -151,6 +143,11 @@ Deno.serve(async (request) => {
       chunkCount: chunkRows.length,
     });
   } catch (error) {
+    const safeError = buildClientSafeError(
+      "process-knowledge-source",
+      error,
+      "Knowledge processing failed.",
+    );
     await adminClient
       .from("knowledge_sources")
       .update({
@@ -160,11 +157,6 @@ Deno.serve(async (request) => {
       })
       .eq("id", source.id);
 
-    return json(
-      {
-        error: error instanceof Error ? error.message : "Knowledge processing failed.",
-      },
-      500,
-    );
+    return json(safeError, 500);
   }
 });

@@ -27,6 +27,7 @@ export async function GET() {
       conversationResult,
       agentsResult,
       widgetsResult,
+      widgetIdsResult,
       liveWidgetsResult,
       connectedAppsResult,
       knowledgeSourcesResult,
@@ -54,6 +55,10 @@ export async function GET() {
         .eq("workspace_id", context.workspace.id),
       admin
         .from("widgets")
+        .select("id")
+        .eq("workspace_id", context.workspace.id),
+      admin
+        .from("widgets")
         .select("id", { count: "exact", head: true })
         .eq("workspace_id", context.workspace.id)
         .eq("status", "deployed"),
@@ -71,6 +76,7 @@ export async function GET() {
     const errors = [
       agentsResult.error,
       widgetsResult.error,
+      widgetIdsResult.error,
       liveWidgetsResult.error,
       connectedAppsResult.error,
       knowledgeSourcesResult.error,
@@ -84,6 +90,23 @@ export async function GET() {
       (agent) =>
         context.workspace.internal_assistants_enabled || agent.surface !== "assistant",
     );
+    const widgetIds = ((widgetIdsResult.data ?? []) as Array<{ id: string }>).map(
+      (widget) => widget.id,
+    );
+    let leadsCount = 0;
+
+    if (widgetIds.length > 0) {
+      const leadsResult = await admin
+        .from("widget_leads")
+        .select("id", { count: "exact", head: true })
+        .in("widget_id", widgetIds);
+
+      if (leadsResult.error) {
+        throw leadsResult.error;
+      }
+
+      leadsCount = leadsResult.count ?? 0;
+    }
 
     return NextResponse.json({
       recentConversations: conversationResult.conversations,
@@ -93,6 +116,7 @@ export async function GET() {
         liveWidgets: liveWidgetsResult.count ?? 0,
         connectedApps: connectedAppsResult.count ?? 0,
         knowledgeSources: knowledgeSourcesResult.count ?? 0,
+        leads: leadsCount,
       },
     });
   } catch (error) {

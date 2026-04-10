@@ -1,8 +1,17 @@
 import type { NextConfig } from "next";
+import { getAppSecurityHeaders } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: getAppSecurityHeaders(),
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

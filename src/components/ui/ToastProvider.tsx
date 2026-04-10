@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { AppIcon } from '@/components/icons/AppIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -58,11 +59,16 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               ${toast.type === 'error' ? 'bg-error/10 text-error' : ''}
               ${toast.type === 'info' ? 'bg-primary/10 text-primary' : ''}
             `}>
-              <span className="material-symbols-outlined text-lg">
-                {toast.type === 'success' ? 'task_alt' : ''}
-                {toast.type === 'error' ? 'warning' : ''}
-                {toast.type === 'info' ? 'info' : ''}
-              </span>
+              <AppIcon
+                name={
+                  toast.type === 'success'
+                    ? 'task_alt'
+                    : toast.type === 'error'
+                      ? 'warning'
+                      : 'info'
+                }
+                className="h-[18px] w-[18px]"
+              />
             </div>
             <div>
               <p className="text-[13px] font-bold text-on-surface">
@@ -79,7 +85,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               aria-label={t('common.close')}
               className="ml-2 text-on-surface-variant/40 hover:text-on-surface"
             >
-              <span className="material-symbols-outlined text-sm">close</span>
+              <AppIcon name="close" className="h-4 w-4" />
             </button>
           </div>
         ))}

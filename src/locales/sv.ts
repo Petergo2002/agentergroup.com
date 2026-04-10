@@ -192,6 +192,8 @@ export const sv = {
     signIn: "Logga in",
     createAccount: "Skapa konto",
     confirmEmailNotice: "Kontrollera din e-post för att bekräfta ditt konto.",
+    signInError: "Det gick inte att logga in med de uppgifterna.",
+    createAccountError: "Det gick inte att skapa kontot just nu. Försök igen.",
     legal:
       "Bygg framtiden med Agentergroup. När du loggar in godkänner du våra användarvillkor och vår integritetspolicy.",
     legalPrefix:

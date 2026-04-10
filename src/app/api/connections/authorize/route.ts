@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createConnectionRequest } from "@/lib/composio";
 import { getSupportedIntegration } from "@/lib/integrations";
+import { createClientSafeError } from "@/lib/server-errors";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -65,10 +66,13 @@ export async function POST(request: NextRequest) {
       redirectUrl: connectionRequest.redirectUrl,
     });
   } catch (error) {
+    const safeError = createClientSafeError(
+      "connections authorize",
+      error,
+      "Failed to start connection flow.",
+    );
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to start connection flow.",
-      },
+      safeError,
       { status: 500 },
     );
   }

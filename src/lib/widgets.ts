@@ -2,6 +2,10 @@ import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
 import { buildDisabledEndChatPolicy } from "@/lib/end-chat";
 import { buildDefaultGmailRecipientPolicy } from "@/lib/gmail";
 import { buildDefaultGoogleCalendarSelection } from "@/lib/google-calendar";
+import {
+  normalizeAllowedOrigin,
+  normalizeAllowedOrigins,
+} from "@/lib/widgets/http";
 import type {
   AgentRecord,
   EndChatPolicy,
@@ -57,26 +61,7 @@ export interface WidgetAgentWithAgent {
   agent: AgentRecord;
 }
 
-export function normalizeAllowedOrigin(value: string | null | undefined) {
-  if (!value) return null;
-
-  try {
-    const parsed = new URL(value.trim());
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-
-    return parsed.origin;
-  } catch {
-    return null;
-  }
-}
-
-export function normalizeAllowedOrigins(values: string[]) {
-  return Array.from(
-    new Set(values.map((value) => normalizeAllowedOrigin(value)).filter(Boolean)),
-  ) as string[];
-}
+export { normalizeAllowedOrigin, normalizeAllowedOrigins };
 
 export function getDefaultWidgetBrandName(workspace: WorkspaceRecord) {
   return workspace.name;

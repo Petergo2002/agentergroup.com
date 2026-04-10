@@ -2,14 +2,17 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
   createTranslator,
   DEFAULT_PLATFORM_LANGUAGE,
+  getMessages,
   PLATFORM_LANGUAGE_COOKIE,
   PLATFORM_LANGUAGE_COOKIE_MAX_AGE,
   PLATFORM_LANGUAGE_STORAGE_KEY,
@@ -36,27 +39,78 @@ function persistLanguage(language: PlatformLanguage) {
 export function LanguageProvider({
   children,
   initialLanguage,
-  messages,
+  initialMessages,
 }: {
   children: React.ReactNode;
   initialLanguage: PlatformLanguage;
-  messages: Record<PlatformLanguage, Messages>;
+  initialMessages: Messages;
 }) {
-  const [language, setLanguageState] = useState<PlatformLanguage>(initialLanguage);
-
-  useEffect(() => {
-    const stored = resolvePlatformLanguage(
-      window.localStorage.getItem(PLATFORM_LANGUAGE_STORAGE_KEY),
-    );
-    const next = stored || DEFAULT_PLATFORM_LANGUAGE;
-
-    if (next !== language) {
-      setLanguageState(next);
+  const [language, setLanguageState] = useState<PlatformLanguage>(() => {
+    if (typeof window === "undefined") {
+      return initialLanguage;
     }
 
-    persistLanguage(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return (
+      resolvePlatformLanguage(window.localStorage.getItem(PLATFORM_LANGUAGE_STORAGE_KEY)) ||
+      initialLanguage
+    );
+  });
+  const [messages, setMessages] = useState<Messages>(initialMessages);
+  const languageRequestRef = useRef(0);
+  const didResolveInitialMessagesRef = useRef(false);
+
+  const loadLanguageMessages = useCallback(
+    async (nextLanguage: PlatformLanguage) => {
+      const requestId = ++languageRequestRef.current;
+      const nextMessages =
+        nextLanguage === initialLanguage
+          ? initialMessages
+          : await getMessages(nextLanguage);
+
+      if (languageRequestRef.current !== requestId) {
+        return;
+      }
+
+      setMessages(nextMessages);
+    },
+    [initialLanguage, initialMessages],
+  );
+
+  const applyLanguage = useCallback(
+    (nextLanguage: PlatformLanguage) => {
+      if (nextLanguage === language) {
+        persistLanguage(nextLanguage);
+        return;
+      }
+
+      setLanguageState(nextLanguage);
+      persistLanguage(nextLanguage);
+      void loadLanguageMessages(nextLanguage);
+    },
+    [language, loadLanguageMessages],
+  );
+
+  useEffect(() => {
+    persistLanguage(language);
+  }, [language]);
+
+  useEffect(() => {
+    if (didResolveInitialMessagesRef.current) {
+      return;
+    }
+
+    didResolveInitialMessagesRef.current = true;
+
+    if (language === initialLanguage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void loadLanguageMessages(language);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [initialLanguage, language, loadLanguageMessages]);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -64,26 +118,34 @@ export function LanguageProvider({
         return;
       }
 
-      const next = resolvePlatformLanguage(event.newValue);
-      setLanguageState(next);
-      document.documentElement.lang = next;
+      const next = resolvePlatformLanguage(event.newValue) || DEFAULT_PLATFORM_LANGUAGE;
+      if (next === language) {
+        persistLanguage(next);
+        return;
+      }
+
+      void applyLanguage(next);
     };
 
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, []);
+  }, [applyLanguage, language]);
 
   const value = useMemo<LanguageContextValue>(() => {
     return {
       language,
-      messages: messages[language],
+      messages,
       setLanguage: (nextLanguage) => {
-        setLanguageState(nextLanguage);
-        persistLanguage(nextLanguage);
+        if (nextLanguage === language) {
+          persistLanguage(nextLanguage);
+          return;
+        }
+
+        void applyLanguage(nextLanguage);
       },
-      t: createTranslator(language),
+      t: createTranslator(messages),
     };
-  }, [language, messages]);
+  }, [applyLanguage, language, messages]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

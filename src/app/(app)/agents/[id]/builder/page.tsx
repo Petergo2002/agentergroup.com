@@ -18,6 +18,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppContext } from '@/components/app/AppContext';
+import { SimpleIcon } from '@/components/icons/SimpleIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
 import { createClient } from '@/lib/supabase/client';
@@ -46,26 +47,6 @@ import type {
   KnowledgeBuilderNodeData,
   KnowledgeSourceRecord,
 } from '@/lib/types';
-import * as simpleIcons from 'simple-icons';
-
-function SimpleIcon({ iconKey, color, size = 24, className = '' }: { iconKey?: string; color?: string; size?: number; className?: string }) {
-  if (!iconKey) return null;
-  
-  const icon = (simpleIcons as Record<string, { path: string }>)[iconKey];
-  if (!icon?.path) return null;
-  
-  return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24" 
-      fill={color || "currentColor"}
-      className={className}
-      dangerouslySetInnerHTML={{ __html: `<path d="${icon.path}"/>` }}
-    />
-  );
-}
 
 type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
@@ -1276,7 +1257,7 @@ export default function AgentBuilderPage() {
         .select('*')
         .order('updated_at', { ascending: false }),
       fetch(`/api/agents/${agentId}/knowledge`, {
-        next: { revalidate: 30 },
+        cache: 'no-store',
       }).then((response) => response.json().then((payload) => ({ ok: response.ok, payload }))),
     ]);
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildWidgetBootstrapHeaders,
@@ -68,7 +69,7 @@ export async function GET(
           accessToken: null,
           source: "preview",
         },
-        { headers: buildWidgetBootstrapHeaders(request) },
+        { headers: buildWidgetBootstrapHeaders(request, { preview: true }) },
       );
     }
 
@@ -107,13 +108,19 @@ export async function GET(
         accessToken,
         source: access.source,
       },
-      { headers: buildWidgetBootstrapHeaders(request) },
+      { headers: buildWidgetBootstrapHeaders(request, { preview: false }) },
     );
   } catch (error) {
+    const safeError = createClientSafeError(
+      "public widget bootstrap",
+      error,
+      "Failed to bootstrap widget.",
+    );
     return buildErrorResponse(
       request,
       500,
-      error instanceof Error ? error.message : "Failed to bootstrap widget.",
+      safeError.error,
+      safeError.code,
     );
   }
 }

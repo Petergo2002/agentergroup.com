@@ -108,7 +108,7 @@ npm run widget:load-test -- --help
 │   ├── functions/              # Edge functions for knowledge processing/search
 │   └── migrations/             # Database schema and platform migrations
 ├── scripts/                    # Load testing and utility scripts
-├── docs/                       # Architecture notes, rollout docs, and implementation plans
+├── docs/                       # Current reference docs plus the active widget rate-limit plan
 ├── public/                     # Static assets served by the dashboard app
 └── proxy.ts                    # Request/session proxy hook for auth session updates
 ```
@@ -146,6 +146,10 @@ The loader and hosted runtime talk to the public API routes under `/api/public/w
 
 Hosted standalone links such as `https://widget.agentergroup.com/?widget=...` are served by the separate `apps/widget-v2` runtime deployment, not by the Next.js dashboard bundle itself.
 
+This embed stays intentionally simple for local-business customers: they paste the loader snippet into their site and do not need to run any backend code or generate customer-side auth tokens.
+
+Embedded `allowed_origins` checks are a soft abuse-control for normal website installs, not a hard security boundary against determined scripted clients. The hard runtime secret stays on the Agentergroup backend and is only used to mint short-lived widget access tokens after bootstrap succeeds.
+
 ## Widget Configuration Model
 
 - `widgets` stores the surface-level widget identity, branding, deployment, and access settings.
@@ -172,14 +176,19 @@ Hosted standalone links such as `https://widget.agentergroup.com/?widget=...` ar
 - Hosted and embedded widget clients both retry bootstrap once when the runtime token expires.
 - Hosted standalone widget mode is desktop-first on large breakpoints and keeps the compact shell only for smaller screens.
 - Widget chat is serialized per session; overlapping turns return `409 SESSION_BUSY`.
+- Embedded widget abuse controls trust only edge-supplied client IP headers (`x-vercel-forwarded-for` and `cf-connecting-ip`); requests without them fall back to the shared `"unknown"` rate-limit bucket.
+- Public widget/API failures now return stable client-safe errors while detailed exceptions stay in server logs.
+- Public lead submissions now return only `ok`, `leadId`, and `createdAt`.
+- The dashboard app now sends baseline browser protections through CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
 - Public widget rate limits are enforced through a Supabase RPC backed by a named uniqueness constraint on `rate_limit_windows`; do not switch that upsert back to a bare column-list conflict target or Postgres can reintroduce ambiguous `window_started_at` errors.
 - Changes under `apps/widget-v2` require a separate widget-runtime deploy; pushing or deploying only the dashboard app does not update `widget.agentergroup.com`.
 - Internal assistant chat is serialized per `chat_threads` row; overlapping turns return `409 THREAD_BUSY`.
 - Internal assistants become usable after the first normal builder save; publish remains widget-only in v1.
 - `scripts/widget-load-test.mjs` exercises bootstrap/chat flows and the same-session lock path.
-- The security regression suite lives under `tests/security/*.test.ts` and currently covers SSRF blocking, workspace ownership guards, DSAR normalization/sanitization, debug-trace redaction, and multi-account Drive selection.
+- The security regression suite lives under `tests/security/*.test.ts` and currently covers redirect sanitization, trusted widget IP handling, widget CORS behavior, browser security headers, SSRF blocking, workspace ownership guards, DSAR normalization/sanitization, debug-trace redaction, and multi-account Drive selection.
 - `npm audit --audit-level=moderate` currently passes in both the root app and `apps/widget-v2`.
 - The top-level `/data-processing` and `/subprocessors` routes are compatibility redirects into `/settings/...`.
+- Self-service password reset and a backup/restore operator runbook are follow-up work and are not part of the current launch-hardening batch.
 
 ## License
 

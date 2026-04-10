@@ -116,8 +116,10 @@
   let container = null;
   let bubble = null;
   let closeButton = null;
+  let iframeContainer = null;
   let iframe = null;
   let styleSheet = null;
+  let runtimeReadyPromise = null;
   let messageListener = null;
   let domReadyListener = null;
   let keydownListener = null;
@@ -436,7 +438,9 @@
         if (logoIconEl) {
           if (brandSettings.logoUrl) {
             logoIconEl.innerHTML =
-              '<img src="' + escapeHtml(brandSettings.logoUrl) + '" alt="" />';
+              '<img src="' +
+              escapeHtml(brandSettings.logoUrl) +
+              '" alt="" loading="lazy" decoding="async" />';
           } else {
             logoIconEl.innerHTML = chatIconSvg;
           }
@@ -492,6 +496,7 @@
   async function refreshBootstrapForIframe() {
     try {
       await fetchBootstrap();
+      updateBubbleContent();
       applyWidgetTheme();
       postBootstrapToIframe();
     } catch (error) {
@@ -949,11 +954,127 @@
     return params.toString();
   }
 
-  function syncWidgetOpenState() {
-    const iframeContainer = container?.querySelector(
-      ".ag-widget-iframe-container",
-    );
+  function getBubbleMarkup() {
+    const brandName = bootstrapPayload?.config?.brand?.name || "Chat";
+    const logoUrl = bootstrapPayload?.config?.brand?.logoUrl;
 
+    return `
+      <div class="ag-widget-bubble-content">
+        <div class="ag-widget-bubble-logo-icon">
+          ${
+            logoUrl
+              ? `<img src="${escapeHtml(
+                  logoUrl,
+                )}" alt="" loading="lazy" decoding="async" />`
+              : chatIconSvg
+          }
+        </div>
+        <div class="ag-widget-bubble-divider"></div>
+        <span class="ag-widget-bubble-text">${escapeHtml(brandName)}</span>
+      </div>
+      <div class="ag-widget-bubble-close">
+        ${closeIconSvg}
+      </div>
+    `;
+  }
+
+  function updateBubbleContent() {
+    if (!bubble) return;
+
+    bubble.innerHTML = getBubbleMarkup();
+    bubble.setAttribute("aria-label", isOpen ? "Stäng chatt" : "Öppna chatt");
+
+    if (iframeContainer) {
+      const brandName = bootstrapPayload?.config?.brand?.name || "Agent";
+      iframeContainer.setAttribute("aria-label", `${brandName} chat`);
+    }
+  }
+
+  function ensureIframeContainer() {
+    if (iframeContainer || !container) {
+      return iframeContainer;
+    }
+
+    iframeContainer = document.createElement("div");
+    iframeContainer.className = "ag-widget-iframe-container";
+    iframeContainer.setAttribute("aria-hidden", "true");
+    iframeContainer.setAttribute("role", "dialog");
+    iframeContainer.setAttribute("aria-modal", "true");
+    iframeContainer.setAttribute("tabindex", "-1");
+    container.insertBefore(iframeContainer, bubble);
+    return iframeContainer;
+  }
+
+  function createIframe() {
+    if (iframe) {
+      return Promise.resolve();
+    }
+
+    const nextIframeContainer = ensureIframeContainer();
+    if (!nextIframeContainer) {
+      return Promise.reject(
+        new Error("Failed to initialize widget container."),
+      );
+    }
+
+    iframe = document.createElement("iframe");
+    iframe.loading = "lazy";
+    const runtimeParams = buildRuntimeParams();
+    iframe.src = `${widgetBaseUrl}/?widget=${encodeURIComponent(widgetPublicKey)}${
+      runtimeParams ? `&${runtimeParams}` : ""
+    }`;
+    iframe.title = "Chat Widget";
+    iframe.allow = "microphone; clipboard-write; clipboard-read";
+
+    const iframeReady = new Promise((resolve, reject) => {
+      iframe.addEventListener(
+        "load",
+        () => {
+          postWidgetStateToIframe();
+          postBootstrapToIframe();
+          if (previewOverrideMessage) {
+            forwardMessageToIframe(previewOverrideMessage);
+          }
+          resolve();
+        },
+        { once: true },
+      );
+
+      iframe.addEventListener(
+        "error",
+        () => {
+          reject(new Error("Failed to load the widget iframe."));
+        },
+        { once: true },
+      );
+    });
+
+    nextIframeContainer.appendChild(iframe);
+    return iframeReady;
+  }
+
+  async function ensureRuntimeReady() {
+    if (iframe && bootstrapPayload) {
+      return;
+    }
+
+    if (runtimeReadyPromise) {
+      return runtimeReadyPromise;
+    }
+
+    runtimeReadyPromise = (async () => {
+      await fetchBootstrap();
+      updateBubbleContent();
+      applyWidgetTheme();
+      await createIframe();
+    })().finally(() => {
+      runtimeReadyPromise = null;
+    });
+
+    return runtimeReadyPromise;
+  }
+
+  function syncWidgetOpenState() {
     if (container) {
       container.classList.toggle("ag-is-open", isOpen);
     }
@@ -1004,13 +1125,6 @@
 
   // Initialize the widget
   async function init() {
-    try {
-      await fetchBootstrap();
-    } catch (error) {
-      console.error("[AgenterGroup Widget] Bootstrap failed", error);
-      return;
-    }
-
     // Remove stale artifacts from older/duplicate loader instances
     document.querySelectorAll(".ag-widget-container").forEach((node) => {
       node.remove();
@@ -1036,64 +1150,16 @@
       initialBubbleTextColor,
     );
 
-    if (
-      previewEnabled &&
-      window[PREVIEW_OVERRIDE_WINDOW_KEY] &&
-      typeof window[PREVIEW_OVERRIDE_WINDOW_KEY] === "object"
-    ) {
-      previewOverrideMessage = window[PREVIEW_OVERRIDE_WINDOW_KEY];
-      applyPreviewBubbleTheme(previewOverrideMessage);
-    }
-
-    // Create iframe container
-    const iframeContainer = document.createElement("div");
-    iframeContainer.className = "ag-widget-iframe-container";
-    iframeContainer.setAttribute("aria-hidden", "true");
-    iframeContainer.setAttribute("role", "dialog");
-    iframeContainer.setAttribute("aria-modal", "true");
-    iframeContainer.setAttribute("tabindex", "-1");
-
-    // Create iframe
-    iframe = document.createElement("iframe");
-    const runtimeParams = buildRuntimeParams();
-    iframe.src = `${widgetBaseUrl}/?widget=${encodeURIComponent(widgetPublicKey)}${
-      runtimeParams ? `&${runtimeParams}` : ""
-    }`;
-    iframe.title = "Chat Widget";
-    iframe.allow = "microphone; clipboard-write; clipboard-read";
-    iframe.addEventListener("load", () => {
-      postWidgetStateToIframe();
-      postBootstrapToIframe();
-      if (previewOverrideMessage) {
-        forwardMessageToIframe(previewOverrideMessage);
-      }
-    });
-    iframeContainer.appendChild(iframe);
-
     // Create bubble button
     bubble = document.createElement("button");
     bubble.className = "ag-widget-bubble";
     bubble.type = "button";
-    const brandName = bootstrapPayload?.config?.brand?.name || "Agent";
-    const logoUrl = bootstrapPayload?.config?.brand?.logoUrl;
-    iframeContainer.setAttribute("aria-label", `${brandName} chat`);
-
-    const contentHtml = `
-      <div class="ag-widget-bubble-content">
-        <div class="ag-widget-bubble-logo-icon">
-          ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="" />` : chatIconSvg}
-        </div>
-        <div class="ag-widget-bubble-divider"></div>
-        <span class="ag-widget-bubble-text">${escapeHtml(brandName)}</span>
-      </div>
-      <div class="ag-widget-bubble-close">
-        ${closeIconSvg}
-      </div>
-    `;
-    bubble.innerHTML = contentHtml;
+    bubble.innerHTML = getBubbleMarkup();
     bubble.setAttribute("aria-label", "Öppna chatt");
     bubble.setAttribute("aria-expanded", "false");
-    bubble.onclick = toggleWidget;
+    bubble.onclick = () => {
+      void toggleWidget();
+    };
 
     closeButton = document.createElement("button");
     closeButton.className = "ag-widget-close-button";
@@ -1105,22 +1171,46 @@
     closeButton.onclick = closeWidget;
 
     // Append elements
-    container.appendChild(iframeContainer);
     container.appendChild(bubble);
     container.appendChild(closeButton);
     document.body.appendChild(container);
+
+    if (
+      previewEnabled &&
+      window[PREVIEW_OVERRIDE_WINDOW_KEY] &&
+      typeof window[PREVIEW_OVERRIDE_WINDOW_KEY] === "object"
+    ) {
+      previewOverrideMessage = window[PREVIEW_OVERRIDE_WINDOW_KEY];
+      applyPreviewBubbleTheme(previewOverrideMessage);
+    }
 
     syncWidgetOpenState();
     applyWidgetTheme();
   }
 
-  function openWidget() {
+  async function openWidget() {
     if (isOpen) return;
 
-    const iframeContainer = container?.querySelector(
-      ".ag-widget-iframe-container",
-    );
-    if (!iframeContainer || !bubble) return;
+    if (!bubble) return;
+
+    bubble.disabled = true;
+    bubble.setAttribute("aria-busy", "true");
+
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error("[AgenterGroup Widget] Bootstrap failed", error);
+      bubble.disabled = false;
+      bubble.removeAttribute("aria-busy");
+      return;
+    }
+
+    bubble.disabled = false;
+    bubble.removeAttribute("aria-busy");
+
+    if (!iframeContainer) {
+      return;
+    }
 
     isOpen = true;
     previousFocusedElement =
@@ -1152,11 +1242,11 @@
     postWidgetStateToIframe();
   }
 
-  function toggleWidget() {
+  async function toggleWidget() {
     if (isOpen) {
       closeWidget();
     } else {
-      openWidget();
+      await openWidget();
     }
   }
 
@@ -1188,7 +1278,9 @@
     }
     bubble = null;
     closeButton = null;
+    iframeContainer = null;
     iframe = null;
+    runtimeReadyPromise = null;
     isOpen = false;
     unlockBackgroundScroll();
 

@@ -22,7 +22,7 @@ export default async function WidgetDraftPreviewPage({
   const { id } = await params;
   const { revision, preview_token: previewToken } = await searchParams;
   const language = await getServerLanguage();
-  const messages = getMessages(language);
+  const messages = await getMessages(language);
   const supabase = await createClient();
   const {
     data: { user },
@@ -112,6 +112,7 @@ export default async function WidgetDraftPreviewPage({
                 <iframe
                   src={widgetPreviewUrl}
                   title={`${loaded.widget.name} standalone widget preview`}
+                  loading="lazy"
                   className="h-[calc(100vh-15rem)] min-h-[720px] w-full rounded-[1.6rem] border border-outline-variant/10 bg-background"
                 />
               </div>

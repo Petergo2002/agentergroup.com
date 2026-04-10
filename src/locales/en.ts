@@ -190,6 +190,8 @@ export const en = {
     signIn: "Sign In",
     createAccount: "Create Account",
     confirmEmailNotice: "Check your email to confirm your account.",
+    signInError: "We could not sign you in with those credentials.",
+    createAccountError: "We could not create your account right now. Please try again.",
     legal:
       "Build your future with Agentergroup. By signing in, you agree to our Terms of Service and Privacy Policy.",
     legalPrefix:

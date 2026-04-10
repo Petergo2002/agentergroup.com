@@ -123,6 +123,8 @@ interface WidgetBuilderContextValue {
 const WidgetBuilderContext = createContext<WidgetBuilderContextValue | undefined>(undefined);
 
 const WIDGET_ASSETS_BUCKET = 'widget-assets';
+const MAX_WIDGET_LOGO_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const NORMALIZED_WIDGET_LOGO_SIZE = 256;
 
 /**
  * Helper Functions
@@ -147,6 +149,64 @@ function sanitizeFileName(fileName: string) {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .toLowerCase();
+}
+
+function loadImageElement(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to read the selected image.'));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function normalizeWidgetLogoFile(file: File) {
+  if (file.type === 'image/svg+xml') {
+    return file;
+  }
+
+  const image = await loadImageElement(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = NORMALIZED_WIDGET_LOGO_SIZE;
+  canvas.height = NORMALIZED_WIDGET_LOGO_SIZE;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('Failed to initialize image processing.');
+  }
+
+  const scale = Math.min(
+    NORMALIZED_WIDGET_LOGO_SIZE / image.naturalWidth,
+    NORMALIZED_WIDGET_LOGO_SIZE / image.naturalHeight,
+  );
+  const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
+  const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
+  const offsetX = Math.round((NORMALIZED_WIDGET_LOGO_SIZE - targetWidth) / 2);
+  const offsetY = Math.round((NORMALIZED_WIDGET_LOGO_SIZE - targetHeight) / 2);
+
+  context.clearRect(0, 0, NORMALIZED_WIDGET_LOGO_SIZE, NORMALIZED_WIDGET_LOGO_SIZE);
+  context.drawImage(image, offsetX, offsetY, targetWidth, targetHeight);
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/webp', 0.86);
+  });
+
+  if (!blob) {
+    throw new Error('Failed to optimize the selected image.');
+  }
+
+  const baseName = sanitizeFileName(file.name.replace(/\.[^.]+$/, '')) || 'logo';
+  return new File([blob], `${baseName}.webp`, { type: 'image/webp' });
 }
 
 function getInitialFormState(summary: WidgetDetailResponse): WidgetFormState {
@@ -238,6 +298,7 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
   const { showToast } = useToast();
   const widgetId = params.id;
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const draftPreviewRevisionRef = useRef<string | null>(null);
 
   const [summary, setSummary] = useState<WidgetDetailResponse | null>(null);
   const [form, setForm] = useState<WidgetFormState | null>(null);
@@ -272,6 +333,10 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
     void loadWidget();
   }, [loadWidget]);
 
+  useEffect(() => {
+    draftPreviewRevisionRef.current = draftPreview?.previewRevision ?? null;
+  }, [draftPreview?.previewRevision]);
+
   const draftPreviewPayload = useMemo(
     () => (form ? buildDraftPreviewPayload(form, attachedAgents) : null),
     [attachedAgents, form],
@@ -282,14 +347,17 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     setPreviewStatus('loading');
     
-    const timeoutId = window.setTimeout(async () => {
-      try {
-        const response = await fetch(`/api/widgets/${widgetId}/preview`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(draftPreviewPayload),
-          signal: controller.signal,
-        });
+	    const timeoutId = window.setTimeout(async () => {
+	      try {
+	        const response = await fetch(`/api/widgets/${widgetId}/preview`, {
+	          method: 'POST',
+	          headers: { 'Content-Type': 'application/json' },
+	          body: JSON.stringify({
+	            ...draftPreviewPayload,
+	            previewRevision: draftPreviewRevisionRef.current,
+	          }),
+	          signal: controller.signal,
+	        });
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload) throw new Error(payload?.error || t('widgetBuilder.previewUnavailable'));
         if (controller.signal.aborted) return;
@@ -390,20 +458,26 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const handleLogoUpload = async (file: File) => {
-    if (!form || !summary) return;
-    if (!file.type.startsWith('image/')) {
-      showToast(t('widgetBuilder.uploadImageError'), 'error');
-      return;
-    }
-    setIsUploadingLogo(true);
-    try {
-      const safeName = sanitizeFileName(file.name || 'logo.png') || 'logo.png';
-      const storagePath = `${summary.widget.workspace_id}/${summary.widget.id}/${Date.now()}-${safeName}`;
-      const { error: uploadError } = await supabase.storage.from(WIDGET_ASSETS_BUCKET).upload(storagePath, file, { cacheControl: '3600', upsert: true, contentType: file.type });
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from(WIDGET_ASSETS_BUCKET).getPublicUrl(storagePath);
-      setForm((current) => current ? { ...current, logoUrl: publicUrl } : current);
+	  const handleLogoUpload = async (file: File) => {
+	    if (!form || !summary) return;
+	    if (!file.type.startsWith('image/')) {
+	      showToast(t('widgetBuilder.uploadImageError'), 'error');
+	      return;
+	    }
+	    if (file.size > MAX_WIDGET_LOGO_FILE_SIZE_BYTES) {
+	      showToast(t('widgetBuilder.uploadImageError'), 'error');
+	      return;
+	    }
+	    setIsUploadingLogo(true);
+	    try {
+	      const normalizedFile = await normalizeWidgetLogoFile(file);
+	      const safeName =
+	        sanitizeFileName(normalizedFile.name || 'logo.webp') || 'logo.webp';
+	      const storagePath = `${summary.widget.workspace_id}/${summary.widget.id}/${Date.now()}-${safeName}`;
+	      const { error: uploadError } = await supabase.storage.from(WIDGET_ASSETS_BUCKET).upload(storagePath, normalizedFile, { cacheControl: '3600', upsert: true, contentType: normalizedFile.type });
+	      if (uploadError) throw uploadError;
+	      const { data: { publicUrl } } = supabase.storage.from(WIDGET_ASSETS_BUCKET).getPublicUrl(storagePath);
+	      setForm((current) => current ? { ...current, logoUrl: publicUrl } : current);
       showToast(t('widgetBuilder.logoUploaded'), 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : t('widgetBuilder.uploadLogoError'), 'error');

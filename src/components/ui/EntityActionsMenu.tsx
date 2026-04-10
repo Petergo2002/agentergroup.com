@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AppIcon } from '@/components/icons/AppIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface EntityActionsMenuProps {
@@ -12,7 +13,6 @@ interface EntityActionsMenuProps {
   deleteLabel?: string;
   deleteDisabled?: boolean;
   buttonClassName?: string;
-  iconClassName?: string;
 }
 
 export function EntityActionsMenu({
@@ -23,7 +23,6 @@ export function EntityActionsMenu({
   deleteLabel,
   deleteDisabled = false,
   buttonClassName = "flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant/65 transition-colors hover:bg-surface-container hover:text-on-surface",
-  iconClassName = "material-symbols-outlined text-[20px]",
 }: EntityActionsMenuProps) {
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -109,7 +108,7 @@ export function EntityActionsMenu({
         }}
         className={buttonClassName}
       >
-        <span className={iconClassName}>more_horiz</span>
+        <AppIcon name="more_horiz" className="h-5 w-5" />
       </button>
 
       {isOpen
@@ -129,7 +128,7 @@ export function EntityActionsMenu({
               disabled={archiveDisabled}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
             >
-              <span className="material-symbols-outlined text-[18px]">archive</span>
+              <AppIcon name="archive" className="h-[18px] w-[18px]" />
               {archiveLabel ?? t('common.archive')}
             </button>
           ) : null}
@@ -143,7 +142,7 @@ export function EntityActionsMenu({
               disabled={deleteDisabled}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-error transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
             >
-              <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+              <AppIcon name="delete_forever" className="h-[18px] w-[18px]" />
               {deleteLabel ?? t('common.delete')}
             </button>
           ) : null}

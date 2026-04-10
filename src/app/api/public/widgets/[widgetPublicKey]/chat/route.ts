@@ -14,6 +14,7 @@ import {
   getPublicWidgetRateLimitRules,
 } from "@/lib/rate-limit";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
+import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   validateBody,
@@ -552,12 +553,18 @@ export async function POST(
             return;
           }
 
-          console.error("Stream generation error:", error);
-          const message =
-            error instanceof Error ? error.message : "Stream error occurred.";
+          const safeError = createClientSafeError(
+            "public widget chat stream",
+            error,
+            "Something went wrong while generating a reply.",
+          );
           controller.enqueue(
             new TextEncoder().encode(
-              sseChunk({ error: message, terminal: true }),
+              sseChunk({
+                error: safeError.error,
+                code: safeError.code,
+                terminal: true,
+              }),
             ),
           );
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
@@ -591,10 +598,16 @@ export async function POST(
       await releaseTurnLock(turnLockWidgetId, turnLockSessionId);
     }
 
+    const safeError = createClientSafeError(
+      "public widget chat",
+      error,
+      "Failed to run widget chat.",
+    );
     return buildErrorResponse(
       request,
       500,
-      error instanceof Error ? error.message : "Failed to run widget chat.",
+      safeError.error,
+      safeError.code,
     );
   }
 }

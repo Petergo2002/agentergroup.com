@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { sanitizeRedirectTo } from "@/lib/auth-redirect";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
@@ -19,10 +20,10 @@ function getSearchValue(value: string | string[] | undefined) {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const language = await getServerLanguage();
-  const messages = getMessages(language);
+  const messages = await getMessages(language);
   const error = getSearchValue(params.error);
   const notice = getSearchValue(params.notice);
-  const redirectTo = getSearchValue(params.redirectTo) || "/dashboard";
+  const redirectTo = sanitizeRedirectTo(getSearchValue(params.redirectTo));
 
   if (!hasSupabaseEnv()) {
     return (

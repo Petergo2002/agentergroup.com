@@ -876,17 +876,21 @@ The public runtime uses these endpoints:
 
 ### Access and security model
 
-The public widget runtime does not trust the browser by default.
+The public widget runtime is a public browser embed, not a customer-backend integration.
 
 Current behavior:
 
 - bootstrap validates whether the request is hosted or embedded
 - bootstrap responses are returned with `Cache-Control: no-store`
 - hosted mode is allowed only when `widget.hosted_enabled` is true
-- embedded mode requires an allowed origin match
-- runtime endpoints only allow widget-runtime origins, not arbitrary reflected request origins
-- bootstrap returns a signed widget access token for subsequent runtime requests
+- embedded mode requires a normalized `Origin` match against `widget.allowed_origins`
+- `allowed_origins` is treated as a soft abuse-control for copy-paste installs, not a hard authentication boundary against scripted clients
+- runtime endpoints only allow widget-runtime origins and no longer emit credentialed wildcard CORS responses
+- bootstrap returns a short-lived signed widget access token for subsequent runtime requests; customers do not mint this token themselves
 - hosted and embedded widget clients both retry one bootstrap refresh automatically on `WIDGET_ACCESS_TOKEN_INVALID`
+- public widget POST endpoints rate-limit by trusted edge headers only (`x-vercel-forwarded-for` and `cf-connecting-ip`); requests without a trusted header fall back to the shared `"unknown"` bucket
+- public widget and related runtime APIs now return stable client-safe errors while full exception detail remains server-side in logs
+- the dashboard app sends baseline browser protections through CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`
 - widget appearance is configured through theme mode plus primary and secondary accent colors; base surfaces/text are derived in the runtime
 - preview mode uses a different signed preview token flow
 - the widget runtime shows a lightweight first-message consent gate before the first real chat turn and links it to the public `/privacy-policy` route
@@ -896,6 +900,7 @@ Current behavior:
 - preview-token traffic is intentionally excluded from the public widget rate limiter
 - the current rollout design and thresholds are documented in `docs/implementation-plans/20260409-widget-rate-limits-plan.md`
 - the rate-limit RPC must upsert with `ON CONFLICT ON CONSTRAINT rate_limit_windows_scope_window_constraint`; using a bare column-list conflict target can reintroduce ambiguous `window_started_at` failures in Postgres
+- self-service password reset and a backup/restore operator runbook remain follow-up work outside this batch
 
 Important token rules:
 
@@ -940,9 +945,10 @@ Current behavior:
 - overlapping turns for the same session are rejected with `409 SESSION_BUSY` instead of being queued
 - public widget chat, events, completion, and lead submission routes are also protected by dedicated rate limits with `429` responses and `Retry-After`
 - user, assistant, and tool messages are persisted
-- lead submissions are stored against the active widget session where possible
+- lead submissions are stored against the active widget session where possible and the public response is intentionally minimized to `leadId` plus `createdAt`
 - session completion can happen through explicit public completion calls, including inactivity-timeout completion
 - widget chat streams token deltas over SSE and client-triggered aborts are propagated through the server runtime to the upstream model request
+- terminal SSE failures now emit a generic client-safe error payload instead of raw exception text
 
 ## Analytics Architecture
 
@@ -1408,7 +1414,7 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a public widget chat message, reject overlapping same-session turns with `409 SESSION_BUSY`, and rate-limit abusive hosted/embed traffic with `429` |
 | `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout, refuse completion while a live turn is active, and apply public runtime rate limits backed by the named `rate_limit_windows_scope_window_constraint` upsert path |
 | `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events under public runtime rate limits without surfacing SQL ambiguity errors from the rate-limit RPC |
-| `POST /api/public/widgets/[widgetPublicKey]/leads` | Persist a lead submission from the widget under public runtime rate limits |
+| `POST /api/public/widgets/[widgetPublicKey]/leads` | Persist a lead submission from the widget under public runtime rate limits and return a minimal success payload |
 
 ### Analytics APIs
 

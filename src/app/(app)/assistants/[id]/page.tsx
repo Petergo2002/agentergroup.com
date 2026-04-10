@@ -79,7 +79,7 @@ export default function AssistantDetailPage() {
       setDetail(payload as AssistantDetailResponse);
       return payload as AssistantDetailResponse;
     },
-    [assistantId],
+    [assistantId, t],
   );
 
   useEffect(() => {

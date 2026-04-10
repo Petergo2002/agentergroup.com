@@ -113,7 +113,6 @@ export function AgentCard({
                 onDelete={() => onPermanentDelete(agent)}
                 deleteDisabled={isBusy || !agent.archived_at || membershipRole !== 'owner'}
                 buttonClassName="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/10 text-on-surface-variant/40 hover:bg-surface-container hover:text-on-surface transition-all"
-                iconClassName="material-symbols-outlined text-[18px]"
             />
         </div>
       </div>

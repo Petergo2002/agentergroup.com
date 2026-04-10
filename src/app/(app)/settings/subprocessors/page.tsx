@@ -13,7 +13,7 @@ async function SettingsSubprocessorsPageContent({
   languagePromise: ReturnType<typeof getServerLanguage>;
 }) {
   const language = await languagePromise;
-  const messages = getMessages(language);
+  const messages = await getMessages(language);
   const providers = messages.subprocessors.providers;
 
   return (

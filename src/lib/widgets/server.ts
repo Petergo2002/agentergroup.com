@@ -20,13 +20,18 @@ import type {
   WidgetSessionRecord,
 } from "@/lib/types";
 import {
+  buildAllowedOriginHeaders,
+  buildWidgetCorsHeaders,
+  getRequestOrigin,
+  normalizeAllowedOrigin,
+  normalizeAllowedOrigins,
+} from "@/lib/widgets/http";
+import {
   buildDraftPreviewWidgetAgentId,
   buildHostedWidgetUrl,
   buildWidgetEmbedSnippet,
   buildWidgetRuntimeConfig,
   buildWidgetRuntimeConfigFromDraft,
-  normalizeAllowedOrigin,
-  normalizeAllowedOrigins,
   type WidgetAgentWithAgent,
 } from "@/lib/widgets";
 
@@ -141,9 +146,8 @@ const WIDGET_PREVIEW_TTL_MS = 15 * 60 * 1000;
 const WIDGET_ACCESS_TTL_MS = 15 * 60 * 1000;
 const WIDGET_ACTIVE_TURN_STALE_MS = 10 * 60 * 1000;
 const DEPLOY_TIMESTAMP_SKEW_MS = 2000;
-const WIDGET_CORS_ALLOW_METHODS = "GET,POST,PATCH,DELETE,OPTIONS";
-const WIDGET_CORS_ALLOW_HEADERS =
-  "Content-Type,x-ag-widget-access-token,x-ag-preview-token,x-ag-preview-source,x-ag-preview-revision,x-ag-widget-context,x-ag-parent-origin";
+
+export { buildWidgetCorsHeaders, getRequestOrigin };
 
 interface WidgetSessionTurnLockRow {
   widget_session_id: string | null;
@@ -209,16 +213,6 @@ async function loadWidgetAgentsWithAgents(
       };
     })
     .filter(Boolean) as WidgetAgentWithAgent[];
-}
-
-export function getRequestOrigin(request: NextRequest) {
-  const originHeader = request.headers.get("origin");
-  const referrerHeader = request.headers.get("referer");
-  return (
-    normalizeAllowedOrigin(originHeader) ??
-    normalizeAllowedOrigin(referrerHeader) ??
-    null
-  );
 }
 
 function getWidgetHostedOrigin() {
@@ -303,18 +297,6 @@ async function verifySignedToken<T>(token: string | null, secret: string) {
   return isValid ? payload : null;
 }
 
-export function buildWidgetCorsHeaders(request: NextRequest) {
-  const origin = request.headers.get("origin");
-
-  return {
-    "Access-Control-Allow-Origin": origin ?? "*",
-    "Access-Control-Allow-Methods": WIDGET_CORS_ALLOW_METHODS,
-    "Access-Control-Allow-Headers": WIDGET_CORS_ALLOW_HEADERS,
-    "Access-Control-Allow-Credentials": "true",
-    Vary: "Origin",
-  };
-}
-
 function getWidgetRuntimeAllowedOrigins() {
   const runtimeOrigin = normalizeAllowedOrigin(getWidgetAppUrl());
   const origins = new Set<string>();
@@ -329,21 +311,6 @@ function getWidgetRuntimeAllowedOrigins() {
   }
 
   return Array.from(origins);
-}
-
-function buildAllowedOriginHeaders(origin: string | null): Record<string, string> {
-  const headers: Record<string, string> = {
-    "Access-Control-Allow-Methods": WIDGET_CORS_ALLOW_METHODS,
-    "Access-Control-Allow-Headers": WIDGET_CORS_ALLOW_HEADERS,
-    Vary: "Origin",
-  };
-
-  if (origin) {
-    headers["Access-Control-Allow-Origin"] = origin;
-    headers["Access-Control-Allow-Credentials"] = "true";
-  }
-
-  return headers;
 }
 
 export function resolveWidgetRuntimeRequestOrigin(request: NextRequest) {
@@ -385,10 +352,13 @@ export function buildWidgetRuntimeCorsHeaders(request: NextRequest) {
 
 export function buildWidgetBootstrapHeaders(
   request: NextRequest,
+  options?: { preview?: boolean },
 ) {
   return {
     ...buildWidgetCorsHeaders(request),
-    "Cache-Control": "no-store, no-cache, must-revalidate",
+    "Cache-Control": options?.preview
+      ? "no-store, no-cache, must-revalidate"
+      : "public, max-age=60, stale-while-revalidate=300",
   };
 }
 
@@ -1091,6 +1061,27 @@ export async function createWidgetPreviewDraft(
   }
 
   return data as WidgetPreviewDraftRecord;
+}
+
+export async function updateWidgetPreviewDraft(
+  supabase: WidgetAdminSupabase,
+  input: {
+    draftId: string;
+    payload: WidgetDraftPreviewInput;
+    expiresAt: string;
+  },
+) {
+  const { error } = await supabase
+    .from("widget_preview_drafts")
+    .update({
+      payload: input.payload,
+      expires_at: input.expiresAt,
+    })
+    .eq("id", input.draftId);
+
+  if (error) {
+    throw new Error(error.message || "Failed to update widget preview draft.");
+  }
 }
 
 export async function loadWidgetPreviewDraft(

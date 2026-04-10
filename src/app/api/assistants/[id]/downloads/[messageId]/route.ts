@@ -12,6 +12,7 @@ import {
 import { loadAssistantById, loadAssistantThread } from "@/lib/assistants/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { SafeFetchError, fetchSafeRemoteResource } from "@/lib/safe-fetch";
+import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -137,7 +138,10 @@ export async function GET(
       });
     } catch (error) {
       if (error instanceof SafeFetchError) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+        return NextResponse.json(
+          { error: "The generated download URL did not pass security checks." },
+          { status: 400 },
+        );
       }
 
       throw error;
@@ -171,13 +175,13 @@ export async function GET(
       headers,
     });
   } catch (error) {
+    const safeError = createClientSafeError(
+      "assistant download",
+      error,
+      "Failed to download the generated PDF.",
+    );
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to download the generated PDF.",
-      },
+      safeError,
       { status: 500 },
     );
   }

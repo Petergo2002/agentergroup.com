@@ -1,5 +1,6 @@
 "use client";
 
+import { AppIcon } from "@/components/icons/AppIcon";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface TopbarProps {
@@ -19,7 +20,7 @@ export function Topbar({
           className="flex h-10 w-10 items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container text-on-surface-variant transition-all hover:border-primary/20 hover:bg-surface-container-high hover:text-on-surface active:scale-95"
           onClick={onOpenSidebar}
         >
-          <span className="material-symbols-outlined text-[22px]">menu</span>
+          <AppIcon name="menu" className="h-[22px] w-[22px]" />
         </button>
         <div className="flex items-center gap-2">
           <div className="h-6 w-6 rounded-lg border border-outline-variant/20 bg-surface-container-high" />

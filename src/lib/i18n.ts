@@ -1,5 +1,4 @@
-import { en, type Messages } from "@/locales/en";
-import { sv } from "@/locales/sv";
+import type { Messages } from "@/locales/en";
 
 export const PLATFORM_LANGUAGE_STORAGE_KEY = "agentergroup.platform_language";
 export const PLATFORM_LANGUAGE_COOKIE = "agentergroup_platform_language";
@@ -8,12 +7,14 @@ export const PLATFORM_LANGUAGES = ["en", "sv"] as const;
 export type PlatformLanguage = (typeof PLATFORM_LANGUAGES)[number];
 export const DEFAULT_PLATFORM_LANGUAGE: PlatformLanguage = "en";
 
-const MESSAGES: Record<PlatformLanguage, Messages> = {
-  en,
-  sv,
+type TranslationValues = Record<string, string | number>;
+
+const messageLoaders: Record<PlatformLanguage, () => Promise<Messages>> = {
+  en: async () => (await import("@/locales/en")).en,
+  sv: async () => (await import("@/locales/sv")).sv,
 };
 
-type TranslationValues = Record<string, string | number>;
+const messageCache = new Map<PlatformLanguage, Promise<Messages>>();
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -27,8 +28,15 @@ export function resolvePlatformLanguage(value: unknown): PlatformLanguage {
   return isPlatformLanguage(value) ? value : DEFAULT_PLATFORM_LANGUAGE;
 }
 
-export function getMessages(language: PlatformLanguage) {
-  return MESSAGES[language];
+export async function getMessages(language: PlatformLanguage) {
+  const cached = messageCache.get(language);
+  if (cached) {
+    return cached;
+  }
+
+  const next = messageLoaders[language]();
+  messageCache.set(language, next);
+  return next;
 }
 
 function resolveMessage(messages: Messages, key: string) {
@@ -56,9 +64,7 @@ function interpolate(template: string, values?: TranslationValues) {
   );
 }
 
-export function createTranslator(language: PlatformLanguage) {
-  const messages = getMessages(language);
-
+export function createTranslator(messages: Messages) {
   return (key: string, values?: TranslationValues) =>
     interpolate(resolveMessage(messages, key), values);
 }

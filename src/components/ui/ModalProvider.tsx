@@ -1,8 +1,15 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { CreateAgentModal } from '../modals/CreateAgentModal';
 import type { AgentSurface } from '@/lib/types';
+
+const CreateAgentModal = dynamic(
+  () => import('../modals/CreateAgentModal').then((mod) => mod.CreateAgentModal),
+  {
+    ssr: false,
+  },
+);
 
 interface ModalContextType {
   openCreateAgent: (surface?: AgentSurface) => void;
@@ -20,9 +27,11 @@ export const useModals = () => {
 
 export const ModalProvider = ({ children }: { children: ReactNode }) => {
   const [isCreateAgentOpen, setIsCreateAgentOpen] = useState(false);
+  const [hasOpenedCreateAgent, setHasOpenedCreateAgent] = useState(false);
   const [initialSurface, setInitialSurface] = useState<AgentSurface>('widget');
 
   const openCreateAgent = (surface: AgentSurface = 'widget') => {
+    setHasOpenedCreateAgent(true);
     setInitialSurface(surface);
     setIsCreateAgentOpen(true);
   };
@@ -34,11 +43,13 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
   return (
     <ModalContext.Provider value={{ openCreateAgent }}>
       {children}
-      <CreateAgentModal 
-        isOpen={isCreateAgentOpen} 
-        onClose={closeCreateAgent} 
-        initialSurface={initialSurface}
-      />
+      {hasOpenedCreateAgent ? (
+        <CreateAgentModal 
+          isOpen={isCreateAgentOpen} 
+          onClose={closeCreateAgent} 
+          initialSurface={initialSurface}
+        />
+      ) : null}
     </ModalContext.Provider>
   );
 };

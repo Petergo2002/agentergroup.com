@@ -5,6 +5,7 @@ import {
   enforceRateLimits,
   getPublicWidgetRateLimitRules,
 } from "@/lib/rate-limit";
+import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   validateBody,
@@ -301,14 +302,20 @@ export async function POST(
     });
 
     return NextResponse.json(
-      { ok: true, lead },
+      { ok: true, leadId: lead.id, createdAt: lead.created_at },
       { headers: buildWidgetRuntimeCorsHeaders(request) },
     );
   } catch (error) {
+    const safeError = createClientSafeError(
+      "public widget leads",
+      error,
+      "Failed to submit lead.",
+    );
     return buildErrorResponse(
       request,
       500,
-      error instanceof Error ? error.message : "Failed to submit lead.",
+      safeError.error,
+      safeError.code,
     );
   }
 }

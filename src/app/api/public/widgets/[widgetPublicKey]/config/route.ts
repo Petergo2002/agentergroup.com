@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildStoredWidgetRuntimeConfig,
@@ -92,11 +93,13 @@ export async function GET(
       },
     );
   } catch (error) {
+    const safeError = createClientSafeError(
+      "public widget config",
+      error,
+      "Failed to load widget config.",
+    );
     return NextResponse.json(
-      {
-        error:
-        error instanceof Error ? error.message : "Failed to load widget config.",
-      },
+      safeError,
       { status: 500, headers: buildWidgetRuntimeCorsHeaders(request) },
     );
   }

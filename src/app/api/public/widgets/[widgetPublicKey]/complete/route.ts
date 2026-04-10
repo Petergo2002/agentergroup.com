@@ -5,6 +5,7 @@ import {
   enforceRateLimits,
   getPublicWidgetRateLimitRules,
 } from "@/lib/rate-limit";
+import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildWidgetRuntimeCorsHeaders,
@@ -204,10 +205,16 @@ export async function POST(
       { headers: buildWidgetRuntimeCorsHeaders(request) },
     );
   } catch (error) {
+    const safeError = createClientSafeError(
+      "public widget complete",
+      error,
+      "Failed to complete chat session.",
+    );
     return buildErrorResponse(
       request,
       500,
-      error instanceof Error ? error.message : "Failed to complete chat session.",
+      safeError.error,
+      safeError.code,
     );
   }
 }

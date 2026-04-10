@@ -1,18 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { buildClientSafeError, json } from "../_shared/http.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const model = new Supabase.ai.Session("gte-small");
-
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-}
 
 Deno.serve(async (request) => {
   const authHeader = request.headers.get("Authorization");
@@ -79,7 +71,14 @@ Deno.serve(async (request) => {
   );
 
   if (result.error) {
-    return json({ error: result.error.message }, 500);
+    return json(
+      buildClientSafeError(
+        "search-knowledge",
+        result.error,
+        "Knowledge search failed.",
+      ),
+      500,
+    );
   }
 
   return json({

@@ -5,6 +5,7 @@ import {
   enforceRateLimits,
   getPublicWidgetRateLimitRules,
 } from "@/lib/rate-limit";
+import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   validateBody,
@@ -170,10 +171,16 @@ export async function POST(
       { headers: buildWidgetRuntimeCorsHeaders(request) },
     );
   } catch (error) {
+    const safeError = createClientSafeError(
+      "public widget events",
+      error,
+      "Failed to record widget event.",
+    );
     return buildErrorResponse(
       request,
       500,
-      error instanceof Error ? error.message : "Failed to record widget event.",
+      safeError.error,
+      safeError.code,
     );
   }
 }
