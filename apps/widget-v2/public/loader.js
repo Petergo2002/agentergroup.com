@@ -1175,6 +1175,16 @@
     container.appendChild(closeButton);
     document.body.appendChild(container);
 
+    // Pre-fetch bootstrap config immediately so logo loads on page load
+    if (!bootstrapPayload) {
+      fetchBootstrap()
+        .then(() => {
+          updateBubbleContent();
+          applyWidgetTheme();
+        })
+        .catch(() => {});
+    }
+
     if (
       previewEnabled &&
       window[PREVIEW_OVERRIDE_WINDOW_KEY] &&
