@@ -127,6 +127,7 @@
   let focusListener = null;
   let previewOverrideMessage = null;
   let bootstrapPayload = null;
+  let widgetReady = false;
   let previousFocusedElement = null;
   const scrollLockState = {
     active: false,
@@ -621,6 +622,14 @@
       z-index: 2;
       pointer-events: auto;
       touch-action: manipulation;
+      visibility: hidden;
+      opacity: 0;
+      transition: visibility 0s, opacity 0.3s ease;
+    }
+
+    .ag-widget-bubble.ag-is-ready {
+      visibility: visible;
+      opacity: 1;
     }
 
     .ag-widget-bubble {
@@ -1181,8 +1190,13 @@
         .then(() => {
           updateBubbleContent();
           applyWidgetTheme();
+          bubble?.classList?.add("ag-is-ready");
         })
-        .catch(() => {});
+        .catch(() => {
+          bubble?.classList?.add("ag-is-ready");
+        });
+    } else {
+      bubble?.classList?.add("ag-is-ready");
     }
 
     if (
