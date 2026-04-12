@@ -287,6 +287,7 @@ export const sv = {
   },
   analytics: {
     allAgents: "Alla agenter",
+    completed: "Avslutade",
     executionContext: "Körningskontext",
     toolCall: "Verktygsanrop: {name}",
     toolSuccess: "Verktyg lyckades: {name}",

@@ -39,6 +39,7 @@ export async function GET() {
           widgetId: null,
           agentId: null,
           search: "",
+          sessionStatus: "all",
         },
         cursor: null,
         limit: 4,

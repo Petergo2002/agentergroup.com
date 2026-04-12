@@ -285,6 +285,7 @@ export const en = {
   },
   analytics: {
     allAgents: "All Agents",
+    completed: "Completed",
     executionContext: "Execution Context",
     toolCall: "Tool Call: {name}",
     toolSuccess: "Tool Success: {name}",

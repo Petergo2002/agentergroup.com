@@ -1,12 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder, type WidgetBuilderTab } from './WidgetBuilderContext';
 
 export function WidgetBuilderHeader() {
   const { t } = useLanguage();
-  const { summary, activeTab, setActiveTab, isSaving, isUpdatingDeployment, persistWidget, updateWidgetDeployment } = useWidgetBuilder();
+  const { summary, form, setForm, activeTab, setActiveTab, isSaving, isUpdatingDeployment, persistWidget, updateWidgetDeployment } = useWidgetBuilder();
+
+  // Local state for the inline name editor
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!summary) return null;
 
@@ -19,6 +25,30 @@ export function WidgetBuilderHeader() {
     { id: 'deploy', label: t('widgetBuilder.tabs.deployment') },
   ];
 
+  /** Opens the inline name editor and pre-fills with current form name */
+  const startEditing = () => {
+    setNameDraft(form?.name ?? summary.widget.name);
+    setIsEditingName(true);
+    // Focus the input on the next paint
+    setTimeout(() => nameInputRef.current?.focus(), 30);
+  };
+
+  /** Commits the name change to the form state and exits edit mode */
+  const commitName = () => {
+    const trimmed = nameDraft.trim();
+    if (trimmed && trimmed !== (form?.name ?? summary.widget.name)) {
+      setForm((current) => (current ? { ...current, name: trimmed } : current));
+    }
+    setIsEditingName(false);
+  };
+
+  /** Cancels the rename without saving */
+  const cancelEdit = () => {
+    setIsEditingName(false);
+  };
+
+  const displayName = form?.name ?? summary.widget.name;
+
   return (
     <div className="sticky top-0 z-30 border-b border-outline-variant/10 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto max-w-[1440px] px-6 py-4 sm:px-8 lg:px-10">
@@ -30,12 +60,59 @@ export function WidgetBuilderHeader() {
                 {t('widgetBuilder.widgetRegistry')}
               </Link>
               <span>/</span>
-              <span className="truncate text-on-surface-variant/80">{summary.widget.name}</span>
+              <span className="truncate text-on-surface-variant/80">{displayName}</span>
             </div>
             <div className="mt-3 flex items-center gap-4">
-              <h1 className="text-2xl font-headline font-bold tracking-tight text-on-surface">
-                {summary.widget.name}
-              </h1>
+              {/* Inline-editable widget name */}
+              {isEditingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={nameInputRef}
+                    id="widget-name-inline-input"
+                    type="text"
+                    value={nameDraft}
+                    maxLength={80}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitName();
+                      if (e.key === 'Escape') cancelEdit();
+                    }}
+                    onBlur={commitName}
+                    className="rounded-xl border border-primary bg-background px-3 py-1.5 text-xl font-headline font-bold tracking-tight text-on-surface outline-none ring-1 ring-primary/20 focus:ring-2"
+                    style={{ minWidth: '12ch', width: `${Math.max(12, nameDraft.length + 2)}ch` }}
+                  />
+                  <button
+                    type="button"
+                    onClick={commitName}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-background transition-all hover:scale-[1.02]"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="rounded-lg border border-outline-variant/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-all hover:text-on-surface"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  title="Click to rename"
+                  className="group flex items-center gap-2 rounded-xl px-1 py-0.5 -mx-1 transition-all hover:bg-surface-container-low"
+                >
+                  <h1 className="text-2xl font-headline font-bold tracking-tight text-on-surface">
+                    {displayName}
+                  </h1>
+                  {/* Pencil icon — visible on hover */}
+                  <span className="opacity-0 text-sm text-on-surface-variant/40 transition-opacity group-hover:opacity-100" aria-hidden>
+                    ✏️
+                  </span>
+                </button>
+              )}
+
               <div className="flex items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1 ring-1 ring-inset ring-outline-variant/10">
                 <span className={`h-1.5 w-1.5 rounded-full ${isDeployed ? 'bg-primary' : 'bg-on-surface-variant/30'} shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]`} />
                 <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/80">

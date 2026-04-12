@@ -368,6 +368,7 @@ async function fetchAllCandidateSessions(
     widgetId: string | null;
     agentId: string | null;
     startIso: string;
+    sessionStatus: "all" | "active" | "completed";
   },
 ) {
   if (input.widgetIds.length === 0) {
@@ -381,7 +382,7 @@ async function fetchAllCandidateSessions(
     let query = supabase
       .from("widget_sessions")
       .select(
-        "id, widget_id, session_id, source, page_url, referrer, active_widget_agent_id, active_agent_id, first_seen_at, last_seen_at",
+        "id, widget_id, session_id, source, page_url, referrer, active_widget_agent_id, active_agent_id, first_seen_at, last_seen_at, status, ended_at",
       )
       .in("widget_id", input.widgetIds)
       .in("source", ["embedded", "hosted"])
@@ -396,6 +397,10 @@ async function fetchAllCandidateSessions(
 
     if (input.agentId) {
       query = query.eq("active_agent_id", input.agentId);
+    }
+
+    if (input.sessionStatus !== "all") {
+      query = query.eq("status", input.sessionStatus);
     }
 
     const { data, error } = await query;
@@ -591,6 +596,7 @@ export async function listDashboardConversations(
     widgetId: input.appliedFilters.widgetId,
     agentId: input.appliedFilters.agentId,
     startIso,
+    sessionStatus: input.appliedFilters.sessionStatus,
   });
 
   if (candidateSessions.length === 0) {

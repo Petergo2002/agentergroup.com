@@ -21,6 +21,10 @@ function parseLimit(value: string | null) {
   return Number.isFinite(numeric) ? numeric : 25;
 }
 
+function parseSessionStatus(value: string | null): "all" | "active" | "completed" {
+  return value === "active" || value === "completed" ? value : "all";
+}
+
 export const revalidate = 30;
 
 export async function GET(request: NextRequest) {
@@ -42,6 +46,7 @@ export async function GET(request: NextRequest) {
       widgetId: searchParams.get("widgetId")?.trim() || null,
       agentId: searchParams.get("agentId")?.trim() || null,
       search: searchParams.get("search")?.trim() || "",
+      sessionStatus: parseSessionStatus(searchParams.get("sessionStatus")),
     };
     const limit = parseLimit(searchParams.get("limit"));
     const cursor = searchParams.get("cursor");

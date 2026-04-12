@@ -45,6 +45,7 @@ function buildAnalyticsUrl(
   if (filters.widgetId) url.searchParams.set("widgetId", filters.widgetId);
   if (filters.agentId) url.searchParams.set("agentId", filters.agentId);
   if (filters.search) url.searchParams.set("search", filters.search);
+  if (filters.sessionStatus !== "all") url.searchParams.set("sessionStatus", filters.sessionStatus);
   if (cursor) url.searchParams.set("cursor", cursor);
   return url.toString();
 }
@@ -437,6 +438,7 @@ export function AnalyticsWorkspaceView() {
     widgetId: null,
     agentId: null,
     search: "",
+    sessionStatus: "active",
   });
   const deferredSearch = useDeferredValue(filters.search);
   const effectiveFilters = useMemo(
@@ -749,7 +751,22 @@ export function AnalyticsWorkspaceView() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 rounded-full bg-surface-container-high px-1 py-0.5">
+            {(["active", "completed", "all"] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilters(prev => ({ ...prev, sessionStatus: status }))}
+                className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                  filters.sessionStatus === status
+                    ? "bg-primary-container text-white"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                {status === "active" ? t("analytics.active") : status === "completed" ? t("analytics.completed") : t("common.all")}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-success">
             <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
             <span className="text-[11px] font-bold tracking-tight">{t("analytics.systemOnline")}</span>

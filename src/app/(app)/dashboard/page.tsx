@@ -34,6 +34,7 @@ async function loadDashboardSummary(): Promise<DashboardSummaryResponse> {
         widgetId: null,
         agentId: null,
         search: "",
+        sessionStatus: "all",
       },
       cursor: null,
       limit: 4,

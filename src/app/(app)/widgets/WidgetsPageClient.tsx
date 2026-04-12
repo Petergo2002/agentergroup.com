@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
@@ -20,6 +20,105 @@ interface WidgetListItem {
   updatedAt: string;
 }
 
+/**
+ * Modal that collects a widget name before creating it.
+ * Prevents the "Untitled Widget" confusion by requiring a name upfront.
+ */
+function CreateWidgetModal({
+  isOpen,
+  isLoading,
+  onConfirm,
+  onClose,
+}: {
+  isOpen: boolean;
+  isLoading: boolean;
+  onConfirm: (name: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [name, setName] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-focus the input when modal opens and reset state when it closes
+  useEffect(() => {
+    if (isOpen) {
+      setName('');
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onConfirm(trimmed);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-widget-modal-title"
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        onClick={() => { if (!isLoading) onClose(); }}
+      />
+
+      {/* Panel */}
+      <div className="relative z-10 w-full max-w-md rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        {/* Icon */}
+        <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+          <span className="text-2xl">💬</span>
+        </div>
+
+        <h2 id="create-widget-modal-title" className="font-headline text-2xl font-bold tracking-tight text-on-surface">
+          {t('widgets.createModalTitle') ?? 'Name your widget'}
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/60">
+          {t('widgets.createModalDescription') ?? 'Give your widget a clear name so you can find it easily later.'}
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+          <input
+            ref={inputRef}
+            id="widget-name-input"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('widgets.createModalPlaceholder') ?? 'e.g. Customer Support Widget'}
+            maxLength={80}
+            disabled={isLoading}
+            className="w-full rounded-[14px] border border-outline-variant/10 bg-background px-5 py-3.5 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/20 placeholder:text-on-surface-variant/30 disabled:opacity-50"
+          />
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="flex-1 rounded-full border border-outline-variant/15 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-all hover:border-on-surface/15 hover:text-on-surface disabled:opacity-40"
+            >
+              {t('common.cancel') ?? 'Cancel'}
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading || !name.trim()}
+              className="flex-1 rounded-full bg-on-surface px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-background transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+            >
+              {isLoading ? (t('widgets.creating') ?? 'Creating…') : (t('widgets.createConfirm') ?? 'Create Widget')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function WidgetsPageClient({
   initialWidgets,
 }: {
@@ -32,6 +131,7 @@ export default function WidgetsPageClient({
   const { showToast } = useToast();
   const [widgets, setWidgets] = useState<WidgetListItem[]>(initialWidgets);
   const [isCreating, setIsCreating] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [deletingWidgetId, setDeletingWidgetId] = useState<string | null>(null);
   const [togglingWidgetId, setTogglingWidgetId] = useState<string | null>(null);
   const [widgetToDelete, setWidgetToDelete] = useState<WidgetListItem | null>(null);
@@ -48,7 +148,11 @@ export default function WidgetsPageClient({
     [widgets],
   );
 
-  const createWidget = async () => {
+  /**
+   * Actually creates the widget once the user has confirmed a name.
+   * The API already supports a `name` field in the POST body.
+   */
+  const createWidget = async (name: string) => {
     setIsCreating(true);
 
     try {
@@ -58,6 +162,7 @@ export default function WidgetsPageClient({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          name,
           agentId: highlightedAgentId || undefined,
         }),
       });
@@ -74,6 +179,7 @@ export default function WidgetsPageClient({
         'error',
       );
       setIsCreating(false);
+      // Keep modal open so user can retry
     }
   };
 
@@ -191,7 +297,7 @@ export default function WidgetsPageClient({
           </p>
         </div>
         <button
-          onClick={() => void createWidget()}
+          onClick={() => setShowCreateModal(true)}
           disabled={isCreating}
           className="group relative flex items-center gap-3 overflow-hidden rounded-full bg-on-surface px-8 py-4 text-sm font-bold uppercase tracking-[0.16em] text-background shadow-xl transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60"
         >
@@ -301,6 +407,14 @@ export default function WidgetsPageClient({
           })}
         </div>
       )}
+
+      {/* Create Widget Name Modal */}
+      <CreateWidgetModal
+        isOpen={showCreateModal}
+        isLoading={isCreating}
+        onConfirm={(name) => void createWidget(name)}
+        onClose={() => { if (!isCreating) setShowCreateModal(false); }}
+      />
 
       <ConfirmDeleteModal
         isOpen={Boolean(widgetToDelete)}

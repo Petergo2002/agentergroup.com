@@ -427,6 +427,7 @@ export interface DashboardAnalyticsAppliedFilters {
   widgetId: string | null;
   agentId: string | null;
   search: string;
+  sessionStatus: "all" | "active" | "completed";
 }
 
 export interface DashboardAnalyticsConversationListItem {
