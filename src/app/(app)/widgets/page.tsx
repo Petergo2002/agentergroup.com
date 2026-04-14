@@ -21,6 +21,7 @@ async function loadWidgetsPageData() {
     return {
       id: summary.widget.id,
       name: summary.widget.name,
+      description: summary.widget.description,
       status: summary.widget.status,
       attachedAgentCount: summary.attachedAgents.length,
       needsRedeploy: summary.needsRedeploy,

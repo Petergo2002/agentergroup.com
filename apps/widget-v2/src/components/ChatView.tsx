@@ -447,27 +447,25 @@ export function ChatView({
             </button>
           </div>
 
-          {(config.widget.showBranding ?? true) && (
-            <div className="mt-3 text-center">
-              <p className="mx-auto max-w-2xl text-xs leading-5 text-widget-muted">
-                {privacyPolicyUrl ? (
-                  <>
-                    {t.privacyText}
-                    <a
-                      href={privacyPolicyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline hover:text-widget-fg transition-colors"
-                    >
-                      {t.privacyLink}
-                    </a>
-                  </>
-                ) : (
-                  <>{t.automatedWarning}</>
-                )}
-              </p>
-            </div>
-          )}
+          <div className="mt-3 text-center">
+            <p className="mx-auto max-w-2xl text-xs leading-5 text-widget-muted">
+              {privacyPolicyUrl ? (
+                <>
+                  {t.privacyText}
+                  <a
+                    href={privacyPolicyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-widget-fg transition-colors"
+                  >
+                    {t.privacyLink}
+                  </a>
+                </>
+              ) : (
+                <>{t.automatedWarning}</>
+              )}
+            </p>
+          </div>
         </div>
       </div>
     </div>

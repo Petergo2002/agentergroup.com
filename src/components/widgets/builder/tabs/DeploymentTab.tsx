@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { StatusToggle } from '@/components/ui/StatusToggle';
+import { ExternalLink, Copy } from 'lucide-react';
 import { useWidgetBuilder } from '../WidgetBuilderContext';
 import { useToast } from '@/components/ui/ToastProvider';
 
@@ -45,8 +46,9 @@ export function DeploymentTab() {
                 <span className={fieldLabelClassName}>{t('widgetBuilder.deployment.embedSnippet')}</span>
                 <button 
                   onClick={() => handleCopy(summary.embedSnippet, t('widgetBuilder.deployment.embedSnippet'))}
-                  className="rounded-full bg-on-surface px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-background transition-opacity hover:opacity-90"
+                  className="inline-flex items-center gap-2 rounded-xl bg-on-surface/5 px-4 py-2 text-xs font-semibold text-on-surface transition-all hover:bg-on-surface/10 active:scale-95 ring-1 ring-on-surface/5"
                 >
+                   <Copy className="h-3.5 w-3.5" strokeWidth={2.5} />
                    {t('common.copy')}
                 </button>
              </div>
@@ -93,18 +95,20 @@ export function DeploymentTab() {
                     target="_blank"
                     rel="noreferrer"
                     aria-disabled={!form.hostedEnabled}
-                    className={`rounded-full border px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all active:scale-95 ring-1 ${
                       form.hostedEnabled
-                        ? 'border-outline-variant/10 bg-background/50 hover:bg-on-surface hover:text-background'
-                        : 'pointer-events-none border-outline-variant/10 bg-background/30 text-on-surface-variant/35'
+                        ? 'bg-on-surface/5 text-on-surface hover:bg-on-surface/10 ring-on-surface/10'
+                        : 'pointer-events-none bg-on-surface/2 text-on-surface-variant/30 ring-on-surface/5'
                     }`}
                   >
+                    <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
                     {t('common.open')}
                   </a>
                   <button 
                      onClick={() => handleCopy(summary.hostedUrl, t('widgetBuilder.deployment.hostedEndpoint'))}
-                     className="rounded-full bg-background/50 border border-outline-variant/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors hover:bg-on-surface hover:text-background"
+                     className="inline-flex items-center gap-2 rounded-xl bg-on-surface/5 px-4 py-2 text-xs font-semibold text-on-surface transition-all hover:bg-on-surface/10 active:scale-95 ring-1 ring-on-surface/10"
                   >
+                     <Copy className="h-3.5 w-3.5" strokeWidth={2.5} />
                      {t('widgetBuilder.deployment.copyLink')}
                   </button>
                 </div>
@@ -166,7 +170,7 @@ export function DeploymentTab() {
                    addOrigin(localOriginInput);
                    setLocalOriginInput('');
                 }}
-                className="shrink-0 rounded-[14px] bg-on-surface px-8 h-[52px] text-xs font-bold uppercase tracking-[0.2em] text-background hover:opacity-90 transition-all active:scale-95 shadow-lg shadow-on-surface/5"
+                className="shrink-0 rounded-[14px] bg-on-surface px-8 h-[52px] text-sm font-semibold text-background hover:bg-on-surface/90 transition-all active:scale-95 shadow-lg shadow-on-surface/5"
               >
                 {t('widgetBuilder.deployment.addDomain')}
               </button>

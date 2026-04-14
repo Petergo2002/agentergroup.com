@@ -9,6 +9,8 @@ interface EntityActionsMenuProps {
   onArchiveToggle?: () => void;
   archiveLabel?: string;
   archiveDisabled?: boolean;
+  onEdit?: () => void;
+  editLabel?: string;
   onDelete?: () => void;
   deleteLabel?: string;
   deleteDisabled?: boolean;
@@ -19,6 +21,8 @@ export function EntityActionsMenu({
   onArchiveToggle,
   archiveLabel,
   archiveDisabled = false,
+  onEdit,
+  editLabel,
   onDelete,
   deleteLabel,
   deleteDisabled = false,
@@ -130,6 +134,19 @@ export function EntityActionsMenu({
             >
               <AppIcon name="archive" className="h-[18px] w-[18px]" />
               {archiveLabel ?? t('common.archive')}
+            </button>
+          ) : null}
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onEdit();
+              }}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
+            >
+              <AppIcon name="edit" className="h-[18px] w-[18px]" />
+              {editLabel ?? t('common.edit')}
             </button>
           ) : null}
           {onDelete ? (

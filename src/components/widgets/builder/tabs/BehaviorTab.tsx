@@ -24,8 +24,8 @@ export function BehaviorTab() {
           </p>
         </div>
 
-        <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
-          <div className="grid gap-8 md:grid-cols-2">
+        <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-premium">
+          <div className="grid gap-8">
             <label className="block space-y-3">
               <span className={fieldLabelClassName}>{t('widgetBuilder.behavior.primaryLanguage')}</span>
               <select
@@ -37,19 +37,6 @@ export function BehaviorTab() {
                 <option value="sv">Svenska</option>
               </select>
             </label>
-
-            <div className="flex items-center justify-between p-6 bg-surface-container-low rounded-[1.8rem] border border-outline-variant/10">
-              <div className="space-y-1">
-                <span className={fieldLabelClassName}>{t('widgetBuilder.behavior.showBranding')}</span>
-                <p className="text-[10px] text-on-surface-variant/40 uppercase tracking-[0.05em] font-medium">{t('widgetBuilder.behavior.brandingDescription')}</p>
-              </div>
-              <button
-                onClick={() => setForm(c => c ? { ...c, showBranding: !form.showBranding } : c)}
-                className={`relative h-6 w-11 rounded-full p-1 transition-colors ${form.showBranding ? 'bg-primary' : 'bg-on-surface-variant/20'}`}
-              >
-                <div className={`h-4 w-4 rounded-full bg-background transition-transform ${form.showBranding ? 'translate-x-5' : 'translate-x-0'}`} />
-              </button>
-            </div>
           </div>
         </div>
       </section>
@@ -63,7 +50,7 @@ export function BehaviorTab() {
           </p>
         </div>
 
-        <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
+        <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-premium">
           <div className="grid gap-8">
             <label className="block space-y-3">
               <span className={fieldLabelClassName}>{t('widgetBuilder.behavior.homeTitle')}</span>

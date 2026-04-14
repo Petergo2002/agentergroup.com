@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope, Inter } from "next/font/google";
 import { LanguageProvider } from "@/components/i18n/LanguageProvider";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
 import "./globals.css";
@@ -34,15 +35,22 @@ export default async function RootLayout({
   const messages = await getMessages(language);
 
   return (
-    <html lang={language}>
+    <html lang={language} suppressHydrationWarning>
       <head />
       <body
         suppressHydrationWarning
         className={`${manrope.variable} ${inter.variable} antialiased`}
       >
-        <LanguageProvider initialLanguage={language} initialMessages={messages}>
-          {children}
-        </LanguageProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <LanguageProvider initialLanguage={language} initialMessages={messages}>
+            {children}
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

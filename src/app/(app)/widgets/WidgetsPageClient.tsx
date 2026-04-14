@@ -9,6 +9,7 @@ import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { EntityActionsMenu } from '@/components/ui/EntityActionsMenu';
 import { StatusToggle } from '@/components/ui/StatusToggle';
 import { useToast } from '@/components/ui/ToastProvider';
+import { MessageSquare, Loader2 } from 'lucide-react';
 import { formatRelativeDate } from '@/lib/utils';
 
 interface WidgetListItem {
@@ -17,6 +18,7 @@ interface WidgetListItem {
   status: 'draft' | 'deployed';
   attachedAgentCount: number;
   needsRedeploy: boolean;
+  description: string;
   updatedAt: string;
 }
 
@@ -32,17 +34,17 @@ function CreateWidgetModal({
 }: {
   isOpen: boolean;
   isLoading: boolean;
-  onConfirm: (name: string) => void;
+  onConfirm: (name: string, description: string) => void;
   onClose: () => void;
 }) {
   const { t } = useLanguage();
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Auto-focus the input when modal opens and reset state when it closes
+  // Auto-focus the input when modal opens
   useEffect(() => {
     if (isOpen) {
-      setName('');
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
@@ -51,9 +53,9 @@ function CreateWidgetModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    onConfirm(trimmed);
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    onConfirm(trimmedName, description.trim());
   };
 
   return (
@@ -70,47 +72,213 @@ function CreateWidgetModal({
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-md rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative z-10 w-full max-w-md rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         {/* Icon */}
-        <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-          <span className="text-2xl">💬</span>
+        <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-on-surface/5">
+          <MessageSquare className="h-7 w-7 text-on-surface" strokeWidth={1.5} />
         </div>
 
         <h2 id="create-widget-modal-title" className="font-headline text-2xl font-bold tracking-tight text-on-surface">
-          {t('widgets.createModalTitle') ?? 'Name your widget'}
+          {t('widgets.createModalTitle')}
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/60">
-          {t('widgets.createModalDescription') ?? 'Give your widget a clear name so you can find it easily later.'}
+          {t('widgets.createModalDescription')}
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <input
-            ref={inputRef}
-            id="widget-name-input"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t('widgets.createModalPlaceholder') ?? 'e.g. Customer Support Widget'}
-            maxLength={80}
-            disabled={isLoading}
-            className="w-full rounded-[14px] border border-outline-variant/10 bg-background px-5 py-3.5 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/20 placeholder:text-on-surface-variant/30 disabled:opacity-50"
-          />
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="widget-name-input" className="ml-1 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">
+                {t('common.name')}
+              </label>
+              <input
+                ref={inputRef}
+                id="widget-name-input"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('widgets.createModalPlaceholder')}
+                maxLength={80}
+                disabled={isLoading}
+                className="w-full rounded-2xl border border-outline-variant/10 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus:border-on-surface/20 focus:ring-1 focus:ring-on-surface/5 placeholder:text-on-surface-variant/30 disabled:opacity-50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="widget-description-input" className="ml-1 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">
+                {t('widgets.createModalDescriptionLabel')}
+              </label>
+              <textarea
+                id="widget-description-input"
+                value={description}
+                onChange={(e) => setDescription(e.target.value.slice(0, 200))}
+                placeholder={t('widgets.createModalDescriptionPlaceholder')}
+                rows={3}
+                disabled={isLoading}
+                className="w-full resize-none rounded-2xl border border-outline-variant/10 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus:border-on-surface/20 focus:ring-1 focus:ring-on-surface/5 placeholder:text-on-surface-variant/30 disabled:opacity-50"
+              />
+              <div className="flex justify-end pr-2">
+                <span className={`text-[9px] font-bold uppercase tracking-[0.1em] ${description.length >= 180 ? 'text-primary' : 'text-on-surface-variant/30'}`}>
+                  {description.length}/200
+                </span>
+              </div>
+            </div>
+          </div>
 
           <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="flex-1 rounded-full border border-outline-variant/15 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-all hover:border-on-surface/15 hover:text-on-surface disabled:opacity-40"
+              className="flex-1 rounded-xl bg-on-surface/5 px-6 py-3.5 text-sm font-semibold text-on-surface transition-all hover:bg-on-surface/10 disabled:opacity-40"
             >
-              {t('common.cancel') ?? 'Cancel'}
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={isLoading || !name.trim()}
-              className="flex-1 rounded-full bg-on-surface px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-background transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+              className="flex-1 rounded-xl bg-on-surface px-6 py-3.5 text-sm font-semibold text-background transition-all hover:bg-on-surface/90 active:scale-95 disabled:opacity-50 shadow-lg shadow-on-surface/5"
             >
-              {isLoading ? (t('widgets.creating') ?? 'Creating…') : (t('widgets.createConfirm') ?? 'Create Widget')}
+              {isLoading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{t('widgets.creating')}</span>
+                </div>
+              ) : t('widgets.createConfirm')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Modal that allows editing a widget's name and description.
+ */
+function EditWidgetModal({
+  isOpen,
+  isLoading,
+  initialName,
+  initialDescription,
+  onConfirm,
+  onClose,
+}: {
+  isOpen: boolean;
+  isLoading: boolean;
+  initialName: string;
+  initialDescription: string;
+  onConfirm: (name: string, description: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [name, setName] = useState(initialName || '');
+  const [description, setDescription] = useState(initialDescription || '');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-focus the input when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    onConfirm(trimmedName, description.trim());
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-widget-modal-title"
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        onClick={() => { if (!isLoading) onClose(); }}
+      />
+
+      {/* Panel */}
+      <div className="relative z-10 w-full max-w-md rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        {/* Icon */}
+        <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-on-surface/5">
+          <MessageSquare className="h-7 w-7 text-on-surface" strokeWidth={1.5} />
+        </div>
+
+        <h2 id="edit-widget-modal-title" className="font-headline text-2xl font-bold tracking-tight text-on-surface">
+          {t('widgets.editModalTitle')}
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/60">
+          {t('widgets.editModalDescription')}
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="edit-widget-name-input" className="ml-1 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">
+                {t('common.name')}
+              </label>
+              <input
+                ref={inputRef}
+                id="edit-widget-name-input"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('widgets.createModalPlaceholder')}
+                maxLength={80}
+                disabled={isLoading}
+                className="w-full rounded-2xl border border-outline-variant/10 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus:border-on-surface/20 focus:ring-1 focus:ring-on-surface/5 placeholder:text-on-surface-variant/30 disabled:opacity-50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="edit-widget-description-input" className="ml-1 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">
+                {t('widgets.createModalDescriptionLabel')}
+              </label>
+              <textarea
+                id="edit-widget-description-input"
+                value={description}
+                onChange={(e) => setDescription(e.target.value.slice(0, 200))}
+                placeholder={t('widgets.createModalDescriptionPlaceholder')}
+                rows={3}
+                disabled={isLoading}
+                className="w-full resize-none rounded-2xl border border-outline-variant/10 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus:border-on-surface/20 focus:ring-1 focus:ring-on-surface/5 placeholder:text-on-surface-variant/30 disabled:opacity-50"
+              />
+              <div className="flex justify-end pr-2">
+                <span className={`text-[9px] font-bold uppercase tracking-[0.1em] ${description.length >= 180 ? 'text-primary' : 'text-on-surface-variant/30'}`}>
+                  {description.length}/200
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="flex-1 rounded-xl bg-on-surface/5 px-6 py-3.5 text-sm font-semibold text-on-surface transition-all hover:bg-on-surface/10 disabled:opacity-40"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading || !name.trim()}
+              className="flex-1 rounded-xl bg-on-surface px-6 py-3.5 text-sm font-semibold text-background transition-all hover:bg-on-surface/90 active:scale-95 disabled:opacity-50 shadow-lg shadow-on-surface/5"
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{t('common.saving')}</span>
+                </div>
+              ) : t('common.save')}
             </button>
           </div>
         </form>
@@ -131,7 +299,9 @@ export default function WidgetsPageClient({
   const { showToast } = useToast();
   const [widgets, setWidgets] = useState<WidgetListItem[]>(initialWidgets);
   const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [widgetToEdit, setWidgetToEdit] = useState<WidgetListItem | null>(null);
   const [deletingWidgetId, setDeletingWidgetId] = useState<string | null>(null);
   const [togglingWidgetId, setTogglingWidgetId] = useState<string | null>(null);
   const [widgetToDelete, setWidgetToDelete] = useState<WidgetListItem | null>(null);
@@ -152,7 +322,7 @@ export default function WidgetsPageClient({
    * Actually creates the widget once the user has confirmed a name.
    * The API already supports a `name` field in the POST body.
    */
-  const createWidget = async (name: string) => {
+  const createWidget = async (name: string, description: string) => {
     setIsCreating(true);
 
     try {
@@ -163,6 +333,7 @@ export default function WidgetsPageClient({
         },
         body: JSON.stringify({
           name,
+          description,
           agentId: highlightedAgentId || undefined,
         }),
       });
@@ -180,6 +351,44 @@ export default function WidgetsPageClient({
       );
       setIsCreating(false);
       // Keep modal open so user can retry
+    }
+  };
+
+  const handleUpdateWidget = async (name: string, description: string) => {
+    if (!widgetToEdit) return;
+    setIsUpdating(true);
+
+    try {
+      const response = await fetch(`/api/widgets/${widgetToEdit.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          description,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || t('widgets.updateError') || 'Failed to update widget');
+      }
+
+      setWidgets((current) =>
+        current.map((w) =>
+          w.id === widgetToEdit.id ? { ...w, name, description, updatedAt: new Date().toISOString() } : w
+        )
+      );
+      setWidgetToEdit(null);
+      showToast(t('common.saveChanges'), 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : t('widgets.updateError') || 'Failed to update widget',
+        'error',
+      );
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -355,6 +564,11 @@ export default function WidgetsPageClient({
                          value: formatRelativeDate(widget.updatedAt, language),
                        })}
                      </p>
+                      {widget.description && (
+                        <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-on-surface-variant/60">
+                          {widget.description}
+                        </p>
+                      )}
                    </div>
                    <div className="flex items-center gap-1.5 rounded-full bg-surface-container-low px-2.5 py-1 ring-1 ring-inset ring-outline-variant/5">
                       <span className={`h-1.5 w-1.5 rounded-full ${isLive ? 'bg-primary animate-pulse' : 'bg-on-surface-variant/20'}`} />
@@ -393,6 +607,7 @@ export default function WidgetsPageClient({
                          {t('common.open')}
                        </Link>
                        <EntityActionsMenu
+                         onEdit={() => setWidgetToEdit(widget)}
                          onDelete={() => void handlePermanentDelete(widget)}
                          deleteDisabled={
                            deletingWidgetId === widget.id ||
@@ -409,12 +624,25 @@ export default function WidgetsPageClient({
       )}
 
       {/* Create Widget Name Modal */}
-      <CreateWidgetModal
-        isOpen={showCreateModal}
-        isLoading={isCreating}
-        onConfirm={(name) => void createWidget(name)}
-        onClose={() => { if (!isCreating) setShowCreateModal(false); }}
-      />
+      {showCreateModal && (
+        <CreateWidgetModal
+          isOpen={showCreateModal}
+          isLoading={isCreating}
+          onConfirm={(name, description) => void createWidget(name, description)}
+          onClose={() => setShowCreateModal(false)}
+        />
+      )}
+
+      {widgetToEdit && (
+        <EditWidgetModal
+          isOpen={Boolean(widgetToEdit)}
+          isLoading={isUpdating}
+          initialName={widgetToEdit.name}
+          initialDescription={widgetToEdit.description}
+          onConfirm={(name, description) => void handleUpdateWidget(name, description)}
+          onClose={() => setWidgetToEdit(null)}
+        />
+      )}
 
       <ConfirmDeleteModal
         isOpen={Boolean(widgetToDelete)}

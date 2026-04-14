@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
@@ -20,6 +20,23 @@ interface AppShellProps {
 
 export function AppShell({ children, context, user }: AppShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("agenter_sidebar_collapsed") === "true";
+    if (saved) {
+      setTimeout(() => setIsSidebarCollapsed(true), 0);
+    }
+    setTimeout(() => setMounted(true), 0);
+  }, []);
+
+  const toggleSidebarCollapse = () => {
+    const newState = !isSidebarCollapsed;
+    setIsSidebarCollapsed(newState);
+    localStorage.setItem("agenter_sidebar_collapsed", String(newState));
+  };
+
   const pathname = usePathname();
   const isFocusedAgentRoute =
     /^\/agents\/[^/]+\/(builder|preview)$/.test(pathname) ||
@@ -35,8 +52,13 @@ export function AppShell({ children, context, user }: AppShellProps) {
             <div className="min-h-screen bg-background">{children}</div>
           ) : (
             <div className="app-shell-gradient flex min-h-screen">
-              <div className="hidden lg:flex lg:shrink-0">
-                <Sidebar userEmail={user.email} />
+              <div className="hidden lg:flex lg:shrink-0 transition-all duration-300 relative z-50">
+                <Sidebar 
+                  userEmail={user.email} 
+                  isCollapsed={isSidebarCollapsed}
+                  onToggleCollapse={toggleSidebarCollapse}
+                  mounted={mounted}
+                />
               </div>
 
               <div

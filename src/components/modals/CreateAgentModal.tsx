@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Bot, Layout, Check } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
@@ -101,51 +102,95 @@ export const CreateAgentModal = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('agents.createModal.title')}>
-      <div className="space-y-6">
-        <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary">
-              {t('agents.createModal.surface')}
-            </label>
-            <div className={`grid gap-3 ${internalAssistantsEnabled ? 'sm:grid-cols-2' : ''}`}>
-              {internalAssistantsEnabled ? (
-                <button
-                  type="button"
-                  onClick={() => setSurface('assistant')}
-                  className={`rounded-2xl border px-4 py-4 text-left transition-colors ${
-                    surface === 'assistant'
-                      ? 'border-primary bg-primary/5 text-on-surface'
-                      : 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-                  }`}
-                >
-                  <p className="text-sm font-bold text-on-surface">{t('agents.createModal.assistantTitle')}</p>
-                  <p className="mt-1 text-xs leading-5">
-                    {t('agents.createModal.assistantDescription')}
-                  </p>
-                </button>
-              ) : null}
+      <div className="space-y-10 py-4">
+        {/* Surface Selection */}
+        <div className="space-y-5">
+          <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.25em] block">
+            {t('agents.createModal.surface')}
+          </label>
+          
+          <div className="flex flex-col gap-3">
+            {internalAssistantsEnabled && (
               <button
                 type="button"
-                onClick={() => setSurface('widget')}
-                className={`rounded-2xl border px-4 py-4 text-left transition-colors ${
-                  surface === 'widget'
-                    ? 'border-primary bg-primary/5 text-on-surface'
-                    : 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
+                onClick={() => setSurface('assistant')}
+                className={`group relative flex items-center gap-5 p-5 rounded-[2rem] border transition-all duration-300 text-left ${
+                  surface === 'assistant'
+                    ? 'border-primary/30 bg-surface shadow-premium scale-[1.01]'
+                    : 'border-outline-variant/10 bg-surface-container-low/40 hover:bg-surface-container-low/80'
                 }`}
               >
-                <p className="text-sm font-bold text-on-surface">{t('agents.createModal.widgetTitle')}</p>
-                <p className="mt-1 text-xs leading-5">
+                <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 ${
+                  surface === 'assistant' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-surface-container-high text-on-surface-variant/40'
+                }`}>
+                  <Bot className="h-7 w-7" />
+                  {surface === 'assistant' && (
+                    <div className="absolute inset-0 bg-primary blur-xl opacity-20" />
+                  )}
+                </div>
+                
+                <div className="min-w-0 flex-1">
+                  <p className="text-[16px] font-bold text-on-surface tracking-tight">
+                    {t('agents.createModal.assistantTitle')}
+                  </p>
+                  <p className="mt-0.5 text-xs text-on-surface-variant leading-relaxed truncate">
+                    {t('agents.createModal.assistantDescription')}
+                  </p>
+                </div>
+
+                <div className={`mr-2 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-500 ${
+                  surface === 'assistant' ? 'border-primary bg-primary scale-110' : 'border-outline-variant/20 scale-100'
+                }`}>
+                  {surface === 'assistant' && <Check className="h-3.5 w-3.5 text-white" />}
+                </div>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSurface('widget')}
+              className={`group relative flex items-center gap-5 p-5 rounded-[2rem] border transition-all duration-300 text-left ${
+                surface === 'widget'
+                  ? 'border-primary/30 bg-surface shadow-premium scale-[1.01]'
+                  : 'border-outline-variant/10 bg-surface-container-low/40 hover:bg-surface-container-low/80'
+              }`}
+            >
+              <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 ${
+                surface === 'widget' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-surface-container-high text-on-surface-variant/40'
+              }`}>
+                <Layout className="h-7 w-7" />
+                {surface === 'widget' && (
+                  <div className="absolute inset-0 bg-primary blur-xl opacity-20" />
+                )}
+              </div>
+              
+              <div className="min-w-0 flex-1">
+                <p className="text-[16px] font-bold text-on-surface tracking-tight">
+                  {t('agents.createModal.widgetTitle')}
+                </p>
+                <p className="mt-0.5 text-xs text-on-surface-variant leading-relaxed truncate">
                   {t('agents.createModal.widgetDescription')}
                 </p>
-              </button>
-            </div>
+              </div>
+
+              <div className={`mr-2 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-500 ${
+                surface === 'widget' ? 'border-primary bg-primary scale-110' : 'border-outline-variant/20 scale-100'
+              }`}>
+                {surface === 'widget' && <Check className="h-3.5 w-3.5 text-white" />}
+              </div>
+            </button>
           </div>
-          <div>
-            <label className="text-xs font-bold text-secondary uppercase tracking-widest block mb-2">
-              {surface === 'assistant'
-                ? t('agents.createModal.assistantName')
-                : t('agents.createModal.agentName')}
-            </label>
+        </div>
+
+        {/* Input Section */}
+        <div className="space-y-5">
+          <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.25em] block">
+            {surface === 'assistant'
+              ? t('agents.createModal.assistantName')
+              : t('agents.createModal.agentName')}
+          </label>
+          
+          <div className="group relative">
             <input 
               type="text" 
               placeholder={
@@ -155,28 +200,36 @@ export const CreateAgentModal = ({
               }
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+              className="w-full bg-surface-container-low/40 border border-outline-variant/15 rounded-[1.5rem] px-7 py-5 text-[15px] text-on-surface transition-all outline-none focus:bg-surface focus:ring-4 focus:ring-primary/5 focus:border-primary/30 shadow-sm placeholder:text-on-surface-variant/60"
             />
           </div>
         </div>
 
-        <div className="pt-2 flex gap-3">
+        {/* Actions */}
+        <div className="flex items-center gap-6 pt-6">
           <button 
             onClick={onClose}
-            className="flex-1 px-4 py-3 border border-outline-variant/30 rounded-xl text-sm font-bold text-on-surface hover:bg-surface-container-high transition-colors"
+            className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant hover:text-on-surface transition-all"
           >
             {t('common.cancel')}
           </button>
           <button 
             onClick={handleCreate}
             disabled={isSaving}
-            className="signature-gradient flex-1 rounded-xl px-4 py-3 text-sm font-bold shadow-lg shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-95"
+            className="signature-gradient flex-1 rounded-full px-10 py-5 text-xs font-bold uppercase tracking-[0.25em] shadow-premium transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/10 active:scale-[0.98] disabled:opacity-40"
           >
-            {isSaving
-              ? t('agents.createModal.creating')
-              : surface === 'assistant'
-                ? t('agents.createModal.createAssistant')
-                : t('agents.createAgent')}
+            <span className="flex items-center justify-center gap-2">
+              {isSaving ? (
+                <>
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-on-primary border-t-transparent" />
+                  {t('agents.createModal.creating')}
+                </>
+              ) : (
+                surface === 'assistant'
+                  ? t('agents.createModal.createAssistant')
+                  : t('agents.createAgent')
+              )}
+            </span>
           </button>
         </div>
       </div>

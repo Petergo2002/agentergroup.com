@@ -3,39 +3,130 @@
 @plugin "@tailwindcss/forms";
 @plugin "@tailwindcss/container-queries";
 
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Light Mode Palette (Default) */
+  --primary: #ff5c00;
+  --primary-container: #ff7a29;
+  --on-primary: #ffffff;
+  --on-primary-container: #fff4eb;
+  
+  --secondary: #ff5c00;
+  --secondary-container: #fef2e8;
+  --on-secondary: #ff5c00;
+  
+  --surface: #ffffff;
+  --surface-bright: #fafbfc;
+  --surface-dim: #f1f5f9;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f8fafc;
+  --surface-container: #f1f5f9;
+  --surface-container-high: #e2e8f0;
+  --surface-container-highest: #cbd5e1;
+  
+  --on-surface: #0f172a;
+  --on-surface-variant: #64748b;
+  --on-background: #0f172a;
+  --background: #fdfdfd;
+  
+  --outline: #e2e8f0;
+  --outline-variant: rgba(0, 0, 0, 0.04);
+  
+  --error: #dc2626;
+  --error-container: #fee2e2;
+  --on-error: #ffffff;
+  
+  --success: #16a34a;
+  --success-container: #f0fdf4;
+
+  --primary-rgb: 255, 92, 0;
+  --shadow-premium: 0 12px 40px -12px rgba(0, 0, 0, 0.08);
+  --shadow-tactile: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.05);
+  --precision-border: rgba(15, 23, 42, 0.08);
+  --glass-background: rgba(255, 255, 255, 0.7);
+  --app-shell-bg: radial-gradient(circle at top right, rgba(255, 92, 0, 0.05), transparent 35%),
+                  linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  --skeleton-bg: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+}
+
+.dark {
+  /* Dark Mode Palette (Premium) */
+  --primary: #ff5c00;
+  --primary-container: #ff7a29;
+  --on-primary: #ffffff;
+  --on-primary-container: #fff4eb;
+  
+  --secondary: #ff5c00;
+  --secondary-container: #34170a;
+  --on-secondary: #fff4eb;
+  
+  --surface: #090909;
+  --surface-bright: #161616;
+  --surface-dim: #050505;
+  --surface-container-lowest: #0e0e0e;
+  --surface-container-low: #141414;
+  --surface-container: #1b1b1b;
+  --surface-container-high: #232323;
+  --surface-container-highest: #2d2d2d;
+  
+  --on-surface: #f5f1eb;
+  --on-surface-variant: #9d948a;
+  --on-background: #f5f1eb;
+  --background: #050505;
+  
+  --outline: #3a312b;
+  --outline-variant: rgba(255, 255, 255, 0.08);
+  
+  --error: #df6d60;
+  --error-container: rgba(223, 109, 96, 0.14);
+  --on-error: #ffffff;
+  
+  --success: #4fa17c;
+  --success-container: rgba(79, 161, 124, 0.14);
+
+  --primary-rgb: 255, 92, 0;
+  --shadow-premium: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
+  --glass-background: rgba(10, 10, 10, 0.82);
+  --app-shell-bg: radial-gradient(circle at top right, rgba(255, 92, 0, 0.1), transparent 28%),
+                  linear-gradient(180deg, #080808 0%, #050505 100%);
+  --skeleton-bg: linear-gradient(90deg, #141414 25%, #1b1b1b 50%, #141414 75%);
+}
+
 @theme inline {
-  --color-primary: #ff5c00;
-  --color-primary-container: #ff7a29;
-  --color-on-primary: #ffffff;
-  --color-on-primary-container: #fff4eb;
+  --color-primary: var(--primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary: var(--on-primary);
+  --color-on-primary-container: var(--on-primary-container);
   
-  --color-secondary: #ff5c00;
-  --color-secondary-container: #34170a;
-  --color-on-secondary: #fff4eb;
+  --color-secondary: var(--secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary: var(--on-secondary);
   
-  --color-surface: #090909;
-  --color-surface-bright: #161616;
-  --color-surface-dim: #050505;
-  --color-surface-container-lowest: #0e0e0e;
-  --color-surface-container-low: #141414;
-  --color-surface-container: #1b1b1b;
-  --color-surface-container-high: #232323;
-  --color-surface-container-highest: #2d2d2d;
+  --color-surface: var(--surface);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
   
-  --color-on-surface: #f5f1eb;
-  --color-on-surface-variant: #9d948a;
-  --color-on-background: #f5f1eb;
-  --color-background: #050505;
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-on-background: var(--on-background);
+  --color-background: var(--background);
   
-  --color-outline: #3a312b;
-  --color-outline-variant: rgba(255, 255, 255, 0.08);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
   
-  --color-error: #df6d60;
-  --color-error-container: rgba(223, 109, 96, 0.14);
-  --color-on-error: #ffffff;
+  --color-error: var(--error);
+  --color-error-container: var(--error-container);
+  --color-on-error: var(--on-error);
   
-  --color-success: #4fa17c;
-  --color-success-container: rgba(79, 161, 124, 0.14);
+  --color-success: var(--success);
+  --color-success-container: var(--success-container);
   
   --font-headline: var(--font-manrope);
   --font-body: var(--font-inter);
@@ -46,26 +137,26 @@
   --radius-lg: 0.5rem;
   --radius-xl: 1.5rem;
   --radius-full: 9999px;
+
+  --shadow-premium: var(--shadow-premium);
 }
 
 @layer utilities {
   .signature-gradient {
     background: linear-gradient(180deg, #f8f3ed 0%, #ffffff 100%);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    color: var(--color-background);
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    color: #080808;
   }
   .glass-panel {
-    background: rgba(10, 10, 10, 0.82);
+    background: var(--glass-background);
     backdrop-filter: blur(18px);
     border: 1px solid var(--color-outline-variant);
   }
   .app-shell-gradient {
-    background:
-      radial-gradient(circle at top right, rgba(255, 92, 0, 0.1), transparent 28%),
-      linear-gradient(180deg, #080808 0%, #050505 100%);
+    background: var(--app-shell-bg);
   }
   .skeleton {
-    background: linear-gradient(90deg, var(--color-surface-container-low) 25%, var(--color-surface-container) 50%, var(--color-surface-container-low) 75%);
+    background: var(--skeleton-bg);
     background-size: 200% 100%;
     animation: loading 1.5s infinite;
   }

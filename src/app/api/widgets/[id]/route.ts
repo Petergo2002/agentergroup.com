@@ -127,6 +127,10 @@ export async function PATCH(
   const body = await request.json().catch(() => ({}));
   const payload = {
     name: parseString(body.name) ?? loaded.widget.name,
+    description:
+      typeof body.description === "string"
+        ? body.description.trim().slice(0, 200)
+        : loaded.widget.description,
     brand_name: parseString(body.brandName) ?? loaded.widget.brand_name,
     logo_url: parseString(body.logoUrl),
     primary_color: parseString(body.primaryColor) ?? loaded.widget.primary_color,

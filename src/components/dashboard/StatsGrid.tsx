@@ -53,7 +53,7 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
       {statItems.map((item, idx) => (
         <div 
           key={item.label} 
-          className="group relative flex flex-col justify-between rounded-[2rem] bg-surface-container-low/55 p-6 ring-1 ring-outline-variant/10 shadow-[0_12px_40px_rgba(0,0,0,0.16)] transition-all hover:bg-surface-container hover:shadow-xl hover:shadow-black/20 hover:ring-primary/20 animate-in fade-in slide-in-from-bottom-4 duration-500"
+              className="group relative flex flex-col justify-between rounded-[2rem] bg-surface-container-low/60 p-6 ring-1 ring-outline-variant/10 shadow-sm transition-all hover:bg-surface-container hover:shadow-premium hover:ring-primary/20 animate-in fade-in slide-in-from-bottom-4 duration-500"
           style={{ animationDelay: `${idx * 100}ms` }}
         >
           <div className="flex items-start justify-between mb-6">

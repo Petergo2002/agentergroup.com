@@ -36,6 +36,7 @@ export async function GET() {
       return {
         id: summary.widget.id,
         name: summary.widget.name,
+        description: summary.widget.description,
         status: summary.widget.status,
         widgetPublicKey: summary.widget.widget_public_key,
         attachedAgentCount: summary.attachedAgents.length,
@@ -70,6 +71,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const requestedName =
     typeof body.name === "string" && body.name.trim() ? body.name.trim() : "Untitled Widget";
+  const requestedDescription =
+    typeof body.description === "string" ? body.description.trim().slice(0, 200) : "";
   const requestedAgentId =
     typeof body.agentId === "string" && body.agentId.trim() ? body.agentId.trim() : null;
   let seededAgent: AgentRecord | null = null;
@@ -110,6 +113,7 @@ export async function POST(request: NextRequest) {
     .insert({
       workspace_id: context.workspace.id,
       ...widgetDefaults,
+      description: requestedDescription,
     })
     .select()
     .single();

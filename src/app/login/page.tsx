@@ -64,8 +64,9 @@ COMPOSIO_API_KEY=`}
           <div
             className="absolute inset-0"
             style={{
-              backgroundImage: "radial-gradient(circle at 2px 2px, rgba(255,255,255,0.04) 1px, transparent 0)",
+              backgroundImage: "radial-gradient(circle at 2px 2px, var(--color-on-surface-variant) 1px, transparent 0)",
               backgroundSize: "32px 32px",
+              opacity: 0.05
             }}
           />
         </div>
@@ -176,7 +177,7 @@ COMPOSIO_API_KEY=`}
               </button>
               <button
                 formAction={signup}
-                className="signature-gradient rounded-2xl px-5 py-4 text-sm font-bold shadow-xl shadow-black/20 transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-[0.98]"
+                className="signature-gradient rounded-2xl px-5 py-4 text-sm font-bold shadow-premium transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-[0.98]"
               >
                 {messages.login.createAccount}
               </button>

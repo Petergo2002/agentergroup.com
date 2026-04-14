@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder, type WidgetBuilderTab } from './WidgetBuilderContext';
 

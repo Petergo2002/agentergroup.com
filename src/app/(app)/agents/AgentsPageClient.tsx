@@ -178,14 +178,14 @@ export default function AgentsPageClient({
             <Plus className="h-5 w-5" />
             <span className="uppercase tracking-[0.15em] pr-4">{t('agents.createAgent')}</span>
           </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-background/8 backdrop-blur-sm transition-colors group-hover:bg-primary/12">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-on-surface/5 backdrop-blur-sm transition-colors group-hover:bg-primary/12">
             <AppIcon name="arrow_forward" className="h-4 w-4" />
           </div>
         </button>
       </header>
 
       {/* ─── Filters & Search ──────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-1.5 rounded-[2.25rem] bg-surface-container-low/40 ring-1 ring-outline-variant/10 backdrop-blur-sm">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-2 rounded-[2.25rem] bg-surface-container-low ring-1 ring-outline-variant/15 backdrop-blur-sm shadow-sm">
         <div className="flex items-center gap-1.5 p-1 w-full md:w-auto">
           {(["all", "active", "draft", "archived"] as const).map((tab) => (
             <button
@@ -193,8 +193,8 @@ export default function AgentsPageClient({
               onClick={() => setFilter(tab)}
               className={`flex-1 md:flex-none rounded-full px-6 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
                 filter === tab
-                  ? "bg-on-surface text-background shadow-lg shadow-on-surface/10 scale-[1.05]"
-                  : "text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container"
+                  ? "bg-on-surface text-background shadow-lg shadow-on-surface/20 scale-[1.02]"
+                  : "text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-container-high/50"
               }`}
             >
               {t(`agents.filters.${tab}`)}
@@ -203,12 +203,12 @@ export default function AgentsPageClient({
         </div>
 
         <div className="relative w-full md:max-w-xs pr-2">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant/30" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant/40" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('agents.searchPlaceholder')}
-            className="w-full bg-surface-container/30 border-none rounded-full py-3.5 pl-11 pr-4 text-sm font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:ring-1 focus:ring-primary/20 transition-all outline-none"
+            className="w-full bg-surface-container-high/30 border border-outline-variant/10 rounded-full py-3 pl-11 pr-4 text-sm font-medium text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 transition-all outline-none shadow-inner shadow-black/5"
           />
         </div>
       </div>

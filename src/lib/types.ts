@@ -195,6 +195,7 @@ export interface WidgetDeploymentRecord {
   allowed_origins: string[];
   quick_actions: WidgetQuickAction[];
   contact_form_settings: WidgetContactFormSettingsRecord;
+  description: string;
   created_at: string;
   updated_at: string;
   deployed_at: string | null;
@@ -221,6 +222,7 @@ export interface WidgetRecord {
   show_branding: boolean;
   privacy_policy_url: string | null;
   allowed_origins: string[];
+  description: string;
   created_at: string;
   updated_at: string;
   deployed_at: string | null;

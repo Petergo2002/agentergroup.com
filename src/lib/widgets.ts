@@ -94,6 +94,7 @@ export function buildDefaultWidgetInput(
   return {
     name: input?.name ?? "Untitled Widget",
     slug: input?.slug ?? "untitled-widget",
+    description: "",
     status: "draft" as const,
     brand_name: getDefaultWidgetBrandName(workspace),
     logo_url: null,

@@ -128,7 +128,7 @@ export function AppearanceTab() {
           <p className="text-sm text-on-surface-variant/60">{t('widgetBuilder.appearance.identityDescription')}</p>
         </div>
 
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-[0_8px_32px_rgba(15,23,42,0.04)]">
+        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-premium">
           <div className="grid gap-10 md:grid-cols-2">
             {/* Logo Upload */}
             <div className="space-y-4">
@@ -204,7 +204,7 @@ export function AppearanceTab() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-[0_8px_32px_rgba(15,23,42,0.04)]">
+          <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-premium">
             <div className="space-y-6">
               <ColorField
                 label={t('widgetBuilder.appearance.primarySignature')}

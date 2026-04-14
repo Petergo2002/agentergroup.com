@@ -9,7 +9,7 @@ export default async function AdminLayout({
   await requireAdminUser();
 
   return (
-    <div className="min-h-screen bg-[#141414] text-white">
+    <div className="min-h-screen bg-background text-on-surface">
       <AdminSidebar />
       <main className="pl-60">
         <div className="mx-auto min-h-screen max-w-[1200px] px-8 py-8">
