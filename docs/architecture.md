@@ -1,6 +1,6 @@
 # Agent Platform Architecture
 
-Last updated: 2026-03-26
+Last updated: 2026-04-15
 
 ## Purpose
 
@@ -29,7 +29,9 @@ The current MVP is intentionally narrow:
 
 - chat-first agent runtime
 - workspace-scoped knowledge base with semantic retrieval
-- limited live tools for Gmail and Google Calendar
+- chat-first agent runtime
+- workspace-scoped knowledge base with semantic retrieval
+- limited live tools for Gmail, Google Calendar, and Cal.com
 - Google Drive only as a knowledge import source
 
 This is not currently a workflow automation platform. There is no active Trigger.dev orchestration, no scheduled jobs, and no post-conversation workflow engine.
@@ -99,6 +101,7 @@ Important implementation docs:
 
 - `docs/agent-builder.md`
 - `docs/architecture.md`
+- `docs/composio-integrations.md` — **read this before writing any Composio tool integration**
 
 ### Core app routes
 
@@ -145,6 +148,7 @@ Important implementation docs:
 - `src/app/api/connections/toolkits/route.ts`
 - `src/app/api/connections/authorize/route.ts`
 - `src/app/api/connections/googlecalendar/calendars/route.ts`
+- `src/app/api/connections/cal/event-types/route.ts`
 - `src/app/api/knowledge/sources/route.ts`
 - `src/app/api/knowledge/sources/[id]/route.ts`
 - `src/app/api/knowledge/sources/[id]/process/route.ts`
@@ -175,6 +179,7 @@ Important implementation docs:
 - `src/lib/composio.ts`
 - `src/lib/integrations.ts`
 - `src/lib/google-calendar.ts`
+- `src/lib/cal.ts`
 - `src/lib/knowledge.ts`
 - `src/lib/runtime/observability.ts`
 - `src/lib/runtime/agent-chat.ts`
@@ -369,6 +374,11 @@ The system is easier to reason about if each layer has a clear ownership boundar
 - authorization links
 - tool execution against third-party services
 
+> ⚠️ **Important:** Composio tool responses have non-obvious envelope shapes that vary between
+> integrations. IDs are sometimes integers, arrays are sometimes nested multiple levels deep,
+> and `data` fields are sometimes JSON strings. Always read `docs/composio-integrations.md`
+> before writing a new tool extractor.
+
 ## Database Architecture
 
 The schema is organized into four main domains.
@@ -525,6 +535,7 @@ Current builder node kinds:
 - `endchat`
 - `gmail`
 - `googlecalendar`
+- `cal`
 - `output`
 
 ### Builder constraints
@@ -538,6 +549,7 @@ Current canvas rules:
 - optional singleton `End Chat`
 - optional singleton `Gmail`
 - optional singleton `Google Calendar`
+- optional singleton `Cal.com`
 - no generic tool node
 - Google Drive is not a live tool node
 
@@ -633,6 +645,35 @@ Live tool capability is locked to:
 - `GOOGLECALENDAR_GET_CURRENT_DATE_TIME`
 - `GOOGLECALENDAR_FIND_FREE_SLOTS`
 - `GOOGLECALENDAR_LIST_CALENDARS`
+
+#### Cal.com
+
+Owns one selected Cal.com connection plus a per-node scheduling configuration.
+
+Current builder/runtime policy:
+
+- the node stores one selected connection (`connectionId`)
+- the node stores a scheduling mode: `ai_decides` or `specific_event_type`
+- when `specific_event_type` is selected, the node stores the chosen event type id (`eventTypeId`) and its label
+- the node stores a resolved booking timezone (`timezone`)
+- the builder fetches available event types from the selected connected account through an internal route
+- the builder falls back to a manual ID entry field when event types cannot be fetched
+- runtime enforces the selected event type on availability and booking tool calls
+
+Event type fetch path:
+
+- `GET /api/connections/cal/event-types?connectionId=<id>`
+- calls `listCalEventTypes()` in `src/lib/composio.ts`
+- calls `CAL_LIST_EVENT_TYPES` via Composio
+- extracts from `result.data.eventTypeGroups[n].eventTypes` (Cal.com v2 shape)
+- event type IDs are integers — coerced to strings before use
+
+For the full response shape and extractor implementation details, see `docs/composio-integrations.md`.
+
+Live tool capability is locked to:
+
+- `CAL_GET_AVAILABLE_SLOTS`
+- `CAL_CREATE_BOOKING`
 
 #### Output
 

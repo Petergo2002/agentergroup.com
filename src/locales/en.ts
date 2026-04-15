@@ -76,6 +76,7 @@ export const en = {
     fixed: "Fixed",
     added: "Added",
     beta: "Beta",
+    view: "View",
   },
   nav: {
     dashboard: "Dashboard",
@@ -462,6 +463,7 @@ export const en = {
       "Controls the model, instructions, and live response behavior.",
     gmailDescription: "Send emails during the current conversation.",
     googleCalendarDescription: "Check availability and book meetings.",
+    calDescription: "Check availability and book meetings with Cal.com.",
     leadsDescription:
       "Choose which lead details this widget agent must collect before an internal lead is created or updated.",
     outputDescription: "Returns the final response to the user.",
@@ -486,6 +488,7 @@ export const en = {
     removeNode: "Remove Node",
     useGmail: "Use Gmail during the current conversation.",
     useCalendar: "Check availability and book meetings.",
+    useCal: "Check availability and book meetings with Cal.com.",
     noConnectedAccount: "No connected {label} account yet.",
     connectLabel: "Connect {label}",
     connectedAccount: "Connected Account",
@@ -509,6 +512,15 @@ export const en = {
     getCurrentDateTimeAction: "Get Current Date Time",
     findFreeSlotsAction: "Find Free Slots",
     listCalendarsAction: "List Calendars",
+    getAvailableSlotsAction: "Get Available Slots",
+    createBookingAction: "Create Booking",
+    selectEventType: "Select meeting type",
+    loadEventTypesError: "Could not load meeting types from this account.",
+    loadingEventTypes: "Loading meeting types from Cal.com...",
+    schedulingMode: "Scheduling Mode",
+    specificEventType: "Specific meeting type",
+    specificEventTypeDesc: "Agent uses selected meeting type for availability and bookings.",
+    aiDecidesEventTypeDesc: "Agent chooses meeting type based on user preferences.",
     bookingCalendar: "Booking Calendar",
     primaryCalendar: "Primary calendar",
     primaryCalendarSuffix: "Primary",
@@ -521,6 +533,14 @@ export const en = {
     alsoBookPrimaryDescription:
       "When enabled, the assistant will mirror bookings to the account's primary calendar in addition to the selected booking calendar.",
     bookingTimezone: "Booking Timezone",
+    eventType: "Meeting Type",
+    eventTypeDesc:
+      "Select the Cal.com meeting type for availability checks and bookings.",
+    eventTypeSelected: "Agent uses this meeting type for scheduling.",
+    eventTypeManualHint: "Could not load meeting types automatically. Enter the event type ID from your",
+    eventTypeManualHintLink: "Cal.com dashboard",
+    eventTypeIdPlaceholder: "e.g. 42 or quick-chat",
+    eventTypeHelpUrl: "https://app.cal.com/event-types",
     primaryCalendarResolved:
       "Automatically resolved from the primary Google Calendar.",
     selectedCalendarResolved:
@@ -897,6 +917,15 @@ export const en = {
     filterPlaceholder: "Filter library...",
     deleteConfirm:
       'Delete "{name}"? This will remove the source, its chunks, and any agent attachments.',
+    viewContentError: "Failed to load content.",
+    textContent: "Text content",
+    fileContent: "File content",
+    previewNotAvailable: "Preview is not available for this file type.",
+    downloadFile: "Download File",
+    updateContentError: "Failed to update content.",
+    contentUpdated: "Content updated and re-processing started.",
+    editingContent: "Editing content",
+    enterTextContent: "Enter your text content here...",
   },
   connections: {
     badge: "Integration access",

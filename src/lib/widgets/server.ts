@@ -3,10 +3,12 @@ import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
+import { extractCalSelectionFromDefinition } from "@/lib/cal";
 import type {
   AgentRecord,
   AgentVersionRecord,
   BuilderDefinition,
+  CalSelection,
   ConversationEndReason,
   EndChatPolicy,
   GmailRecipientPolicy,
@@ -846,6 +848,7 @@ function buildAgentPolicyMapsFromVersionDefinitions(
     string,
     GoogleCalendarSelection
   >();
+  const calSelectionsByAgentId = new Map<string, CalSelection>();
 
   for (const { widgetAgent, agent } of widgetAgents) {
     const definition = widgetAgent.published_version_id
@@ -864,12 +867,17 @@ function buildAgentPolicyMapsFromVersionDefinitions(
       agent.id,
       extractGoogleCalendarSelectionFromDefinition(definition),
     );
+    calSelectionsByAgentId.set(
+      agent.id,
+      extractCalSelectionFromDefinition(definition),
+    );
   }
 
   return {
     endChatPoliciesByAgentId,
     gmailRecipientPoliciesByAgentId,
     googleCalendarSelectionsByAgentId,
+    calSelectionsByAgentId,
   };
 }
 
@@ -883,6 +891,7 @@ function buildAgentPolicyMapsFromDraftDefinitions(
     string,
     GoogleCalendarSelection
   >();
+  const calSelectionsByAgentId = new Map<string, CalSelection>();
 
   for (const agentId of agentIds) {
     const definition = definitionsByAgentId.get(agentId);
@@ -898,12 +907,17 @@ function buildAgentPolicyMapsFromDraftDefinitions(
       agentId,
       extractGoogleCalendarSelectionFromDefinition(definition),
     );
+    calSelectionsByAgentId.set(
+      agentId,
+      extractCalSelectionFromDefinition(definition),
+    );
   }
 
   return {
     endChatPoliciesByAgentId,
     gmailRecipientPoliciesByAgentId,
     googleCalendarSelectionsByAgentId,
+    calSelectionsByAgentId,
   };
 }
 
@@ -950,6 +964,7 @@ export async function buildStoredWidgetRuntimeConfig(
     endChatPoliciesByAgentId,
     gmailRecipientPoliciesByAgentId,
     googleCalendarSelectionsByAgentId,
+    calSelectionsByAgentId,
   } = await buildStoredAgentPolicyMapsByAgentId(
     supabase,
     widgetAgents,
@@ -960,6 +975,7 @@ export async function buildStoredWidgetRuntimeConfig(
     endChatPoliciesByAgentId,
     gmailRecipientPoliciesByAgentId,
     googleCalendarSelectionsByAgentId,
+    calSelectionsByAgentId,
   });
 }
 
@@ -973,6 +989,7 @@ export async function buildDraftWidgetRuntimeConfig(
     endChatPoliciesByAgentId,
     gmailRecipientPoliciesByAgentId,
     googleCalendarSelectionsByAgentId,
+    calSelectionsByAgentId,
   } = await buildDraftAgentPolicyMapsByAgentId(
     supabase,
     draft,
@@ -983,6 +1000,7 @@ export async function buildDraftWidgetRuntimeConfig(
     endChatPoliciesByAgentId,
     gmailRecipientPoliciesByAgentId,
     googleCalendarSelectionsByAgentId,
+    calSelectionsByAgentId,
   });
 }
 

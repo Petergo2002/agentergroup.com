@@ -1,4 +1,4 @@
-export type SupportedIntegrationSlug = "gmail" | "googlecalendar" | "googledrive";
+export type SupportedIntegrationSlug = "gmail" | "googlecalendar" | "cal" | "googledrive";
 export type InternalAssistantToolkitSlug = "text_to_pdf";
 export type IntegrationSurface = "chat" | "knowledge";
 
@@ -52,6 +52,22 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
       "GOOGLECALENDAR_GET_CURRENT_DATE_TIME",
       "GOOGLECALENDAR_FIND_FREE_SLOTS",
       "GOOGLECALENDAR_LIST_CALENDARS",
+    ],
+    allowedKnowledgeTools: [],
+  },
+  {
+    slug: "cal",
+    displayName: "Cal.com",
+    description: "Check availability and book meetings with Cal.com.",
+    icon: "event_available",
+    simpleIcon: "siCalcom",
+    simpleIconColor: "#22C55E",
+    category: "Scheduling",
+    connectionPurpose: "Used by agents to check availability and book meetings using Cal.com.",
+    surface: "chat",
+    allowedChatTools: [
+      "CAL_GET_AVAILABLE_SLOTS_INFO",
+      "CAL_CREATE_BOOKING_VERSION_2",
     ],
     allowedKnowledgeTools: [],
   },

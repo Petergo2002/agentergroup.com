@@ -43,7 +43,19 @@ function getKnowledgeMatches(message: MessageRecord) {
     return [];
   }
 
-  return value as KnowledgeMatchRecord[];
+  const allMatches = value as KnowledgeMatchRecord[];
+  
+  const uniqueNames = new Set<string>();
+  const uniqueMatches: typeof allMatches = [];
+  
+  for (const match of allMatches) {
+    if (!uniqueNames.has(match.source_name)) {
+      uniqueNames.add(match.source_name);
+      uniqueMatches.push(match);
+    }
+  }
+
+  return uniqueMatches;
 }
 
 export default function AgentPreviewPage() {

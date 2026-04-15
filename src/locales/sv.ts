@@ -78,6 +78,7 @@ export const sv = {
     fixed: "Fast",
     added: "Tillagd",
     beta: "Beta",
+    view: "Visa",
   },
   nav: {
     dashboard: "Översikt",
@@ -466,6 +467,7 @@ export const sv = {
       "Styr modell, instruktioner och livebeteende i svaren.",
     gmailDescription: "Skicka e-post under den aktuella konversationen.",
     googleCalendarDescription: "Kontrollera tillgänglighet och boka möten.",
+    calDescription: "Kontrollera tillgänglighet och boka möten med Cal.com.",
     leadsDescription:
       "Välj vilka leaduppgifter den här widget-agenten måste samla in innan ett internt lead skapas eller uppdateras.",
     outputDescription: "Returnerar det slutliga svaret till användaren.",
@@ -490,6 +492,7 @@ export const sv = {
     removeNode: "Ta bort nod",
     useGmail: "Använd Gmail i den aktuella konversationen.",
     useCalendar: "Kontrollera tillgänglighet och boka möten.",
+    useCal: "Kontrollera tillgänglighet och boka möten med Cal.com.",
     noConnectedAccount: "Inget anslutet {label}-konto ännu.",
     connectLabel: "Anslut {label}",
     connectedAccount: "Anslutet konto",
@@ -513,6 +516,15 @@ export const sv = {
     getCurrentDateTimeAction: "Hämta aktuellt datum och tid",
     findFreeSlotsAction: "Hitta lediga tider",
     listCalendarsAction: "Lista kalendrar",
+    getAvailableSlotsAction: "Hämta lediga tider",
+    createBookingAction: "Skapa bokning",
+    selectEventType: "Välj mötestyp",
+    loadEventTypesError: "Det gick inte att ladda mötestyper från det här kontot.",
+    loadingEventTypes: "Laddar mötestyper från Cal.com...",
+    schedulingMode: "Schemaläggningsläge",
+    specificEventType: "Specifik mötestyp",
+    specificEventTypeDesc: "Agenten använder den valda mötestypen för tillgänglighet och bokningar.",
+    aiDecidesEventTypeDesc: "Agenten väljer mötestyp baserat på användarens preferenser.",
     bookingCalendar: "Bokningskalender",
     primaryCalendar: "Primärkalender",
     primaryCalendarSuffix: "Primär",
@@ -525,6 +537,14 @@ export const sv = {
     alsoBookPrimaryDescription:
       "När detta är aktiverat speglar assistenten bokningar till kontots primärkalender utöver den valda bokningskalendern.",
     bookingTimezone: "Bokningstidszon",
+    eventType: "Mötestyp",
+    eventTypeDesc:
+      "Välj den Cal.com mötestyp för tillgänglighet och bokningar.",
+    eventTypeSelected: "Agenten använder denna mötestyp för schemaläggning.",
+    eventTypeManualHint: "Kunde inte ladda mötestyper automatiskt. Ange mötestyp-ID från din",
+    eventTypeManualHintLink: "Cal.com-dashboard",
+    eventTypeIdPlaceholder: "t.ex. 42 eller snabbt-samtal",
+    eventTypeHelpUrl: "https://app.cal.com/event-types",
     primaryCalendarResolved:
       "Löses automatiskt från den primära Google-kalendern.",
     selectedCalendarResolved:
@@ -904,6 +924,15 @@ export const sv = {
     filterPlaceholder: "Filtrera bibliotek...",
     deleteConfirm:
       'Radera "{name}"? Detta tar bort källan, dess chunkar och alla agentkopplingar.',
+    viewContentError: "Det gick inte att ladda innehåll.",
+    textContent: "Textinnehåll",
+    fileContent: "Filinnehåll",
+    previewNotAvailable: "Förhandsvisning är inte tillgänglig för denna filtyp.",
+    downloadFile: "Ladda ner fil",
+    updateContentError: "Det gick inte att uppdatera innehållet.",
+    contentUpdated: "Innehåll uppdaterat och ombearbetning påbörjad.",
+    editingContent: "Redigerar innehåll",
+    enterTextContent: "Ange ditt textinnehåll här...",
   },
   connections: {
     badge: "Integrationsåtkomst",

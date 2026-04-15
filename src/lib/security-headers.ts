@@ -19,7 +19,7 @@ export function buildAppContentSecurityPolicy() {
   return [
     "default-src 'self'",
     "base-uri 'self'",
-    "object-src 'none'",
+    `object-src 'self' ${supabaseOrigin}`,
     "frame-ancestors 'none'",
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${widgetAppOrigin}`,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
@@ -28,7 +28,7 @@ export function buildAppContentSecurityPolicy() {
     `connect-src 'self' ${widgetAppOrigin} ${supabaseOrigin} wss://${new URL(
       supabaseOrigin,
     ).host}`,
-    `frame-src 'self' ${widgetAppOrigin}`,
+    `frame-src 'self' ${widgetAppOrigin} ${supabaseOrigin} https://docs.google.com`,
   ].join("; ");
 }
 

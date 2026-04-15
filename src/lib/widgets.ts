@@ -2,12 +2,14 @@ import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
 import { buildDisabledEndChatPolicy } from "@/lib/end-chat";
 import { buildDefaultGmailRecipientPolicy } from "@/lib/gmail";
 import { buildDefaultGoogleCalendarSelection } from "@/lib/google-calendar";
+import { buildDefaultCalSelection } from "@/lib/cal";
 import {
   normalizeAllowedOrigin,
   normalizeAllowedOrigins,
 } from "@/lib/widgets/http";
 import type {
   AgentRecord,
+  CalSelection,
   EndChatPolicy,
   GmailRecipientPolicy,
   GoogleCalendarSelection,
@@ -192,6 +194,7 @@ export function buildWidgetRuntimeConfig(
     endChatPoliciesByAgentId?: Map<string, EndChatPolicy>;
     gmailRecipientPoliciesByAgentId?: Map<string, GmailRecipientPolicy>;
     googleCalendarSelectionsByAgentId?: Map<string, GoogleCalendarSelection>;
+    calSelectionsByAgentId?: Map<string, CalSelection>;
   },
 ): WidgetRuntimeConfig {
   const orderedAgents = [...widgetAgents].sort(
@@ -247,6 +250,9 @@ export function buildWidgetRuntimeConfig(
       googleCalendarSelection:
         options?.googleCalendarSelectionsByAgentId?.get(agent.id) ??
         buildDefaultGoogleCalendarSelection(),
+      calSelection:
+        options?.calSelectionsByAgentId?.get(agent.id) ??
+        buildDefaultCalSelection(),
     })),
   };
 }
@@ -259,6 +265,7 @@ export function buildWidgetRuntimeConfigFromDraft(
     endChatPoliciesByAgentId?: Map<string, EndChatPolicy>;
     gmailRecipientPoliciesByAgentId?: Map<string, GmailRecipientPolicy>;
     googleCalendarSelectionsByAgentId?: Map<string, GoogleCalendarSelection>;
+    calSelectionsByAgentId?: Map<string, CalSelection>;
   },
 ): WidgetRuntimeConfig {
   const orderedAgents = [...draft.agents].sort(
@@ -309,6 +316,9 @@ export function buildWidgetRuntimeConfigFromDraft(
       googleCalendarSelection:
         options?.googleCalendarSelectionsByAgentId?.get(agent.agentId) ??
         buildDefaultGoogleCalendarSelection(),
+      calSelection:
+        options?.calSelectionsByAgentId?.get(agent.agentId) ??
+        buildDefaultCalSelection(),
     })),
   };
 }

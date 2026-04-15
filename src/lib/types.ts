@@ -704,6 +704,7 @@ export interface WidgetRuntimeConfig {
     endChatPolicy: EndChatPolicy;
     gmailRecipientPolicy: GmailRecipientPolicy;
     googleCalendarSelection: GoogleCalendarSelection;
+    calSelection: CalSelection;
   }>;
 }
 
@@ -817,6 +818,14 @@ export interface GoogleCalendarSelection {
   includePrimaryCalendar: boolean;
 }
 
+export interface CalSelection {
+  connectionId: string | null;
+  eventTypeMode: "ai_decides" | "specific_event_type";
+  eventTypeId: string | null;
+  eventTypeLabel: string | null;
+  timezone: string | null;
+}
+
 export interface EndChatMetadata {
   suggested: boolean;
   sessionCompleted: boolean;
@@ -831,8 +840,8 @@ export type BuilderNodeKind =
   | "knowledge"
   | "gmail"
   | "googlecalendar"
-  | "endchat"
-  | "output";
+  | "cal"
+  | "endchat";
 
 export type BuilderNodeStatus = "active" | "idle" | "error";
 export type BuilderNodeBadgeTone = "default" | "success" | "warning" | "error";
@@ -888,15 +897,22 @@ export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
   simpleIconColor?: string;
 }
 
+export interface CalBuilderNodeData extends BaseBuilderNodeData {
+  kind: "cal";
+  integrationSlug: "cal";
+  connectionId: string | null;
+  eventTypeMode: "ai_decides" | "specific_event_type";
+  eventTypeId: string | null;
+  eventTypeLabel: string | null;
+  timezone: string | null;
+  simpleIcon?: string;
+  simpleIconColor?: string;
+}
+
 export interface EndChatBuilderNodeData extends BaseBuilderNodeData {
   kind: "endchat";
   inactivityTimeoutSeconds: number | null;
   allowAssistantSuggestion: boolean;
-}
-
-export interface OutputBuilderNodeData extends BaseBuilderNodeData {
-  kind: "output";
-  locked: true;
 }
 
 export type BuilderNodeData =
@@ -905,8 +921,8 @@ export type BuilderNodeData =
   | KnowledgeBuilderNodeData
   | GmailBuilderNodeData
   | GoogleCalendarBuilderNodeData
-  | EndChatBuilderNodeData
-  | OutputBuilderNodeData;
+  | CalBuilderNodeData
+  | EndChatBuilderNodeData;
 
 export interface BuilderDefinition {
   nodes: unknown[];

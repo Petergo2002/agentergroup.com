@@ -12,6 +12,9 @@ This folder keeps the current reference docs for the product plus one implementa
   - current GDPR/privacy operations and retention workflow
 - `widget-embed-security.md`
   - current public widget security model for copy-paste embeds
+- `composio-integrations.md`
+  - **mandatory reading before adding any Composio tool integration**
+  - documents response envelope pitfalls, ID type coercion, known response shapes per integration, and the debug procedure for silent failures
 
 ## Active implementation plan
 

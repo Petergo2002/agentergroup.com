@@ -29,6 +29,7 @@ import type {
 } from "@/lib/types";
 import { SourceBentoGrid } from "@/components/knowledge/SourceBentoGrid";
 import { SourceTable } from "@/components/knowledge/SourceTable";
+import { ViewSourceModal } from "@/components/modals/ViewSourceModal";
 import { formatRelativeDate } from "@/lib/utils";
 
 const ACCEPTED_FILE_TYPES = [...SUPPORTED_KNOWLEDGE_MIME_TYPES, ...SUPPORTED_KNOWLEDGE_EXTENSIONS].join(",");
@@ -94,6 +95,8 @@ export default function KnowledgePageClient({
       : t("knowledge.connectDriveStatus"),
   );
   const [activeTab, setActiveTab] = useState<InputTab>(null);
+  const [selectedSource, setSelectedSource] = useState<KnowledgeSourceRecord | null>(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   const filteredSources = useMemo(() => {
     if (!sourceSearch.trim()) return sources;
@@ -318,6 +321,11 @@ export default function KnowledgePageClient({
     } finally {
       setIsImportingDriveFileId(null);
     }
+  };
+
+  const handleView = (source: KnowledgeSourceRecord) => {
+    setSelectedSource(source);
+    setIsViewerOpen(true);
   };
 
   const handleProcess = async (sourceId: string) => {
@@ -659,10 +667,21 @@ export default function KnowledgePageClient({
           isLoading={isLoading}
           onProcess={handleProcess}
           onDelete={handleDelete}
+          onView={handleView}
           processingId={processingSourceId}
           deletingId={deletingSourceId}
         />
       </section>
+
+      <ViewSourceModal
+        isOpen={isViewerOpen}
+        onClose={() => {
+          setIsViewerOpen(false);
+          setSelectedSource(null);
+        }}
+        source={selectedSource}
+        onSourceUpdated={loadSources}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, CheckCircle2, Clock, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
+import { FileText, CheckCircle2, Clock, AlertCircle, RefreshCw, Trash2, Eye } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import type { KnowledgeSourceRecord } from "@/lib/types";
 import { formatRelativeDate } from "@/lib/utils";
@@ -10,6 +10,7 @@ interface SourceTableProps {
   isLoading: boolean;
   onProcess: (id: string) => void;
   onDelete: (source: KnowledgeSourceRecord) => void;
+  onView: (source: KnowledgeSourceRecord) => void;
   processingId?: string | null;
   deletingId?: string | null;
 }
@@ -19,6 +20,7 @@ export function SourceTable({
   isLoading,
   onProcess,
   onDelete,
+  onView,
   processingId,
   deletingId,
 }: SourceTableProps) {
@@ -119,6 +121,13 @@ export function SourceTable({
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => onView(source)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors"
+                        title={t("common.view")}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={() => onProcess(source.id)}
                         disabled={isProcessing}

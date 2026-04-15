@@ -115,6 +115,8 @@ export async function POST(
     );
   }
 
+  let finalSourceIdsToInsert: string[] = sourceIds;
+
   if (sourceIds.length > 0) {
     const { data: validSources, error: validSourcesError } = await supabase
       .from("knowledge_sources")
@@ -126,12 +128,7 @@ export async function POST(
       return NextResponse.json({ error: validSourcesError.message }, { status: 500 });
     }
 
-    if ((validSources ?? []).length !== sourceIds.length) {
-      return NextResponse.json(
-        { error: "One or more knowledge sources are invalid for this workspace." },
-        { status: 400 },
-      );
-    }
+    finalSourceIdsToInsert = (validSources ?? []).map((s) => s.id);
   }
 
   const { error: deleteError } = await supabase
@@ -143,9 +140,9 @@ export async function POST(
     return NextResponse.json({ error: deleteError.message }, { status: 500 });
   }
 
-  if (sourceIds.length > 0) {
+  if (finalSourceIdsToInsert.length > 0) {
     const { error: insertError } = await supabase.from("agent_knowledge_sources").insert(
-      sourceIds.map((sourceId) => ({
+      finalSourceIdsToInsert.map((sourceId) => ({
         agent_id: agentId,
         knowledge_source_id: sourceId,
       })),

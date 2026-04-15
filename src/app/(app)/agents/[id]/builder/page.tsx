@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -31,6 +31,7 @@ import { DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS } from '@/lib/end-chat';
 import { normalizeGmailRecipientEmail } from '@/lib/gmail';
 import { formatLocaleDateTime, type PlatformLanguage } from '@/lib/i18n';
 import type { GoogleCalendarListItem } from '@/lib/google-calendar';
+import { CalEventTypeListItem, extractCalEventTypeListItems } from '@/lib/cal';
 import { getSupportedIntegration, isChatIntegrationSlug } from '@/lib/integrations';
 import { getKnowledgeStatusTone, isReadyKnowledgeSource } from '@/lib/knowledge';
 import { formatRelativeDate } from '@/lib/utils';
@@ -40,6 +41,7 @@ import type {
   BuilderDefinition,
   BuilderNodeData,
   BuilderNodeKind,
+  CalBuilderNodeData,
   ConnectionRecord,
   EndChatBuilderNodeData,
   GmailBuilderNodeData,
@@ -50,9 +52,9 @@ import type {
 
 type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
-type ToolNodeKind = 'gmail' | 'googlecalendar';
-type ToolNodeData = GmailBuilderNodeData | GoogleCalendarBuilderNodeData;
-type LibraryItemKey = 'knowledge' | 'tools' | 'endchat' | 'agent' | 'output';
+type ToolNodeKind = 'gmail' | 'googlecalendar' | 'cal';
+type ToolNodeData = GmailBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
+type LibraryItemKey = 'knowledge' | 'tools' | 'endchat' | 'agent';
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 type BuilderStatusNote =
   | { kind: 'draftInitial' }
@@ -77,7 +79,6 @@ interface NormalizedBuilderDefinition {
 const FIXED_NODE_IDS = {
   trigger: 'trigger',
   agent: 'agent',
-  output: 'response',
 } as const;
 
 const DEFAULT_EDGE_STYLE = {
@@ -98,7 +99,7 @@ const DEFAULT_POSITIONS: Record<BuilderNodeKind, { x: number; y: number }> = {
   knowledge: { x: 610, y: 70 },
   gmail: { x: 610, y: 220 },
   googlecalendar: { x: 610, y: 360 },
-  output: { x: 930, y: 150 },
+  cal: { x: 610, y: 500 },
   endchat: { x: 1210, y: 150 },
 };
 
@@ -127,13 +128,6 @@ const NODE_LIBRARY: NodeLibraryItem[] = [
     label: 'End Chat',
     icon: 'stop_circle',
     description: 'Define when the backend should close the conversation.',
-  },
-  {
-    key: 'output',
-    label: 'Response',
-    icon: 'output',
-    description: 'How the agent delivers its final response. Already on canvas.',
-    fixed: true,
   },
 ];
 
@@ -181,7 +175,7 @@ const TIMEZONE_OPTIONS = [
   { value: 'Pacific/Auckland', label: 'Auckland' },
 ];
 
-const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'googlecalendar'];
+const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'googlecalendar', 'cal'];
 
 function getStarterPromptFields(prompts: string[]) {
   return Array.from({ length: 3 }, (_, index) => prompts[index] ?? '');
@@ -208,11 +202,6 @@ function getNodeLibraryText(key: LibraryItemKey, t: Translate) {
       return {
         label: t('agentBuilder.nodeLibrary.endChat'),
         description: t('agentBuilder.nodeLibrary.endChatDescription'),
-      };
-    case 'output':
-      return {
-        label: t('agentBuilder.nodeLibrary.output'),
-        description: t('agentBuilder.nodeLibrary.outputDescription'),
       };
   }
 }
@@ -249,11 +238,11 @@ function getBuilderNodeText(kind: BuilderNodeKind, t: Translate) {
         type: t('agentBuilder.toolType'),
         description: t('agentBuilder.googleCalendarDescription'),
       };
-    case 'output':
+    case 'cal':
       return {
-        label: t('agentBuilder.outputLabel'),
-        type: t('agentBuilder.outputType'),
-        description: t('agentBuilder.outputDescription'),
+        label: 'Cal.com',
+        type: t('agentBuilder.toolType'),
+        description: t('agentBuilder.calDescription'),
       };
     case 'endchat':
       return {
@@ -299,6 +288,13 @@ function translateKnowledgeStatus(status: string, t: Translate) {
 function getToolActionLabels(kind: ToolNodeKind, t: Translate) {
   if (kind === 'gmail') {
     return [t('agentBuilder.sendEmailAction')];
+  }
+
+  if (kind === 'cal') {
+    return [
+      t('agentBuilder.getAvailableSlotsAction'),
+      t('agentBuilder.createBookingAction'),
+    ];
   }
 
   return [
@@ -348,21 +344,21 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
 
   return (
     <div
-      className={`group/node min-w-[280px] rounded-3xl border border-outline-variant/10 bg-surface shadow-2xl transition-all ${
-        selected ? 'ring-8 ring-primary/5 border-primary/20' : 'hover:border-outline-variant/30'
+      className={`group/node min-w-[280px] rounded-[2.5rem] border border-outline-variant/20 bg-surface dark:bg-surface-bright shadow-premium transition-all duration-300 ease-out ring-1 ring-inset ring-outline-variant/5 ${
+        selected ? 'ring-4 ring-primary/20 border-primary/30 shadow-primary/10' : 'hover:border-outline-variant/40 hover:shadow-2xl'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
         isConnectable={false}
-        className="!h-3.5 !w-3.5 !-left-[8px] !border-[3px] !border-surface !bg-primary !transition-transform group-hover/node:scale-125"
+        className="!h-3.5 !w-3.5 !-left-[8px] !border-[3px] !border-surface dark:!border-surface-bright !bg-primary !transition-transform duration-300 group-hover/node:scale-125"
       />
       <div
-        className={`flex items-center justify-between rounded-t-3xl px-4 py-3 ${
+        className={`flex items-center justify-between rounded-t-[2.5rem] px-5 py-3.5 border-b border-outline-variant/10 ${
           selected
-            ? 'bg-primary/[0.03]'
-            : 'bg-surface-container-low'
+            ? 'bg-primary/[0.05] dark:bg-primary/[0.08]'
+            : 'bg-surface-container-low dark:bg-surface-container/50'
         }`}
       >
         <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary/70">
@@ -379,7 +375,7 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
       </div>
       <div className="space-y-4 p-5">
         <div className="flex items-start gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 shadow-inner">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 shadow-inner ring-1 ring-inset ring-primary/20">
             {(data as { simpleIcon?: string }).simpleIcon ? (
               <SimpleIcon 
                 iconKey={(data as { simpleIcon?: string }).simpleIcon} 
@@ -393,7 +389,7 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
           </div>
           <div className="min-w-0 flex-1 pt-0.5">
             <p className="text-sm font-bold text-on-surface tracking-tight">{data.label}</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70 italic">{data.description}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70 italic line-clamp-2">{data.description}</p>
           </div>
         </div>
         {data.badgeText ? (
@@ -424,18 +420,16 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
         type="source"
         position={Position.Right}
         isConnectable={false}
-        className="!h-3.5 !w-3.5 !-right-[8px] !border-[3px] !border-surface !bg-primary !transition-transform group-hover/node:scale-125"
+        className="!h-3.5 !w-3.5 !-right-[8px] !border-[3px] !border-surface dark:!border-surface-bright !bg-primary !transition-transform duration-300 group-hover/node:scale-125"
       />
     </div>
   );
 }
 
-const nodeTypes = {
-  agentNode: AgentNode,
-};
+// nodeTypes is now memoized inside AgentBuilderPage to prevent Fast Refresh warnings
 
 function isToolNodeKind(kind: BuilderNodeKind): kind is ToolNodeKind {
-  return kind === 'gmail' || kind === 'googlecalendar';
+  return kind === 'gmail' || kind === 'googlecalendar' || kind === 'cal';
 }
 
 function isToolNodeData(data: BuilderNodeData): data is ToolNodeData {
@@ -457,8 +451,8 @@ function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
     value === 'knowledge' ||
     value === 'gmail' ||
     value === 'googlecalendar' ||
-    value === 'endchat' ||
-    value === 'output'
+    value === 'cal' ||
+    value === 'endchat'
   );
 }
 
@@ -466,6 +460,7 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
   const hasKnowledge = nodes.some((node) => node.data.kind === 'knowledge');
   const hasGmail = nodes.some((node) => node.data.kind === 'gmail');
   const hasCalendar = nodes.some((node) => node.data.kind === 'googlecalendar');
+  const hasCal = nodes.some((node) => node.data.kind === 'cal');
   const hasEndChat = nodes.some((node) => node.data.kind === 'endchat');
 
   const edges: BuilderFlowEdge[] = [
@@ -475,12 +470,6 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
       target: FIXED_NODE_IDS.agent,
       animated: true,
       style: PRIMARY_EDGE_STYLE,
-    },
-    {
-      id: 'e-agent-response',
-      source: FIXED_NODE_IDS.agent,
-      target: FIXED_NODE_IDS.output,
-      style: DEFAULT_EDGE_STYLE,
     },
   ];
 
@@ -511,10 +500,19 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
     });
   }
 
+  if (hasCal) {
+    edges.push({
+      id: 'e-agent-cal',
+      source: FIXED_NODE_IDS.agent,
+      target: 'cal',
+      style: DEFAULT_EDGE_STYLE,
+    });
+  }
+
   if (hasEndChat) {
     edges.push({
-      id: 'e-response-endchat',
-      source: FIXED_NODE_IDS.output,
+      id: 'e-agent-endchat',
+      source: FIXED_NODE_IDS.agent,
       target: 'endchat',
       style: DEFAULT_EDGE_STYLE,
     });
@@ -646,22 +644,31 @@ function createGoogleCalendarNode(
   };
 }
 
-function createOutputNode(
-  position = DEFAULT_POSITIONS.output,
-  data?: Partial<BuilderNodeData>,
+function createCalNode(
+  position = DEFAULT_POSITIONS.cal,
+  connectionId: string | null = null,
+  timezone: string | null = null,
+  data?: Partial<CalBuilderNodeData>,
 ): BuilderFlowNode {
   return {
-    id: FIXED_NODE_IDS.output,
+    id: 'cal',
     type: 'agentNode',
     position,
     data: {
-      kind: 'output',
-      label: 'Assistant Response',
-      type: 'Output',
-      icon: 'send',
-      description: 'Returns the final response to the user.',
+      kind: 'cal',
+      label: 'Cal.com',
+      type: 'Tool',
+      icon: 'event_available',
+      simpleIcon: 'siCalcom',
+      simpleIconColor: '#22C55E',
+      description: 'Check availability and book meetings with Cal.com.',
       status: 'idle',
-      locked: true,
+      integrationSlug: 'cal',
+      connectionId,
+      timezone,
+      eventTypeMode: 'ai_decides',
+      eventTypeId: null,
+      eventTypeLabel: null,
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -718,10 +725,6 @@ function inferNodeKind(node: BuilderFlowNode) {
 
   if (label === 'google calendar') {
     return 'googlecalendar';
-  }
-
-  if (label === 'assistant response' || type === 'output') {
-    return 'output';
   }
 
   if (label === 'end chat' || type === 'control') {
@@ -796,6 +799,7 @@ function normalizeDefinition(
 
   const gmailNode = nodesByKind.get('gmail');
   const calendarNode = nodesByKind.get('googlecalendar');
+  const calNode = nodesByKind.get('cal');
   const endChatNode = nodesByKind.get('endchat');
   const gmailConnectionId = pickPreferredConnectionId(
     connections,
@@ -808,6 +812,12 @@ function normalizeDefinition(
     attachedConnectionIds,
     'googlecalendar',
     calendarNode && isToolNodeData(calendarNode.data) ? calendarNode.data.connectionId : null,
+  );
+  const calConnectionId = pickPreferredConnectionId(
+    connections,
+    attachedConnectionIds,
+    'cal',
+    calNode && isToolNodeData(calNode.data) ? calNode.data.connectionId : null,
   );
 
   const normalizedNodes: BuilderFlowNode[] = [
@@ -875,9 +885,38 @@ function normalizeDefinition(
     );
   }
 
-  normalizedNodes.push(
-    createOutputNode(nodesByKind.get('output')?.position ?? DEFAULT_POSITIONS.output),
-  );
+  if (calNode || calConnectionId) {
+    const calTimezone = calNode && isToolNodeData(calNode.data) 
+      ? (calNode.data as CalBuilderNodeData).timezone 
+      : null;
+    normalizedNodes.push(
+      createCalNode(
+        calNode?.position ?? DEFAULT_POSITIONS.cal,
+        calConnectionId,
+        calTimezone,
+        calNode && calNode.data.kind === 'cal'
+          ? {
+              timezone:
+                typeof calNode.data.timezone === 'string'
+                  ? calNode.data.timezone
+                  : null,
+              eventTypeMode:
+                calNode.data.eventTypeMode === 'specific_event_type'
+                  ? 'specific_event_type'
+                  : 'ai_decides',
+              eventTypeId:
+                typeof calNode.data.eventTypeId === 'string'
+                  ? calNode.data.eventTypeId
+                  : null,
+              eventTypeLabel:
+                typeof calNode.data.eventTypeLabel === 'string'
+                  ? calNode.data.eventTypeLabel
+                  : null,
+            }
+          : undefined,
+      ),
+    );
+  }
 
   if (endChatNode && isEndChatNodeData(endChatNode.data)) {
     normalizedNodes.push(
@@ -1044,6 +1083,7 @@ function getSelectableConnections(
 }
 
 export default function AgentBuilderPage() {
+  const nodeTypes = useMemo(() => ({ agentNode: AgentNode }), []);
   const [supabase] = useState(() => createClient());
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -1069,6 +1109,15 @@ export default function AgentBuilderPage() {
     Record<string, 'idle' | 'loading' | 'ready' | 'error'>
   >({});
   const calendarOptionsStatusRef = useRef<Record<string, 'idle' | 'loading' | 'ready' | 'error'>>(
+    {},
+  );
+  const [calEventTypesByConnectionId, setCalEventTypesByConnectionId] = useState<
+    Record<string, CalEventTypeListItem[]>
+  >({});
+  const [calEventTypesStatusByConnectionId, setCalEventTypesStatusByConnectionId] = useState<
+    Record<string, 'idle' | 'loading' | 'ready' | 'error'>
+  >({});
+  const calEventTypesStatusRef = useRef<Record<string, 'idle' | 'loading' | 'ready' | 'error'>>(
     {},
   );
   const [name, setName] = useState('');
@@ -1393,6 +1442,10 @@ export default function AgentBuilderPage() {
     calendarOptionsStatusRef.current = calendarOptionsStatusByConnectionId;
   }, [calendarOptionsStatusByConnectionId]);
 
+  useEffect(() => {
+    calEventTypesStatusRef.current = calEventTypesStatusByConnectionId;
+  }, [calEventTypesStatusByConnectionId]);
+
   const selectedGoogleCalendarConnectionId =
     selectedNode?.data.kind === 'googlecalendar' ? selectedNode.data.connectionId : null;
   const selectedGoogleCalendarConnection = selectedGoogleCalendarConnectionId
@@ -1511,6 +1564,103 @@ export default function AgentBuilderPage() {
     updateNode,
   ]);
 
+  const selectedCalConnectionId =
+    selectedNode?.data.kind === 'cal' ? selectedNode.data.connectionId : null;
+  const selectedCalConnection = selectedCalConnectionId
+    ? connections.find((connection) => connection.id === selectedCalConnectionId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!selectedCalConnectionId || selectedNode?.data.kind !== 'cal') {
+      return;
+    }
+
+    const selectedCalNodeId = selectedNode.id;
+    const connectionId = selectedCalConnectionId;
+    if (!connectionId) {
+      return;
+    }
+
+    if (!selectedCalConnection || selectedCalConnection.status !== 'connected') {
+      setCalEventTypesByConnectionId((current) => ({
+        ...current,
+        [connectionId]: [],
+      }));
+      setCalEventTypesStatusByConnectionId((current) => ({
+        ...current,
+        [connectionId]: 'idle',
+      }));
+      return;
+    }
+
+    const currentStatus = calEventTypesStatusRef.current[connectionId];
+    // Only skip if actively loading or successfully ready — NOT if previously errored,
+    // because the user may have fixed their connection and re-selected the node.
+    if (currentStatus === 'ready' || currentStatus === 'loading') {
+      return;
+    }
+
+    setCalEventTypesStatusByConnectionId((current) => ({
+      ...current,
+      [connectionId]: 'loading',
+    }));
+
+    const loadEventTypes = async () => {
+      try {
+        const response = await fetch(
+          `/api/connections/cal/event-types?connectionId=${encodeURIComponent(
+            connectionId,
+          )}`,
+          {
+            cache: 'no-store',
+          },
+        );
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? t('agentBuilder.loadEventTypesError'));
+        }
+
+        const eventTypes = Array.isArray(payload.eventTypes)
+          ? (payload.eventTypes as CalEventTypeListItem[])
+          : [];
+
+        setCalEventTypesByConnectionId((current) => ({
+          ...current,
+          [connectionId]: eventTypes,
+        }));
+        // Always mark as 'ready' even if the list is empty — returning 0 event types
+        // is a valid state and should NOT be treated as an error, otherwise the guard
+        // above blocks any future retry for that connection.
+        setCalEventTypesStatusByConnectionId((current) => ({
+          ...current,
+          [connectionId]: 'ready',
+        }));
+      } catch (error) {
+        setCalEventTypesByConnectionId((current) => ({
+          ...current,
+          [connectionId]: [],
+        }));
+        setCalEventTypesStatusByConnectionId((current) => ({
+          ...current,
+          [connectionId]: 'error',
+        }));
+        showToast(
+          error instanceof Error ? error.message : t('agentBuilder.loadEventTypesError'),
+          'error',
+        );
+      }
+    };
+
+    void loadEventTypes();
+  }, [
+    selectedCalConnection,
+    selectedCalConnectionId,
+    selectedNode,
+    showToast,
+    t,
+  ]);
+
   useEffect(() => {
     if (nodes.length === 0) {
       return;
@@ -1558,7 +1708,9 @@ export default function AgentBuilderPage() {
 
     saveToHistory();
     const nextNode =
-      kind === 'gmail' ? createGmailNode() : createGoogleCalendarNode();
+      kind === 'gmail' ? createGmailNode() :
+      kind === 'cal' ? createCalNode() :
+      createGoogleCalendarNode();
     setNodes((currentNodes) => [...currentNodes, nextNode]);
     setSelectedNodeId(nextNode.id);
     setIsToolPickerOpen(false);
@@ -1600,6 +1752,19 @@ export default function AgentBuilderPage() {
             timezone: null,
             calendarId: null,
             calendarLabel: null,
+          },
+        };
+      }
+
+      if (node.data.kind === 'cal') {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            connectionId,
+            timezone: null,
+            eventTypeId: null,
+            eventTypeLabel: null,
           },
         };
       }
@@ -1855,7 +2020,9 @@ export default function AgentBuilderPage() {
       description:
         kind === 'gmail'
           ? t('agentBuilder.gmailDescription')
-          : t('agentBuilder.googleCalendarDescription'),
+          : kind === 'cal'
+            ? t('agentBuilder.calDescription')
+            : t('agentBuilder.googleCalendarDescription'),
       icon: integration?.icon ?? 'extension',
       simpleIcon: integration?.simpleIcon,
       simpleIconColor: integration?.simpleIconColor,
@@ -1993,25 +2160,32 @@ export default function AgentBuilderPage() {
 
     if (knowledgeNode && isKnowledgeNodeData(knowledgeNode.data)) {
       const attachedSourceIds = knowledgeNode.data.sourceIds;
+      const validAttachedSourceIds = attachedSourceIds.filter((id) =>
+        knowledgeSources.some((source) => source.id === id)
+      );
 
       return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm leading-relaxed text-on-surface-variant/80">
+          <div className="space-y-8">
+            <div className="flex flex-col gap-4 rounded-3xl border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface">Data Sources</h3>
+                <div className="flex shrink-0 items-center gap-1.5 rounded-full ring-1 ring-inset ring-primary/20 bg-primary/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-primary">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  {validAttachedSourceIds.length === 1
+                    ? t('agentBuilder.sourceCount', { count: validAttachedSourceIds.length })
+                    : t('agentBuilder.sourceCountPlural', { count: validAttachedSourceIds.length })}
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed text-on-surface-variant/70">
                 {t('agentBuilder.semanticSourcesDescription')}
               </p>
-              <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-                <div className="h-1 w-1 rounded-full bg-primary" />
-                {attachedSourceIds.length === 1
-                  ? t('agentBuilder.sourceCount', { count: attachedSourceIds.length })
-                  : t('agentBuilder.sourceCountPlural', { count: attachedSourceIds.length })}
-              </div>
             </div>
+            
             <div className="space-y-3">
               {knowledgeSources.length === 0 ? (
-                <div className="flex items-center gap-3 rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-5 text-sm text-on-surface-variant/60 italic">
-                  <span className="material-symbols-outlined text-base">info</span>
-                  {t('agentBuilder.noIndexedSources')}
+                <div className="flex flex-col items-center gap-3 rounded-[2rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-6 py-10 text-center">
+                  <span className="material-symbols-outlined text-3xl text-primary/40">library_books</span>
+                  <span className="text-xs font-medium text-on-surface-variant/60">{t('agentBuilder.noIndexedSources')}</span>
                 </div>
               ) : (
                 knowledgeSources.map((source) => {
@@ -2021,15 +2195,30 @@ export default function AgentBuilderPage() {
                   return (
                     <label
                       key={source.id}
-                      className={`group flex items-start gap-4 rounded-2xl border px-5 py-5 transition-all cursor-pointer ${
+                      className={`group flex items-center justify-between gap-4 rounded-[2rem] border p-4 transition-all duration-300 ease-out cursor-pointer ${
                         isReady
                           ? checked 
-                            ? 'border-primary/30 bg-primary/[0.03]' 
-                            : 'border-outline-variant/10 bg-surface-container-low hover:border-outline-variant/30'
-                          : 'border-outline-variant/10 bg-surface-container-high/50 grayscale'
+                            ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-sm' 
+                            : 'border-outline-variant/15 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low hover:shadow-md'
+                          : 'border-outline-variant/10 bg-surface-container-high/30 grayscale opacity-70 cursor-not-allowed'
                       }`}
                     >
-                      <div className="relative mt-1 flex h-5 w-5 shrink-0 items-center justify-center">
+                      <div className="min-w-0 flex-1 pl-1">
+                        <p className="text-sm font-bold text-on-surface tracking-tight truncate pr-4">{source.name}</p>
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] ${getKnowledgeStatusTone(source.status)}`}
+                          >
+                            {translateKnowledgeStatus(source.status, t)}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/40">
+                            {t('agentBuilder.knowledgeChunks', {
+                              count: source.chunk_count,
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
                         <input
                           type="checkbox"
                           checked={checked}
@@ -2037,23 +2226,8 @@ export default function AgentBuilderPage() {
                           onChange={(event) => updateKnowledgeSources(source.id, event.target.checked)}
                           className="peer absolute h-full w-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                         />
-                        <div className="h-5 w-5 rounded-md border-2 border-outline-variant/30 transition-all peer-checked:border-primary peer-checked:bg-primary" />
-                        <span className="material-symbols-outlined absolute scale-0 text-white text-sm transition-transform peer-checked:scale-100">check</span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-bold text-on-surface tracking-tight">{source.name}</p>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${getKnowledgeStatusTone(source.status)}`}
-                          >
-                            {translateKnowledgeStatus(source.status, t)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/40">
-                          {t('agentBuilder.knowledgeChunks', {
-                            count: source.chunk_count,
-                          })}
-                        </p>
+                        <div className="h-6 w-6 rounded-lg border-2 border-outline-variant/20 transition-all peer-checked:border-primary peer-checked:bg-primary group-hover:border-primary/50" />
+                        <span className="material-symbols-outlined absolute scale-0 text-white text-[16px] transition-transform peer-checked:scale-100 peer-disabled:opacity-50">check</span>
                       </div>
                     </label>
                   );
@@ -2061,19 +2235,20 @@ export default function AgentBuilderPage() {
               )}
             </div>
             
-            <div className="flex items-center gap-3 pt-4">
+            <div className="flex items-center gap-3 pt-6 border-t border-outline-variant/10">
               <Link
                 href="/knowledge"
-                className="flex-1 rounded-full border border-outline-variant/15 px-4 py-2.5 text-center text-xs font-bold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-[0.98]"
+                className="flex-[4] flex items-center justify-center gap-2 rounded-[1.5rem] border border-outline-variant/20 bg-surface-container-lowest px-5 py-3.5 text-xs font-bold uppercase tracking-widest text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/30 hover:shadow-sm active:scale-[0.98]"
               >
+                <span className="material-symbols-outlined text-sm">sync</span>
                 {t('agentBuilder.syncOperations')}
               </Link>
               <button
                 onClick={() => removeOptionalNode('knowledge')}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-all hover:bg-red-500/10 hover:text-red-500 active:scale-[0.98]"
+                className="flex-1 flex h-[50px] items-center justify-center rounded-[1.5rem] bg-error-container/50 text-on-error-container transition-all hover:bg-error hover:text-on-error hover:shadow-error/20 active:scale-[0.98]"
                 title={t('agentBuilder.removeNode')}
               >
-                <span className="material-symbols-outlined text-lg focus:outline-none">delete</span>
+                <span className="material-symbols-outlined text-[20px]">delete</span>
               </button>
             </div>
           </div>
@@ -2113,6 +2288,14 @@ export default function AgentBuilderPage() {
       const calendarOptionsStatus = selectedCalendarConnectionId
         ? calendarOptionsStatusByConnectionId[selectedCalendarConnectionId] ?? 'idle'
         : 'idle';
+      const selectedCalConnectionId =
+        toolNode.data.kind === 'cal' ? toolNode.data.connectionId : null;
+      const calEventTypes = selectedCalConnectionId
+        ? calEventTypesByConnectionId[selectedCalConnectionId] ?? []
+        : [];
+      const calEventTypesStatus = selectedCalConnectionId
+        ? calEventTypesStatusByConnectionId[selectedCalConnectionId] ?? 'idle'
+        : 'idle';
       const hasValidSpecificRecipient =
         toolNode.data.kind === 'gmail' &&
         toolNode.data.recipientMode === 'specific_email' &&
@@ -2124,7 +2307,9 @@ export default function AgentBuilderPage() {
           <p className="text-sm leading-6 text-on-surface-variant">
             {toolNode.data.kind === 'gmail'
               ? t('agentBuilder.useGmail')
-              : t('agentBuilder.useCalendar')}
+              : toolNode.data.kind === 'cal'
+                ? t('agentBuilder.useCal')
+                : t('agentBuilder.useCalendar')}
           </p>
           {selectedConnection && selectedConnection.status !== 'connected' ? (
             <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-sm text-on-surface-variant">
@@ -2221,19 +2406,24 @@ export default function AgentBuilderPage() {
               )}
             </div>
           )}
-          <div className="space-y-2">
+          <div className="group relative">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
               {t('agentBuilder.allowedActions')}
             </p>
-            <div className="flex flex-wrap gap-2">
-              {lockedActions.map((action) => (
-                <span
-                  key={action}
-                  className="rounded-full bg-background px-3 py-2 text-[11px] font-semibold text-on-surface-variant"
-                >
-                  {action}
-                </span>
-              ))}
+            <div className="mt-2 flex min-w-[120px] items-center justify-center rounded-full bg-background px-3 py-2 text-[11px] font-semibold text-on-surface-variant">
+              {lockedActions.length} {lockedActions.length === 1 ? 'action' : 'actions'}
+            </div>
+            <div className="absolute left-0 top-full z-50 mt-1 hidden w-48 rounded-xl border border-outline-variant/20 bg-surface-container p-2 shadow-lg group-hover:block">
+              <div className="space-y-1">
+                {lockedActions.map((action) => (
+                  <div
+                    key={action}
+                    className="rounded-lg px-3 py-2 text-xs font-medium text-on-surface hover:bg-surface-container-high"
+                  >
+                    {action}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           {toolNode.data.kind === 'googlecalendar' && (
@@ -2310,6 +2500,136 @@ export default function AgentBuilderPage() {
                       ? t('agentBuilder.primaryCalendarResolved')
                       : t('agentBuilder.selectedCalendarResolved')
                     : t('agentBuilder.bookingTimezoneFallback')}
+                </p>
+              </div>
+            </div>
+          )}
+          {toolNode.data.kind === 'cal' && (
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                  {t('agentBuilder.schedulingMode')}
+                </label>
+                <select
+                  value={(toolNode.data as CalBuilderNodeData).eventTypeMode}
+                  onChange={(event) => {
+                    const nextMode = event.target.value === 'specific_event_type' 
+                      ? 'specific_event_type' 
+                      : 'ai_decides';
+                    updateNode(toolNode.id, (node) => {
+                      if (node.data.kind !== 'cal') {
+                        return node;
+                      }
+                      return {
+                        ...node,
+                        data: {
+                          ...node.data,
+                          eventTypeMode: nextMode,
+                          eventTypeId: nextMode === 'ai_decides' ? null : node.data.eventTypeId,
+                          eventTypeLabel: nextMode === 'ai_decides' ? null : node.data.eventTypeLabel,
+                        } as CalBuilderNodeData,
+                      };
+                    });
+                  }}
+                  onKeyDown={stopBuilderFieldKeyDown}
+                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
+                >
+                  <option value="ai_decides">{t('agentBuilder.aiDecides')}</option>
+                  <option value="specific_event_type">{t('agentBuilder.specificEventType')}</option>
+                </select>
+                <p className="mt-2 text-xs text-on-surface-variant">
+                  {(toolNode.data as CalBuilderNodeData).eventTypeMode === 'specific_event_type'
+                    ? t('agentBuilder.specificEventTypeDesc')
+                    : t('agentBuilder.aiDecidesEventTypeDesc')}
+                </p>
+              </div>
+              {(toolNode.data as CalBuilderNodeData).eventTypeMode === 'specific_event_type' && (
+                <div>
+                  <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                    {t('agentBuilder.eventType')}
+                  </label>
+                  {calEventTypes.length > 0 ? (
+                    <select
+                      value={(toolNode.data as CalBuilderNodeData).eventTypeId ?? ''}
+                      onChange={(event) => {
+                        const nextEventTypeId = event.target.value || null;
+                        const selectedEventType = calEventTypes.find(et => et.id === nextEventTypeId);
+                        updateNode(toolNode.id, (node) => {
+                          if (node.data.kind !== 'cal') {
+                            return node;
+                          }
+                          return {
+                            ...node,
+                            data: {
+                              ...node.data,
+                              eventTypeId: nextEventTypeId,
+                              eventTypeLabel: nextEventTypeId && selectedEventType ? selectedEventType.title : null,
+                            } as CalBuilderNodeData,
+                          };
+                        });
+                      }}
+                      onKeyDown={stopBuilderFieldKeyDown}
+                      disabled={calEventTypesStatus === 'loading'}
+                      className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <option value="">{t('agentBuilder.selectEventType')}</option>
+                      {calEventTypes.map((eventType) => (
+                        <option key={eventType.id} value={eventType.id}>
+                          {eventType.title}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={(toolNode.data as CalBuilderNodeData).eventTypeId ?? ''}
+                      onChange={(event) => {
+                        const nextEventTypeId = event.target.value || null;
+                        updateNode(toolNode.id, (node) => {
+                          if (node.data.kind !== 'cal') {
+                            return node;
+                          }
+                          return {
+                            ...node,
+                            data: {
+                              ...node.data,
+                              eventTypeId: nextEventTypeId,
+                            } as CalBuilderNodeData,
+                          };
+                        });
+                      }}
+                      onKeyDown={stopBuilderFieldKeyDown}
+                      placeholder={t('agentBuilder.eventTypeIdPlaceholder')}
+                      className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
+                    />
+                  )}
+                  {calEventTypesStatus === 'loading' && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-on-surface-variant">
+                      <div className="h-3 w-3 animate-spin rounded-full border border-primary/30 border-t-primary" />
+                      {t('agentBuilder.loadingEventTypes')}
+                    </div>
+                  )}
+                  {calEventTypesStatus === 'error' && calEventTypes.length === 0 && (
+                    <div className="mt-2 rounded-xl border border-outline-variant/10 bg-surface-container px-3 py-2 text-xs text-on-surface-variant">
+                      {t('agentBuilder.eventTypeManualHint')}{' '}
+                      <a
+                        href={t('agentBuilder.eventTypeHelpUrl')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        {t('agentBuilder.eventTypeManualHintLink')}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                  {t('agentBuilder.bookingTimezone')}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-on-surface">
+                  {(toolNode.data as CalBuilderNodeData).timezone ?? timezone}
                 </p>
               </div>
             </div>

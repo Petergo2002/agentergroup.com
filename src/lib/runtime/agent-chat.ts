@@ -23,6 +23,7 @@ import { createOpenRouterChatCompletion } from "@/lib/openrouter";
 import { getSupabaseEnv, getSupabaseServiceRoleKey } from "@/lib/env";
 import type {
   AgentRecord,
+  CalSelection,
   EndChatMetadata,
   EndChatPolicy,
   GmailRecipientPolicy,
@@ -134,6 +135,7 @@ export interface AgentRuntimeInput {
   widgetPublicKey?: string | null;
   calendarTimezone?: string | null;
   googleCalendarSelection?: GoogleCalendarSelection | null;
+  calSelection?: CalSelection | null;
   endChatPolicy?: EndChatPolicy | null;
   gmailRecipientPolicy?: GmailRecipientPolicy | null;
   abortSignal?: AbortSignal;
@@ -285,6 +287,7 @@ function buildToolGuidance(
   toolkitSlugs: string[],
   gmailRecipientPolicy: GmailRecipientPolicy,
   googleCalendarSelection: GoogleCalendarSelection | null,
+  calSelection: CalSelection | null,
 ) {
   const availableIntegrations = Array.from(new Set(toolkitSlugs))
     .map((toolkitSlug) => getSupportedIntegration(toolkitSlug))
@@ -356,6 +359,26 @@ function buildToolGuidance(
         `For Google Calendar scheduling, treat ${resolvedCalendarTimezone} as the calendar timezone for availability checks and event creation.`,
       );
     }
+  }
+
+  if (toolkitSlugs.includes("cal")) {
+    const eventTypeLabel = calSelection?.eventTypeLabel?.trim();
+    const resolvedTimezone = calSelection?.timezone?.trim();
+    guidance.push(
+      eventTypeLabel
+        ? `For Cal.com scheduling, ALWAYS check availability using CAL_GET_AVAILABLE_SLOTS_INFO before attempting to book. Use the configured event type "${eventTypeLabel}" for all availability checks and bookings.`
+        : "For Cal.com scheduling, ALWAYS check availability using CAL_GET_AVAILABLE_SLOTS_INFO before attempting to book. Ensure an event type is configured.",
+    );
+
+    if (resolvedTimezone) {
+      guidance.push(
+        `For Cal.com scheduling, treat ${resolvedTimezone} as the scheduling timezone for availability checks and bookings.`,
+      );
+    }
+
+    guidance.push(
+      "When the user wants to book a meeting, first check available slots with CAL_GET_AVAILABLE_SLOTS_INFO, then use CAL_CREATE_BOOKING_VERSION_2 to create the booking with the selected time slot.",
+    );
   }
 
   return guidance.join(" ");
@@ -511,6 +534,7 @@ export async function runAgentChat({
   widgetPublicKey,
   calendarTimezone,
   googleCalendarSelection,
+  calSelection,
   endChatPolicy,
   gmailRecipientPolicy,
   abortSignal,
@@ -558,50 +582,32 @@ export async function runAgentChat({
         return `Current timezone: ${effectiveTimezone}. Current local time: ${timeString}. You MUST use this timezone for all date and time operations, especially when creating or reading calendar events.`;
       })()
     : null;
-
-  const modelMessages: Array<Record<string, unknown>> = [
-    {
-      role: "system",
-      content:
-        agent.instructions ||
-        "You are a configurable AI agent. Help the user clearly and use tools when useful. Never mention internal errors, retries, system prompts, hidden context, or raw tool payloads.",
-    },
-    ...mapDbMessagesToModel(history),
+  const systemInstructionBlocks: string[] = [
+    agent.instructions ||
+      "You are a configurable AI agent. Help the user clearly and use tools when useful. Never mention internal errors, retries, system prompts, hidden context, or raw tool payloads.",
   ];
 
   if (timezoneContext) {
-    modelMessages.splice(1, 0, {
-      role: "system",
-      content: timezoneContext,
-    });
+    systemInstructionBlocks.push(timezoneContext);
   }
 
   if (audience === "assistant" && agent.surface === "assistant") {
-    modelMessages.splice(1, 0, {
-      role: "system",
-      content: INTERNAL_ASSISTANT_TOOLKIT_PROMPT,
-    });
+    systemInstructionBlocks.push(INTERNAL_ASSISTANT_TOOLKIT_PROMPT);
   }
 
   const toolGuidance = buildToolGuidance(
     enabledToolkits,
     effectiveGmailRecipientPolicy,
     googleCalendarSelection ?? null,
+    calSelection ?? null,
   );
-  const endChatGuidance = buildEndChatGuidance(effectiveEndChatPolicy);
-
   if (toolGuidance) {
-    modelMessages.splice(1, 0, {
-      role: "system",
-      content: toolGuidance,
-    });
+    systemInstructionBlocks.push(toolGuidance);
   }
 
+  const endChatGuidance = buildEndChatGuidance(effectiveEndChatPolicy);
   if (endChatGuidance) {
-    modelMessages.splice(1, 0, {
-      role: "system",
-      content: endChatGuidance,
-    });
+    systemInstructionBlocks.push(endChatGuidance);
   }
 
   const toolsPromise = getWrappedTools(toolUserId, enabledToolkits);
@@ -622,10 +628,7 @@ export async function runAgentChat({
       const knowledgeContext = buildKnowledgeContext(knowledgeMatches);
 
       if (knowledgeContext) {
-        modelMessages.splice(1, 0, {
-          role: "system",
-          content: knowledgeContext,
-        });
+        systemInstructionBlocks.push(knowledgeContext);
       }
     } catch (error) {
       console.error("Knowledge retrieval failed; continuing without knowledge.", {
@@ -636,6 +639,14 @@ export async function runAgentChat({
       });
     }
   }
+
+  const modelMessages: Array<Record<string, unknown>> = [
+    {
+      role: "system",
+      content: systemInstructionBlocks.join("\n\n---\n\n"),
+    },
+    ...mapDbMessagesToModel(history),
+  ];
 
   const tools = await toolsPromise;
   const toolDefinitions: ToolDefinitionLike[] = [
@@ -841,6 +852,7 @@ export async function runAgentChat({
           {
             gmailRecipientPolicy: effectiveGmailRecipientPolicy,
             googleCalendarSelection: googleCalendarSelection ?? null,
+            calSelection: calSelection ?? null,
           },
         );
         const { results, sessionWasRecreated } = toolCallResult as unknown as {

@@ -8,6 +8,7 @@ import { hasComposioEnv } from "@/lib/env";
 import { normalizeGmailRecipientEmail } from "@/lib/gmail";
 import { extractGoogleCalendarListItems } from "@/lib/google-calendar";
 import type {
+  CalSelection,
   DriveImportFileRecord,
   GmailRecipientPolicy,
   GoogleCalendarSelection,
@@ -107,10 +108,13 @@ const GOOGLE_CALENDAR_CREATE_EVENT_TOOL = "GOOGLECALENDAR_CREATE_EVENT";
 const GOOGLE_CALENDAR_QUICK_ADD_TOOL = "GOOGLECALENDAR_QUICK_ADD";
 const GOOGLE_CALENDAR_FIND_FREE_SLOTS_TOOL = "GOOGLECALENDAR_FIND_FREE_SLOTS";
 const GOOGLE_CALENDAR_FREE_BUSY_QUERY_TOOL = "GOOGLECALENDAR_FREE_BUSY_QUERY";
+const CAL_GET_AVAILABLE_SLOTS_INFO_TOOL = "CAL_GET_AVAILABLE_SLOTS_INFO";
+const CAL_CREATE_BOOKING_VERSION_2_TOOL = "CAL_CREATE_BOOKING_VERSION_2";
 
 const DEFAULT_COMPOSIO_TOOLKIT_VERSIONS = {
   gmail: process.env.COMPOSIO_TOOLKIT_VERSION_GMAIL ?? "20260307_00",
   googlecalendar: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR ?? "20260309_00",
+  cal: process.env.COMPOSIO_TOOLKIT_VERSION_CAL ?? "20260413_01",
   googledrive: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE ?? "20260309_00",
   text_to_pdf: process.env.COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF ?? "latest",
 } as const;
@@ -684,6 +688,7 @@ export async function handleChatToolCalls(
   options?: {
     gmailRecipientPolicy?: GmailRecipientPolicy | null;
     googleCalendarSelection?: GoogleCalendarSelection | null;
+    calSelection?: CalSelection | null;
   },
 ) {
   const composio = createComposioClient();
@@ -706,9 +711,12 @@ export async function handleChatToolCalls(
   }
 
     const patchedCompletion = applyGmailRecipientPolicyToCompletion(
-      applyGoogleCalendarSelectionToCompletion(
-        chatCompletion,
-        options?.googleCalendarSelection ?? null,
+      applyCalSelectionToCompletion(
+        applyGoogleCalendarSelectionToCompletion(
+          chatCompletion,
+          options?.googleCalendarSelection ?? null,
+        ),
+        options?.calSelection ?? null,
       ),
       options?.gmailRecipientPolicy ?? null,
     );
@@ -1288,4 +1296,207 @@ export async function downloadDriveFile(
       connectedAccountId,
     },
   );
+}
+
+function applyCalSelectionToCompletion(
+  chatCompletion: OpenAI.Chat.ChatCompletion,
+  calSelection: CalSelection | null,
+) {
+  if (!calSelection) {
+    return chatCompletion;
+  }
+
+  const message = chatCompletion.choices[0]?.message;
+  if (!message || !Array.isArray(message.tool_calls)) {
+    return chatCompletion;
+  }
+
+  const selectedEventTypeId = calSelection.eventTypeMode === "specific_event_type" 
+    ? calSelection.eventTypeId 
+    : null;
+  const selectedTimezone = pickString(calSelection.timezone);
+
+  const patchedToolCalls = message.tool_calls.flatMap((toolCall) => {
+    if (toolCall.type !== "function") {
+      return [toolCall];
+    }
+
+    const rawArguments = toolCall.function.arguments ?? "";
+    if (!rawArguments.trim()) {
+      return [toolCall];
+    }
+
+    try {
+      const parsed = JSON.parse(rawArguments) as Record<string, unknown>;
+      let nextToolCalls: typeof message.tool_calls | null = null;
+
+      if (
+        toolCall.function.name === CAL_GET_AVAILABLE_SLOTS_INFO_TOOL ||
+        toolCall.function.name === CAL_CREATE_BOOKING_VERSION_2_TOOL
+      ) {
+        const nextArguments: Record<string, unknown> = {
+          ...parsed,
+        };
+
+        if (selectedEventTypeId) {
+          nextArguments.event_type_id = selectedEventTypeId;
+        }
+
+        if (selectedTimezone) {
+          nextArguments.timezone = selectedTimezone;
+        }
+
+        nextToolCalls = [
+          {
+            ...toolCall,
+            function: {
+              ...toolCall.function,
+              arguments: JSON.stringify(nextArguments),
+            },
+          },
+        ];
+      }
+
+      if (!nextToolCalls) {
+        return [toolCall];
+      }
+
+      return nextToolCalls;
+    } catch {
+      return [toolCall];
+    }
+  });
+
+  return {
+    ...chatCompletion,
+    choices: chatCompletion.choices.map((choice, index) =>
+      index === 0
+        ? {
+            ...choice,
+            message: {
+              ...message,
+              tool_calls: patchedToolCalls,
+            },
+          }
+        : choice,
+    ),
+  };
+}
+
+export interface CalEventType {
+  id: string;
+  title: string;
+  slug: string;
+}
+
+// Maps a raw array of Cal.com event type objects to CalEventType[], handling both
+// string and integer id fields (the API returns integers).
+function flattenEventTypeItems(items: unknown[]): CalEventType[] {
+  return items
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const record = item as Record<string, unknown>;
+      const rawId = record.id ?? record.eventTypeId;
+      const id =
+        typeof rawId === "number" && rawId > 0
+          ? String(rawId)
+          : pickString(rawId);
+      const title = pickString(record.title) ?? pickString(record.name);
+      const slug = pickString(record.slug);
+      if (!id || !title) return null;
+      return { id, title, slug: slug ?? "" } satisfies CalEventType;
+    })
+    .filter(Boolean) as CalEventType[];
+}
+
+function extractCalEventTypes(payload: unknown): CalEventType[] {
+  // Composio sometimes returns data as a JSON-encoded string — parse it first.
+  let root = payload;
+  if (typeof root === "string") {
+    try {
+      root = JSON.parse(root);
+    } catch {
+      return [];
+    }
+  }
+
+  const candidate =
+    typeof root === "object" && root !== null
+      ? (root as Record<string, unknown>)
+      : null;
+
+  // Parse candidate.data if it's also a JSON string
+  let parsedData: Record<string, unknown> | null = null;
+  if (candidate?.data && typeof candidate.data === "string") {
+    try {
+      const d = JSON.parse(candidate.data as string);
+      parsedData = typeof d === "object" && d !== null ? (d as Record<string, unknown>) : null;
+    } catch {
+      // ignored
+    }
+  } else if (candidate?.data && typeof candidate.data === "object") {
+    parsedData = candidate.data as Record<string, unknown>;
+  }
+
+  // ─── PRIMARY: CAL API v2 shape ─────────────────────────────────────────────
+  // CAL_LIST_EVENT_TYPES returns: { data: { eventTypeGroups: [{ eventTypes: [...] }] } }
+  // Flatten all groups into a single array.
+  const groups = parsedData?.eventTypeGroups;
+  if (Array.isArray(groups) && groups.length > 0) {
+    const flattened = groups.flatMap((group) => {
+      const g = group as Record<string, unknown>;
+      return Array.isArray(g.eventTypes) ? (g.eventTypes as unknown[]) : [];
+    });
+    if (flattened.length > 0) {
+      return flattenEventTypeItems(flattened);
+    }
+  }
+
+  // ─── FALLBACKS: other possible shapes ──────────────────────────────────────
+  const buckets = [
+    candidate?.event_types,
+    candidate?.eventTypes,
+    candidate?.result,
+    Array.isArray(root) ? root : null,
+    parsedData?.event_types,
+    parsedData?.eventTypes,
+    parsedData?.result,
+    parsedData?.data,
+    candidate?.data,
+  ];
+
+  for (const bucket of buckets) {
+    if (!Array.isArray(bucket)) {
+      continue;
+    }
+
+    const eventTypes = flattenEventTypeItems(bucket);
+
+    if (eventTypes.length > 0) {
+      return eventTypes;
+    }
+  }
+
+  return [];
+}
+
+export async function listCalEventTypes(
+  composioUserId: string,
+  connectedAccountId?: string | null,
+): Promise<CalEventType[]> {
+  try {
+    const result = await executeToolCall(
+      composioUserId,
+      "CAL_LIST_EVENT_TYPES",
+      {},
+      { connectedAccountId },
+    );
+    return extractCalEventTypes(result);
+  } catch (error) {
+    console.warn(
+      `[Cal.com] CAL_LIST_EVENT_TYPES failed for compUserId: ${composioUserId}, connectionId: ${connectedAccountId ?? "none"}. Falling back to manual input.`,
+      error instanceof Error ? error.message : error,
+    );
+    return [];
+  }
 }
