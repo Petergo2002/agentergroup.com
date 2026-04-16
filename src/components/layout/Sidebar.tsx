@@ -22,6 +22,7 @@ import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { hasInternalAssistantsEnabled } from "@/lib/assistants/feature-flags";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 interface SidebarProps {
   mobile?: boolean;
@@ -174,41 +175,21 @@ export function Sidebar({
 
       <div className={`mt-auto p-4 space-y-3 transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-4'}`}>
         
-        
-        <div className={`group relative flex w-full items-center gap-3 rounded-2xl bg-surface-container/55 p-3 ring-1 ring-transparent transition-all hover:bg-surface-container-high hover:ring-outline-variant ${
-          isCollapsed && !mobile ? 'justify-center' : ''
-        }`}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-xs font-bold text-on-surface-variant transition-colors group-hover:bg-primary/10 group-hover:text-primary">
-            {initials}
-          </div>
-          {(!isCollapsed || mobile) && (
+        {membership.role !== 'owner' && (!isCollapsed || mobile) && (
+          <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/8 ring-1 ring-amber-500/15 px-3 py-2.5">
+            <span className="material-symbols-outlined text-base text-amber-500">domain</span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold text-on-surface">
-                {userEmail ?? t("nav.workspace")}
+              <p className="truncate text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                {t("nav.guestWorkspace") || "Guest Workspace"}
               </p>
-              <div className="mt-1 inline-flex rounded-md bg-surface-container-high px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
-                {t(`roles.${membership.role}Lower`)}
-              </div>
+              <p className="truncate text-[11px] font-medium text-on-surface-variant mt-0.5">
+                {workspace.name}
+              </p>
             </div>
-          )}
-          
-          <form action="/auth/logout" method="post" className={`absolute right-3 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 ${isCollapsed && !mobile ? 'hidden' : ''}`}>
-            <button 
-              type="submit"
-              aria-label={t("nav.signOut")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary"
-              title={t("nav.signOut")}
-            >
-              <LogOut className="h-4 w-4" strokeWidth={2} />
-            </button>
-          </form>
+          </div>
+        )}
 
-          {isCollapsed && !mobile && (
-            <div className="fixed left-[70px] rounded-md bg-on-surface px-3 py-2 text-xs font-bold text-background opacity-0 shadow-xl ring-1 ring-outline-variant pointer-events-none transition-opacity duration-200 group-hover:opacity-100 z-[9999] whitespace-nowrap">
-              {userEmail ?? t("nav.workspace")}
-            </div>
-          )}
-        </div>
+        <WorkspaceSwitcher isCollapsed={isCollapsed} mobile={mobile} />
       </div>
     </aside>
   );

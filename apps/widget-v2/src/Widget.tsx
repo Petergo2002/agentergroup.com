@@ -26,6 +26,23 @@ import {
   sendWidgetMessage,
   type WidgetRequestContext,
 } from "./lib/api";
+import { createJsonError, hasErrorCode, getRetryAfterSeconds, buildRequestContextFromBootstrap } from "./lib/api-errors";
+import { buildChatRateLimitMessage } from "./lib/localization";
+import { normalizeWidgetConfig, resolveWidgetLanguage, resolveSelectedAgent } from "./lib/config";
+import { buildLocalizedPrivacyPolicyUrl } from "./lib/localization";
+import {
+  PREVIEW_REQUEST_MESSAGE_TYPE,
+  BOOTSTRAP_REQUEST_MESSAGE_TYPE,
+  BOOTSTRAP_REFRESH_MESSAGE_TYPE,
+  WIDGET_CLOSE_REQUEST_MESSAGE_TYPE,
+  type SessionPresenceEvent,
+  parsePreviewOverrideMessage,
+  parseWidgetStateMessage,
+  parsePreviewResetMessage,
+  parseWidgetBootstrapMessage,
+  parseWidgetBootstrapErrorMessage,
+} from "./lib/postmessage";
+import { resolveEmbeddedParentOrigin } from "./lib/origin";
 import {
   applyStreamFailureToMessages,
   resolveStreamedAgentContent,
@@ -34,11 +51,9 @@ import {
 import { deriveWidgetPalette, hexToRgb } from "./theme";
 import type {
   Message,
-  WidgetAgentConfig,
   WidgetBootstrapResponse,
   WidgetConfig,
   WidgetEndChatReason,
-  WidgetPreviewOverride,
 } from "./types";
 
 interface WidgetProps {
@@ -51,463 +66,15 @@ interface WidgetProps {
   embeddedBy?: string;
 }
 
-const PREVIEW_MESSAGE_TYPE = "ag:widget-preview:update-config";
-const PREVIEW_RESET_MESSAGE_TYPE = "ag:widget-preview:reset-chat";
-const PREVIEW_REQUEST_MESSAGE_TYPE = "ag:widget-preview:request-config";
-const BOOTSTRAP_MESSAGE_TYPE = "ag:widget-bootstrap";
-const BOOTSTRAP_REQUEST_MESSAGE_TYPE = "ag:widget-bootstrap:request";
-const BOOTSTRAP_REFRESH_MESSAGE_TYPE = "ag:widget-bootstrap:refresh";
-const BOOTSTRAP_ERROR_MESSAGE_TYPE = "ag:widget-bootstrap:error";
-const WIDGET_CLOSE_REQUEST_MESSAGE_TYPE = "ag:widget:close-request";
-const WIDGET_STATE_MESSAGE_TYPE = "ag:widget:state";
 const MIN_INTERIM_STREAM_RENDER_DELAY_MS = 0;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const PRESENCE_DEDUPE_MS = 1_500;
-type SessionPresenceEvent =
-  | "widget_open"
-  | "widget_close"
-  | "page_hidden"
-  | "page_visible"
-  | "page_unload"
-  | "heartbeat";
-
-interface WidgetStateMessagePayload {
-  type: typeof WIDGET_STATE_MESSAGE_TYPE;
-  isOpen: boolean;
-  at?: number;
-}
-
-interface WidgetBootstrapMessagePayload {
-  type: typeof BOOTSTRAP_MESSAGE_TYPE;
-  payload: WidgetBootstrapResponse;
-}
-
-interface WidgetPreviewResetPayload {
-  type: typeof PREVIEW_RESET_MESSAGE_TYPE;
-  payload?: {
-    previewRevision?: string | number;
-    reason?: string;
-  };
-}
-
-interface WidgetBootstrapErrorMessagePayload {
-  type: typeof BOOTSTRAP_ERROR_MESSAGE_TYPE;
-  error: string;
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function detectBrowserLanguage(): "sv" | "en" {
-  if (typeof navigator !== "undefined") {
-    const browserLanguage = navigator.language?.toLowerCase() || "";
-    if (browserLanguage.startsWith("sv")) return "sv";
-  }
-
-  return "en";
-}
-
-function normalizeOriginValue(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-
-    return parsed.origin;
-  } catch {
-    return null;
-  }
-}
-
-function resolveEmbeddedParentOrigin(parentOrigin?: string): string | null {
-  const normalizedFromProp = normalizeOriginValue(parentOrigin);
-  if (normalizedFromProp) return normalizedFromProp;
-  if (typeof document === "undefined") return null;
-  return normalizeOriginValue(document.referrer);
-}
-
-function buildLocalizedPrivacyPolicyUrl(
-  value: string | null | undefined,
-  language: "sv" | "en",
-): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  try {
-    const base =
-      typeof window !== "undefined" ? window.location.href : "https://agentergroup.com";
-    const parsed = new URL(trimmed, base);
-
-    if (parsed.pathname === "/privacy-policy") {
-      parsed.searchParams.set("lang", language);
-    }
-
-    return parsed.toString();
-  } catch {
-    return trimmed;
-  }
-}
-
-function parsePreviewOverrideMessage(
-  data: unknown,
-): WidgetPreviewOverride | null {
-  if (!isObjectRecord(data)) return null;
-  if (data.type !== PREVIEW_MESSAGE_TYPE) return null;
-  const payload = data.payload;
-  if (!isObjectRecord(payload)) return null;
-
-  const next: WidgetPreviewOverride = {};
-
-  if (isObjectRecord(payload.brand)) {
-    next.brand = payload.brand as Partial<WidgetConfig["brand"]>;
-  }
-
-  if (isObjectRecord(payload.widget)) {
-    next.widget = payload.widget as Partial<WidgetConfig["widget"]>;
-  }
-
-  if (isObjectRecord(payload.home)) {
-    next.home = payload.home as Partial<WidgetConfig["home"]>;
-  }
-
-  if (isObjectRecord(payload.agent)) {
-    next.agent = payload.agent as WidgetPreviewOverride["agent"];
-  }
-
-  if (typeof payload.orgName === "string") {
-    next.brand = {
-      ...(next.brand ?? {}),
-      name: payload.orgName,
-    };
-  }
-
-  if (isObjectRecord(payload.agentSettings)) {
-    next.agent = {
-      ...(next.agent ?? {}),
-      ...(payload.agentSettings as WidgetPreviewOverride["agent"]),
-    };
-  }
-
-  if (isObjectRecord(payload.widgetSettings)) {
-    next.widget = {
-      ...(next.widget ?? {}),
-      ...(payload.widgetSettings as Partial<WidgetConfig["widget"]>),
-    };
-  }
-
-  return next;
-}
-
-function parseWidgetStateMessage(
-  data: unknown,
-): WidgetStateMessagePayload | null {
-  if (!isObjectRecord(data)) return null;
-  if (data.type !== WIDGET_STATE_MESSAGE_TYPE) return null;
-  if (typeof data.isOpen !== "boolean") return null;
-
-  return {
-    type: WIDGET_STATE_MESSAGE_TYPE,
-    isOpen: data.isOpen,
-    at: typeof data.at === "number" ? data.at : undefined,
-  };
-}
-
-function parsePreviewResetMessage(
-  data: unknown,
-): WidgetPreviewResetPayload | null {
-  if (!isObjectRecord(data)) return null;
-  if (data.type !== PREVIEW_RESET_MESSAGE_TYPE) return null;
-  const payload = isObjectRecord(data.payload) ? data.payload : undefined;
-
-  return {
-    type: PREVIEW_RESET_MESSAGE_TYPE,
-    payload: payload
-      ? {
-          previewRevision:
-            typeof payload.previewRevision === "string" ||
-            typeof payload.previewRevision === "number"
-              ? payload.previewRevision
-              : undefined,
-          reason:
-            typeof payload.reason === "string" ? payload.reason : undefined,
-        }
-      : undefined,
-  };
-}
-
-function parseWidgetBootstrapMessage(
-  data: unknown,
-): WidgetBootstrapMessagePayload | null {
-  if (!isObjectRecord(data)) return null;
-  if (data.type !== BOOTSTRAP_MESSAGE_TYPE) return null;
-  if (!isObjectRecord(data.payload)) return null;
-  if (!isObjectRecord(data.payload.config)) return null;
-
-  return {
-    type: BOOTSTRAP_MESSAGE_TYPE,
-    payload: data.payload as unknown as WidgetBootstrapResponse,
-  };
-}
-
-function parseWidgetBootstrapErrorMessage(
-  data: unknown,
-): WidgetBootstrapErrorMessagePayload | null {
-  if (!isObjectRecord(data)) return null;
-  if (data.type !== BOOTSTRAP_ERROR_MESSAGE_TYPE) return null;
-  if (typeof data.error !== "string") return null;
-
-  return {
-    type: BOOTSTRAP_ERROR_MESSAGE_TYPE,
-    error: data.error,
-  };
-}
 
 function isAbortError(error: unknown) {
   return (
     (error instanceof DOMException && error.name === "AbortError") ||
     (error instanceof Error && error.name === "AbortError")
   );
-}
-
-
-
-const WIDGET_DEFAULTS: Record<"sv" | "en", {
-  agentLabel: string;
-  greeting: string;
-  placeholder: string;
-  homeTitle: string;
-  greetingFallback: string;
-  placeholderFallback: string;
-}> = {
-  sv: {
-    agentLabel: "AI-Agent",
-    greeting: "Hej! Hur kan jag hjälpa dig idag?",
-    greetingFallback: "Hi! How can I help you today?",
-    placeholder: "Skriv ett meddelande...",
-    placeholderFallback: "Write a message...",
-    homeTitle: "Hur kan vi hjälpa till?",
-  },
-  en: {
-    agentLabel: "AI Agent",
-    greeting: "Hi! How can I help you today?",
-    greetingFallback: "Hej! Hur kan jag hjälpa dig idag?",
-    placeholder: "Write a message...",
-    placeholderFallback: "Skriv ett meddelande...",
-    homeTitle: "How can we help?",
-  },
-};
-
-function getLocalizedText(
-  value: string | null | undefined,
-  key: keyof typeof WIDGET_DEFAULTS["en"],
-  language: "sv" | "en"
-): string {
-  const trimmed = value?.trim() ?? "";
-  const targetDefault = WIDGET_DEFAULTS[language][key];
-  const enDefault = WIDGET_DEFAULTS["en"][key];
-  const svDefault = WIDGET_DEFAULTS["sv"][key];
-  
-  // If empty, or matches ANY of the standard defaults, replace with the target language's default
-  if (!trimmed || trimmed === enDefault || trimmed === svDefault) {
-    return targetDefault;
-  }
-  
-  // Otherwise it's custom admin text, keep it!
-  return trimmed;
-}
-
-
-function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
-  const language = resolveWidgetLanguage(config);
-  const d = WIDGET_DEFAULTS[language];
-
-  const normalizedAgents = Array.isArray(config.agents)
-    ? config.agents
-        .map((agent) => {
-          if (!agent || typeof agent !== "object") {
-            return null;
-          }
-
-          return {
-            widgetAgentId: String(agent.widgetAgentId ?? "").trim(),
-            agentId: String(agent.agentId ?? "").trim(),
-            label: agent.label?.trim() || d.agentLabel,
-            description: agent.description?.trim() || "",
-            icon:
-              typeof agent.icon === "string" && agent.icon.trim()
-                ? agent.icon.trim()
-                : null,
-            interactionMode:
-              agent.interactionMode === "contact_form"
-                ? "contact_form"
-                : "chat",
-            // Use smart localized text: if admin didn't change it from the default strings,
-            // it will translate automatically. If they wrote custom text, it stays.
-            greeting: getLocalizedText(agent.greeting, "greeting", language),
-            placeholder: getLocalizedText(agent.placeholder, "placeholder", language),
-            showQuickActions: agent.showQuickActions !== false,
-            quickActions: Array.isArray(agent.quickActions)
-              ? agent.quickActions
-              : [],
-            endChatPolicy: {
-              enabled: Boolean(agent.endChatPolicy?.enabled),
-              inactivityTimeoutSeconds:
-                typeof agent.endChatPolicy?.inactivityTimeoutSeconds === "number" &&
-                agent.endChatPolicy.inactivityTimeoutSeconds > 0
-                  ? Math.round(agent.endChatPolicy.inactivityTimeoutSeconds)
-                  : null,
-              allowAssistantSuggestion:
-                agent.endChatPolicy?.allowAssistantSuggestion !== false,
-            },
-          } satisfies WidgetAgentConfig;
-        })
-        .filter(Boolean) as WidgetAgentConfig[]
-    : [];
-
-  return {
-    ...config,
-    widgetId: config.widgetId || config.widgetPublicKey,
-    brand: {
-      name: config.brand?.name || "Agent",
-      logoUrl: config.brand?.logoUrl ?? null,
-      privacyPolicyUrl: config.brand?.privacyPolicyUrl ?? null,
-    },
-    widget: {
-      language: config.widget?.language ?? detectBrowserLanguage(),
-      theme: config.widget?.theme === "light" ? "light" : "dark",
-      primaryColor: config.widget?.primaryColor || "#ff5c00",
-      secondaryColor:
-        config.widget?.secondaryColor ||
-        config.widget?.primaryColor ||
-        "#ff5c00",
-      showBranding: config.widget?.showBranding ?? true,
-    },
-    home: {
-      mode:
-        config.home?.mode === "single_auto" && normalizedAgents.length === 1
-          ? "single_auto"
-          : "chooser",
-      // Smart localized text for home title
-      title: getLocalizedText(config.home?.title, "homeTitle", language),
-      subtitle: config.home?.subtitle ?? null,
-    },
-    agents: normalizedAgents,
-  };
-}
-
-function resolveWidgetLanguage(config: WidgetConfig | null): "sv" | "en" {
-  return config?.widget.language ?? detectBrowserLanguage();
-}
-
-function resolveSelectedAgent(
-  config: WidgetConfig | null,
-  selectedWidgetAgentId: string | null,
-) {
-  if (!config) return null;
-
-  if (selectedWidgetAgentId) {
-    return (
-      config.agents.find(
-        (agent) => agent.widgetAgentId === selectedWidgetAgentId,
-      ) ?? null
-    );
-  }
-
-  if (config.home.mode === "single_auto") {
-    return config.agents[0] ?? null;
-  }
-
-  return null;
-}
-
-async function createJsonError(response: Response, fallback: string) {
-  const payload = await response.json().catch(() => null);
-  const retryAfterHeader = response.headers.get("Retry-After");
-  const error = new Error(
-    typeof payload?.error === "string" ? payload.error : fallback,
-  ) as Error & { code?: string; retryAfterSeconds?: number; status?: number };
-  if (typeof payload?.code === "string") {
-    error.code = payload.code;
-  }
-  const retryAfterSeconds =
-    typeof payload?.retryAfterSeconds === "number"
-      ? payload.retryAfterSeconds
-      : retryAfterHeader
-        ? Number.parseInt(retryAfterHeader, 10)
-        : null;
-  if (typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-    error.retryAfterSeconds = retryAfterSeconds;
-  }
-  error.status = response.status;
-  return error;
-}
-
-function hasErrorCode(error: unknown, code: string) {
-  return (
-    error instanceof Error &&
-    "code" in error &&
-    (error as Error & { code?: string }).code === code
-  );
-}
-
-function getRetryAfterSeconds(error: unknown) {
-  if (!(error instanceof Error) || !("retryAfterSeconds" in error)) {
-    return null;
-  }
-
-  const retryAfterSeconds = (error as Error & { retryAfterSeconds?: number }).retryAfterSeconds;
-  return typeof retryAfterSeconds === "number" && retryAfterSeconds > 0
-    ? retryAfterSeconds
-    : null;
-}
-
-function formatRetryAfterDelay(
-  language: "sv" | "en",
-  retryAfterSeconds: number,
-) {
-  if (retryAfterSeconds >= 60) {
-    const minutes = Math.ceil(retryAfterSeconds / 60);
-    return language === "sv"
-      ? `${minutes} ${minutes === 1 ? "minut" : "minuter"}`
-      : `${minutes} minute${minutes === 1 ? "" : "s"}`;
-  }
-
-  return language === "sv"
-    ? `${retryAfterSeconds} ${retryAfterSeconds === 1 ? "sekund" : "sekunder"}`
-    : `${retryAfterSeconds} second${retryAfterSeconds === 1 ? "" : "s"}`;
-}
-
-function buildChatRateLimitMessage(
-  language: "sv" | "en",
-  retryAfterSeconds: number | null,
-) {
-  if (retryAfterSeconds && retryAfterSeconds > 0) {
-    const delay = formatRetryAfterDelay(language, retryAfterSeconds);
-    return language === "sv"
-      ? `Det går lite för snabbt just nu. Vänta ${delay} och försök igen.`
-      : `You're sending messages too quickly right now. Please wait ${delay} and try again.`;
-  }
-
-  return language === "sv"
-    ? "Det går lite för snabbt just nu. Vänta en stund och försök igen."
-    : "You're sending messages too quickly right now. Please wait a moment and try again.";
-}
-
-function buildRequestContextFromBootstrap(
-  bootstrapContext: WidgetRequestContext,
-  payload: WidgetBootstrapResponse,
-): WidgetRequestContext {
-  return {
-    ...bootstrapContext,
-    accessToken: payload.accessToken ?? null,
-  };
 }
 
 export default function Widget({

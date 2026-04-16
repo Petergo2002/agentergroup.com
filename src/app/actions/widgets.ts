@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { ensureWorkspaceContext } from '@/lib/app/bootstrap';
 import { createClient } from '@/lib/supabase/server';
 import { slugify } from '@/lib/utils';
@@ -10,6 +11,12 @@ function buildWidgetSlug(name: string) {
   const base = slugify(name) || 'widget';
   return `${base}-${Date.now().toString().slice(-6)}`;
 }
+
+const createWidgetSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+});
+
+const updateWidgetSchema = z.record(z.string(), z.unknown());
 
 export async function createWidgetAction(formData: FormData) {
   const supabase = await createClient();
@@ -22,21 +29,28 @@ export async function createWidgetAction(formData: FormData) {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  const requestedName =
-    (formData.get('name') as string)?.trim() || 'Untitled Widget';
+  
+  const parsed = createWidgetSchema.safeParse({
+    name: formData.get('name'),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+  
+  const requestedName = parsed.data.name;
 
   const widgetDefaults = buildDefaultWidgetInput(context.workspace, {
     name: requestedName,
     slug: buildWidgetSlug(requestedName),
   });
 
-  const admin = await import('@/lib/supabase/admin').then((m) => m.createAdminClient());
-
-  const { data: widget, error } = await admin
+  const { data: widget, error } = await supabase
     .from('widgets')
     .insert({
       ...widgetDefaults,
       workspace_id: context.workspace.id,
+      created_by: user.id,
     })
     .select()
     .single();
@@ -64,12 +78,17 @@ export async function updateWidgetAction(
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  const admin = await import('@/lib/supabase/admin').then((m) => m.createAdminClient());
+  
+  const parsed = updateWidgetSchema.safeParse(updates);
+  
+  if (!parsed.success) {
+    return { error: 'Invalid updates payload' };
+  }
 
-  const { error } = await admin
+  const { error } = await supabase
     .from('widgets')
     .update({
-      ...updates,
+      ...parsed.data,
       updated_at: new Date().toISOString(),
     })
     .eq('id', widgetId)
@@ -96,17 +115,21 @@ export async function toggleWidgetStatusAction(widgetId: string) {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  const admin = await import('@/lib/supabase/admin').then((m) => m.createAdminClient());
 
-  const { data: widget } = await admin
+  const { data: widget } = await supabase
     .from('widgets')
     .select('status')
     .eq('id', widgetId)
+    .eq('workspace_id', context.workspace.id)
     .single();
 
-  const newStatus = widget?.status === 'deployed' ? 'draft' : 'deployed';
+  if (!widget) {
+    return { error: 'Widget not found' };
+  }
 
-  const { error } = await admin
+  const newStatus = widget.status === 'deployed' ? 'draft' : 'deployed';
+
+  const { error } = await supabase
     .from('widgets')
     .update({
       status: newStatus,
@@ -124,6 +147,3 @@ export async function toggleWidgetStatusAction(widgetId: string) {
 
   return { success: true, newStatus };
 }
-
-// Legacy delete server actions were removed because they were unused and
-// duplicated authenticated route-handler logic with service-role drift.
