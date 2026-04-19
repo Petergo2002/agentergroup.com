@@ -8,7 +8,6 @@ import { isConnectedAccountMissingError } from "@/lib/composio-errors";
 import {
   listCalEventTypes,
   syncConnectedAccountsToDatabase,
-  type CalEventType,
 } from "@/lib/composio";
 import { createClient } from "@/lib/supabase/server";
 import type { ConnectionStatus } from "@/lib/types";

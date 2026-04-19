@@ -31,6 +31,7 @@ export async function GET() {
   }
 
   // Format array flattening from PostgREST joins
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formattedInvites: ExpandedWorkspaceInviteRecord[] = (invites ?? []).map((row: any) => {
     const workspaceData = Array.isArray(row.workspace) ? row.workspace[0] : row.workspace;
     const inviterData = Array.isArray(row.inviter) ? row.inviter[0] : row.inviter;

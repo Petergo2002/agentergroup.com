@@ -1,6 +1,5 @@
 import type { NextRequest } from "next/server";
 import type {
-  AgentRecord,
   WidgetDraftPreviewInput,
   WidgetPreviewDraftRecord,
   WidgetRecord,

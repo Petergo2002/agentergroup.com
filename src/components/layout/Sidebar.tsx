@@ -7,7 +7,6 @@ import {
   BarChart3,
   Bot,
   LayoutGrid,
-  LogOut,
   MessageCircle,
   MessageSquare,
   Network,
@@ -36,7 +35,6 @@ interface SidebarProps {
 export function Sidebar({
   mobile = false,
   onNavigate,
-  userEmail,
   isCollapsed = false,
   onToggleCollapse,
   mounted = false,
@@ -44,7 +42,6 @@ export function Sidebar({
   const pathname = usePathname();
   const { membership, workspace } = useAppContext();
   const { t } = useLanguage();
-  const initials = (userEmail ?? "AG").slice(0, 2).toUpperCase();
   const internalAssistantsEnabled = hasInternalAssistantsEnabled(workspace);
 
   const navItems = [

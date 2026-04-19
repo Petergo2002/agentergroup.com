@@ -31,7 +31,7 @@ import { DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS } from '@/lib/end-chat';
 import { normalizeGmailRecipientEmail } from '@/lib/gmail';
 import { formatLocaleDateTime, type PlatformLanguage } from '@/lib/i18n';
 import type { GoogleCalendarListItem } from '@/lib/google-calendar';
-import { CalEventTypeListItem, extractCalEventTypeListItems } from '@/lib/cal';
+import { CalEventTypeListItem, } from '@/lib/cal';
 import { getSupportedIntegration, isChatIntegrationSlug } from '@/lib/integrations';
 import { getKnowledgeStatusTone, isReadyKnowledgeSource } from '@/lib/knowledge';
 import { formatRelativeDate } from '@/lib/utils';
@@ -1575,7 +1575,7 @@ export default function AgentBuilderPage() {
       return;
     }
 
-    const selectedCalNodeId = selectedNode.id;
+
     const connectionId = selectedCalConnectionId;
     if (!connectionId) {
       return;

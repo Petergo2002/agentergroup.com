@@ -22,7 +22,6 @@ import {
   type WidgetAgentWithAgent,
 } from "@/lib/widgets";
 import {
-  WIDGET_ACTIVE_TURN_STALE_MS,
   DEPLOY_TIMESTAMP_SKEW_MS,
   type WidgetAdminSupabase,
   type AgentDraftDefinitionRow,

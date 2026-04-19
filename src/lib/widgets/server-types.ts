@@ -1,17 +1,10 @@
 import type {
   AgentRecord,
-  AgentVersionRecord,
   BuilderDefinition,
-  ConversationEndReason,
-  WidgetAgentRecord,
   WidgetDraftPreviewInput,
-  WidgetLeadRecord,
   WidgetPreviewDraftRecord,
-  WidgetRecord,
-  WidgetSessionMessageRecord,
   WidgetSessionRecord,
 } from "@/lib/types";
-import type { WidgetAgentWithAgent } from "@/lib/widgets";
 
 export interface WidgetQueryResult<TData> {
   data?: TData | null;

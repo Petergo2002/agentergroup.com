@@ -56,7 +56,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile }: WorkspaceSwitcherProp
 
       if (response.ok) {
         // Force a hard reload to ensure all app contexts are completely fresh
-        window.location.href = '/dashboard';
+        window.location.assign('/dashboard');
       } else {
         setIsSwitching(false);
       }
