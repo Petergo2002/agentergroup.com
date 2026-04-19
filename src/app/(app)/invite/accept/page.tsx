@@ -10,16 +10,11 @@ export default function AcceptInvitePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
-  const [state, setState] = useState<AcceptState>('loading');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [state, setState] = useState<AcceptState>(token ? 'loading' : 'error');
+  const [errorMessage, setErrorMessage] = useState(token ? '' : 'No invite token provided. Please check your invite link.');
 
   useEffect(() => {
-    if (!token) {
-      setState('error');
-      setErrorMessage('No invite token provided. Please check your invite link.');
-      return;
-    }
+    if (!token) return;
 
     const acceptInvite = async () => {
       try {
@@ -37,7 +32,6 @@ export default function AcceptInvitePage() {
           return;
         }
 
-        setWorkspaceId(payload.workspaceId);
         setState('success');
 
         // Redirect to dashboard after a short delay

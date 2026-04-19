@@ -127,7 +127,7 @@
   let focusListener = null;
   let previewOverrideMessage = null;
   let bootstrapPayload = null;
-  let widgetReady = false;
+
   let previousFocusedElement = null;
   const scrollLockState = {
     active: false,

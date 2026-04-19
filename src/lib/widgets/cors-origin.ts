@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
+import { getWidgetAppUrl } from "@/lib/env";
 import {
   buildAllowedOriginHeaders,
   buildWidgetCorsHeaders,
@@ -9,7 +9,6 @@ import {
 } from "@/lib/widgets/http";
 import type { WidgetRecord } from "@/lib/types";
 import type {
-  WidgetAccessTokenPayload,
   WidgetPreviewTokenPayload,
 } from "./server-types";
 import { verifyWidgetAccessToken } from "./tokens";

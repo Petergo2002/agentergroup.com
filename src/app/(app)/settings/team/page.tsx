@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
-import { getAppUrl } from '@/lib/env';
 import type { WorkspaceMemberWithProfile, WorkspaceInviteRecord, ExpandedWorkspaceInviteRecord } from '@/lib/types';
 import { Mail, Copy, X, Info } from 'lucide-react';
 
@@ -18,7 +17,6 @@ export default function TeamSettingsPage() {
   const [incomingInvites, setIncomingInvites] = useState<ExpandedWorkspaceInviteRecord[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [isLoadingInvites, setIsLoadingInvites] = useState(true);
-  const [isLoadingIncoming, setIsLoadingIncoming] = useState(true);
 
   // Invite modal state
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
