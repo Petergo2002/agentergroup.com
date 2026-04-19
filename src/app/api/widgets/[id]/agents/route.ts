@@ -3,7 +3,7 @@ import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 import type { AgentRecord } from "@/lib/types";
 import { buildDefaultWidgetAgentInput } from "@/lib/widgets";
-import { buildWidgetSummary, loadWidgetById } from "@/lib/widgets/server";
+import { buildWidgetSummary, loadWidgetById, type WidgetAdminSupabase } from "@/lib/widgets/server";
 
 interface AgentPayload {
   agentId: string;
@@ -34,7 +34,7 @@ export async function POST(
   }
 
   const context = await ensureWorkspaceContext(supabase, user);
-  const loaded = await loadWidgetById(supabase, id);
+  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
 
   if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
@@ -154,7 +154,7 @@ export async function POST(
     }
   }
 
-  const nextLoaded = await loadWidgetById(supabase as never, id);
+  const nextLoaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
 
   if (!nextLoaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });

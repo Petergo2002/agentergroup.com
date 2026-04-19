@@ -8,6 +8,7 @@ import {
   buildWidgetSummary,
   loadWidgetById,
   signWidgetPreviewToken,
+  type WidgetAdminSupabase,
 } from "@/lib/widgets/server";
 import { WorkspaceAccessError, assertOwnedWorkspaceResource } from "@/lib/workspace-security";
 import type { AgentRecord } from "@/lib/types";
@@ -35,7 +36,7 @@ export async function GET(
   }
 
   const context = await ensureWorkspaceContext(supabase, user);
-  const loaded = await loadWidgetById(supabase, id);
+  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
 
   if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
@@ -104,7 +105,7 @@ export async function PATCH(
   }
 
   const context = await ensureWorkspaceContext(supabase, user);
-  const loaded = await loadWidgetById(supabase, id);
+  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
 
   if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
@@ -205,7 +206,7 @@ export async function DELETE(
   }
 
   const context = await ensureWorkspaceContext(supabase, user);
-  const loaded = await loadWidgetById(supabase, id);
+  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
 
   if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });

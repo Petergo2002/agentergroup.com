@@ -165,7 +165,7 @@ export async function POST(
   }
 
   const context = await ensureWorkspaceContext(supabase, user);
-  const loaded = await loadWidgetById(supabase, id);
+  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
 
   if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
