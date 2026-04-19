@@ -17,6 +17,7 @@ export default function TeamSettingsPage() {
   const [incomingInvites, setIncomingInvites] = useState<ExpandedWorkspaceInviteRecord[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [isLoadingInvites, setIsLoadingInvites] = useState(true);
+  const [isLoadingIncoming, setIsLoadingIncoming] = useState(true);
 
   // Invite modal state
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -206,7 +207,7 @@ export default function TeamSettingsPage() {
     return (email ?? 'AG').slice(0, 2).toUpperCase();
   };
 
-  const isLoading = isLoadingMembers || isLoadingInvites;
+  const isLoading = isLoadingMembers || isLoadingInvites || isLoadingIncoming;
 
   const workspaceOwner = members.find((m) => m.role === 'owner');
   const ownerName = workspaceOwner?.profile?.full_name ?? workspaceOwner?.profile?.email ?? 'another user';
