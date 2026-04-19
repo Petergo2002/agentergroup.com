@@ -56,7 +56,7 @@ function inferMimeType(file: File) {
   return "";
 }
 
-type InputTab = "text" | "file" | "drive" | null;
+type InputTab = "text" | "file" | "drive" | "website" | null;
 
 export default function KnowledgePageClient({
   initialSources,
@@ -76,6 +76,10 @@ export default function KnowledgePageClient({
   const [fileName, setFileName] = useState("");
   const [fileDescription, setFileDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [websiteName, setWebsiteName] = useState("");
+  const [websiteDescription, setWebsiteDescription] = useState("");
+  const [isScrapingWebsite, setIsScrapingWebsite] = useState(false);
   const isLoading = false;
   const [isCreatingText, setIsCreatingText] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -290,6 +294,58 @@ export default function KnowledgePageClient({
     }
   };
 
+  const handleScrapeWebsite = async () => {
+    const trimmedUrl = websiteUrl.trim();
+    const trimmedName = websiteName.trim();
+
+    if (!trimmedUrl || !trimmedName) {
+      showToast(t("knowledge.missingTextNameOrContent"), "error");
+      return;
+    }
+
+    try {
+      new URL(trimmedUrl);
+    } catch {
+      showToast(t("knowledge.missingUrl"), "error");
+      return;
+    }
+
+    setIsScrapingWebsite(true);
+
+    try {
+      const response = await fetch("/api/knowledge/sources", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          description: websiteDescription.trim(),
+          sourceType: "website",
+          url: trimmedUrl,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? t("knowledge.scrapeError"));
+      }
+
+      setWebsiteUrl("");
+      setWebsiteName("");
+      setWebsiteDescription("");
+      await loadSources();
+      showToast(t("knowledge.websiteScraped"), "success");
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : t("knowledge.scrapeError"),
+        "error",
+      );
+    } finally {
+      setIsScrapingWebsite(false);
+    }
+  };
+
   const handleDriveImport = async (file: DriveImportFileRecord) => {
     setIsImportingDriveFileId(file.id);
 
@@ -497,6 +553,49 @@ export default function KnowledgePageClient({
               </div>
             )}
 
+            {activeTab === "website" && (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 focus-within:text-primary transition-colors">
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.sourceName")}</label>
+                    <input
+                      value={websiteName}
+                      onChange={(event) => setWebsiteName(event.target.value)}
+                      placeholder={t("knowledge.sourceNamePlaceholder")}
+                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.descriptionOptional")}</label>
+                    <input
+                      value={websiteDescription}
+                      onChange={(event) => setWebsiteDescription(event.target.value)}
+                      placeholder={t("knowledge.sourceDescriptionPlaceholder")}
+                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5 focus-within:text-primary transition-colors">
+                  <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.websiteUrl")}</label>
+                  <input
+                    value={websiteUrl}
+                    onChange={(event) => setWebsiteUrl(event.target.value)}
+                    placeholder={t("knowledge.urlPlaceholder")}
+                    className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/20"
+                  />
+                </div>
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => void handleScrapeWebsite()}
+                    disabled={isScrapingWebsite || !websiteName || !websiteUrl}
+                    className="signature-gradient h-11 rounded-full px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-105 active:scale-95 disabled:opacity-50"
+                  >
+                    {isScrapingWebsite ? t("knowledge.scraping") : t("knowledge.finishAndSync")}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {activeTab === "file" && (
               <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -635,6 +734,7 @@ export default function KnowledgePageClient({
             onAddText={() => setActiveTab("text")}
             onUploadFile={() => setActiveTab("file")}
             onCloudImport={() => setActiveTab("drive")}
+            onScrapeWebsite={() => setActiveTab("website")}
           />
         )}
       </section>

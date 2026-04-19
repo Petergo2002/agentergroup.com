@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import Firecrawl from "@mendable/firecrawl-js";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { KNOWLEDGE_BUCKET, SUPPORTED_KNOWLEDGE_MIME_TYPES } from "@/lib/knowledge";
@@ -81,8 +82,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "name is required." }, { status: 400 });
   }
 
-  if (!["text", "file"].includes(sourceType)) {
-    return NextResponse.json({ error: "sourceType must be text or file." }, { status: 400 });
+  if (!["text", "file", "website"].includes(sourceType)) {
+    return NextResponse.json({ error: "sourceType must be text, file, or website." }, { status: 400 });
   }
 
   if (sourceType === "text") {
@@ -102,6 +103,89 @@ export async function POST(request: NextRequest) {
         source_type: "text",
         raw_text: rawText,
         status: "pending",
+      })
+      .select()
+      .single();
+
+    if (error || !source) {
+      return NextResponse.json(
+        { error: error?.message ?? "Failed to create knowledge source." },
+        { status: 500 },
+      );
+    }
+
+    const processResponse = await supabase.functions.invoke("process-knowledge-source", {
+      headers: session?.access_token
+        ? {
+            Authorization: `Bearer ${session.access_token}`,
+          }
+        : undefined,
+      body: {
+        sourceId: source.id,
+      },
+    });
+
+    if (processResponse.error) {
+      return NextResponse.json(
+        {
+          error: processResponse.error.message,
+          source,
+        },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      source,
+      processStatus: "processing",
+    });
+  }
+
+  if (sourceType === "website") {
+    const url = String(body.url ?? "").trim();
+
+    if (!url) {
+      return NextResponse.json({ error: "url is required for website sources." }, { status: 400 });
+    }
+
+    try {
+      new URL(url);
+    } catch {
+      return NextResponse.json({ error: "Invalid URL provided." }, { status: 400 });
+    }
+
+    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+    if (!firecrawlApiKey) {
+      return NextResponse.json({ error: "FIRECRAWL_API_KEY is not configured." }, { status: 500 });
+    }
+
+    const firecrawl = new Firecrawl({ apiKey: firecrawlApiKey });
+    let rawText = "";
+
+    try {
+      const scrapeResult = await firecrawl.scrape(url, { formats: ["markdown"] });
+      if (!scrapeResult.markdown) {
+        throw new Error("Failed to extract markdown from website.");
+      }
+      rawText = scrapeResult.markdown;
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Failed to scrape website." },
+        { status: 500 }
+      );
+    }
+
+    const { data: source, error } = await supabase
+      .from("knowledge_sources")
+      .insert({
+        workspace_id: context.workspace.id,
+        created_by: user.id,
+        name,
+        description,
+        source_type: "website",
+        raw_text: rawText,
+        status: "pending",
+        metadata: { sourceUrl: url },
       })
       .select()
       .single();

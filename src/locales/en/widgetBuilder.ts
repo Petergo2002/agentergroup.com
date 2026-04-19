@@ -1,0 +1,133 @@
+export const widgetBuilder = {
+  loadError: "Failed to load widget.",
+  previewUnavailable: "Preview unavailable.",
+  saveError: "Failed to save widget.",
+  saved: "Widget saved.",
+  updateDeploymentError: "Failed to update deployment.",
+  deployed: "Widget deployed.",
+  takenOffline: "Widget taken offline.",
+  uploadImageError: "Please upload an image file.",
+  logoUploaded: "Logo uploaded.",
+  uploadLogoError: "Failed to upload logo.",
+  copySuccess: "{label} copied to clipboard.",
+  copyError: "Failed to copy {label}.",
+  tabs: {
+    aesthetics: "Aesthetics",
+    specialists: "Specialists",
+    behavior: "Behavior",
+    deployment: "Deployment",
+  },
+  widgetRegistry: "Widget Registry",
+  needsSync: "Needs Sync",
+  syncChanges: "Sync Changes",
+  syncing: "Syncing...",
+  goLive: "Go Live",
+  takeOffline: "Take Offline",
+  processing: "Processing...",
+  behavior: {
+    interactionLogic: "Interaction Logic",
+    interactionDescription:
+      "Control how the widget behaves when a user first interacts with it.",
+    primaryLanguage: "Primary Language",
+    showBranding: "Show Agenter Branding",
+    brandingDescription: 'Toggle "Powered by Agenter" footer',
+    homeCopywriting: "Home Screen Copywriting",
+    homeCopywritingDescription:
+      "The initial text shown in the home chooser screen when multiple specialists are active.",
+    homeTitle: "Home Title",
+    homeTitlePlaceholder: "e.g. How can we help you today?",
+    homeSubtitle: "Home Subtitle",
+    homeSubtitlePlaceholder:
+      "e.g. Select a specialist from our roster to start a conversation.",
+  },
+  agents: {
+    activeSpecialists: "Active Specialists",
+    activeSpecialistsDescription:
+      "Configure which agents are available within your widget and define their specific greetings.",
+    displayName: "Display Name",
+    displayNamePlaceholder: "How this specialist appears in the widget",
+    greetingPrompt: "Greeting Prompt",
+    descriptionSnippet: "Description Snippet",
+    descriptionPlaceholder: "Explain what this agent does...",
+    interaction: "Interaction",
+    realtimeChat: "Real-time Chat",
+    contactForm: "Contact Form",
+    noSpecialists: "No Specialists Attached",
+    noSpecialistsDescription:
+      "Users will see a generic home screen if no agents are attached to the widget.",
+    detachAgent: "Detach Agent",
+    expandRoster: "Expand Your Roster",
+    expandRosterDescription:
+      "Choose an available specialist from your workspace to attach.",
+    standardSpecialist: "Standard AI Specialist",
+    clickToAttach: "Click to Attach",
+    noRemainingSpecialists: "No remaining specialists in registry",
+    createNewAgent: "Create New Agent",
+    defaultGreeting: "Hi! How can I help you today?",
+    defaultPlaceholder: "Write a message...",
+    contactFormIntro: "Leave your details and we'll contact you.",
+    contactFormSuccess: "Thanks! We'll get back to you soon.",
+  },
+  appearance: {
+    identityBranding: "Identity & Branding",
+    identityDescription:
+      "Define the core personality of your widget experience.",
+    brandLogo: "Brand Logo",
+    noLogo: "No Logo",
+    change: "Change",
+    brandName: "Brand Name",
+    brandNamePlaceholder: "e.g. Agentergroup",
+    uploadImage: "Upload Image",
+    optimizedLogo:
+      "Optimized for PNG or SVG with transparent background.",
+    visualTone: "Visual Tone",
+    visualToneDescription:
+      "Color schemes drive interaction states and focus priority.",
+    primarySignature: "Primary Signature",
+    secondaryTint: "Secondary Tint",
+    surfaceTheme: "Surface Theme",
+    themeDescription:
+      "The surface theme affects backgrounds, text clarity, and shadow depth across the interactive UI.",
+    pickColor: "Pick color",
+    chooseColor: "Choose {label}",
+    colorPicker: "{label} color picker",
+    logoPreviewAlt: "Logo preview",
+  },
+  deployment: {
+    accessConnectivity: "Access & Connectivity",
+    accessConnectivityDescription:
+      "Embed your widget across your ecosystem using these direct snippets and hosted endpoints.",
+    embedSnippet: "Embed Snippet (Copy & Paste)",
+    embedDescription:
+      "Paste this script inside the <head> or bottom of the <body> of your website.",
+    hostedEndpoint: "Hosted Endpoint (Standalone)",
+    hostedAccess: "Hosted access",
+    hostedEnabledTitle: "Hosted link is enabled",
+    hostedEnabledDescription:
+      "Customers can open the standalone hosted URL directly.",
+    hostedDisabledTitle: "Hosted link is disabled",
+    hostedDisabledDescription:
+      "Turn this on if you want to share a standalone hosted page outside embedded placements.",
+    hostedDescription:
+      "Use this link for direct customer support shareable on social, email, or as a dedicated portal.",
+    hostedSaveHint: "Save or go live to apply hosted access changes.",
+    securityDomainAccess: "Security & Domain Access",
+    securityDomainAccessDescription:
+      "Control which websites are allowed to load your widget. This prevents unauthorized usage of your API keys.",
+    allowedOriginsPlaceholder: "e.g. https://agentergroup.com",
+    addDomain: "Add Domain",
+    authorizedDomainRegistry: "Authorized Domain Registry",
+    noDomainRestrictions: "No domain restrictions applied",
+    noDomainRestrictionsDescription:
+      "By default, your widget is accessible from all origins (less secure).",
+    copyLink: "Copy Link",
+  },
+  devicePreviewTitle: "Live Widget Preview",
+  devicePreviewDescription: "Check the bottom right corner of your screen",
+  devicePreviewBody:
+    "Your widget is running natively on this page. Any visual changes made on the left will immediately sync with the floating bubble.",
+  devicePreviewSyncing: "Syncing changes...",
+  openFullHostedPreview: "Open Full Hosted Preview",
+  openRawWidget: "Open raw widget in new tab",
+  invalidUrl: "Invalid URL",
+};

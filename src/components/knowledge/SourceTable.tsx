@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, CheckCircle2, Clock, AlertCircle, RefreshCw, Trash2, Eye } from "lucide-react";
+import { FileText, CheckCircle2, Clock, AlertCircle, RefreshCw, Trash2, Eye, Globe } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import type { KnowledgeSourceRecord } from "@/lib/types";
 import { formatRelativeDate } from "@/lib/utils";
@@ -77,14 +77,18 @@ export function SourceTable({
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant group-hover/row:bg-primary/10 group-hover/row:text-primary transition-colors">
-                        <FileText className="h-4.5 w-4.5" />
+                        {source.source_type === "website" ? (
+                          <Globe className="h-4.5 w-4.5" />
+                        ) : (
+                          <FileText className="h-4.5 w-4.5" />
+                        )}
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-on-surface tracking-tight">
                           {source.name}
                         </p>
                         <p className="mt-0.5 truncate text-[11px] text-on-surface-variant/60">
-                          {source.chunk_count} chunks • {source.description || t("assistants.noDescription")}
+                          {source.chunk_count} chunks • {source.source_type === "website" && typeof source.metadata?.sourceUrl === "string" ? source.metadata.sourceUrl : source.description || t("assistants.noDescription")}
                         </p>
                       </div>
                     </div>

@@ -1,0 +1,133 @@
+export const widgetBuilder = {
+  loadError: "Det gick inte att ladda widgeten.",
+  previewUnavailable: "Förhandsvisning är inte tillgänglig.",
+  saveError: "Det gick inte att spara widgeten.",
+  saved: "Widget sparad.",
+  updateDeploymentError: "Det gick inte att uppdatera driftsättningen.",
+  deployed: "Widget publicerad.",
+  takenOffline: "Widget togs offline.",
+  uploadImageError: "Ladda upp en bildfil.",
+  logoUploaded: "Logotyp uppladdad.",
+  uploadLogoError: "Det gick inte att ladda upp logotypen.",
+  copySuccess: "{label} kopierades till urklipp.",
+  copyError: "Det gick inte att kopiera {label}.",
+  tabs: {
+    aesthetics: "Utseende",
+    specialists: "Specialister",
+    behavior: "Beteende",
+    deployment: "Driftsättning",
+  },
+  widgetRegistry: "Widgetregister",
+  needsSync: "Behöver synkas",
+  syncChanges: "Synka ändringar",
+  syncing: "Synkar...",
+  goLive: "Gå live",
+  takeOffline: "Ta offline",
+  processing: "Bearbetar...",
+  behavior: {
+    interactionLogic: "Interaktionslogik",
+    interactionDescription:
+      "Styr hur widgeten beter sig när en användare först interagerar med den.",
+    primaryLanguage: "Primärt språk",
+    showBranding: "Visa Agenter-branding",
+    brandingDescription: 'Växla sidfoten "Powered by Agenter"',
+    homeCopywriting: "Copy för hemskärm",
+    homeCopywritingDescription:
+      "Den första texten som visas i väljarvyn när flera specialister är aktiva.",
+    homeTitle: "Huvudtitel",
+    homeTitlePlaceholder: "t.ex. Hur kan vi hjälpa dig idag?",
+    homeSubtitle: "Undertitel",
+    homeSubtitlePlaceholder:
+      "t.ex. Välj en specialist från vår lista för att starta en konversation.",
+  },
+  agents: {
+    activeSpecialists: "Aktiva specialister",
+    activeSpecialistsDescription:
+      "Konfigurera vilka agenter som är tillgängliga i widgeten och definiera deras specifika hälsningar.",
+    displayName: "Visningsnamn",
+    displayNamePlaceholder: "Hur specialisten visas i widgeten",
+    greetingPrompt: "Hälsningsprompt",
+    descriptionSnippet: "Beskrivningssnutt",
+    descriptionPlaceholder: "Förklara vad denna agent gör...",
+    interaction: "Interaktion",
+    realtimeChat: "Realtidschatt",
+    contactForm: "Kontaktformulär",
+    noSpecialists: "Inga specialister kopplade",
+    noSpecialistsDescription:
+      "Användare ser en generisk startskärm om inga agenter är kopplade till widgeten.",
+    detachAgent: "Koppla bort agent",
+    expandRoster: "Utöka din lista",
+    expandRosterDescription:
+      "Välj en tillgänglig specialist från ditt workspace att koppla.",
+    standardSpecialist: "Standard AI-specialist",
+    clickToAttach: "Klicka för att koppla",
+    noRemainingSpecialists: "Inga specialister återstår i registret",
+    createNewAgent: "Skapa ny agent",
+    defaultGreeting: "Hej! Hur kan jag hjälpa dig idag?",
+    defaultPlaceholder: "Skriv ett meddelande...",
+    contactFormIntro: "Lämna dina uppgifter så kontaktar vi dig.",
+    contactFormSuccess: "Tack! Vi återkommer snart.",
+  },
+  appearance: {
+    identityBranding: "Identitet och branding",
+    identityDescription:
+      "Definiera kärnpersonligheten i din widgetupplevelse.",
+    brandLogo: "Varumärkeslogotyp",
+    noLogo: "Ingen logotyp",
+    change: "Ändra",
+    brandName: "Varumärkesnamn",
+    brandNamePlaceholder: "t.ex. Agentergroup",
+    uploadImage: "Ladda upp bild",
+    optimizedLogo:
+      "Optimerad för PNG eller SVG med transparent bakgrund.",
+    visualTone: "Visuell ton",
+    visualToneDescription:
+      "Färgscheman styr interaktionslägen och fokusprioritet.",
+    primarySignature: "Primär signatur",
+    secondaryTint: "Sekundär ton",
+    surfaceTheme: "Yttema",
+    themeDescription:
+      "Yttemat påverkar bakgrunder, texttydlighet och skuggdjup i hela gränssnittet.",
+    pickColor: "Välj färg",
+    chooseColor: "Välj {label}",
+    colorPicker: "{label} färgväljare",
+    logoPreviewAlt: "Förhandsvisning av logotyp",
+  },
+  deployment: {
+    accessConnectivity: "Åtkomst och uppkoppling",
+    accessConnectivityDescription:
+      "Bädda in widgeten i hela ditt ekosystem med dessa direkta snippets och hostade endpoints.",
+    embedSnippet: "Inbäddningskod (kopiera och klistra in)",
+    embedDescription:
+      "Klistra in detta script i <head> eller längst ned i <body> på din webbplats.",
+    hostedEndpoint: "Hostad endpoint (fristående)",
+    hostedAccess: "Hostad åtkomst",
+    hostedEnabledTitle: "Hostad länk är aktiverad",
+    hostedEnabledDescription:
+      "Kunder kan öppna den fristående hostade länken direkt.",
+    hostedDisabledTitle: "Hostad länk är avstängd",
+    hostedDisabledDescription:
+      "Slå på detta om du vill dela en fristående hostad sida utanför inbäddade placeringar.",
+    hostedDescription:
+      "Använd denna länk för direkt kundsupport som kan delas i sociala medier, e-post eller som en dedikerad portal.",
+    hostedSaveHint: "Spara eller gå live för att tillämpa ändringar för hostad åtkomst.",
+    securityDomainAccess: "Säkerhet och domänåtkomst",
+    securityDomainAccessDescription:
+      "Styr vilka webbplatser som får ladda din widget. Detta förhindrar obehörig användning av dina API-nycklar.",
+    allowedOriginsPlaceholder: "t.ex. https://agentergroup.com",
+    addDomain: "Lägg till domän",
+    authorizedDomainRegistry: "Register över godkända domäner",
+    noDomainRestrictions: "Inga domänbegränsningar används",
+    noDomainRestrictionsDescription:
+      "Som standard är widgeten tillgänglig från alla ursprung (mindre säkert).",
+    copyLink: "Kopiera länk",
+  },
+  devicePreviewTitle: "Liveförhandsvisning av widget",
+  devicePreviewDescription: "Kontrollera nedre högra hörnet på skärmen",
+  devicePreviewBody:
+    "Din widget körs direkt på den här sidan. Alla visuella ändringar till vänster synkas omedelbart till den flytande bubblan.",
+  devicePreviewSyncing: "Synkar ändringar...",
+  openFullHostedPreview: "Öppna full hostad förhandsvisning",
+  openRawWidget: "Öppna rå widget i ny flik",
+  invalidUrl: "Ogiltig URL",
+};

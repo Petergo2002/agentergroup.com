@@ -131,13 +131,33 @@ export function WidgetBuilderHeader() {
             >
               {isSaving ? t('common.saving') : t('agentBuilder.saveDraft')}
             </button>
+
+            {isDeployed && needsRedeploy && (
+              <button
+                onClick={() => void updateWidgetDeployment('deployed')}
+                disabled={isUpdatingDeployment || isSaving}
+                className="group relative flex items-center gap-2 overflow-hidden rounded-full bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-background transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+              >
+                <span className="relative z-10">
+                  {isUpdatingDeployment ? t('widgetBuilder.syncing') : t('widgetBuilder.syncChanges')}
+                </span>
+                {!isUpdatingDeployment && (
+                  <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
+                )}
+              </button>
+            )}
+
             <button
               onClick={() => void updateWidgetDeployment(isDeployed ? 'draft' : 'deployed')}
               disabled={isUpdatingDeployment || isSaving}
-              className="group relative flex items-center gap-2 overflow-hidden rounded-full bg-on-surface px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-background transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+              className={`group relative flex items-center gap-2 overflow-hidden rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 ${
+                isDeployed 
+                  ? 'border border-outline-variant/15 text-on-surface-variant hover:border-on-surface/15 hover:text-on-surface' 
+                  : 'bg-on-surface text-background'
+              }`}
             >
               <span className="relative z-10">
-                {isUpdatingDeployment
+                {isUpdatingDeployment && (!isDeployed || !needsRedeploy)
                   ? t('widgetBuilder.processing')
                   : isDeployed
                     ? t('widgetBuilder.takeOffline')

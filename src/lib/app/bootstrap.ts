@@ -9,7 +9,8 @@ import type {
   WorkspaceRecord,
 } from "@/lib/types";
 
-type SupabaseLike = Pick<SupabaseClient, "from">;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseLike = Pick<SupabaseClient<any>, "from">;
 
 interface WorkspaceMembershipQuery {
   id: string;

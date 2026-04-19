@@ -28,7 +28,7 @@ export async function createWidgetAction(formData: FormData) {
     return { error: 'Unauthorized' };
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
+  const context = await ensureWorkspaceContext(supabase, user);
   
   const parsed = createWidgetSchema.safeParse({
     name: formData.get('name'),
@@ -77,7 +77,7 @@ export async function updateWidgetAction(
     return { error: 'Unauthorized' };
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
+  const context = await ensureWorkspaceContext(supabase, user);
   
   const parsed = updateWidgetSchema.safeParse(updates);
   
@@ -114,7 +114,7 @@ export async function toggleWidgetStatusAction(widgetId: string) {
     return { error: 'Unauthorized' };
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
+  const context = await ensureWorkspaceContext(supabase, user);
 
   const { data: widget } = await supabase
     .from('widgets')

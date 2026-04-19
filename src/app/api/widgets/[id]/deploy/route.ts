@@ -22,8 +22,8 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
-  const loaded = await loadWidgetById(supabase as never, id);
+  const context = await ensureWorkspaceContext(supabase, user);
+  const loaded = await loadWidgetById(supabase, id);
 
   if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
@@ -85,7 +85,7 @@ export async function POST(
     );
   }
 
-  const summary = buildWidgetSummary(updatedWidget as never, loaded.widgetAgents, {
+  const summary = buildWidgetSummary(updatedWidget, loaded.widgetAgents, {
     preview: true,
   });
   const previewToken = await signWidgetPreviewToken(

@@ -1,0 +1,47 @@
+export const widgets = {
+  badge: "Customer Surfaces",
+  title: "Widget Registry",
+  description:
+    "Assemble specialists into multi-agent chat surfaces, monitor real-time deployments, and manage your customer-facing interaction layer.",
+  createModalTitle: "Create New Widget",
+  createModalDescription: "Give your widget a clear name to distinguish it in your registry.",
+  createModalPlaceholder: "e.g. Sales Support Widget",
+  createModalDescriptionLabel: "Description",
+  createModalDescriptionPlaceholder: "Briefly describe the purpose of this widget...",
+  createConfirm: "Create Widget",
+  editModalTitle: "Edit Widget",
+  editModalDescription: "Update the widget's name and description.",
+  creating: "Creating...",
+  creatingWorkspace: "Creating Widget...",
+  newWidgetFromAgent: "New Widget From Agent",
+  initializeWidget: "Initialize New Widget",
+  managementSessionActive:
+    "Widget management session active. Create a widget to attach the selected specialist.",
+  noWidgets: "No Registered Widgets",
+  noWidgetsDescription:
+    "Initialize your first chat surface to begin connecting specialists with your customers.",
+  loadError: "Failed to load widgets.",
+  createError: "Failed to create widget.",
+  ownerDeleteOnly: "Only workspace owners can permanently delete a widget.",
+  updateStatusError: "Failed to update widget status.",
+  turnedOn: "Widget turned on.",
+  turnedOff: "Widget turned off.",
+  deleteError: "Failed to delete widget.",
+  deleted: "Widget permanently deleted.",
+  widgetPreview: "Preview Mode",
+  standalonePreviewDescription:
+    "This preview shows the standalone widget link itself, not the docked bubble from widget settings.",
+  openRawWidget: "Open raw widget",
+  backToWidget: "Back to widget",
+  standaloneLinkPreview: "Standalone widget link preview",
+  previewExpired: "Preview expired",
+  previewExpiredDescription:
+    "Open preview again from the widget page to mint a fresh internal preview URL.",
+  idUpdated: "ID: {id} • Updated {value}",
+  specialist: "Specialist",
+  specialists: "Specialists",
+  deleteTitle: "Permanently Remove Widget",
+  deleteEntityLabel: "Widget Registry Entry",
+  deleteDescription:
+    "This action will terminate all associated sessions, hosted portals, and embedded instances. This cannot be undone.",
+};

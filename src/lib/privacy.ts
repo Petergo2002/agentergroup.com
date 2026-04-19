@@ -710,7 +710,7 @@ export async function purgeExpiredWidgetData(
       }
 
       for (const [workspaceId, counts] of countsByWorkspace.entries()) {
-        await createAuditLog(supabase as never, {
+        await createAuditLog(supabase, {
           workspaceId,
           action: "privacy.retention.run",
           summary: "Purged expired widget data under the 180-day retention policy.",

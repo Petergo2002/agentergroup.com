@@ -1,0 +1,35 @@
+export const login = {
+  systemConfiguration: "System Configuration",
+  readyToBuild: "Ready to build?",
+  setupDatabase:
+    "We just need to wire up your database. Add your Supabase credentials to .env.local and you'll be live in seconds.",
+  headline: "The control interface for AI Agents.",
+  subheadline:
+    "Agentergroup lets you architect, deploy, and monitor production-ready agents with effortless precision.",
+  seamless: "Seamless",
+  architecture: "Architecture",
+  scalable: "Scalable",
+  deployment: "Deployment",
+  secure: "Secure",
+  runtime: "Runtime",
+  workspacePortal: "Workspace Portal",
+  signInTitle: "Sign in to Agentergroup",
+  signInSubtitle: "Enter your credentials below to access your workspace.",
+  emailAddress: "Email Address",
+  password: "Password",
+  passwordPlaceholder: "Min. 6 characters",
+  emailPlaceholder: "name@company.com",
+  signIn: "Sign In",
+  createAccount: "Create Account",
+  confirmEmailNotice: "Check your email to confirm your account.",
+  signInError: "We could not sign you in with those credentials.",
+  createAccountError: "We could not create your account right now. Please try again.",
+  legal:
+    "Build your future with Agentergroup. By signing in, you agree to our Terms of Service and Privacy Policy.",
+  legalPrefix:
+    "Build your future with Agentergroup. By signing in, you agree to our",
+  legalAnd: "and",
+  privacyPolicy: "Privacy Policy",
+  termsOfService: "Terms of Service",
+  logoAlt: "Agentergroup logo",
+};

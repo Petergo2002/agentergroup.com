@@ -34,8 +34,8 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
-  const loaded = await loadWidgetById(supabase as never, id);
+  const context = await ensureWorkspaceContext(supabase, user);
+  const loaded = await loadWidgetById(supabase, id);
 
   if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
@@ -103,8 +103,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
-  const loaded = await loadWidgetById(supabase as never, id);
+  const context = await ensureWorkspaceContext(supabase, user);
+  const loaded = await loadWidgetById(supabase, id);
 
   if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
@@ -172,8 +172,8 @@ export async function PATCH(
     );
   }
 
-  const summary = buildWidgetSummary(updatedWidget as never, loaded.widgetAgents, {
-    preview: true,
+  const summary = buildWidgetSummary(updatedWidget, loaded.widgetAgents, {
+    preview: false,
   });
   const previewToken = await signWidgetPreviewToken(
     buildWidgetPreviewPayload({
@@ -204,8 +204,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
-  const loaded = await loadWidgetById(supabase as never, id);
+  const context = await ensureWorkspaceContext(supabase, user);
+  const loaded = await loadWidgetById(supabase, id);
 
   if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });

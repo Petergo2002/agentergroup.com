@@ -1,0 +1,35 @@
+export const login = {
+  systemConfiguration: "Systemkonfiguration",
+  readyToBuild: "Redo att bygga?",
+  setupDatabase:
+    "Vi behöver bara koppla upp din databas. Lägg till dina Supabase-uppgifter i .env.local så är du igång på några sekunder.",
+  headline: "Kontrollgränssnittet för AI-agenter.",
+  subheadline:
+    "Agentergroup låter dig designa, driftsätta och övervaka produktionsklara agenter med hög precision.",
+  seamless: "Sömlös",
+  architecture: "Arkitektur",
+  scalable: "Skalbar",
+  deployment: "Driftsättning",
+  secure: "Säker",
+  runtime: "Runtime",
+  workspacePortal: "Workspace-portal",
+  signInTitle: "Logga in i Agentergroup",
+  signInSubtitle: "Ange dina uppgifter nedan för att öppna ditt workspace.",
+  emailAddress: "E-postadress",
+  password: "Lösenord",
+  passwordPlaceholder: "Minst 6 tecken",
+  emailPlaceholder: "namn@bolag.se",
+  signIn: "Logga in",
+  createAccount: "Skapa konto",
+  confirmEmailNotice: "Kontrollera din e-post för att bekräfta ditt konto.",
+  signInError: "Det gick inte att logga in med de uppgifterna.",
+  createAccountError: "Det gick inte att skapa kontot just nu. Försök igen.",
+  legal:
+    "Bygg framtiden med Agentergroup. När du loggar in godkänner du våra användarvillkor och vår integritetspolicy.",
+  legalPrefix:
+    "Bygg framtiden med Agentergroup. När du loggar in godkänner du våra",
+  legalAnd: "och",
+  privacyPolicy: "Integritetspolicy",
+  termsOfService: "Användarvillkor",
+  logoAlt: "Agentergroup-logotyp",
+};

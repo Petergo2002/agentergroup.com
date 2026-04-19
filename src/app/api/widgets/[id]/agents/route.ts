@@ -33,8 +33,8 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
-  const loaded = await loadWidgetById(supabase as never, id);
+  const context = await ensureWorkspaceContext(supabase, user);
+  const loaded = await loadWidgetById(supabase, id);
 
   if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });

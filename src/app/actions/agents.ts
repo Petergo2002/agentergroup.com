@@ -22,7 +22,7 @@ export async function createAgentAction(formData: FormData) {
     return { error: 'Unauthorized' };
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
+  const context = await ensureWorkspaceContext(supabase, user);
 
   const parsed = createAgentSchema.safeParse({
     name: formData.get('name'),
@@ -71,7 +71,7 @@ export async function updateAgentAction(
     return { error: 'Unauthorized' };
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
+  const context = await ensureWorkspaceContext(supabase, user);
 
   const parsed = updateAgentSchema.safeParse(updates);
   
@@ -108,7 +108,7 @@ export async function toggleAgentStatusAction(agentId: string) {
     return { error: 'Unauthorized' };
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
+  const context = await ensureWorkspaceContext(supabase, user);
 
   const { data: agent } = await supabase
     .from('agents')
@@ -158,7 +158,7 @@ export async function archiveAgentAction(agentId: string) {
     return { error: 'Unauthorized' };
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
+  const context = await ensureWorkspaceContext(supabase, user);
 
   const { error } = await supabase
     .from('agents')

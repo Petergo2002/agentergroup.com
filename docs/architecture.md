@@ -1,6 +1,6 @@
 # Agent Platform Architecture
 
-Last updated: 2026-04-15
+Last updated: 2026-04-19
 
 ## Purpose
 
@@ -891,7 +891,29 @@ The product surface is split into:
 The authenticated app owns:
 
 - widget list and detail screens
-- deployment status and redeploy logic
+### Widget Deployment & "Needs Sync"
+
+The widget has a two-stage lifecycle: `draft` and `deployed`.
+
+- **Draft:** Changes are saved to the database but not reflected in the live widget.
+- **Deployed:** Changes are officially "pushed" to the live widget, and a snapshot of the current agent versions is taken.
+
+#### Redeployment Logic (`needs_redeploy`)
+
+A widget enters the "Needs Sync" state when:
+1. The widget's own configuration (colors, branding, title, etc.) has been updated since the last deployment.
+2. Any of the attached agents have been updated or had a new version published since the last deployment.
+
+#### Syncing Changes
+
+To resolve the "Needs Sync" state, the operator must click the **Sync Changes** button in the widget builder. This:
+1. Re-snapshots the currently attached agents with their latest published versions.
+2. Updates the `deployed_at` timestamp on the widget.
+3. Makes all pending configuration changes live.
+
+This separation ensures that live widgets remain stable even while the operator is actively editing their configuration or specialists.
+
+### Deployment status and redeploy logic
 - attached-agent ordering and configuration
 - hosted access toggle
 - preview drafting and preview URLs
@@ -1206,9 +1228,10 @@ The knowledge system is a workspace-level library backed by Supabase Postgres + 
 
 Current supported source types:
 
-- pasted text
-- uploaded files
-- Google Drive imported files
+- pasted text (previewable and editable)
+- uploaded files (previewable)
+- Google Drive imported files (previewable)
+- website scraping via Firecrawl (previewable and editable as markdown)
 
 ### Supported file formats
 
@@ -1217,6 +1240,7 @@ Current supported knowledge file types:
 - `.txt`
 - `.md`
 - `.pdf`
+- website URLs (converted to markdown)
 
 MIME types:
 
@@ -1242,13 +1266,17 @@ Storage only holds raw files. Retrieval never reads directly from Storage at cha
 
 ### Why the knowledge base is Supabase-native
 
-The runtime does not treat Google Drive as a live retrieval backend.
+The runtime does not treat Google Drive or external websites as live retrieval backends.
 
 Instead:
 
-1. Drive file is imported
-2. file is stored in Supabase Storage
-3. file is processed into chunks and embeddings
+1. External source is imported:
+   - Drive file is downloaded
+   - Website is scraped and converted to markdown using Firecrawl
+2. content is stored:
+   - Files are stored in Supabase Storage
+   - Website/Text content is stored in the `raw_text` column of `knowledge_sources`
+3. content is processed into chunks and embeddings
 4. the agent retrieves from Supabase vector search during chat
 
 This is the right separation because it keeps retrieval:
@@ -1256,7 +1284,7 @@ This is the right separation because it keeps retrieval:
 - fast
 - workspace-scoped
 - deterministic
-- independent from third-party file APIs at answer time
+- independent from third-party file or scraping APIs at answer time
 
 ## Knowledge Processing Pipeline
 
@@ -1272,13 +1300,14 @@ This is the right separation because it keeps retrieval:
 
 1. Verify caller auth from `Authorization` header
 2. Load knowledge source
-3. If it is a file source, download the raw file from Supabase Storage
-4. Extract text from the file
-5. Normalize text
-6. Chunk text
-7. Generate embeddings with `Supabase.ai.Session("gte-small")`
-8. Replace all existing chunks for the source
-9. Update source status and chunk count
+3. Extract raw text:
+   - If it is a file source, download from Supabase Storage and extract text
+   - If it is a text or website source, use the `raw_text` from the database
+4. Normalize text
+5. Chunk text
+6. Generate embeddings with `Supabase.ai.Session("gte-small")`
+7. Replace all existing chunks for the source
+8. Update source status and chunk count
 
 ### Embedding model
 
@@ -1426,7 +1455,7 @@ After import, the source behaves like any other workspace knowledge source.
 | Route | Purpose |
 | --- | --- |
 | `GET /api/knowledge/sources` | List workspace knowledge sources |
-| `POST /api/knowledge/sources` | Create a text source or reserve file source upload |
+| `POST /api/knowledge/sources` | Create a text source, scrape a website, or reserve file source upload |
 | `DELETE /api/knowledge/sources/[id]` | Delete a source and associated file/chunks |
 | `POST /api/knowledge/sources/[id]/process` | Reprocess an existing source |
 | `GET /api/knowledge/drive/files` | List importable Google Drive files for a selected connected account |

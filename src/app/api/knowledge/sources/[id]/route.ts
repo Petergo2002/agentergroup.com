@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createAuditLog } from "@/lib/runtime/observability";
+import { safeInternalFetch } from "@/lib/app/fetch";
 import type { KnowledgeSourceRecord } from "@/lib/types";
 
 export async function PATCH(
@@ -32,8 +33,8 @@ export async function PATCH(
 
   const knowledgeSource = source as KnowledgeSourceRecord;
 
-  if (knowledgeSource.source_type !== "text") {
-    return NextResponse.json({ error: "Only text sources can be edited." }, { status: 400 });
+  if (knowledgeSource.source_type !== "text" && knowledgeSource.source_type !== "website") {
+    return NextResponse.json({ error: "Only text and website sources can be edited." }, { status: 400 });
   }
 
   const body = await request.json();
@@ -52,13 +53,15 @@ export async function PATCH(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  const processResponse = await fetch(
-    `${request.headers.get("origin")}/api/knowledge/sources/${knowledgeSource.id}/process`,
-    { method: "POST" },
-  );
-
-  if (!processResponse.ok) {
-    return NextResponse.json({ error: "Failed to re-process source." }, { status: 500 });
+  try {
+    await safeInternalFetch(
+      `${request.headers.get("origin")}/api/knowledge/sources/${knowledgeSource.id}/process`,
+      { method: "POST" },
+    );
+  } catch (error) {
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : "Failed to re-process source." 
+    }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

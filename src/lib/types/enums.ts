@@ -6,7 +6,7 @@ export type ConnectionStatus =
   | "error"
   | "disconnected";
 export type KnowledgeSourceStatus = "pending" | "processing" | "ready" | "failed";
-export type KnowledgeSourceType = "text" | "file";
+export type KnowledgeSourceType = "text" | "file" | "website";
 export type WidgetDeploymentStatus = "draft" | "deployed";
 export type RunStatus =
   | "queued"

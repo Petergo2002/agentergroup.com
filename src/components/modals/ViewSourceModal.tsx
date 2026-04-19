@@ -276,7 +276,13 @@ export function ViewSourceModal({ isOpen, onClose, source, onSourceUpdated }: Vi
               {source.name}
             </h3>
             <p className="mt-1 text-xs text-on-surface-variant">
-              {content?.type === 'text' && (isEditing ? t('knowledge.editingContent') : t('knowledge.textContent'))}
+              {content?.type === 'text' && (
+                isEditing 
+                  ? t('knowledge.editingContent') 
+                  : source.source_type === 'website' 
+                    ? t('knowledge.websiteContent') 
+                    : t('knowledge.textContent')
+              )}
               {content?.type === 'file' && t('knowledge.fileContent')}
             </p>
           </div>

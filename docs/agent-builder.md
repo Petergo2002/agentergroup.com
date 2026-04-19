@@ -1,6 +1,6 @@
 # Agent Builder
 
-Last updated: 2026-03-20
+Last updated: 2026-04-19
 
 ## Purpose
 
@@ -450,10 +450,12 @@ Important operational detail:
 - current defaults are defined for:
   - Gmail
   - Google Calendar
+  - Cal.com
   - Google Drive
 - these can be overridden via environment variables:
   - `COMPOSIO_TOOLKIT_VERSION_GMAIL`
   - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
+  - `COMPOSIO_TOOLKIT_VERSION_CAL`
   - `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
 
 This is why Google Calendar's booking-calendar selector and Google Drive import utilities do not pass per-request versions manually.
