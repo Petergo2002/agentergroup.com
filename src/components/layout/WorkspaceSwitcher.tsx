@@ -72,14 +72,14 @@ export function WorkspaceSwitcher({ isCollapsed, mobile }: WorkspaceSwitcherProp
       {/* Switcher Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`group flex w-full items-center gap-3 rounded-2xl bg-surface-container/55 p-3 ring-1 ring-transparent transition-all hover:bg-surface-container-high hover:ring-outline-variant ${
+        className={`group flex items-center gap-3 rounded-2xl bg-surface-container/55 ring-1 ring-transparent transition-all hover:bg-surface-container-high hover:ring-outline-variant ${
           isOpen ? 'bg-surface-container-high ring-outline-variant' : ''
-        }`}
+        } ${isMinimized ? 'h-12 w-12 justify-center p-0' : 'w-full p-3'}`}
         aria-expanded={isOpen}
         aria-haspopup="true"
         disabled={isSwitching}
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-xs font-bold text-on-surface-variant transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-xs font-bold text-on-surface-variant transition-colors group-hover:bg-primary/10 group-hover:text-primary ${isMinimized ? 'h-9 w-9 text-[10px]' : 'h-10 w-10'}`}>
           {isSwitching ? (
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
           ) : (

@@ -7,6 +7,7 @@ import type {
   ProfileRecord,
   WorkspaceMemberRecord,
   WorkspaceRecord,
+  WorkspaceSubscriptionRecord,
 } from "@/lib/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -235,10 +236,21 @@ export async function ensureWorkspaceContext(
   const workspaces = await getOrCreateUserWorkspaces(supabase, user);
   const activeWorkspace = await resolveActiveWorkspace(workspaces);
 
+  const subscriptionResult = await supabase
+    .from("workspace_subscriptions")
+    .select("*")
+    .eq("workspace_id", activeWorkspace.workspace.id)
+    .single();
+
+  if (subscriptionResult.error) {
+    throw subscriptionResult.error;
+  }
+
   return {
     profile: profileResult.data as ProfileRecord,
     workspace: activeWorkspace.workspace,
     membership: activeWorkspace.membership,
     workspaces,
+    subscription: subscriptionResult.data as WorkspaceSubscriptionRecord,
   };
 }

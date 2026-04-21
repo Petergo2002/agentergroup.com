@@ -1,3 +1,5 @@
+import type { WorkspaceSubscriptionRecord } from "./subscription";
+
 export interface ProfileRecord {
   id: string;
   email: string | null;
@@ -59,4 +61,5 @@ export interface AppWorkspaceContext {
   workspace: WorkspaceRecord;
   membership: WorkspaceMemberRecord;
   workspaces: AvailableWorkspace[];
+  subscription: WorkspaceSubscriptionRecord;
 }

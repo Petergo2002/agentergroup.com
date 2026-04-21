@@ -22,6 +22,11 @@ export type { ExpandedWorkspaceInviteRecord } from "./types/workspace";
 export type { WorkspaceMemberWithProfile } from "./types/workspace";
 export type { AppWorkspaceContext } from "./types/workspace";
 
+export type {
+  PlanTier,
+  WorkspaceSubscriptionRecord,
+} from "./types/subscription";
+
 export type { AgentRecord } from "./types/agent";
 export type { AgentVersionRecord } from "./types/agent";
 

@@ -1165,7 +1165,7 @@ export default function AgentBuilderPage() {
   const [supabase] = useState(() => createClient());
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { membership, user, workspace } = useAppContext();
+  const { membership, user, workspace, subscription } = useAppContext();
   const { language, t } = useLanguage();
   const { showToast } = useToast();
   const agentId = params.id;
@@ -1313,6 +1313,7 @@ export default function AgentBuilderPage() {
   const nodeLibraryItems = NODE_LIBRARY.map((item) => ({
     ...item,
     ...getNodeLibraryText(item.key, t),
+    disabled: item.key === 'tools' && !subscription?.integrations_enabled,
   }));
   const displayNodes = nodes.map((node) => enrichNodeForDisplay(node, connections, t));
   const selectedNode = displayNodes.find((node) => node.id === selectedNodeId) ?? null;
@@ -2935,13 +2936,15 @@ export default function AgentBuilderPage() {
                     item.key === 'endchat' &&
                     nodes.some((node) => node.data.kind === 'endchat');
                   const isFixed = item.fixed;
-                  const isDisabled = isKnowledgeAdded || isEndChatAdded || isFixed;
+                  const isDisabled = isKnowledgeAdded || isEndChatAdded || isFixed || item.disabled;
 
                   return (
                     <button
                       key={item.key}
                       onClick={() =>
-                        item.key === 'knowledge'
+                        item.disabled
+                          ? showToast(t('settings.billing.featureLocked') || 'Please upgrade your plan to unlock this feature.', 'error')
+                          : item.key === 'knowledge'
                           ? handleAddKnowledgeNode()
                           : item.key === 'endchat'
                           ? handleAddEndChatNode()
@@ -2949,22 +2952,28 @@ export default function AgentBuilderPage() {
                           ? setIsToolPickerOpen(true)
                           : undefined
                       }
-                      disabled={isDisabled}
-                      className={`group/item flex w-full items-start gap-4 rounded-2xl border border-outline-variant/10 bg-surface-container-low p-5 text-left transition-all ${
-                        isFixed
+                      disabled={isDisabled && !item.disabled}
+                      className={`group/item flex w-full items-start gap-4 rounded-2xl border transition-all ${
+                        item.disabled
+                          ? 'border-outline-variant/10 bg-surface-container-low opacity-60 cursor-pointer grayscale'
+                          : isFixed
                           ? 'border-dashed border-outline-variant/20 bg-surface-container-lowest/50 cursor-default opacity-80'
-                          : 'hover:border-primary/40 hover:bg-surface-container-high hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]'
-                      }`}
+                          : 'border-outline-variant/10 bg-surface-container-low hover:border-primary/40 hover:bg-surface-container-high hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]'
+                      } p-5 text-left`}
                     >
-                      <span className={`material-symbols-outlined ${isFixed ? 'text-on-surface-variant/40' : 'text-primary'}`}>
+                      <span className={`material-symbols-outlined ${item.disabled ? 'text-on-surface-variant/40' : isFixed ? 'text-on-surface-variant/40' : 'text-primary'}`}>
                         {item.icon}
                       </span>
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className={`text-sm font-semibold ${isFixed ? 'text-on-surface-variant' : 'text-on-surface'}`}>
+                          <p className={`text-sm font-semibold ${item.disabled ? 'text-on-surface-variant' : isFixed ? 'text-on-surface-variant' : 'text-on-surface'}`}>
                             {item.label}
                           </p>
-                          {isFixed ? (
+                          {item.disabled ? (
+                            <span className="rounded-full bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant border border-outline-variant/10">
+                              {t('common.locked') || 'Locked'}
+                            </span>
+                          ) : isFixed ? (
                             <span className="rounded-full bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                               {t('common.fixed')}
                             </span>

@@ -25,7 +25,7 @@ export const CreateAgentModal = ({
 }: CreateAgentModalProps) => {
   const router = useRouter();
   const supabase = createClient();
-  const { workspace, user } = useAppContext();
+  const { workspace, user, subscription } = useAppContext();
   const { t } = useLanguage();
   const { showToast } = useToast();
   const internalAssistantsEnabled = hasInternalAssistantsEnabled(workspace);
@@ -57,6 +57,24 @@ export const CreateAgentModal = ({
     setIsSaving(true);
 
     try {
+      // Check agent limit
+      const { count, error: countError } = await supabase
+        .from('agents')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', workspace.id)
+        .is('archived_at', null);
+
+      if (countError) throw countError;
+
+      if ((count ?? 0) >= (subscription?.agents_limit ?? 1)) {
+        showToast(
+          t('settings.billing.agentLimitReached') || 
+          'You have reached your agent limit. Please upgrade your plan.', 
+          'error'
+        );
+        return;
+      }
+
       const agentPayload = buildAgentPayload('custom', name, surface);
       const definition = buildInitialDefinition('custom');
 

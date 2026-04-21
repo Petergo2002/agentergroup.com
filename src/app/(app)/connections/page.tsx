@@ -17,6 +17,12 @@ async function loadConnectionsPageData() {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+
+  if (!context.subscription?.integrations_enabled) {
+    const { redirect } = await import("next/navigation");
+    redirect("/settings/billing");
+  }
+
   await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id);
 
   const { data: storedConnections, error } = await supabase

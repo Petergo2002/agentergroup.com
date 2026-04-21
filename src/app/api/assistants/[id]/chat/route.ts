@@ -160,6 +160,21 @@ export async function POST(
       };
 
       try {
+        // Enforce message limits
+        const { data: allowed, error: rpcError } = await admin.rpc(
+          "increment_workspace_message_usage",
+          { p_workspace_id: assistant.workspace_id },
+        );
+
+        if (rpcError || !allowed) {
+          send({
+            type: "error",
+            error: "You have reached your monthly message limit. Please upgrade your plan.",
+          });
+          controller.close();
+          return;
+        }
+
         const { data: run, error: runError } = await admin
           .from("runs")
           .insert({

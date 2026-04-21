@@ -294,6 +294,20 @@ export async function POST(
       }
     }
 
+    const { data: allowed, error: rpcError } = await supabase.rpc(
+      "increment_workspace_message_usage",
+      { p_workspace_id: loaded.widget.workspace_id },
+    );
+
+    if (rpcError || !allowed) {
+      return buildErrorResponse(
+        request,
+        402,
+        "This workspace has reached its monthly message limit.",
+        "MESSAGE_LIMIT_REACHED",
+      );
+    }
+
     const {
       sessionId,
       message,

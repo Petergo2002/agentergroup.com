@@ -40,9 +40,17 @@ export function Sidebar({
   mounted = false,
 }: SidebarProps) {
   const pathname = usePathname();
-  const { membership, workspace } = useAppContext();
-  const { t } = useLanguage();
+  const { membership, workspace, subscription } = useAppContext();
+  const { t, language } = useLanguage();
   const internalAssistantsEnabled = hasInternalAssistantsEnabled(workspace);
+
+  // Defensive check for subscription
+  const messagesUsed = subscription?.messages_used ?? 0;
+  const messagesLimit = subscription?.messages_limit ?? 50;
+  const usagePercent = Math.min(
+    Math.round((messagesUsed / messagesLimit) * 100),
+    100
+  );
 
   const navItems = [
     { name: t("nav.dashboard"), href: "/dashboard", icon: LayoutGrid },
@@ -53,7 +61,9 @@ export function Sidebar({
       : []),
     { name: t("nav.widgets"), href: "/widgets", icon: MessageSquare },
     { name: t("nav.knowledge"), href: "/knowledge", icon: Database },
-    { name: t("nav.connections"), href: "/connections", icon: Network },
+    ...(subscription?.integrations_enabled
+      ? [{ name: t("nav.connections"), href: "/connections", icon: Network }]
+      : []),
     { name: t("nav.settings"), href: "/settings", icon: Settings },
   ] satisfies Array<{ name: string; href: string; icon: LucideIcon; beta?: boolean }>;
 
@@ -172,6 +182,59 @@ export function Sidebar({
 
       <div className={`mt-auto p-4 space-y-3 transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-4'}`}>
         
+        {/* Message Usage Bar */}
+        {subscription && (
+          <div className={`relative w-full ${isCollapsed && !mobile ? 'flex justify-center' : ''}`}>
+            <div className={`group relative rounded-xl border border-outline-variant/10 bg-surface-container-high/40 transition-all ${isCollapsed && !mobile ? 'flex h-12 w-12 flex-col items-center justify-center p-0' : 'p-3 w-full'}`}>
+              {isCollapsed && !mobile ? (
+                <>
+                  <div className="flex items-center justify-center flex-1">
+                    <MessageSquare className={`h-5 w-5 transition-transform duration-200 group-hover:scale-110 ${usagePercent > 90 ? 'text-error' : 'text-primary'}`} />
+                  </div>
+                  
+                  {/* Progress bar at the bottom of the square */}
+                  <div className="absolute bottom-2 left-2.5 right-2.5 h-1 rounded-full bg-surface-container overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-500 ${usagePercent > 90 ? 'bg-error' : 'bg-primary'}`}
+                      style={{ width: `${usagePercent}%` }}
+                    />
+                  </div>
+                  
+                  {/* Tooltip for collapsed usage */}
+                  <div className="fixed left-[70px] rounded-md bg-on-surface px-3 py-2 text-xs font-bold text-background opacity-0 shadow-xl ring-1 ring-outline-variant pointer-events-none transition-opacity duration-200 group-hover:opacity-100 z-[9999] whitespace-nowrap">
+                    {t('settings.billing.messagesUsed', {
+                      used: messagesUsed,
+                      limit: messagesLimit
+                    })}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      {t('settings.billing.messages')}
+                    </span>
+                    <span className="text-[10px] font-bold text-on-surface">
+                      {messagesUsed}/{messagesLimit}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container">
+                    <div 
+                      className={`h-full transition-all duration-500 ${usagePercent > 90 ? 'bg-error' : 'bg-primary'}`}
+                      style={{ width: `${usagePercent}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[9px] font-medium text-on-surface-variant leading-tight">
+                    {t('settings.billing.messagesReset', {
+                      date: new Date(subscription.billing_cycle_end).toLocaleDateString(language === 'sv' ? 'sv-SE' : 'en-US', { day: 'numeric', month: 'short' })
+                    })}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {membership.role !== 'owner' && (!isCollapsed || mobile) && (
           <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/8 ring-1 ring-amber-500/15 px-3 py-2.5">
             <span className="material-symbols-outlined text-base text-amber-500">domain</span>
