@@ -1,4 +1,4 @@
-export type SupportedIntegrationSlug = "gmail" | "googlecalendar" | "cal" | "googledrive";
+export type SupportedIntegrationSlug = "gmail" | "googlecalendar" | "cal" | "googledrive" | "outlook";
 export type InternalAssistantToolkitSlug = "text_to_pdf";
 export type IntegrationSurface = "chat" | "knowledge";
 
@@ -34,6 +34,19 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     connectionPurpose: "Used by agents to send emails during the current conversation.",
     surface: "chat",
     allowedChatTools: ["GMAIL_SEND_EMAIL"],
+    allowedKnowledgeTools: [],
+  },
+  {
+    slug: "outlook",
+    displayName: "Microsoft Outlook",
+    description: "Send emails during the current conversation via Outlook.",
+    icon: "mail",
+    simpleIcon: "siMicrosoftoutlook",
+    simpleIconColor: "#0078D4",
+    category: "Communication",
+    connectionPurpose: "Used by agents to send emails during the current conversation.",
+    surface: "chat",
+    allowedChatTools: ["OUTLOOK_SEND_EMAIL"],
     allowedKnowledgeTools: [],
   },
   {

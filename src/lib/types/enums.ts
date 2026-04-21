@@ -30,6 +30,7 @@ export type BuilderNodeKind =
   | "agent"
   | "knowledge"
   | "gmail"
+  | "outlook"
   | "googlecalendar"
   | "cal"
   | "endchat";

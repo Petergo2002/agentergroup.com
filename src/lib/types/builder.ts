@@ -40,6 +40,16 @@ export interface GmailBuilderNodeData extends BaseBuilderNodeData {
   simpleIconColor?: string;
 }
 
+export interface OutlookBuilderNodeData extends BaseBuilderNodeData {
+  kind: "outlook";
+  integrationSlug: "outlook";
+  connectionId: string | null;
+  recipientMode: GmailRecipientMode;
+  recipientEmail: string | null;
+  simpleIcon?: string;
+  simpleIconColor?: string;
+}
+
 export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
   kind: "googlecalendar";
   integrationSlug: "googlecalendar";
@@ -75,6 +85,7 @@ export type BuilderNodeData =
   | AgentBuilderNodeData
   | KnowledgeBuilderNodeData
   | GmailBuilderNodeData
+  | OutlookBuilderNodeData
   | GoogleCalendarBuilderNodeData
   | CalBuilderNodeData
   | EndChatBuilderNodeData;

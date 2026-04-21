@@ -104,6 +104,7 @@ interface ConnectionSyncSupabaseTable {
 }
 
 const GMAIL_SEND_EMAIL_TOOL = "GMAIL_SEND_EMAIL";
+const OUTLOOK_SEND_EMAIL_TOOL = "OUTLOOK_SEND_EMAIL";
 const GOOGLE_CALENDAR_CREATE_EVENT_TOOL = "GOOGLECALENDAR_CREATE_EVENT";
 const GOOGLE_CALENDAR_QUICK_ADD_TOOL = "GOOGLECALENDAR_QUICK_ADD";
 const GOOGLE_CALENDAR_FIND_FREE_SLOTS_TOOL = "GOOGLECALENDAR_FIND_FREE_SLOTS";
@@ -116,6 +117,7 @@ const DEFAULT_COMPOSIO_TOOLKIT_VERSIONS = {
   googlecalendar: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR ?? "20260309_00",
   cal: process.env.COMPOSIO_TOOLKIT_VERSION_CAL ?? "latest",
   googledrive: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE ?? "20260309_00",
+  outlook: process.env.COMPOSIO_TOOLKIT_VERSION_OUTLOOK ?? "latest",
   text_to_pdf: process.env.COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF ?? "latest",
 } as const;
 
@@ -710,7 +712,7 @@ export async function handleChatToolCalls(
     return [];
   }
 
-    const patchedCompletion = applyGmailRecipientPolicyToCompletion(
+    const patchedCompletion = applyEmailRecipientPolicyToCompletion(
       applyCalSelectionToCompletion(
         applyGoogleCalendarSelectionToCompletion(
           chatCompletion,
@@ -727,7 +729,7 @@ export async function handleChatToolCalls(
       const results = await composio.provider.handleToolCalls(userId, patchedCompletion);
 
       return {
-        results: sanitizeGmailToolMessages(results, options?.gmailRecipientPolicy ?? null),
+        results: sanitizeEmailToolMessages(results, options?.gmailRecipientPolicy ?? null),
         sessionWasRecreated,
       };
     } catch (error) {
@@ -747,7 +749,7 @@ export async function handleChatToolCalls(
             // Retry handling tool calls with the new session
             const retryResults = await composio.provider.handleToolCalls(userId, patchedCompletion);
             return {
-              results: sanitizeGmailToolMessages(
+              results: sanitizeEmailToolMessages(
                 retryResults,
                 options?.gmailRecipientPolicy ?? null,
               ),
@@ -1079,13 +1081,13 @@ function applyGoogleCalendarSelectionToCompletion(
   };
 }
 
-function applyGmailRecipientPolicyToCompletion(
+function applyEmailRecipientPolicyToCompletion(
   chatCompletion: OpenAI.Chat.ChatCompletion,
-  gmailRecipientPolicy: GmailRecipientPolicy | null,
+  emailRecipientPolicy: GmailRecipientPolicy | null,
 ) {
   if (
-    gmailRecipientPolicy?.mode !== "specific_email" ||
-    !normalizeGmailRecipientEmail(gmailRecipientPolicy.specificEmail)
+    emailRecipientPolicy?.mode !== "specific_email" ||
+    !normalizeGmailRecipientEmail(emailRecipientPolicy.specificEmail)
   ) {
     return chatCompletion;
   }
@@ -1095,7 +1097,7 @@ function applyGmailRecipientPolicyToCompletion(
     return chatCompletion;
   }
 
-  const specificEmail = normalizeGmailRecipientEmail(gmailRecipientPolicy.specificEmail);
+  const specificEmail = normalizeGmailRecipientEmail(emailRecipientPolicy.specificEmail);
   if (!specificEmail) {
     return chatCompletion;
   }
@@ -1103,7 +1105,8 @@ function applyGmailRecipientPolicyToCompletion(
   const patchedToolCalls = message.tool_calls.map((toolCall) => {
     if (
       toolCall.type !== "function" ||
-      toolCall.function.name !== GMAIL_SEND_EMAIL_TOOL
+      (toolCall.function.name !== GMAIL_SEND_EMAIL_TOOL &&
+        toolCall.function.name !== OUTLOOK_SEND_EMAIL_TOOL)
     ) {
       return toolCall;
     }
@@ -1152,19 +1155,21 @@ function applyGmailRecipientPolicyToCompletion(
   };
 }
 
-function sanitizeGmailToolMessages(
+function sanitizeEmailToolMessages(
   messages: OpenAI.Chat.ChatCompletionToolMessageParam[] | Array<Record<string, unknown>>,
-  gmailRecipientPolicy: GmailRecipientPolicy | null,
+  emailRecipientPolicy: GmailRecipientPolicy | null,
 ) {
   if (
-    gmailRecipientPolicy?.mode !== "specific_email" ||
-    !normalizeGmailRecipientEmail(gmailRecipientPolicy.specificEmail)
+    emailRecipientPolicy?.mode !== "specific_email" ||
+    !normalizeGmailRecipientEmail(emailRecipientPolicy.specificEmail)
   ) {
     return messages;
   }
 
   return messages.map((message) =>
-    ("name" in message && message.name === GMAIL_SEND_EMAIL_TOOL)
+    ("name" in message &&
+      (message.name === GMAIL_SEND_EMAIL_TOOL ||
+        message.name === OUTLOOK_SEND_EMAIL_TOOL))
       ? {
           ...message,
           content: "Internal notification email sent successfully.",

@@ -101,6 +101,7 @@ export type { TriggerBuilderNodeData } from "./types/builder";
 export type { AgentBuilderNodeData } from "./types/builder";
 export type { KnowledgeBuilderNodeData } from "./types/builder";
 export type { GmailBuilderNodeData } from "./types/builder";
+export type { OutlookBuilderNodeData } from "./types/builder";
 export type { GoogleCalendarBuilderNodeData } from "./types/builder";
 export type { CalBuilderNodeData } from "./types/builder";
 export type { EndChatBuilderNodeData } from "./types/builder";

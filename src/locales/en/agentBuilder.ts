@@ -11,7 +11,7 @@ export const agentBuilder = {
     knowledgeDescription:
       "Attach workspace sources the agent can retrieve from.",
     toolsDescription:
-      "Pick Gmail or Google Calendar for live in-chat actions.",
+      "Pick Gmail, Microsoft Outlook, or Google Calendar for live in-chat actions.",
     leadsDescription:
       "Capture structured internal leads from widget conversations.",
     endChatDescription:
@@ -79,6 +79,7 @@ export const agentBuilder = {
   coreDescription:
     "Controls the model, instructions, and live response behavior.",
   gmailDescription: "Send emails during the current conversation.",
+  outlookDescription: "Send emails during the current conversation via Outlook.",
   googleCalendarDescription: "Check availability and book meetings.",
   calDescription: "Check availability and book meetings with Cal.com.",
   leadsDescription:
@@ -104,6 +105,7 @@ export const agentBuilder = {
   syncOperations: "Sync Operations",
   removeNode: "Remove Node",
   useGmail: "Use Gmail during the current conversation.",
+  useOutlook: "Use Outlook during the current conversation.",
   useCalendar: "Check availability and book meetings.",
   useCal: "Check availability and book meetings with Cal.com.",
   noConnectedAccount: "No connected {label} account yet.",

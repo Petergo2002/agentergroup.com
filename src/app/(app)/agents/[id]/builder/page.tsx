@@ -45,6 +45,7 @@ import type {
   ConnectionRecord,
   EndChatBuilderNodeData,
   GmailBuilderNodeData,
+  OutlookBuilderNodeData,
   GoogleCalendarBuilderNodeData,
   KnowledgeBuilderNodeData,
   KnowledgeSourceRecord,
@@ -52,8 +53,8 @@ import type {
 
 type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
-type ToolNodeKind = 'gmail' | 'googlecalendar' | 'cal';
-type ToolNodeData = GmailBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
+type ToolNodeKind = 'gmail' | 'outlook' | 'googlecalendar' | 'cal';
+type ToolNodeData = GmailBuilderNodeData | OutlookBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
 type LibraryItemKey = 'knowledge' | 'tools' | 'endchat' | 'agent';
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 type BuilderStatusNote =
@@ -98,6 +99,7 @@ const DEFAULT_POSITIONS: Record<BuilderNodeKind, { x: number; y: number }> = {
   agent: { x: 320, y: 150 },
   knowledge: { x: 610, y: 70 },
   gmail: { x: 610, y: 220 },
+  outlook: { x: 610, y: 220 },
   googlecalendar: { x: 610, y: 360 },
   cal: { x: 610, y: 500 },
   endchat: { x: 1210, y: 150 },
@@ -175,7 +177,7 @@ const TIMEZONE_OPTIONS = [
   { value: 'Pacific/Auckland', label: 'Auckland' },
 ];
 
-const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'googlecalendar', 'cal'];
+const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'outlook', 'googlecalendar', 'cal'];
 
 function getStarterPromptFields(prompts: string[]) {
   return Array.from({ length: 3 }, (_, index) => prompts[index] ?? '');
@@ -232,6 +234,12 @@ function getBuilderNodeText(kind: BuilderNodeKind, t: Translate) {
         type: t('agentBuilder.toolType'),
         description: t('agentBuilder.gmailDescription'),
       };
+    case 'outlook':
+      return {
+        label: 'Microsoft Outlook',
+        type: t('agentBuilder.toolType'),
+        description: t('agentBuilder.outlookDescription'),
+      };
     case 'googlecalendar':
       return {
         label: 'Google Calendar',
@@ -286,7 +294,7 @@ function translateKnowledgeStatus(status: string, t: Translate) {
 }
 
 function getToolActionLabels(kind: ToolNodeKind, t: Translate) {
-  if (kind === 'gmail') {
+  if (kind === 'gmail' || kind === 'outlook') {
     return [t('agentBuilder.sendEmailAction')];
   }
 
@@ -429,7 +437,7 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
 // nodeTypes is now memoized inside AgentBuilderPage to prevent Fast Refresh warnings
 
 function isToolNodeKind(kind: BuilderNodeKind): kind is ToolNodeKind {
-  return kind === 'gmail' || kind === 'googlecalendar' || kind === 'cal';
+  return kind === 'gmail' || kind === 'outlook' || kind === 'googlecalendar' || kind === 'cal';
 }
 
 function isToolNodeData(data: BuilderNodeData): data is ToolNodeData {
@@ -450,6 +458,7 @@ function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
     value === 'agent' ||
     value === 'knowledge' ||
     value === 'gmail' ||
+    value === 'outlook' ||
     value === 'googlecalendar' ||
     value === 'cal' ||
     value === 'endchat'
@@ -459,6 +468,7 @@ function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
 function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
   const hasKnowledge = nodes.some((node) => node.data.kind === 'knowledge');
   const hasGmail = nodes.some((node) => node.data.kind === 'gmail');
+  const hasOutlook = nodes.some((node) => node.data.kind === 'outlook');
   const hasCalendar = nodes.some((node) => node.data.kind === 'googlecalendar');
   const hasCal = nodes.some((node) => node.data.kind === 'cal');
   const hasEndChat = nodes.some((node) => node.data.kind === 'endchat');
@@ -487,6 +497,15 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
       id: 'e-agent-gmail',
       source: FIXED_NODE_IDS.agent,
       target: 'gmail',
+      style: DEFAULT_EDGE_STYLE,
+    });
+  }
+
+  if (hasOutlook) {
+    edges.push({
+      id: 'e-agent-outlook',
+      source: FIXED_NODE_IDS.agent,
+      target: 'outlook',
       style: DEFAULT_EDGE_STYLE,
     });
   }
@@ -614,6 +633,33 @@ function createGmailNode(
   };
 }
 
+function createOutlookNode(
+  position = DEFAULT_POSITIONS.outlook,
+  connectionId: string | null = null,
+  data?: Partial<OutlookBuilderNodeData>,
+): BuilderFlowNode {
+  return {
+    id: 'outlook',
+    type: 'agentNode',
+    position,
+    data: {
+      kind: 'outlook',
+      label: 'Microsoft Outlook',
+      type: 'Tool',
+      icon: 'mail',
+      simpleIcon: 'siMicrosoftoutlook',
+      simpleIconColor: '#0078D4',
+      description: 'Send emails during the current conversation via Outlook.',
+      status: 'idle',
+      integrationSlug: 'outlook',
+      connectionId,
+      recipientMode: 'ai_decides',
+      recipientEmail: null,
+      ...(data ?? {}),
+    } as BuilderNodeData,
+  };
+}
+
 function createGoogleCalendarNode(
   position = DEFAULT_POSITIONS.googlecalendar,
   connectionId: string | null = null,
@@ -723,6 +769,10 @@ function inferNodeKind(node: BuilderFlowNode) {
     return 'gmail';
   }
 
+  if (label === 'microsoft outlook' || label === 'outlook') {
+    return 'outlook';
+  }
+
   if (label === 'google calendar') {
     return 'googlecalendar';
   }
@@ -798,6 +848,7 @@ function normalizeDefinition(
       : attachedKnowledgeSourceIds;
 
   const gmailNode = nodesByKind.get('gmail');
+  const outlookNode = nodesByKind.get('outlook');
   const calendarNode = nodesByKind.get('googlecalendar');
   const calNode = nodesByKind.get('cal');
   const endChatNode = nodesByKind.get('endchat');
@@ -806,6 +857,12 @@ function normalizeDefinition(
     attachedConnectionIds,
     'gmail',
     gmailNode && isToolNodeData(gmailNode.data) ? gmailNode.data.connectionId : null,
+  );
+  const outlookConnectionId = pickPreferredConnectionId(
+    connections,
+    attachedConnectionIds,
+    'outlook',
+    outlookNode && isToolNodeData(outlookNode.data) ? outlookNode.data.connectionId : null,
   );
   const googleCalendarConnectionId = pickPreferredConnectionId(
     connections,
@@ -848,6 +905,27 @@ function normalizeDefinition(
               recipientEmail:
                 typeof gmailNode.data.recipientEmail === 'string'
                   ? gmailNode.data.recipientEmail
+                  : null,
+            }
+          : undefined,
+      ),
+    );
+  }
+
+  if (outlookNode || outlookConnectionId) {
+    normalizedNodes.push(
+      createOutlookNode(
+        outlookNode?.position ?? DEFAULT_POSITIONS.outlook,
+        outlookConnectionId,
+        outlookNode && outlookNode.data.kind === 'outlook'
+          ? {
+              recipientMode:
+                outlookNode.data.recipientMode === 'specific_email'
+                  ? 'specific_email'
+                  : 'ai_decides',
+              recipientEmail:
+                typeof outlookNode.data.recipientEmail === 'string'
+                  ? outlookNode.data.recipientEmail
                   : null,
             }
           : undefined,
@@ -1709,6 +1787,7 @@ export default function AgentBuilderPage() {
     saveToHistory();
     const nextNode =
       kind === 'gmail' ? createGmailNode() :
+      kind === 'outlook' ? createOutlookNode() :
       kind === 'cal' ? createCalNode() :
       createGoogleCalendarNode();
     setNodes((currentNodes) => [...currentNodes, nextNode]);
@@ -1779,12 +1858,12 @@ export default function AgentBuilderPage() {
     });
   };
 
-  const updateGmailRecipientSettings = (
+  const updateEmailRecipientSettings = (
     nodeId: string,
-    updates: Partial<Pick<GmailBuilderNodeData, 'recipientMode' | 'recipientEmail'>>,
+    updates: Partial<Pick<GmailBuilderNodeData | OutlookBuilderNodeData, 'recipientMode' | 'recipientEmail'>>,
   ) => {
     updateNode(nodeId, (node) => {
-      if (node.data.kind !== 'gmail') {
+      if (node.data.kind !== 'gmail' && node.data.kind !== 'outlook') {
         return node;
       }
 
@@ -2020,9 +2099,11 @@ export default function AgentBuilderPage() {
       description:
         kind === 'gmail'
           ? t('agentBuilder.gmailDescription')
-          : kind === 'cal'
-            ? t('agentBuilder.calDescription')
-            : t('agentBuilder.googleCalendarDescription'),
+          : kind === 'outlook'
+            ? t('agentBuilder.outlookDescription')
+            : kind === 'cal'
+              ? t('agentBuilder.calDescription')
+              : t('agentBuilder.googleCalendarDescription'),
       icon: integration?.icon ?? 'extension',
       simpleIcon: integration?.simpleIcon,
       simpleIconColor: integration?.simpleIconColor,
@@ -2267,8 +2348,8 @@ export default function AgentBuilderPage() {
       const hasConnectedOptions = selectableConnections.some(
         (connection) => connection.status === 'connected',
       );
-      const gmailRecipientEmail =
-        toolNode.data.kind === 'gmail' ? toolNode.data.recipientEmail ?? '' : '';
+      const emailRecipientEmail =
+        toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook' ? toolNode.data.recipientEmail ?? '' : '';
       const selectedCalendarConnectionId =
         toolNode.data.kind === 'googlecalendar' ? toolNode.data.connectionId : null;
       const calendarOptions = selectedCalendarConnectionId
@@ -2297,7 +2378,7 @@ export default function AgentBuilderPage() {
         ? calEventTypesStatusByConnectionId[selectedCalConnectionId] ?? 'idle'
         : 'idle';
       const hasValidSpecificRecipient =
-        toolNode.data.kind === 'gmail' &&
+        (toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook') &&
         toolNode.data.recipientMode === 'specific_email' &&
         Boolean(normalizeGmailRecipientEmail(toolNode.data.recipientEmail));
       const lockedActions = getToolActionLabels(toolNode.data.kind, t);
@@ -2307,9 +2388,11 @@ export default function AgentBuilderPage() {
           <p className="text-sm leading-6 text-on-surface-variant">
             {toolNode.data.kind === 'gmail'
               ? t('agentBuilder.useGmail')
-              : toolNode.data.kind === 'cal'
-                ? t('agentBuilder.useCal')
-                : t('agentBuilder.useCalendar')}
+              : toolNode.data.kind === 'outlook'
+                ? t('agentBuilder.useOutlook')
+                : toolNode.data.kind === 'cal'
+                  ? t('agentBuilder.useCal')
+                  : t('agentBuilder.useCalendar')}
           </p>
           {selectedConnection && selectedConnection.status !== 'connected' ? (
             <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-sm text-on-surface-variant">
@@ -2352,7 +2435,7 @@ export default function AgentBuilderPage() {
               </div>
             </div>
           )}
-          {toolNode.data.kind === 'gmail' && (
+          {(toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook') && (
             <div className="space-y-3">
               <div>
                 <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
@@ -2361,7 +2444,7 @@ export default function AgentBuilderPage() {
                 <select
                   value={toolNode.data.recipientMode}
                   onChange={(event) =>
-                    updateGmailRecipientSettings(toolNode.id, {
+                    updateEmailRecipientSettings(toolNode.id, {
                       recipientMode:
                         event.target.value === 'specific_email'
                           ? 'specific_email'
@@ -2387,9 +2470,9 @@ export default function AgentBuilderPage() {
                     </label>
                     <input
                       type="email"
-                      value={gmailRecipientEmail}
+                      value={emailRecipientEmail}
                       onChange={(event) =>
-                        updateGmailRecipientSettings(toolNode.id, {
+                        updateEmailRecipientSettings(toolNode.id, {
                           recipientEmail: event.target.value || null,
                         })
                       }

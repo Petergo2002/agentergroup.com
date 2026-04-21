@@ -1,4 +1,4 @@
-# Agent Platform Architecture
+µ# Agent Platform Architecture
 
 Last updated: 2026-04-19
 
@@ -29,10 +29,9 @@ The current MVP is intentionally narrow:
 
 - chat-first agent runtime
 - workspace-scoped knowledge base with semantic retrieval
-- chat-first agent runtime
-- workspace-scoped knowledge base with semantic retrieval
-- limited live tools for Gmail, Google Calendar, and Cal.com
+- limited live tools for Gmail, Microsoft Outlook, Google Calendar, and Cal.com
 - Google Drive only as a knowledge import source
+- internal assistant toolkit for Text to PDF generation
 
 This is not currently a workflow automation platform. There is no active Trigger.dev orchestration, no scheduled jobs, and no post-conversation workflow engine.
 

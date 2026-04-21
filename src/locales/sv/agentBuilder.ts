@@ -80,6 +80,7 @@ export const agentBuilder = {
   coreDescription:
     "Styr modell, instruktioner och livebeteende i svaren.",
   gmailDescription: "Skicka e-post under den aktuella konversationen.",
+  outlookDescription: "Skicka e-post under den aktuella konversationen via Outlook.",
   googleCalendarDescription: "Kontrollera tillgänglighet och boka möten.",
   calDescription: "Kontrollera tillgänglighet och boka möten med Cal.com.",
   leadsDescription:
@@ -105,6 +106,7 @@ export const agentBuilder = {
   syncOperations: "Synka operationer",
   removeNode: "Ta bort nod",
   useGmail: "Använd Gmail i den aktuella konversationen.",
+  useOutlook: "Använd Outlook i den aktuella konversationen.",
   useCalendar: "Kontrollera tillgänglighet och boka möten.",
   useCal: "Kontrollera tillgänglighet och boka möten med Cal.com.",
   noConnectedAccount: "Inget anslutet {label}-konto ännu.",

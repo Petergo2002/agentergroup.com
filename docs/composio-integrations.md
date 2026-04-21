@@ -178,6 +178,16 @@ Implementation: `extractCalEventTypes()` in `src/lib/composio.ts`
 
 ---
 
+### Microsoft Outlook — `OUTLOOK_SEND_EMAIL`
+
+| Field | Path | Notes |
+|-------|------|-------|
+| Status | `result.success` | Boolean (wrapped by `executeToolCall`) |
+
+*Note: Outlook is currently an action-only tool in the product. It does not have a listing extractor.*
+
+---
+
 ### Google Calendar — `GOOGLECALENDAR_LIST_CALENDARS`
 
 | Field | Path | Notes |

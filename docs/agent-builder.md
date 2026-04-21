@@ -74,14 +74,18 @@ The builder currently supports these optional node kinds:
 
 - `knowledge`
 - `gmail`
+- `outlook`
 - `googlecalendar`
+- `cal`
 - `endchat`
 
 Current limits:
 
 - only one `knowledge` node
 - only one `gmail` node
+- only one `outlook` node
 - only one `googlecalendar` node
+- only one `cal` node
 - only one `endchat` node
 - no custom node types
 - no arbitrary edge editing
@@ -130,24 +134,21 @@ Important current behavior:
 
 ### Tool inspector
 
-When `gmail` or `googlecalendar` is selected, the builder lets the user choose one connected account for that tool.
+When `gmail`, `outlook`, `googlecalendar`, or `cal` is selected, the builder lets the user choose one connected account for that tool.
 
 Important current behavior:
 
 - only chat-surface integrations are shown in the builder
 - the selectable connection is stored on the node as `connectionId`
 - the actual durable mapping is synced to `agent_connections`
-- Gmail also exposes a per-node recipient policy:
+- Gmail and Outlook both expose a per-node recipient policy:
   - `ai_decides`
   - `specific_email`
-- when Gmail uses `specific_email`, the node stores the hidden fixed recipient on the draft definition and runtime enforces it server-side
+- when Gmail or Outlook uses `specific_email`, the node stores the hidden fixed recipient on the draft definition and runtime enforces it server-side
 - Google Calendar exposes one selected booking calendar and resolves the booking timezone from that calendar
-- the builder now loads connection inventory from `/api/connections/toolkits` so stale Composio rows are downgraded before the tool inspector renders
-- the builder loads selectable Google Calendars from the connected Composio account through `/api/connections/googlecalendar/calendars`
-- the selected Google Calendar is stored on the node as `calendarId` plus `calendarLabel`
-- the Google Calendar node also stores the resolved calendar timezone returned by the selected booking calendar
-- if the stored Google Calendar connected account no longer exists in Composio, the calendar-list route marks the row disconnected and asks the operator to reconnect instead of surfacing a 500
-- the calendar-list route is backed by a manual `GOOGLECALENDAR_LIST_CALENDARS` Composio tool execution, so the app must define Composio toolkit versions centrally for Google Calendar to keep the selector stable
+- Cal.com exposes a scheduling mode: `ai_decides` or `specific_event_type`
+- the builder loads selectable Google Calendars or Cal.com event types from the connected Composio account
+- if the connection no longer exists in Composio, the app marks the row disconnected and asks the operator to reconnect
 
 ### End Chat inspector
 
@@ -168,12 +169,17 @@ Allowed actions are currently informational and hardcoded:
 
 - Gmail:
   - `Send Email`
+- Microsoft Outlook:
+  - `Send Email`
 - Google Calendar:
   - `Create Event`
   - `Quick Add`
   - `Get Current Date Time`
   - `Find Free Slots`
   - `List Calendars`
+- Cal.com:
+  - `Get Available Slots`
+  - `Create Booking`
 
 ### Library and tool picker
 
@@ -418,12 +424,14 @@ Current supported node data types in `src/lib/types.ts`:
 - `KnowledgeBuilderNodeData`
 - `EndChatBuilderNodeData`
 - `GmailBuilderNodeData`
+- `OutlookBuilderNodeData`
 - `GoogleCalendarBuilderNodeData`
+- `CalBuilderNodeData`
 - `OutputBuilderNodeData`
 
 Important current tool-node fields:
 
-- `GmailBuilderNodeData`
+- `GmailBuilderNodeData` / `OutlookBuilderNodeData`
   - `connectionId`
   - `recipientMode`
   - `recipientEmail`
@@ -433,6 +441,12 @@ Important current tool-node fields:
   - `calendarId`
   - `calendarLabel`
   - `includePrimaryCalendar`
+- `CalBuilderNodeData`
+  - `connectionId`
+  - `timezone`
+  - `eventTypeMode`
+  - `eventTypeId`
+  - `eventTypeLabel`
 
 ### Composio toolkit versions
 

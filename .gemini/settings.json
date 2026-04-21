@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "httpUrl": "https://mcp.supabase.com/mcp?project_ref=rklntfzmqayziqesjoih&features=development%2Cdocs%2Caccount%2Cdatabase%2Cdebugging%2Cfunctions%2Cbranching%2Cstorage",
+      "oauth": {
+        "enabled": true,
+        "authorizationUrl": "https://auth.supabase.com/oauth/authorize",
+        "tokenUrl": "https://auth.supabase.com/oauth/token"
+      }
+    }
+  }
+}

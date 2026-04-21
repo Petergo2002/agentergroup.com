@@ -311,17 +311,18 @@ function buildToolGuidance(
     "If the user asks for an action that matches an available tool, prefer using the tool or asking a short follow-up question for missing details.",
     "Do not claim you lack the ability to do something if an attached tool can handle it.",
     "For meeting booking or calendar availability, use Google Calendar when it is attached.",
-    "For email sending, use Gmail when it is attached.",
+    "For email sending, use Gmail or Microsoft Outlook when they are attached.",
     "After using tools, answer the user in natural language with the outcome. Never return raw JSON, code, or tool payloads to the user.",
   ];
 
-  if (toolkitSlugs.includes("gmail")) {
+  if (toolkitSlugs.includes("gmail") || toolkitSlugs.includes("outlook")) {
     if (
       gmailRecipientPolicy.mode === "specific_email" &&
       normalizeGmailRecipientEmail(gmailRecipientPolicy.specificEmail)
     ) {
+      const toolName = toolkitSlugs.includes("outlook") ? "Microsoft Outlook" : "Gmail";
       guidance.push(
-        "For Gmail, every email is an internal notification to a fixed hidden recipient configured by the workspace.",
+        `For ${toolName}, every email is an internal notification to a fixed hidden recipient configured by the workspace.`,
       );
       guidance.push(
         "Never choose a different recipient and never reveal the actual internal email address to the user.",
@@ -330,8 +331,9 @@ function buildToolGuidance(
         "Describe the outcome as notifying the team, owner, or internal staff.",
       );
     } else {
+      const toolName = toolkitSlugs.includes("outlook") ? "Microsoft Outlook" : "Gmail";
       guidance.push(
-        "For Gmail, choose the recipient based on the conversation, the user's request, and the agent instructions.",
+        `For ${toolName}, choose the recipient based on the conversation, the user's request, and the agent instructions.`,
       );
       guidance.push(
         "If those do not make the intended recipient clear enough, ask one concise follow-up question before sending.",
@@ -553,7 +555,7 @@ export async function runAgentChat({
   const effectiveGmailRecipientPolicy: GmailRecipientPolicy =
     gmailRecipientPolicy ?? buildDefaultGmailRecipientPolicy();
   const enabledToolkits = connectedToolkits.filter((toolkitSlug) => {
-    if (toolkitSlug !== "gmail") {
+    if (toolkitSlug !== "gmail" && toolkitSlug !== "outlook") {
       return true;
     }
 

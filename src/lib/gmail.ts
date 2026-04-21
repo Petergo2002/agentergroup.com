@@ -33,27 +33,27 @@ export function extractGmailRecipientPolicyFromNodes(
     return buildDefaultGmailRecipientPolicy();
   }
 
-  const gmailNode = nodes.find((node) => {
+  const emailNode = nodes.find((node) => {
     if (!node || typeof node !== "object") {
       return false;
     }
 
     const data = (node as { data?: { kind?: unknown } }).data;
-    return data?.kind === "gmail";
+    return data?.kind === "gmail" || data?.kind === "outlook";
   }) as { data?: Partial<GmailBuilderNodeData> } | undefined;
 
-  if (!gmailNode?.data) {
+  if (!emailNode?.data) {
     return buildDefaultGmailRecipientPolicy();
   }
 
   const mode =
-    gmailNode.data.recipientMode === "specific_email"
+    emailNode.data.recipientMode === "specific_email"
       ? "specific_email"
       : "ai_decides";
 
   return {
     mode,
-    specificEmail: normalizeGmailRecipientEmail(gmailNode.data.recipientEmail),
+    specificEmail: normalizeGmailRecipientEmail(emailNode.data.recipientEmail),
   };
 }
 
