@@ -90,6 +90,7 @@ export const agentBuilder = {
   endChatNodeDescription: "Stänger sessionen när avslutsvillkoren uppfylls.",
   semanticSourcesDescription:
     "Välj de semantiska källor som buildern får hämta från.",
+  dataSources: "Datakällor",
   sourceCount: "{count} källa",
   sourceCountPlural: "{count} källor",
   knowledgeChunks: "{count} kunskapssegment",

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Copy, Send } from "lucide-react";
+import { Copy, Send, Paperclip } from "lucide-react";
 import { Fragment, useEffect, useRef } from "react";
 import type {
   Message,
@@ -248,6 +248,10 @@ interface ChatViewProps {
   endReason: WidgetEndChatReason | null;
   onStartNewChat: () => void;
   sendMessage: (text?: string) => Promise<void>;
+  pendingAttachments?: { url: string; name: string; type: string; size: number }[];
+  isUploadingAttachment?: boolean;
+  onAttachFile?: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  uploadError?: string | null;
 }
 
 export function ChatView({
@@ -264,6 +268,10 @@ export function ChatView({
   endReason,
   onStartNewChat,
   sendMessage,
+  pendingAttachments,
+  isUploadingAttachment,
+  onAttachFile,
+  uploadError,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -327,10 +335,28 @@ export function ChatView({
             >
               {msg.role === "user" ? (
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-[var(--widget-primary)] px-4 py-3 text-[var(--widget-primary-fg)] shadow-sm">
-                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words font-medium">
-                      {msg.content}
-                    </p>
+                  <div className="max-w-[85%] flex flex-col gap-2">
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="flex flex-col gap-1 items-end">
+                        {msg.attachments.map((att, i) => (
+                          att.type.startsWith("image/") ? (
+                            <img key={i} src={att.url} alt={att.name} className="max-w-[200px] rounded-lg shadow-sm object-cover" />
+                          ) : (
+                            <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-widget-card border border-widget-border rounded-lg px-3 py-2 text-xs text-widget-fg hover:bg-widget-border/30 transition-colors shadow-sm">
+                              <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate max-w-[150px] font-medium">{att.name}</span>
+                            </a>
+                          )
+                        ))}
+                      </div>
+                    )}
+                    {msg.content && (
+                      <div className="self-end rounded-2xl rounded-br-sm bg-[var(--widget-primary)] px-4 py-3 text-[var(--widget-primary-fg)] shadow-sm">
+                        <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words font-medium">
+                          {msg.content}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -398,6 +424,25 @@ export function ChatView({
       {/* Chat Input */}
       <div className="relative z-10 shrink-0 bg-[color:var(--widget-bg)]/96 px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-2 backdrop-blur-sm peer group md:px-10 lg:px-14">
         <div className="relative mx-auto max-w-4xl">
+          {uploadError && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-xs font-medium text-red-500 shadow-sm border border-red-500/20">
+              <span className="flex-1">{uploadError}</span>
+            </div>
+          )}
+          {pendingAttachments && pendingAttachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2 px-1">
+              {pendingAttachments.map((att, i) => (
+                <div key={i} className="flex items-center gap-2 bg-widget-card border border-widget-border rounded-lg px-2 py-1 shadow-sm">
+                  {att.type.startsWith("image/") ? (
+                    <img src={att.url} alt={att.name} className="w-6 h-6 rounded object-cover" />
+                  ) : (
+                    <Paperclip className="w-4 h-4 text-widget-muted" />
+                  )}
+                  <span className="text-xs font-medium text-widget-fg max-w-[120px] truncate">{att.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {isConversationCompleted && (
             <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-widget-border bg-widget-card px-4 py-3 text-sm text-widget-fg">
               <div>
@@ -416,6 +461,24 @@ export function ChatView({
             </div>
           )}
           <div className="widget-input-shell relative flex items-center rounded-2xl px-1.5 shadow-lg">
+            {onAttachFile && (
+              <label
+                className={`p-2.5 rounded-xl bg-transparent text-widget-muted hover:text-[var(--widget-secondary)] transition-colors shrink-0 ml-1 ${
+                  isConversationCompleted || isLoading || isStreaming || isUploadingAttachment
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer"
+                }`}
+              >
+                <input
+                  type="file"
+                  className="hidden"
+                  disabled={isConversationCompleted || isLoading || isStreaming || isUploadingAttachment}
+                  onChange={onAttachFile}
+                  accept="image/*,application/pdf,text/plain"
+                />
+                <Paperclip className={`w-5 h-5 ${isUploadingAttachment ? "animate-pulse" : ""}`} />
+              </label>
+            )}
             <input
               ref={inputRef}
               type="text"
@@ -437,7 +500,7 @@ export function ChatView({
               onClick={() => sendMessage()}
               disabled={
                 isConversationCompleted ||
-                !input.trim() ||
+                (!input.trim() && (!pendingAttachments || pendingAttachments.length === 0)) ||
                 isLoading ||
                 isStreaming
               }

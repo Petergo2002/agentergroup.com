@@ -173,6 +173,22 @@ function ConversationRow({
   language: "en" | "sv";
 }) {
   const { t } = useLanguage();
+  
+  // Personalization logic: Prioritize Lead name > Lead email > Agent name
+  const primaryDisplay = conversation.leadSummary?.name || 
+                        conversation.leadSummary?.email || 
+                        conversation.agentLabel || 
+                        conversation.agentName || 
+                        t("analytics.anonymousUser");
+
+  const secondaryDisplay = (conversation.leadSummary?.name && conversation.leadSummary?.email) 
+                           ? conversation.leadSummary.email 
+                           : (conversation.agentLabel || conversation.agentName);
+
+  const initials = (conversation.leadSummary?.name?.[0] || 
+                   conversation.leadSummary?.email?.[0] || 
+                   "U").toUpperCase();
+
   return (
     <button
       type="button"
@@ -187,42 +203,58 @@ function ConversationRow({
         <div className="absolute left-0 top-0 h-full w-1 bg-primary-container" />
       )}
       
-      <div className="flex items-center justify-between gap-3 mb-2.5">
-        <div className="flex items-center gap-2">
-          {conversation.hasLead && (
-            <span className="rounded-full bg-primary-container/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-tight text-primary-container">
-              {t("analytics.leadCaptured")}
-            </span>
-          )}
+      <div className="flex items-start gap-4">
+        {/* User Avatar */}
+        <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-headline text-xs font-bold ring-2 ring-offset-2 ring-offset-surface ${
+          conversation.hasLead 
+            ? "bg-primary-container text-white ring-primary-container/10" 
+            : "bg-surface-container-highest text-on-surface-variant ring-transparent"
+        }`}>
+          {initials}
         </div>
-        <span className="text-[10px] font-medium text-on-surface-variant/60">
-          {formatRelativeDate(conversation.lastActivityAt, language)}
-        </span>
-      </div>
 
-      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-headline text-[14px] font-bold text-on-surface group-hover:text-primary-container transition-colors">
-            {conversation.agentLabel || conversation.agentName || t("common.unknownAgent")}
-          </p>
-          <p className="mt-1 line-clamp-1 text-[12px] leading-relaxed text-on-surface-variant">
-            {conversation.latestSnippet || t("analytics.monitoringSession")}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between border-t border-outline-variant/5 pt-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-container-highest text-[10px] font-bold text-on-surface-variant">
-            {conversation.agentName?.[0] || "A"}
+          <div className="flex items-center justify-between gap-3">
+            <p className="truncate font-headline text-[15px] font-bold text-on-surface group-hover:text-primary-container transition-colors">
+              {primaryDisplay}
+            </p>
+            <span className="shrink-0 text-[10px] font-medium text-on-surface-variant/60">
+              {formatRelativeDate(conversation.lastActivityAt, language)}
+            </span>
           </div>
-          <span className="text-[10px] font-medium text-on-surface-variant">
-            {conversation.widgetName || t("analytics.globalWidget")}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 opacity-60">
-          <MessageSquare className="h-3 w-3" />
-          <span className="text-[10px] font-bold">{conversation.messageCount}</span>
+
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="truncate text-[12px] font-medium text-on-surface-variant/70">
+              {secondaryDisplay}
+            </p>
+            {conversation.hasLead && (
+              <span className="flex h-1.5 w-1.5 rounded-full bg-primary-container" />
+            )}
+          </div>
+
+          <p className="mt-2.5 line-clamp-1 text-[12px] leading-relaxed text-on-surface-variant/80 italic">
+            &ldquo;{conversation.latestSnippet || t("analytics.monitoringSession")}&rdquo;
+          </p>
+          
+          <div className="mt-4 flex items-center justify-between border-t border-outline-variant/5 pt-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">
+                {conversation.widgetName || t("analytics.globalWidget")}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 text-on-surface-variant/60">
+                <MessageSquare className="h-3 w-3" />
+                <span className="text-[10px] font-bold">{conversation.messageCount}</span>
+              </div>
+              {conversation.hasLead && (
+                <div className="flex items-center gap-1 text-primary-container">
+                  <span className="material-symbols-outlined text-[14px]">person_check</span>
+                  <span className="text-[9px] font-bold uppercase tracking-tight">{t("analytics.leadCaptured")}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </button>
@@ -329,30 +361,77 @@ function ConversationDetail({
   const { t, language } = useLanguage();
   return (
     <section className="flex h-full flex-col bg-surface relative overflow-hidden">
-      <div className="shrink-0 p-8 pb-4 flex justify-between items-end border-b border-outline-variant/5 lg:border-none">
-        <div className="min-w-0">
-          <h2 className="font-headline text-3xl font-bold tracking-tight text-on-surface truncate">
-            {detail
-              ? t("analytics.sessionWith", { name: detail.lead?.name || t("analytics.anonymous") })
-              : t("analytics.operationalPreview")}
-          </h2>
-          {detail && (
-            <div className="flex items-center gap-4 mt-2.5">
-              <span className="flex items-center gap-1.5 text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">
-                <span className="material-symbols-outlined text-[14px]">hub</span>
-                {detail.conversation.source}
-              </span>
+      <div className="shrink-0 p-8 pb-6 border-b border-outline-variant/5">
+        <div className="flex justify-between items-start">
+          <div className="min-w-0">
+            <h2 className="font-headline text-3xl font-bold tracking-tight text-on-surface truncate">
+              {detail
+                ? (detail.lead?.name || detail.lead?.email || t("analytics.anonymousUser"))
+                : t("analytics.operationalPreview")}
+            </h2>
+            
+            {detail && (
+              <div className="flex items-center gap-3 mt-3">
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-widest ${
+                  detail.conversation.source === 'hosted' 
+                    ? 'bg-primary-container/10 text-primary-container' 
+                    : 'bg-surface-container-high text-on-surface-variant'
+                }`}>
+                  {detail.conversation.source}
+                </span>
+                <div className="h-1 w-1 rounded-full bg-outline-variant/30" />
+                <span className="text-[11px] font-medium text-on-surface-variant">
+                  {t("analytics.sessionInitialized")} {formatRelativeDate(detail.conversation.startedAt, language)}
+                </span>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex gap-2">
+            {onClose && (
+              <button onClick={onClose} className="p-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-colors lg:hidden">
+                <span className="material-symbols-outlined text-on-surface-variant">close</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Lead Contact Card (CRM Style) */}
+        {detail?.lead && (
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-primary-container/5 flex items-center justify-center text-primary-container">
+                <span className="material-symbols-outlined text-[18px]">mail</span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-tighter">Email</p>
+                <p className="text-[13px] font-medium text-on-surface truncate">{detail.lead.email}</p>
+              </div>
             </div>
-          )}
-        </div>
-        
-        <div className="flex gap-2">
-          {onClose && (
-            <button onClick={onClose} className="p-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-colors lg:hidden">
-              <span className="material-symbols-outlined text-on-surface-variant">close</span>
-            </button>
-          )}
-        </div>
+            
+            {detail.lead.phone && (
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-primary-container/5 flex items-center justify-center text-primary-container">
+                  <span className="material-symbols-outlined text-[18px]">call</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-tighter">Phone</p>
+                  <p className="text-[13px] font-medium text-on-surface truncate">{detail.lead.phone}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-primary-container/5 flex items-center justify-center text-primary-container">
+                <span className="material-symbols-outlined text-[18px]">history</span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-tighter">Captured</p>
+                <p className="text-[13px] font-medium text-on-surface truncate">{formatRelativeDate(detail.lead.createdAt, language)}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -408,6 +487,22 @@ function ConversationDetail({
                         {message.content}
                       </p>
 
+                      {(message.metadata as { attachments?: { type?: string; url: string; name: string }[] })?.attachments && Array.isArray((message.metadata as { attachments?: { type?: string; url: string; name: string }[] }).attachments) && (message.metadata as { attachments?: { type?: string; url: string; name: string }[] }).attachments!.length > 0 && (
+                        <div className={`mt-4 flex flex-wrap gap-2 ${message.role === "user" ? "justify-end" : ""}`}>
+                          {(message.metadata as { attachments?: { type?: string; url: string; name: string }[] }).attachments!.map((att, i: number) => (
+                            att.type?.startsWith("image/") ? (
+                              <a key={i} href={att.url} target="_blank" rel="noopener noreferrer">
+                                <img src={att.url} alt={att.name} className="w-24 h-24 object-cover rounded-lg border border-black/10 shadow-sm" />
+                              </a>
+                            ) : (
+                              <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-black/10 hover:bg-black/20 transition-colors rounded-lg text-xs font-medium shadow-sm">
+                                <span className="material-symbols-outlined text-[14px]">attachment</span>
+                                <span className="truncate max-w-[120px]">{att.name}</span>
+                              </a>
+                            )
+                          ))}
+                        </div>
+                      )}
 
                       {message.role === "assistant" && message.debugTrace && (
                         <DebugPanel trace={message.debugTrace} />

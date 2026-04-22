@@ -339,6 +339,13 @@ function formatBuilderStatusNote(
 }
 
 function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
+  const { t } = useLanguage();
+  const nodeText = getBuilderNodeText(data.kind, t);
+  
+  const label = nodeText?.label || data.label;
+  const type = nodeText?.type || data.type || 'Blueprint Node';
+  const description = nodeText?.description || data.description;
+
   const badgeToneClass = {
     default: 'bg-background text-on-surface-variant',
     success: 'bg-primary/10 text-primary',
@@ -370,7 +377,7 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
         }`}
       >
         <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary/70">
-          {data.type || 'Blueprint Node'}
+          {type}
         </span>
         <div className="flex items-center gap-1.5">
           {selected && (
@@ -396,8 +403,8 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
             )}
           </div>
           <div className="min-w-0 flex-1 pt-0.5">
-            <p className="text-sm font-bold text-on-surface tracking-tight">{data.label}</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70 italic line-clamp-2">{data.description}</p>
+            <p className="text-sm font-bold text-on-surface tracking-tight">{label}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70 italic line-clamp-2">{description}</p>
           </div>
         </div>
         {data.badgeText ? (
@@ -2250,7 +2257,7 @@ export default function AgentBuilderPage() {
           <div className="space-y-8">
             <div className="flex flex-col gap-4 rounded-3xl border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface">Data Sources</h3>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface">{t('agentBuilder.dataSources')}</h3>
                 <div className="flex shrink-0 items-center gap-1.5 rounded-full ring-1 ring-inset ring-primary/20 bg-primary/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-primary">
                   <div className="h-1.5 w-1.5 rounded-full bg-primary" />
                   {validAttachedSourceIds.length === 1

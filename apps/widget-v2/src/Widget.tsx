@@ -24,6 +24,7 @@ import {
   getWidgetBootstrap,
   sendWidgetEvent,
   sendWidgetMessage,
+  uploadWidgetAttachment,
   type WidgetRequestContext,
 } from "./lib/api";
 import { createJsonError, hasErrorCode, getRetryAfterSeconds, buildRequestContextFromBootstrap } from "./lib/api-errors";
@@ -96,6 +97,9 @@ export default function Widget({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<{ url: string; name: string; type: string; size: number }[]>([]);
   const [hasStarted, setHasStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"home" | "messages">("home");
@@ -749,6 +753,33 @@ export default function Widget({
     );
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    console.log("File selected:", file);
+    if (!file) return;
+    
+    e.target.value = "";
+    if (file.size > 5 * 1024 * 1024) {
+      console.error("File size must be under 5MB");
+      setError("File size must be under 5MB");
+      return;
+    }
+    
+    try {
+      setIsUploadingAttachment(true);
+      setError(null);
+      console.log("Uploading file...", file.name);
+      const attachment = await uploadWidgetAttachment(widgetPublicKey, sessionId, file, requestContext);
+      console.log("Upload successful:", attachment);
+      setPendingAttachments(prev => [...prev, attachment]);
+    } catch (err) {
+      console.error("Upload error:", err);
+      setError(err instanceof Error ? err.message : "Failed to upload file");
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
+
   const sendMessage = async (text: string = input) => {
     const activeLanguage = resolveWidgetLanguage(config);
     const activeAgent = resolveSelectedAgent(config, selectedWidgetAgentId);
@@ -758,7 +789,7 @@ export default function Widget({
         : null;
     const trimmedMessage = text.trim();
 
-    if (!trimmedMessage) {
+    if (!trimmedMessage && pendingAttachments.length === 0) {
       return;
     }
 
@@ -777,10 +808,13 @@ export default function Widget({
     setActiveTab("messages");
 
     const userMessage = trimmedMessage;
+    const currentAttachments = [...pendingAttachments];
     setInput("");
+    setPendingAttachments([]);
+    setUploadError(null);
     setMessages((previous) => [
       ...previous,
-      { role: "user", content: userMessage },
+      { role: "user", content: userMessage, attachments: currentAttachments.length > 0 ? currentAttachments : undefined },
     ]);
     setIsLoading(true);
     const streamAbortController = new AbortController();
@@ -792,6 +826,7 @@ export default function Widget({
         message: userMessage,
         widgetAgentId: activeAgent.widgetAgentId,
         language: activeLanguage,
+        attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
         pageUrl:
           typeof window !== "undefined" ? window.location.href : undefined,
         referrer:
@@ -1230,6 +1265,10 @@ export default function Widget({
                 endReason={conversationEndReason}
                 onStartNewChat={() => resetConversation()}
                 sendMessage={sendMessage}
+                pendingAttachments={pendingAttachments}
+                isUploadingAttachment={isUploadingAttachment}
+                onAttachFile={handleFileUpload}
+                uploadError={uploadError}
               />
             )}
           </AnimatePresence>

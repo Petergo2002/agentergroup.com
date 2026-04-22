@@ -133,6 +133,7 @@ export interface AgentRuntimeInput {
   audience: "preview" | "assistant" | "widget";
   knowledgeAccessToken?: string | null;
   widgetPublicKey?: string | null;
+  widgetSessionId?: string | null;
   calendarTimezone?: string | null;
   googleCalendarSelection?: GoogleCalendarSelection | null;
   calSelection?: CalSelection | null;
@@ -259,16 +260,56 @@ function mapDbMessagesToModel(messages: RuntimeMessage[]) {
         return false;
       }
 
-      if (message.role !== "assistant") {
+      if (message.role !== "assistant" && message.role !== "user") {
         return true;
       }
 
-      return !OMITTED_ASSISTANT_HISTORY_MESSAGES.has(message.content.trim());
+      if (message.role === "assistant") {
+        return !OMITTED_ASSISTANT_HISTORY_MESSAGES.has(message.content.trim());
+      }
+      
+      return true;
     })
     .map((message) => {
+      let content: unknown = message.content;
+      
+      if (message.role === "user" && message.metadata?.attachments && Array.isArray(message.metadata.attachments)) {
+        const parts: { type: string; text?: string; image_url?: { url: string } }[] = [];
+        let hasImage = false;
+        
+        if (message.content) {
+          parts.push({ type: "text", text: message.content });
+        }
+        
+        let textNotes = "";
+        
+        for (const att of message.metadata.attachments) {
+          if (typeof att.url === "string" && typeof att.type === "string") {
+            if (att.type.startsWith("image/")) {
+              hasImage = true;
+              parts.push({ type: "image_url", image_url: { url: att.url } });
+            } else {
+              textNotes += `\\n[Attached File: ${att.name || 'document'} (${att.url})]`;
+            }
+          }
+        }
+        
+        if (textNotes && parts.length > 0 && parts[0].type === "text") {
+          parts[0].text += textNotes;
+        } else if (textNotes) {
+          parts.push({ type: "text", text: textNotes.trim() });
+        }
+        
+        if (hasImage) {
+          content = parts;
+        } else if (textNotes && typeof content === "string") {
+          content += textNotes;
+        }
+      }
+
       const result: Record<string, unknown> = {
         role: message.role,
-        content: message.content,
+        content,
       };
 
       if (
@@ -470,6 +511,7 @@ async function retrieveKnowledgeMatches({
   query,
   knowledgeAccessToken,
   widgetPublicKey,
+  widgetSessionId,
 }: {
   supabase: RuntimeSupabaseLike;
   workspaceId: string;
@@ -477,6 +519,7 @@ async function retrieveKnowledgeMatches({
   query: string;
   knowledgeAccessToken?: string | null;
   widgetPublicKey?: string | null;
+  widgetSessionId?: string | null;
 }) {
   void supabase;
 
@@ -502,6 +545,7 @@ async function retrieveKnowledgeMatches({
       agentId,
       query,
       widgetPublicKey,
+      widgetSessionId,
       matchThreshold: KNOWLEDGE_MATCH_THRESHOLD,
       matchCount: KNOWLEDGE_MATCH_COUNT,
     }),
@@ -615,9 +659,12 @@ export async function runAgentChat({
   const toolsPromise = getWrappedTools(toolUserId, enabledToolkits);
   let knowledgeMatches: KnowledgeMatchRecord[] = [];
 
-  if (readyKnowledgeSources.length > 0) {
+  const hasGlobalKnowledge = readyKnowledgeSources.length > 0;
+  const hasSessionKnowledge = Boolean(widgetSessionId);
+
+  if (hasGlobalKnowledge || hasSessionKnowledge) {
     try {
-      if (onStatus) onStatus("Searching specific knowledge...");
+      if (onStatus) onStatus("Searching knowledge...");
       knowledgeMatches = await retrieveKnowledgeMatches({
         supabase,
         workspaceId: agent.workspace_id,
@@ -625,6 +672,7 @@ export async function runAgentChat({
         query: input,
         knowledgeAccessToken,
         widgetPublicKey,
+        widgetSessionId,
       });
 
       const knowledgeContext = buildKnowledgeContext(knowledgeMatches);

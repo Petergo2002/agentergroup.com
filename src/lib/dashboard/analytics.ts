@@ -291,6 +291,7 @@ function buildTranscriptWithDebugTrace(messages: AnalyticsTranscriptRow[]) {
         role: "user",
         content: message.content,
         createdAt: message.created_at,
+        metadata: message.metadata,
         debugTrace: null,
       });
       continue;
@@ -312,6 +313,7 @@ function buildTranscriptWithDebugTrace(messages: AnalyticsTranscriptRow[]) {
       role: "assistant",
       content: message.content,
       createdAt: message.created_at,
+      metadata: message.metadata,
       debugTrace:
         debugTraceFromMetadata ??
         buildSyntheticDebugTraceFromToolMessages(

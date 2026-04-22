@@ -1,24 +1,20 @@
-# Documentation Index
+# Agentergroup Documentation
 
-This folder keeps the current reference docs for the product plus one implementation plan that still documents active runtime behavior.
+Welcome to the technical documentation for Agentergroup. This directory contains the architectural blueprints and guides for maintaining and extending the platform.
 
-## Current reference docs
+## 🏗️ [Architecture](./architecture/core.md)
+Detailed overview of the system design, database schema, and agent orchestration flow.
 
-- `architecture.md`
-  - end-to-end system structure, routes, data model, and deployment behavior
-- `agent-builder.md`
-  - current builder behavior, persistence model, and update expectations
-- `privacy-operations.md`
-  - current GDPR/privacy operations and retention workflow
-- `widget-embed-security.md`
-  - current public widget security model for copy-paste embeds
-- `composio-integrations.md`
-  - **mandatory reading before adding any Composio tool integration**
-  - documents response envelope pitfalls, ID type coercion, known response shapes per integration, and the debug procedure for silent failures
+## 📘 Guides
+Practical instructions for common tasks:
+- **[Agent Builder](./guides/agent-builder.md)** - How the flow-based builder works.
+- **[Adding Integrations](./guides/adding-integrations.md)** - Guide for extending toolkits.
+- **[Composio Integration](./guides/composio-integrations.md)** - Details on our tool execution engine.
+- **[Widget Security](./guides/widget-embed-security.md)** - Security protocols for public embeds.
+- **[Privacy Operations](./guides/privacy-operations.md)** - GDPR and data processing details.
 
-## Active implementation plan
+## 📁 [Archive](./archive/plans/)
+Historical implementation plans and completed feature specs.
 
-- `implementation-plans/20260409-widget-rate-limits-plan.md`
-  - current rate-limit rollout notes that are still referenced from the architecture doc
-
-Historical redesign plans, walkthrough notes, outdated phase docs, and superseded planning placeholders were removed because they no longer describe the product as it works today.
+---
+*Last updated: April 2026*

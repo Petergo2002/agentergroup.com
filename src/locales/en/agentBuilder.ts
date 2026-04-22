@@ -89,8 +89,9 @@ export const agentBuilder = {
   endChatNodeDescription: "Closes the session when end conditions are met.",
   semanticSourcesDescription:
     "Choose the semantic sources this builder can retrieve from.",
+  dataSources: "Data Sources",
   sourceCount: "{count} source",
-  sourceCountPlural: "{count} källor",
+  sourceCountPlural: "{count} sources",
   knowledgeChunks: "{count} cognitive chunks",
   noIndexedSources: "No library sources indexed yet.",
   attachedBadge: "{count} attached",

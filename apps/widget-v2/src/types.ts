@@ -78,4 +78,5 @@ export interface Message {
   role: "user" | "agent";
   content: string;
   isStreaming?: boolean;
+  attachments?: { url: string; name: string; type: string; size: number }[];
 }

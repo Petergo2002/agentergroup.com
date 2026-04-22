@@ -314,6 +314,7 @@ export async function POST(
       widgetAgentId: requestedWidgetAgentId,
       pageUrl,
       referrer,
+      attachments,
     } = bodyValidation.value;
 
     const existingSession = await loadWidgetSession(
@@ -426,7 +427,7 @@ export async function POST(
         widgetId: loaded.widget.id,
         widgetAgentId: selected!.persistedWidgetAgentId,
         agentId: selected!.agent.id,
-        messages: [{ role: "user", content: message }],
+        messages: [{ role: "user", content: message, metadata: attachments ? { attachments } : undefined }],
       }),
     ]);
 
@@ -486,10 +487,12 @@ export async function POST(
                 typeof item.metadata?.tool_call_id === "string"
                   ? item.metadata.tool_call_id
                   : null,
+              metadata: item.metadata,
             })),
             toolUserId: buildWorkspaceComposioUserId(selected!.agent.workspace_id),
             audience: "widget",
             widgetPublicKey: loaded.widget.widget_public_key,
+            widgetSessionId: sessionId,
             calendarTimezone,
             googleCalendarSelection,
             endChatPolicy,

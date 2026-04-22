@@ -105,6 +105,7 @@ export interface DashboardConversationDetailResponse {
     role: "user" | "assistant";
     content: string;
     createdAt: string;
+    metadata?: Record<string, unknown> | null;
     debugTrace?: DebugTrace | null;
   }>;
 }

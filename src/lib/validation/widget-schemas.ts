@@ -47,6 +47,7 @@ export interface WidgetChatBody {
   widgetAgentId: string | null;
   pageUrl: string | null;
   referrer: string | null;
+  attachments?: { url: string; name: string; type: string; size: number }[];
 }
 
 export interface WidgetLeadBody {
@@ -324,8 +325,29 @@ export function validateWidgetChatBody(input: unknown): ValidationResult<WidgetC
     return sessionIdResult;
   }
 
+  let attachments: { url: string; name: string; type: string; size: number }[] | undefined;
+  if (record.attachments !== undefined) {
+    if (!Array.isArray(record.attachments)) {
+      return invalid("attachments must be an array.");
+    }
+    const parsedAttachments = [];
+    for (const attachment of record.attachments) {
+      const attRecord = asRecord(attachment);
+      if (!attRecord || typeof attRecord.url !== "string" || typeof attRecord.name !== "string" || typeof attRecord.type !== "string" || typeof attRecord.size !== "number") {
+        return invalid("Each attachment must have url (string), name (string), type (string), and size (number).");
+      }
+      parsedAttachments.push({
+        url: attRecord.url,
+        name: attRecord.name,
+        type: attRecord.type,
+        size: attRecord.size,
+      });
+    }
+    attachments = parsedAttachments;
+  }
+
   const messageResult = readRequiredString(
-    record.message,
+    record.message || (attachments && attachments.length > 0 ? " " : ""),
     "message",
     MAX_CHAT_MESSAGE_LENGTH,
   );
@@ -362,10 +384,11 @@ export function validateWidgetChatBody(input: unknown): ValidationResult<WidgetC
 
   return valid({
     sessionId: sessionIdResult.value,
-    message: messageResult.value,
+    message: record.message === "" ? "" : messageResult.value,
     widgetAgentId: widgetAgentIdResult.value,
     pageUrl: pageUrlResult.value,
     referrer: referrerResult.value,
+    attachments,
   });
 }
 

@@ -69,6 +69,8 @@ export interface WidgetAdminSupabase {
     fn: string,
     args?: Record<string, unknown>,
   ) => Promise<WidgetRpcQueryResult<TData>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  storage: any;
 }
 
 export interface WidgetPreviewDraftRow extends WidgetPreviewDraftRecord {

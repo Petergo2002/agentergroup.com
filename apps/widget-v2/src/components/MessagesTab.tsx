@@ -21,6 +21,10 @@ export interface MessagesTabProps {
   endReason: WidgetEndChatReason | null;
   onStartNewChat: () => void;
   sendMessage: (text?: string) => Promise<void>;
+  pendingAttachments?: { url: string; name: string; type: string; size: number }[];
+  isUploadingAttachment?: boolean;
+  onAttachFile?: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  uploadError?: string | null;
 }
 
 export function MessagesTab({
@@ -37,6 +41,10 @@ export function MessagesTab({
   endReason,
   onStartNewChat,
   sendMessage,
+  pendingAttachments,
+  isUploadingAttachment,
+  onAttachFile,
+  uploadError,
 }: MessagesTabProps) {
   return (
     <motion.div
@@ -61,6 +69,10 @@ export function MessagesTab({
           endReason={endReason}
           onStartNewChat={onStartNewChat}
           sendMessage={sendMessage}
+          pendingAttachments={pendingAttachments}
+          isUploadingAttachment={isUploadingAttachment}
+          onAttachFile={onAttachFile}
+          uploadError={uploadError}
         />
       </div>
     </motion.div>

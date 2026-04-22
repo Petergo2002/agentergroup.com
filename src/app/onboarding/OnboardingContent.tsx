@@ -41,24 +41,21 @@ export default function OnboardingContent({
   workspaceId,
   workspaceName,
   userName,
-  currentPlan,
 }: OnboardingContentProps) {
   const searchParams = useSearchParams();
-  const [loading, setLoading] = useState<string | null>(null);
-  const [status, setStatus] = useState<'idle' | 'success' | 'canceled'>('idle');
+  const success = searchParams.get("success") === "true";
+  const canceled = searchParams.get("canceled") === "true";
+
+  const [loading, setLoading] = useState<string | null>(success ? 'completing' : null);
+  const [status, setStatus] = useState<'idle' | 'success' | 'canceled'>(
+    success ? 'success' : canceled ? 'canceled' : 'idle'
+  );
 
   useEffect(() => {
-    const success = searchParams.get("success") === "true";
-    const canceled = searchParams.get("canceled") === "true";
-
     if (success) {
-      setStatus('success');
-      setLoading('completing');
       completeOnboarding(workspaceId);
-    } else if (canceled) {
-      setStatus('canceled');
     }
-  }, [searchParams, workspaceId]);
+  }, [success, workspaceId]);
 
   async function handleSelectPlan(plan: string) {
     setLoading(plan);

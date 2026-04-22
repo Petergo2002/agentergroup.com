@@ -142,6 +142,7 @@ export async function sendWidgetMessage(
     language: "sv" | "en";
     pageUrl?: string;
     referrer?: string;
+    attachments?: { url: string; name: string; type: string; size: number }[];
   },
   context: WidgetRequestContext,
   options?: { signal?: AbortSignal },
@@ -152,6 +153,34 @@ export async function sendWidgetMessage(
     body: JSON.stringify(body),
     signal: options?.signal,
   });
+}
+
+export async function uploadWidgetAttachment(
+  widgetPublicKey: string,
+  sessionId: string,
+  file: File,
+  context: WidgetRequestContext,
+): Promise<{ url: string; name: string; type: string; size: number }> {
+  const formData = new FormData();
+  formData.append("sessionId", sessionId);
+  formData.append("file", file);
+
+  const headers = buildWidgetHeaders(context, { includeContentType: false });
+  // Browser will set Content-Type automatically for FormData
+
+  const response = await fetch(buildWidgetUrl(widgetPublicKey, "/upload"), {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message = payload?.error || `Upload failed with status ${response.status}.`;
+    throw new Error(message);
+  }
+
+  return response.json();
 }
 
 export async function completeWidgetSession(

@@ -1145,6 +1145,7 @@ The public runtime uses these endpoints:
 - `POST /api/public/widgets/[widgetPublicKey]/complete`
 - `POST /api/public/widgets/[widgetPublicKey]/events`
 - `POST /api/public/widgets/[widgetPublicKey]/leads`
+- `POST /api/public/widgets/[widgetPublicKey]/upload`
 
 ### Access and security model
 
@@ -1173,6 +1174,7 @@ Current behavior:
 - the current rollout design and thresholds are documented in `docs/implementation-plans/20260409-widget-rate-limits-plan.md`
 - the rate-limit RPC must upsert with `ON CONFLICT ON CONSTRAINT rate_limit_windows_scope_window_constraint`; using a bare column-list conflict target can reintroduce ambiguous `window_started_at` failures in Postgres
 - self-service password reset and a backup/restore operator runbook remain follow-up work outside this batch
+- file uploads support images and documents (up to 5MB) via the public `upload` endpoint and are stored securely in the `widget-attachments` storage bucket
 
 Important token rules:
 
@@ -1483,6 +1485,7 @@ Google Docs, Sheets, Slides, images, and general binaries are not part of the cu
 #### Storage
 
 - bucket: `knowledge-files`
+- bucket: `widget-attachments`
 
 Storage only holds raw files. Retrieval never reads directly from Storage at chat time.
 
@@ -1917,3 +1920,4 @@ The current architecture is a focused full-stack agent platform built around one
 - keep the end-user experience conversational and clean
 
 That gives the project a practical MVP foundation while keeping the core architecture extensible for future integrations and more capable agent behaviors.
+behaviors.
