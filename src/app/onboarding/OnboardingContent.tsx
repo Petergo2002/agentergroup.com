@@ -33,12 +33,14 @@ const PLAN_PRICES = { free: "0", starter: "30", premium: "110" };
 interface OnboardingContentProps {
   workspaceId: string;
   workspaceName: string;
+  userName: string;
   currentPlan: string;
 }
 
 export default function OnboardingContent({
   workspaceId,
   workspaceName,
+  userName,
   currentPlan,
 }: OnboardingContentProps) {
   const searchParams = useSearchParams();
@@ -110,7 +112,7 @@ export default function OnboardingContent({
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-orange-400">Workflow</span>
           </h1>
           <p className="text-lg text-on-surface-variant/70 font-medium max-w-xl mx-auto leading-relaxed">
-            Welcome, <span className="text-white">{workspaceName}</span>. Select a plan to unlock the full potential of your autonomous agents.
+            Welcome, <span className="text-white">{userName || workspaceName.replace(" Workspace", "")}</span>. Select a plan to unlock the full potential of your autonomous agents.
           </p>
         </div>
 
