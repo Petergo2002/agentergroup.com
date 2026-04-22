@@ -172,14 +172,14 @@ export default function AgentsPageClient({
 
         <button
           onClick={() => openCreateAgent()}
-          className="signature-gradient group relative flex h-14 items-center justify-between rounded-full pl-6 pr-2 text-sm font-bold shadow-xl shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98]"
+          className="signature-gradient group relative flex h-14 items-center justify-between rounded-full pl-6 pr-2 text-sm font-bold shadow-xl shadow-black/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
           <div className="flex items-center gap-3">
             <Plus className="h-5 w-5" />
             <span className="uppercase tracking-[0.15em] pr-4">{t('agents.createAgent')}</span>
           </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-on-surface/5 backdrop-blur-sm transition-colors group-hover:bg-primary/12">
-            <AppIcon name="arrow_forward" className="h-4 w-4" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/5 backdrop-blur-sm transition-colors group-hover:bg-black/10">
+            <AppIcon name="arrow_forward" className="h-4 w-4 text-black" />
           </div>
         </button>
       </header>

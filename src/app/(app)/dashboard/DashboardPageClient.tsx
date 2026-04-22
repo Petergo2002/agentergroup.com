@@ -52,14 +52,14 @@ export default function DashboardPageClient({
             
             <button
               onClick={() => openCreateAgent()}
-              className="signature-gradient group relative flex h-[72px] items-center justify-between rounded-[2rem] px-8 text-sm font-bold shadow-premium transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98]"
+              className="signature-gradient group relative flex h-[72px] items-center justify-between rounded-[2rem] px-8 text-sm font-bold shadow-premium transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
             <div className="flex items-center gap-3">
                 <AppIcon name="add_circle" className="h-5 w-5" />
                 <span className="uppercase tracking-[0.18em]">{t("dashboard.initializeAgent")}</span>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/5 backdrop-blur-sm transition-colors group-hover:bg-primary/12">
-                <AppIcon name="arrow_forward" className="h-4 w-4" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/5 backdrop-blur-sm transition-colors group-hover:bg-black/10">
+                <AppIcon name="arrow_forward" className="h-4 w-4 text-black" />
               </div>
             </button>
           </div>

@@ -545,7 +545,7 @@ export default function KnowledgePageClient({
                   <button
                     onClick={() => void handleCreateTextSource()}
                     disabled={isCreatingText || !textName || !rawText}
-                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:bg-slate-50 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                   >
                     {isCreatingText ? t("common.processing") : t("knowledge.finishAndSync")}
                   </button>
@@ -588,7 +588,7 @@ export default function KnowledgePageClient({
                   <button
                     onClick={() => void handleScrapeWebsite()}
                     disabled={isScrapingWebsite || !websiteName || !websiteUrl}
-                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:bg-slate-50 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                   >
                     {isScrapingWebsite ? t("knowledge.scraping") : t("knowledge.finishAndSync")}
                   </button>
@@ -643,7 +643,7 @@ export default function KnowledgePageClient({
                   <button
                     onClick={() => void handleUploadFileSource()}
                     disabled={isUploadingFile || !selectedFile || !fileName}
-                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:bg-slate-50 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                   >
                     {isUploadingFile ? t("common.uploading") : t("knowledge.importDocument")}
                   </button>
