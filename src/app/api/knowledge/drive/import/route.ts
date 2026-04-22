@@ -7,7 +7,6 @@ import {
 } from "@/lib/connections";
 import {
   downloadDriveFile,
-  exportDriveFile,
   getDriveFileMetadata,
   syncConnectedAccountsToDatabase,
 } from "@/lib/composio";
