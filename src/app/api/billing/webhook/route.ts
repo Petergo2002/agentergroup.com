@@ -16,9 +16,6 @@ import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { stripe, STRIPE_PRICE_TO_PLAN, PLAN_LIMITS } from '@/lib/stripe';
 
-// The webhook route must NOT be processed through Next.js body parsing
-// because we need to verify the raw body against the Stripe signature.
-export const config = { api: { bodyParser: false } };
 
 /**
  * Creates a privileged Supabase client using the service role key.
