@@ -18,6 +18,10 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(new URL(next, request.url));
     }
+
+    console.error("[Auth Confirm] Verify OTP Error:", error.message, { type, token_hash: token_hash.slice(0, 10) + "..." });
+  } else {
+    console.warn("[Auth Confirm] Missing token_hash or type", { hasToken: !!token_hash, type });
   }
 
   // Redirect to error page if verification fails
