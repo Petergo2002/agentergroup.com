@@ -64,6 +64,17 @@ async function updateWorkspaceSubscription(
     throw error;
   }
 
+  // Also mark workspace as onboarding completed
+  const { error: workspaceError } = await admin
+    .from('workspaces')
+    .update({ onboarding_completed: true })
+    .eq('id', workspaceId);
+
+  if (workspaceError) {
+    console.error('[webhook] Failed to mark workspace as onboarding completed:', workspaceError);
+    // Non-fatal, but should be logged
+  }
+
   console.log(`[webhook] Updated workspace ${workspaceId} → plan: ${planTier}`);
 }
 

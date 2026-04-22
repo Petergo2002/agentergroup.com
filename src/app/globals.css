@@ -144,9 +144,9 @@
 
 @layer utilities {
   .signature-gradient {
-    background: linear-gradient(180deg, #f8f3ed 0%, #ffffff 100%);
-    border: 1px solid rgba(15, 23, 42, 0.1);
-    color: #080808;
+    background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-container-low) 100%);
+    border: 1px solid var(--color-outline-variant);
+    color: var(--color-on-surface);
   }
   .glass-panel {
     background: var(--glass-background);

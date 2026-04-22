@@ -89,13 +89,16 @@ export async function POST(req: Request) {
 
     const appUrl = getAppUrl();
 
+    const successUrl = `${appUrl}/onboarding?success=true&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${appUrl}/onboarding?canceled=true`;
+
     // Create the Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: 'subscription',
       line_items: [{ price: STRIPE_PRICE_IDS[plan], quantity: 1 }],
-      success_url: `${appUrl}/settings/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/settings/billing?canceled=true`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       // Pass workspace context through metadata so the webhook knows which workspace to update
       subscription_data: {
         metadata: { workspace_id: workspaceId },

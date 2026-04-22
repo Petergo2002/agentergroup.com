@@ -21,8 +21,8 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
  * These are the recurring monthly prices created in Stripe.
  */
 export const STRIPE_PRICE_IDS: Record<string, string> = {
-  starter: 'price_1TP1pxEqNgWOqUOe64tSR342',  // $30/mo
-  premium: 'price_1TP1ptEqNgWOqUOePAREbCk0',  // $110/mo
+  starter: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || 'price_1TP1pxEqNgWOqUOe64tSR342',  // $30/mo
+  premium: process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID || 'price_1TP1ptEqNgWOqUOePAREbCk0',  // $110/mo
 };
 
 /**
@@ -30,8 +30,8 @@ export const STRIPE_PRICE_IDS: Record<string, string> = {
  * Used by the webhook to determine which plan to activate.
  */
 export const STRIPE_PRICE_TO_PLAN: Record<string, string> = {
-  'price_1TP1pxEqNgWOqUOe64tSR342': 'starter',
-  'price_1TP1ptEqNgWOqUOePAREbCk0': 'premium',
+  [process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || 'price_1TP1pxEqNgWOqUOe64tSR342']: 'starter',
+  [process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID || 'price_1TP1ptEqNgWOqUOePAREbCk0']: 'premium',
 };
 
 /**

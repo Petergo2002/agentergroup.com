@@ -160,7 +160,7 @@ async function loadWorkspaceMemberships(
   const membershipResult = await supabase
     .from("workspace_members")
     .select(
-      "id, workspace_id, user_id, role, created_at, workspace:workspaces(id, name, slug, description, owner_id, internal_assistants_enabled)",
+      "id, workspace_id, user_id, role, created_at, workspace:workspaces(id, name, slug, description, owner_id, internal_assistants_enabled, onboarding_completed)",
     )
     .eq("user_id", userId);
 

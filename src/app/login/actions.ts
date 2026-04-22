@@ -11,7 +11,7 @@ function getCredentials(formData: FormData) {
   return {
     email: String(formData.get("email") ?? "").trim(),
     password: String(formData.get("password") ?? ""),
-    redirectTo: sanitizeRedirectTo(String(formData.get("redirectTo") ?? "/dashboard")),
+    redirectTo: sanitizeRedirectTo(String(formData.get("redirectTo") ?? "/onboarding")),
   };
 }
 
