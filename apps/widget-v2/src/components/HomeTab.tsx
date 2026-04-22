@@ -119,7 +119,7 @@ export function HomeTab({
                   <span className="text-[15px] font-semibold text-widget-fg group-hover:text-[var(--widget-secondary)] transition-colors duration-200 leading-snug">
                     {agent.label}
                   </span>
-                  {config.agents.length > 1 && (agent.description) && (
+                  {config.agents.length > 1 && agent.description && (
                     <span className="mt-0.5 text-[12px] text-widget-muted leading-snug line-clamp-2">
                       {agent.description}
                     </span>

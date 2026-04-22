@@ -78,20 +78,20 @@ export function WidgetBuilderHeader() {
                       if (e.key === 'Escape') cancelEdit();
                     }}
                     onBlur={commitName}
-                    className="rounded-xl border border-primary bg-background px-3 py-1.5 text-xl font-headline font-bold tracking-tight text-on-surface outline-none ring-1 ring-primary/20 focus:ring-2"
+                    className="rounded-md border border-primary bg-background px-3 py-1.5 text-xl font-headline font-bold tracking-tight text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     style={{ minWidth: '12ch', width: `${Math.max(12, nameDraft.length + 2)}ch` }}
                   />
                   <button
                     type="button"
                     onClick={commitName}
-                    className="rounded-lg bg-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-background transition-all hover:scale-[1.02]"
+                    className="rounded-md bg-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-background transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     ✓
                   </button>
                   <button
                     type="button"
                     onClick={cancelEdit}
-                    className="rounded-lg border border-outline-variant/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-all hover:text-on-surface"
+                    className="rounded-md border border-outline-variant/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-all duration-150 hover:text-on-surface hover:bg-on-surface/5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     ✕
                   </button>
@@ -101,7 +101,7 @@ export function WidgetBuilderHeader() {
                   type="button"
                   onClick={startEditing}
                   title="Click to rename"
-                  className="group flex items-center gap-2 rounded-xl px-1 py-0.5 -mx-1 transition-all hover:bg-surface-container-low"
+                  className="group flex items-center gap-2 rounded-md px-1 py-0.5 -mx-1 transition-all duration-150 hover:bg-surface-container-low active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <h1 className="text-2xl font-headline font-bold tracking-tight text-on-surface">
                     {displayName}
@@ -127,7 +127,7 @@ export function WidgetBuilderHeader() {
             <button
               onClick={() => void persistWidget()}
               disabled={isSaving || isUpdatingDeployment}
-              className="rounded-full border border-outline-variant/15 px-5 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-all hover:border-on-surface/15 hover:text-on-surface disabled:opacity-40"
+              className="rounded-md border border-outline-variant/20 px-5 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-all duration-150 hover:bg-on-surface/5 hover:text-on-surface active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-40"
             >
               {isSaving ? t('common.saving') : t('agentBuilder.saveDraft')}
             </button>
@@ -136,7 +136,7 @@ export function WidgetBuilderHeader() {
               <button
                 onClick={() => void updateWidgetDeployment('deployed')}
                 disabled={isUpdatingDeployment || isSaving}
-                className="group relative flex items-center gap-2 overflow-hidden rounded-full bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-background transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                className="group relative flex items-center gap-2 overflow-hidden rounded-md bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-background transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50"
               >
                 <span className="relative z-10">
                   {isUpdatingDeployment ? t('widgetBuilder.syncing') : t('widgetBuilder.syncChanges')}
@@ -150,9 +150,9 @@ export function WidgetBuilderHeader() {
             <button
               onClick={() => void updateWidgetDeployment(isDeployed ? 'draft' : 'deployed')}
               disabled={isUpdatingDeployment || isSaving}
-              className={`group relative flex items-center gap-2 overflow-hidden rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 ${
+              className={`group relative flex items-center gap-2 overflow-hidden rounded-md px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 ${
                 isDeployed 
-                  ? 'border border-outline-variant/15 text-on-surface-variant hover:border-on-surface/15 hover:text-on-surface' 
+                  ? 'border border-outline-variant/20 text-on-surface-variant hover:bg-on-surface/5 hover:text-on-surface' 
                   : 'bg-on-surface text-background'
               }`}
             >
@@ -176,7 +176,7 @@ export function WidgetBuilderHeader() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative pb-4 text-xs font-bold uppercase tracking-[0.2em] transition-colors ${
+              className={`relative pb-4 text-xs font-bold uppercase tracking-[0.2em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm ${
                 activeTab === tab.id
                   ? 'text-on-surface'
                   : 'text-on-surface-variant/50 hover:text-on-surface-variant'

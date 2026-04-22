@@ -7,6 +7,8 @@ import {
 import { AdminWidgetsTable } from "@/components/admin/AdminWidgetsTable";
 import { AdminWorkspaceAnalytics } from "@/components/admin/AdminWorkspaceAnalytics";
 import { AdminWorkspaceSummaryPanel } from "@/components/admin/AdminWorkspaceSummaryPanel";
+import { AdminInternalAssistantsToggle } from "@/components/admin/AdminInternalAssistantsToggle";
+import { AdminPlanSelector } from "@/components/admin/AdminPlanSelector";
 import { requireAdminUser } from "@/lib/admin/auth";
 import {
   getDailyMessageActivity,
@@ -21,11 +23,11 @@ interface AdminWorkspaceDetailPageProps {
 }
 
 function resolveTab(tab: string | undefined): AdminWorkspaceTab {
-  if (tab === "agents" || tab === "widgets") {
+  if (tab === "agents" || tab === "widgets" || tab === "analytics") {
     return tab;
   }
 
-  return "analytics";
+  return "customer";
 }
 
 export default async function AdminWorkspaceDetailPage({
@@ -82,6 +84,27 @@ export default async function AdminWorkspaceDetailPage({
         </header>
 
         <AdminTabs currentTab={currentTab} workspaceId={id} />
+
+        {currentTab === "customer" ? (
+          <div className="space-y-6 admin-fade-in">
+            <div>
+              <h3 className="text-xl font-semibold text-white">
+                {language === "sv" ? "Kundinformation" : "Customer Information"}
+              </h3>
+            </div>
+            
+            <div className="grid gap-6 md:grid-cols-2">
+              <AdminPlanSelector
+                workspaceId={workspace.id}
+                currentPlan={workspace.planTier}
+              />
+              <AdminInternalAssistantsToggle
+                workspaceId={workspace.id}
+                enabled={workspace.internalAssistantsEnabled}
+              />
+            </div>
+          </div>
+        ) : null}
 
         {currentTab === "analytics" ? (
           <AdminWorkspaceAnalytics workspace={workspace} points={activityPoints} language={language} />

@@ -41,7 +41,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       />
       
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg glass-panel border border-outline-variant/15 rounded-[2.5rem] shadow-premium animate-in zoom-in-95 duration-300 overflow-hidden">
+      <div className="relative w-full max-w-lg glass-panel border border-outline-variant/20 rounded-xl shadow-xl animate-in zoom-in-95 duration-300 overflow-hidden">
         {/* Physical Top-Light Detail */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         
@@ -53,7 +53,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
           <button 
             onClick={onClose}
             aria-label={t('common.close')}
-            className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all active:scale-95"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <AppIcon name="close" className="h-6 w-6" />
           </button>

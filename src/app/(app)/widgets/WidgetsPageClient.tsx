@@ -100,7 +100,7 @@ function CreateWidgetModal({
                 placeholder={t('widgets.createModalPlaceholder')}
                 maxLength={80}
                 disabled={isLoading}
-                className="w-full rounded-2xl border border-outline-variant/10 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus:border-on-surface/20 focus:ring-1 focus:ring-on-surface/5 placeholder:text-on-surface-variant/30 disabled:opacity-50"
+                className="w-full rounded-md border border-outline-variant/30 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 placeholder:text-on-surface-variant/30 disabled:opacity-50"
               />
             </div>
 
@@ -115,7 +115,7 @@ function CreateWidgetModal({
                 placeholder={t('widgets.createModalDescriptionPlaceholder')}
                 rows={3}
                 disabled={isLoading}
-                className="w-full resize-none rounded-2xl border border-outline-variant/10 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus:border-on-surface/20 focus:ring-1 focus:ring-on-surface/5 placeholder:text-on-surface-variant/30 disabled:opacity-50"
+                className="w-full resize-none rounded-md border border-outline-variant/30 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 placeholder:text-on-surface-variant/30 disabled:opacity-50"
               />
               <div className="flex justify-end pr-2">
                 <span className={`text-[9px] font-bold uppercase tracking-[0.1em] ${description.length >= 180 ? 'text-primary' : 'text-on-surface-variant/30'}`}>
@@ -234,7 +234,7 @@ function EditWidgetModal({
                 placeholder={t('widgets.createModalPlaceholder')}
                 maxLength={80}
                 disabled={isLoading}
-                className="w-full rounded-2xl border border-outline-variant/10 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus:border-on-surface/20 focus:ring-1 focus:ring-on-surface/5 placeholder:text-on-surface-variant/30 disabled:opacity-50"
+                className="w-full rounded-md border border-outline-variant/30 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 placeholder:text-on-surface-variant/30 disabled:opacity-50"
               />
             </div>
 
@@ -249,7 +249,7 @@ function EditWidgetModal({
                 placeholder={t('widgets.createModalDescriptionPlaceholder')}
                 rows={3}
                 disabled={isLoading}
-                className="w-full resize-none rounded-2xl border border-outline-variant/10 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus:border-on-surface/20 focus:ring-1 focus:ring-on-surface/5 placeholder:text-on-surface-variant/30 disabled:opacity-50"
+                className="w-full resize-none rounded-md border border-outline-variant/30 bg-background px-6 py-4 text-sm text-on-surface outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 placeholder:text-on-surface-variant/30 disabled:opacity-50"
               />
               <div className="flex justify-end pr-2">
                 <span className={`text-[9px] font-bold uppercase tracking-[0.1em] ${description.length >= 180 ? 'text-primary' : 'text-on-surface-variant/30'}`}>

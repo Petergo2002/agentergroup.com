@@ -3,7 +3,6 @@ import {
   formatAdminNumber,
 } from "@/lib/admin/format";
 import { AdminTimestamp } from "@/components/admin/AdminTimestamp";
-import { AdminInternalAssistantsToggle } from "@/components/admin/AdminInternalAssistantsToggle";
 import type { PlatformLanguage } from "@/lib/i18n";
 
 interface AdminWorkspaceSummaryPanelProps {
@@ -60,26 +59,21 @@ export function AdminWorkspaceSummaryPanel({
         </div>
       </dl>
 
-      <div className="mt-6 flex flex-wrap gap-2">
+      <div className="mt-6 flex flex-wrap gap-3">
         {pills.map((pill) => (
           <div
             key={pill.label}
-            className="rounded-full border border-[#262626] bg-[#121212] px-3 py-2"
+            className="flex-1 rounded-2xl bg-neutral-800/40 px-4 py-3"
           >
-            <p className="text-[11px] uppercase tracking-[0.14em] text-neutral-600">
+            <p className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
               {pill.label}
             </p>
-            <p className="mt-1 text-sm font-medium text-white">
+            <p className="mt-1 text-lg font-medium tracking-tight text-white">
               {formatAdminNumber(pill.value, language)}
             </p>
           </div>
         ))}
       </div>
-
-      <AdminInternalAssistantsToggle
-        workspaceId={workspace.id}
-        enabled={workspace.internalAssistantsEnabled}
-      />
     </aside>
   );
 }

@@ -139,7 +139,7 @@
   --radius-xl: 1.5rem;
   --radius-full: 9999px;
 
-  --shadow-premium: var(--shadow-premium);
+  --shadow-premium: 0 12px 40px -12px rgba(0, 0, 0, 0.08);
 }
 
 @layer utilities {

@@ -191,9 +191,9 @@ export default function AgentsPageClient({
             <button
               key={tab}
               onClick={() => setFilter(tab)}
-              className={`flex-1 md:flex-none rounded-full px-6 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
+              className={`flex-1 md:flex-none rounded-md px-6 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all duration-150 active:scale-[0.98] ${
                 filter === tab
-                  ? "bg-on-surface text-background shadow-lg shadow-on-surface/20 scale-[1.02]"
+                  ? "bg-on-surface text-background shadow-lg shadow-on-surface/20"
                   : "text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-container-high/50"
               }`}
             >
@@ -208,7 +208,7 @@ export default function AgentsPageClient({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('agents.searchPlaceholder')}
-            className="w-full bg-surface-container-high/30 border border-outline-variant/10 rounded-full py-3 pl-11 pr-4 text-sm font-medium text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 transition-all outline-none shadow-inner shadow-black/5"
+            className="w-full bg-surface-container-high/30 border border-outline-variant/30 rounded-md py-3 pl-11 pr-4 text-sm font-medium text-on-surface placeholder:text-on-surface-variant/40 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all outline-none shadow-sm"
           />
         </div>
       </div>
@@ -263,9 +263,9 @@ export default function AgentsPageClient({
               <button
                 key={page}
                 onClick={() => setCurrentPage(page)}
-                className={`h-9 w-9 rounded-xl flex items-center justify-center text-[12px] font-bold transition-all ${
+                className={`h-9 w-9 rounded-md flex items-center justify-center text-[12px] font-bold transition-all duration-150 active:scale-[0.98] ${
                   page === safePage
-                    ? "bg-on-surface text-background shadow-lg shadow-on-surface/10"
+                    ? "bg-on-surface text-background shadow-md shadow-on-surface/10"
                     : "text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container"
                 }`}
               >

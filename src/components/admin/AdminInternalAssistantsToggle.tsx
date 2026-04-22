@@ -56,8 +56,8 @@ export function AdminInternalAssistantsToggle({
   };
 
   return (
-    <div className="mt-6 rounded-2xl border border-[#262626] bg-[#121212] p-4">
-      <div className="flex items-start justify-between gap-4">
+    <div className="rounded-2xl border border-[#262626] bg-[#121212] p-4">
+      <div className="flex items-center justify-between gap-4">
         <div className="space-y-2">
           <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
             {t("admin.internalAssistants")}

@@ -43,6 +43,16 @@ export interface AdminWorkspaceDetailSummary {
   conversationCount: number;
   messageCount: number;
   lastActiveAt: string | null;
+  /** Current subscription plan tier for this workspace. */
+  planTier: "free" | "starter" | "premium";
+  /** Maximum messages allowed in the current billing cycle. */
+  messagesLimit: number;
+  /** Messages consumed in the current billing cycle. */
+  messagesUsed: number;
+  /** Maximum active agents allowed under this plan. */
+  agentsLimit: number;
+  /** Whether external tool integrations are unlocked. */
+  integrationsEnabled: boolean;
 }
 
 export interface AdminWorkspaceAgentRow {

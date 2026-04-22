@@ -1,50 +1,162 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
-import { CreditCard, Download, CheckCircle2, MessageSquare } from 'lucide-react';
+import { CreditCard, Download, CheckCircle2, MessageSquare, ExternalLink, Loader2 } from 'lucide-react';
 import { useAppContext } from '@/components/app/AppContext';
+import { useSearchParams, useRouter } from 'next/navigation';
 
-const INVOICES = [
-  { id: '1', date: 'Apr 1, 2026', amount: '$0.00', status: 'Paid' },
-];
+// ─── Static plan data ─────────────────────────────────────────────────────────
 
 const PLAN_FEATURES = {
-  free: [
-    '50 messages per month',
-    '1 active agent',
-    'Community support',
-  ],
-  starter: [
-    '500 messages per month',
-    'Up to 3 agents',
-    'Full integrations',
-    'Priority support',
-  ],
-  premium: [
-    '4000 messages per month',
-    'Unlimited agents',
-    'Full integrations',
-    'Dedicated support',
-  ],
+  free:    ['50 messages per month', '1 active agent', 'Community support'],
+  starter: ['500 messages per month', 'Up to 3 agents', 'Full integrations', 'Priority support'],
+  premium: ['4000 messages per month', 'Unlimited agents', 'Full integrations', 'Dedicated support'],
 };
 
-const PLAN_PRICES = {
-  free: '$0',
-  starter: '$30',
-  premium: '$110',
-};
+const PLAN_PRICES = { free: '$0', starter: '$30', premium: '$110' };
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Invoice {
+  id: string;
+  date: string;
+  amount: string;
+  status: string;
+  pdf: string | null;
+}
+
+// ─── Page component ───────────────────────────────────────────────────────────
 
 export default function BillingSettingsPage() {
   const { t, language } = useLanguage();
-  const { workspace, subscription } = useAppContext();
+  const { subscription, workspace, membership } = useAppContext();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(true);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const isAdmin = ['owner', 'admin'].includes(membership?.role ?? 'member');
   const currentPlan = subscription?.plan_tier || 'free';
-  const usagePercent = subscription 
+  const usagePercent = subscription
     ? Math.min(Math.round((subscription.messages_used / subscription.messages_limit) * 100), 100)
     : 0;
 
+  // ─── Show toast from Stripe redirect params ──────────────────────────────
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      setToast({ type: 'success', message: '🎉 Plan upgraded successfully! Welcome aboard.' });
+      router.replace('/settings/billing');
+    } else if (searchParams.get('canceled') === 'true') {
+      setToast({ type: 'error', message: 'Checkout canceled. No changes were made.' });
+      router.replace('/settings/billing');
+    }
+  }, [searchParams, router]);
+
+  // Auto-dismiss toast after 5 seconds
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  // ─── Fetch real invoices from Stripe ─────────────────────────────────────
+  const fetchInvoices = useCallback(async () => {
+    setInvoicesLoading(true);
+    try {
+      const res = await fetch(`/api/billing/invoices?workspaceId=${workspace.id}`);
+      if (!res.ok) throw new Error('Failed to fetch invoices');
+      const data = await res.json();
+      setInvoices(data.invoices ?? []);
+    } catch {
+      // Silently fail — invoices are non-critical
+      setInvoices([]);
+    } finally {
+      setInvoicesLoading(false);
+    }
+  }, [workspace.id]);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [fetchInvoices]);
+
+  // ─── Handle plan upgrade via Stripe Checkout ─────────────────────────────
+  async function handleUpgrade(plan: string) {
+    if (plan === currentPlan || plan === 'free') return;
+
+    setCheckoutLoading(plan);
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, workspaceId: workspace.id }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setToast({ type: 'error', message: data.error ?? 'Failed to start checkout.' });
+        return;
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+
+    } catch {
+      setToast({ type: 'error', message: 'Something went wrong. Please try again.' });
+    } finally {
+      setCheckoutLoading(null);
+    }
+  }
+
+  // ─── Open Stripe Customer Portal ──────────────────────────────────────────
+  async function handlePortal() {
+    setPortalLoading(true);
+    try {
+      const res = await fetch('/api/billing/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId: workspace.id }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setToast({ type: 'error', message: data.error ?? 'Failed to open billing portal.' });
+        return;
+      }
+
+      window.location.href = data.url;
+
+    } catch {
+      setToast({ type: 'error', message: 'Something went wrong. Please try again.' });
+    } finally {
+      setPortalLoading(false);
+    }
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={`fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 shadow-xl text-sm font-semibold transition-all animate-in slide-in-from-top-2 ${
+            toast.type === 'success'
+              ? 'bg-success/10 text-success border border-success/20'
+              : 'bg-error/10 text-error border border-error/20'
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
+      {/* Page header */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
@@ -60,6 +172,7 @@ export default function BillingSettingsPage() {
       </div>
 
       <div className="space-y-6">
+
         {/* Usage Overview */}
         <div className="rounded-[1.7rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between">
@@ -68,13 +181,13 @@ export default function BillingSettingsPage() {
             </p>
             {subscription && (
               <p className="text-[10px] font-medium text-on-surface-variant uppercase tracking-wider">
-                {t('settings.billing.messagesReset', { 
-                  date: new Date(subscription.billing_cycle_end).toLocaleDateString(language === 'sv' ? 'sv-SE' : 'en-US') 
+                {t('settings.billing.messagesReset', {
+                  date: new Date(subscription.billing_cycle_end).toLocaleDateString(language === 'sv' ? 'sv-SE' : 'en-US')
                 })}
               </p>
             )}
           </div>
-          
+
           <div className="mt-6">
             <div className="flex items-end justify-between mb-2">
               <div className="flex items-center gap-2 text-on-surface">
@@ -89,7 +202,7 @@ export default function BillingSettingsPage() {
               <span className="text-sm font-medium text-on-surface-variant">{usagePercent}%</span>
             </div>
             <div className="h-3 w-full overflow-hidden rounded-full bg-surface-container">
-              <div 
+              <div
                 className={`h-full transition-all duration-500 ${usagePercent > 90 ? 'bg-error' : 'bg-primary'}`}
                 style={{ width: `${usagePercent}%` }}
               />
@@ -113,40 +226,53 @@ export default function BillingSettingsPage() {
                 <CheckCircle2 className="h-6 w-6" />
               </div>
               <div className="min-w-0">
-                <p className="text-xl font-bold text-on-surface">
-                  {t(`settings.billing.plans.${currentPlan}`)} {t('settings.billing.title').split(' ')[1]}
+                <p className="text-xl font-bold text-on-surface capitalize">
+                  {currentPlan} Plan
                 </p>
                 <p className="text-sm text-on-surface-variant">
                   {PLAN_PRICES[currentPlan as keyof typeof PLAN_PRICES]}/mo · Billed monthly
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button className="rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container">
-                {t('settings.billing.changePlan')}
+            {/* Manage Billing Portal button — only for paid plans */}
+            {currentPlan !== 'free' && (
+              <button
+                onClick={handlePortal}
+                disabled={!isAdmin || portalLoading}
+                className="flex items-center gap-2 rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:opacity-60"
+                title={!isAdmin ? 'Only workspace admins can manage billing' : undefined}
+              >
+                {portalLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4" />
+                )}
+                {isAdmin ? 'Manage Billing' : 'Admin Only'}
               </button>
-            </div>
+            )}
           </div>
         </div>
 
         {/* Plan Options */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {(['free', 'starter', 'premium'] as const).map((plan) => (
-            <div 
+            <div
               key={plan}
               className={`rounded-[1.7rem] border p-6 transition-all ${
-                currentPlan === plan 
-                  ? 'border-primary bg-primary/5' 
+                currentPlan === plan
+                  ? 'border-primary bg-primary/5'
                   : 'border-outline-variant/30 bg-surface-container-lowest hover:border-primary/50'
               }`}
             >
-              <h3 className="text-lg font-bold text-on-surface">{t(`settings.billing.plans.${plan}`)}</h3>
-              <p className="mt-1 text-sm text-on-surface-variant leading-tight">{t(`settings.billing.plans.${plan}Desc`)}</p>
+              <h3 className="text-lg font-bold text-on-surface capitalize">{plan}</h3>
+              <p className="mt-1 text-sm text-on-surface-variant leading-tight">
+                {t(`settings.billing.plans.${plan}Desc`)}
+              </p>
               <div className="mt-4 flex items-baseline gap-1">
                 <span className="text-2xl font-bold text-on-surface">{PLAN_PRICES[plan]}</span>
                 <span className="text-xs text-on-surface-variant">/mo</span>
               </div>
-              
+
               <ul className="mt-6 space-y-3">
                 {PLAN_FEATURES[plan].map((feature, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs text-on-surface-variant">
@@ -156,15 +282,34 @@ export default function BillingSettingsPage() {
                 ))}
               </ul>
 
-              <button 
-                disabled={currentPlan === plan}
-                className={`mt-8 w-full rounded-xl py-2.5 text-xs font-bold uppercase tracking-widest transition-all ${
+              <button
+                disabled={!isAdmin || currentPlan === plan || plan === 'free' || checkoutLoading === plan}
+                onClick={() => handleUpgrade(plan)}
+                title={!isAdmin ? 'Only workspace admins can upgrade plans' : undefined}
+                className={`mt-8 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold uppercase tracking-widest transition-all ${
                   currentPlan === plan
                     ? 'bg-surface-container text-on-surface-variant cursor-default'
-                    : 'bg-primary text-white hover:opacity-90 shadow-lg shadow-primary/20'
+                    : plan === 'free'
+                    ? 'bg-surface-container text-on-surface-variant cursor-default'
+                    : !isAdmin
+                    ? 'bg-surface-container text-on-surface-variant cursor-not-allowed opacity-50'
+                    : 'bg-primary text-white hover:opacity-90 shadow-lg shadow-primary/20 disabled:opacity-60'
                 }`}
               >
-                {currentPlan === plan ? t('common.active') : t('settings.billing.changePlan')}
+                {checkoutLoading === plan ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Redirecting…
+                  </>
+                ) : currentPlan === plan ? (
+                  t('common.active')
+                ) : plan === 'free' ? (
+                  'Free'
+                ) : !isAdmin ? (
+                  'Admin Only'
+                ) : (
+                  `Upgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`
+                )}
               </button>
             </div>
           ))}
@@ -181,17 +326,28 @@ export default function BillingSettingsPage() {
                 <CreditCard className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-sm font-bold text-on-surface uppercase tracking-widest text-[10px]">
-                  {currentPlan === 'free' ? 'No payment method' : t('settings.billing.cardEndingIn', { last4: '4242' })}
-                </p>
-                <p className="text-xs text-on-surface-variant">
-                  {currentPlan === 'free' ? 'Upgrade to a paid plan to add a card' : 'Expires 12/28'}
-                </p>
+                {currentPlan === 'free' ? (
+                  <>
+                    <p className="text-sm font-bold text-on-surface-variant">No payment method</p>
+                    <p className="text-xs text-on-surface-variant">Upgrade to a paid plan to add a card</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-bold text-on-surface">Card on file</p>
+                    <p className="text-xs text-on-surface-variant">Managed securely through Stripe</p>
+                  </>
+                )}
               </div>
             </div>
             {currentPlan !== 'free' && (
-              <button className="rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container">
-                {t('settings.billing.updatePayment')}
+              <button
+                onClick={handlePortal}
+                disabled={!isAdmin || portalLoading}
+                title={!isAdmin ? 'Only workspace admins can manage billing' : undefined}
+                className="flex items-center gap-2 rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:opacity-60"
+              >
+                {portalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {isAdmin ? t('settings.billing.updatePayment') : 'Admin Only'}
               </button>
             )}
           </div>
@@ -203,35 +359,59 @@ export default function BillingSettingsPage() {
             {t('settings.billing.history')}
           </p>
           <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-outline-variant/10">
-                  <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Date</th>
-                  <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Amount</th>
-                  <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Status</th>
-                  <th className="pb-4 text-right"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/5">
-                {INVOICES.map((invoice) => (
-                  <tr key={invoice.id} className="group">
-                    <td className="py-4 text-sm text-on-surface">{invoice.date}</td>
-                    <td className="py-4 text-sm text-on-surface">{invoice.amount}</td>
-                    <td className="py-4">
-                      <span className="inline-flex rounded-md bg-success/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-success">
-                        {invoice.status}
-                      </span>
-                    </td>
-                    <td className="py-4 text-right">
-                      <button className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
-                        <Download className="h-3.5 w-3.5" />
-                        {t('common.download')}
-                      </button>
-                    </td>
+            {invoicesLoading ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-on-surface-variant text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading invoices…
+              </div>
+            ) : invoices.length === 0 ? (
+              <p className="py-8 text-center text-sm text-on-surface-variant">
+                No invoices yet.{currentPlan === 'free' ? ' Upgrade to a paid plan to see your billing history.' : ''}
+              </p>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-outline-variant/10">
+                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Date</th>
+                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Amount</th>
+                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Status</th>
+                    <th className="pb-4 text-right" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/5">
+                  {invoices.map((invoice) => (
+                    <tr key={invoice.id} className="group">
+                      <td className="py-4 text-sm text-on-surface">{invoice.date}</td>
+                      <td className="py-4 text-sm text-on-surface">{invoice.amount}</td>
+                      <td className="py-4">
+                        <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${
+                          invoice.status === 'Paid'
+                            ? 'bg-success/10 text-success'
+                            : invoice.status === 'Open'
+                            ? 'bg-warning/10 text-warning'
+                            : 'bg-surface-container text-on-surface-variant'
+                        }`}>
+                          {invoice.status}
+                        </span>
+                      </td>
+                      <td className="py-4 text-right">
+                        {invoice.pdf && (
+                          <a
+                            href={invoice.pdf}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            {t('common.download')}
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>

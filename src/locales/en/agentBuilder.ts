@@ -11,7 +11,7 @@ export const agentBuilder = {
     knowledgeDescription:
       "Attach workspace sources the agent can retrieve from.",
     toolsDescription:
-      "Pick Gmail, Microsoft Outlook, or Google Calendar for live in-chat actions.",
+      "Add tools for live in-chat actions.",
     leadsDescription:
       "Capture structured internal leads from widget conversations.",
     endChatDescription:

@@ -32,7 +32,7 @@ export function ConfirmDeleteModal({
   const isMatch = confirmationValue === entityName;
 
   return (
-    <Modal isOpen={isOpen} onClose={isDeleting ? () => {} : onClose} title={title}>
+    <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-5">
         <div className="rounded-2xl border border-error/15 bg-error/5 px-4 py-4">
           <p className="text-sm font-semibold text-on-surface">{t('modals.permanentAction')}</p>
@@ -53,7 +53,7 @@ export function ConfirmDeleteModal({
             value={confirmationValue}
             onChange={(event) => onConfirmationChange(event.target.value)}
             placeholder={entityName}
-            className="w-full rounded-2xl border border-outline-variant/20 bg-background px-4 py-3 text-sm outline-none transition-colors focus:border-error/30"
+            className="w-full rounded-md border border-outline-variant/30 bg-background px-4 py-3 text-sm outline-none transition-all focus-visible:ring-2 focus-visible:ring-error/40 focus-visible:ring-offset-2"
           />
         </div>
 
@@ -61,14 +61,14 @@ export function ConfirmDeleteModal({
           <button
             onClick={onClose}
             disabled={isDeleting}
-            className="flex-1 rounded-2xl border border-outline-variant/20 px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 rounded-md border border-outline-variant/30 px-4 py-3 text-sm font-semibold text-on-surface transition-all duration-150 active:scale-[0.98] hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={onConfirm}
             disabled={!isMatch || isDeleting}
-            className="flex-1 rounded-2xl border border-error/20 bg-error px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 rounded-md border border-error/20 bg-error px-4 py-3 text-sm font-semibold text-white transition-all duration-150 active:scale-[0.98] hover:bg-error/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isDeleting ? t('common.deleting') : `${t('common.delete')} ${entityLabel}`}
           </button>

@@ -1,6 +1,6 @@
 µ# Agent Platform Architecture
 
-Last updated: 2026-04-19
+Last updated: 2026-04-22
 
 ## Purpose
 
@@ -119,6 +119,8 @@ Important implementation docs:
 - `src/app/(app)/connections/page.tsx`
 - `src/app/(app)/knowledge/page.tsx`
 - `src/app/(app)/settings/page.tsx`
+- `src/app/(app)/settings/billing/page.tsx`
+- `src/app/(app)/settings/team/page.tsx`
 - `src/app/(app)/settings/subprocessors/page.tsx`
 - `src/app/(app)/settings/data-processing/page.tsx`
 - `src/app/privacy-policy/page.tsx`
@@ -131,25 +133,39 @@ Important implementation docs:
 
 - `src/app/api/workspaces/route.ts`
 - `src/app/api/workspaces/active/route.ts`
+- `src/app/api/workspaces/[id]/route.ts`
+- `src/app/api/workspaces/[id]/members/route.ts`
+- `src/app/api/workspaces/[id]/members/[memberId]/route.ts`
+- `src/app/api/workspaces/[id]/invites/route.ts`
+- `src/app/api/workspaces/[id]/invites/[inviteId]/route.ts`
 - `src/app/api/workspaces/[id]/privacy/dsar/lookup/route.ts`
 - `src/app/api/workspaces/[id]/privacy/dsar/export/route.ts`
 - `src/app/api/workspaces/[id]/privacy/dsar/delete/route.ts`
+- `src/app/api/invites/incoming/route.ts`
+- `src/app/api/invites/accept/route.ts`
+- `src/app/api/invites/decline/route.ts`
 - `src/app/api/internal/privacy/retention/route.ts`
+- `src/app/api/admin/workspaces/[id]/internal-assistants/route.ts`
+- `src/app/api/agents/[id]/route.ts`
 - `src/app/api/agents/[id]/chat/route.ts`
 - `src/app/api/agents/[id]/knowledge/route.ts`
 - `src/app/api/agents/[id]/archive/route.ts`
 - `src/app/api/agents/[id]/rollback/route.ts`
+- `src/app/api/agents/[id]/status/route.ts`
 - `src/app/api/agents/[id]/widget/route.ts`
 - `src/app/api/assistants/route.ts`
 - `src/app/api/assistants/[id]/route.ts`
 - `src/app/api/assistants/[id]/threads/route.ts`
 - `src/app/api/assistants/[id]/chat/route.ts`
+- `src/app/api/assistants/[id]/downloads/[messageId]/route.ts`
 - `src/app/api/connections/toolkits/route.ts`
 - `src/app/api/connections/authorize/route.ts`
+- `src/app/api/connections/disconnect/route.ts`
 - `src/app/api/connections/googlecalendar/calendars/route.ts`
 - `src/app/api/connections/cal/event-types/route.ts`
 - `src/app/api/knowledge/sources/route.ts`
 - `src/app/api/knowledge/sources/[id]/route.ts`
+- `src/app/api/knowledge/sources/[id]/content/route.ts`
 - `src/app/api/knowledge/sources/[id]/process/route.ts`
 - `src/app/api/knowledge/drive/files/route.ts`
 - `src/app/api/knowledge/drive/import/route.ts`
@@ -166,6 +182,7 @@ Important implementation docs:
 - `src/app/api/public/widgets/[widgetPublicKey]/events/route.ts`
 - `src/app/api/public/widgets/[widgetPublicKey]/leads/route.ts`
 - `src/app/api/dashboard/analytics/route.ts`
+- `src/app/api/dashboard/summary/route.ts`
 - `src/app/api/dashboard/analytics/conversations/[widgetSessionId]/route.ts`
 
 ### Core libraries
@@ -325,6 +342,165 @@ It is written through:
 
 This keeps workspace switching centralized in bootstrap/context instead of spreading special logic through individual pages.
 
+## Subscription and Billing
+
+### Plan tiers
+
+The product uses a tiered subscription model with three plan levels:
+
+- `free`
+- `starter`
+- `premium`
+
+Each plan defines limits for:
+
+- monthly message allowance (`messages_limit`)
+- active agent count (`agents_limit`)
+- integration access (`integrations_enabled`)
+
+### Data model
+
+Subscription state is stored in:
+
+- `workspace_subscriptions`
+
+Key fields:
+
+- `plan_tier`: the current plan level
+- `messages_limit`: total messages allowed per billing cycle
+- `messages_used`: messages consumed in the current cycle
+- `agents_limit`: maximum active agents
+- `integrations_enabled`: whether external tool integrations are unlocked
+- `billing_cycle_start` / `billing_cycle_end`: current cycle window
+- `stripe_customer_id` / `stripe_subscription_id`: Stripe identifiers (nullable for free plans)
+
+### Bootstrap integration
+
+The workspace bootstrap in `src/lib/app/bootstrap.ts` now loads the subscription record alongside the workspace context.
+
+The `AppWorkspaceContext` type includes a `subscription` field of type `WorkspaceSubscriptionRecord`, which is available to all authenticated pages through `useAppContext()`.
+
+### Billing UI
+
+The billing settings page lives at:
+
+- `src/app/(app)/settings/billing/page.tsx`
+
+Current billing UI surfaces:
+
+- message usage progress bar with percentage and reset date
+- current plan display with pricing
+- plan comparison grid (Free / Starter / Premium) with feature lists
+- payment method display (tied to Stripe)
+- billing history table with invoice downloads
+
+Current plan pricing:
+
+- Free: $0/mo — 50 messages, 1 agent, community support
+- Starter: $30/mo — 500 messages, up to 3 agents, full integrations, priority support
+- Premium: $110/mo — 4000 messages, unlimited agents, full integrations, dedicated support
+
+### Current limitations
+
+- plan upgrade/downgrade actions are not yet connected to Stripe Checkout
+- payment method management is UI-only (not wired to Stripe portal)
+- billing history is currently static/placeholder
+- message counting enforcement at runtime is planned but not yet gated at the API level
+
+### Admin plan management
+
+Internal admins can override the subscription plan for any workspace directly from the `/admin` panel.
+
+**Entry point:**
+
+The plan selector lives in the workspace detail sidebar at `/admin/workspaces/[id]`, below the Internal Assistants toggle.
+
+**API route:**
+
+`PATCH /api/admin/workspaces/[id]/plan`
+
+Accepts `{ plan_tier: "free" | "starter" | "premium" }`. Protected by `isAdminUser()` check. Uses the service-role admin client, which bypasses RLS.
+
+**Plan tier → limits mapping:**
+
+| Plan | `messages_limit` | `agents_limit` | `integrations_enabled` |
+| --- | --- | --- | --- |
+| `free` | 50 | 1 | false |
+| `starter` | 500 | 3 | true |
+| `premium` | 4000 | 9999 (unlimited) | true |
+
+**Important behavioral notes:**
+
+- Stripe is **not involved** — this is a direct database override for internal ops use (trials, billing corrections, etc.)
+- `messages_used` is **not reset** when the plan changes — usage history is preserved
+- The workspace user's billing UI will reflect the new plan tier immediately after their next page load (the `AppWorkspaceContext` is reloaded on each authenticated request via bootstrap)
+
+
+## Team Management
+
+### Overview
+
+Workspaces support multi-member teams with role-based access and an invite system.
+
+### Roles
+
+- `owner`: full workspace control, billing, delete
+- `admin`: can manage members and invites, cannot delete workspace
+- `member`: standard workspace access
+
+### Data model
+
+Team management uses:
+
+- `workspace_members`: membership rows with role
+- `workspace_invites`: pending, accepted, or revoked email invites
+
+Key workspace invite fields:
+
+- `email`: invited user's email
+- `role`: currently limited to `admin`
+- `token`: unique accept/decline token
+- `status`: `pending`, `accepted`, or `revoked`
+- `expires_at`: invite expiry timestamp
+- `invited_by`: the user who created the invite
+
+### Team settings UI
+
+The team management page lives at:
+
+- `src/app/(app)/settings/team/page.tsx`
+
+It provides:
+
+- current member list with roles
+- member role editing (owner/admin only)
+- member removal
+- invite creation by email
+- pending invite list with revoke action
+- incoming invite notifications for the current user
+
+### Invite flow
+
+1. Owner/admin creates an invite for an email address
+2. Invite row is created with `status = 'pending'` and a unique token
+3. The invited user sees pending invites through `GET /api/invites/incoming`
+4. The user accepts or declines the invite
+5. On accept: a `workspace_members` row is created and invite status becomes `accepted`
+6. On decline: invite status becomes `revoked`
+
+### APIs
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/workspaces/[id]/members` | List workspace members with profile data |
+| `PATCH /api/workspaces/[id]/members/[memberId]` | Update a member's role |
+| `DELETE /api/workspaces/[id]/members/[memberId]` | Remove a member from the workspace |
+| `POST /api/workspaces/[id]/invites` | Create a pending invite for an email |
+| `DELETE /api/workspaces/[id]/invites/[inviteId]` | Revoke a pending invite |
+| `GET /api/invites/incoming` | List pending invites for the authenticated user |
+| `POST /api/invites/accept` | Accept a pending invite by token |
+| `POST /api/invites/decline` | Decline a pending invite by token |
+
 ## Data Ownership Model
 
 The system is easier to reason about if each layer has a clear ownership boundary.
@@ -387,6 +563,8 @@ The schema is organized into four main domains.
 - `profiles`
 - `workspaces`
 - `workspace_members`
+- `workspace_subscriptions`
+- `workspace_invites`
 
 Purpose:
 
@@ -394,6 +572,8 @@ Purpose:
 - define tenant boundaries
 - scope all product data to a workspace
 - let one operator manage multiple client workspaces
+- track subscription plan, billing cycle, and usage limits per workspace
+- manage team invites with pending/accepted/revoked lifecycle
 
 ### 2. Agents and builder state
 
@@ -533,6 +713,7 @@ Current builder node kinds:
 - `knowledge`
 - `endchat`
 - `gmail`
+- `outlook`
 - `googlecalendar`
 - `cal`
 - `output`
@@ -547,6 +728,7 @@ Current canvas rules:
 - optional singleton `Knowledge`
 - optional singleton `End Chat`
 - optional singleton `Gmail`
+- optional singleton `Microsoft Outlook`
 - optional singleton `Google Calendar`
 - optional singleton `Cal.com`
 - no generic tool node
@@ -622,6 +804,23 @@ Current builder/runtime policy:
 Live tool capability is locked to:
 
 - `GMAIL_SEND_EMAIL`
+
+#### Outlook
+
+Owns one selected Microsoft Outlook connection plus a per-node recipient policy.
+
+Current builder/runtime policy:
+
+- the node stores one selected connection
+- the node also stores whether Outlook should send to:
+  - an AI-chosen recipient from conversation context
+  - one hidden fixed internal email
+- when a fixed internal email is configured, runtime enforces that recipient server-side and does not trust the model-selected recipient
+- the builder UI is structurally identical to the Gmail node
+
+Live tool capability is locked to:
+
+- `OUTLOOK_SEND_EMAIL`
 
 #### Google Calendar
 
@@ -1071,7 +1270,9 @@ Composio integration lives in:
 The product-owned integration catalog currently allows only:
 
 - `gmail`
+- `outlook`
 - `googlecalendar`
+- `cal`
 - `googledrive`
 
 This is intentionally narrow. Unsupported marketplace-style integrations are not part of the current product surface.
@@ -1082,12 +1283,17 @@ This is intentionally narrow. Unsupported marketplace-style integrations are not
 
 - Gmail
   - `GMAIL_SEND_EMAIL`
+- Microsoft Outlook
+  - `OUTLOOK_SEND_EMAIL`
 - Google Calendar
   - `GOOGLECALENDAR_CREATE_EVENT`
   - `GOOGLECALENDAR_QUICK_ADD`
   - `GOOGLECALENDAR_GET_CURRENT_DATE_TIME`
   - `GOOGLECALENDAR_FIND_FREE_SLOTS`
   - `GOOGLECALENDAR_LIST_CALENDARS`
+- Cal.com
+  - `CAL_GET_AVAILABLE_SLOTS`
+  - `CAL_CREATE_BOOKING`
 
 #### Knowledge-only integration
 
@@ -1125,13 +1331,17 @@ To keep this stable, the app configures toolkit versions centrally when the Comp
 Current defaults are defined for:
 
 - `gmail`
+- `outlook`
 - `googlecalendar`
+- `cal`
 - `googledrive`
 
 These defaults can be overridden with environment variables:
 
 - `COMPOSIO_TOOLKIT_VERSION_GMAIL`
+- `COMPOSIO_TOOLKIT_VERSION_OUTLOOK`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
+- `COMPOSIO_TOOLKIT_VERSION_CAL`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
 
 The app does not pass toolkit versions ad hoc on each manual execution call.
@@ -1175,7 +1385,9 @@ The Connections page is a fixed product surface, not an open integration marketp
 It shows only:
 
 - Gmail
+- Microsoft Outlook
 - Google Calendar
+- Cal.com
 - Google Drive
 
 Each integration card shows:

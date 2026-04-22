@@ -11,7 +11,7 @@ export const agentBuilder = {
     knowledgeDescription:
       "Koppla på workspace-källor som agenten kan hämta från.",
     toolsDescription:
-      "Välj Gmail eller Google Calendar för liveåtgärder i chatten.",
+      "Lägg till verktyg för liveåtgärder i chatten.",
     leadsDescription:
       "Fånga strukturerade interna leads från widgetkonversationer.",
     endChatDescription:

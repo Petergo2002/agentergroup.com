@@ -518,7 +518,7 @@ export default function KnowledgePageClient({
                       value={textName}
                       onChange={(event) => setTextName(event.target.value)}
                       placeholder={t("knowledge.sourceNamePlaceholder")}
-                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/20"
+                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -527,7 +527,7 @@ export default function KnowledgePageClient({
                       value={textDescription}
                       onChange={(event) => setTextDescription(event.target.value)}
                       placeholder={t("knowledge.sourceDescriptionPlaceholder")}
-                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
+                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                     />
                   </div>
                 </div>
@@ -538,14 +538,14 @@ export default function KnowledgePageClient({
                     onChange={(event) => setRawText(event.target.value)}
                     rows={12}
                     placeholder={t("knowledge.contentPlaceholder")}
-                    className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-4 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-primary/20"
+                    className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-4 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                   />
                 </div>
                 <div className="flex justify-end pt-2">
                   <button
                     onClick={() => void handleCreateTextSource()}
                     disabled={isCreatingText || !textName || !rawText}
-                    className="signature-gradient h-11 rounded-full px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-105 active:scale-95 disabled:opacity-50"
+                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                   >
                     {isCreatingText ? t("common.processing") : t("knowledge.finishAndSync")}
                   </button>
@@ -562,7 +562,7 @@ export default function KnowledgePageClient({
                       value={websiteName}
                       onChange={(event) => setWebsiteName(event.target.value)}
                       placeholder={t("knowledge.sourceNamePlaceholder")}
-                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/20"
+                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -571,7 +571,7 @@ export default function KnowledgePageClient({
                       value={websiteDescription}
                       onChange={(event) => setWebsiteDescription(event.target.value)}
                       placeholder={t("knowledge.sourceDescriptionPlaceholder")}
-                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
+                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                     />
                   </div>
                 </div>
@@ -581,14 +581,14 @@ export default function KnowledgePageClient({
                     value={websiteUrl}
                     onChange={(event) => setWebsiteUrl(event.target.value)}
                     placeholder={t("knowledge.urlPlaceholder")}
-                    className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/20"
+                    className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                   />
                 </div>
                 <div className="flex justify-end pt-2">
                   <button
                     onClick={() => void handleScrapeWebsite()}
                     disabled={isScrapingWebsite || !websiteName || !websiteUrl}
-                    className="signature-gradient h-11 rounded-full px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-105 active:scale-95 disabled:opacity-50"
+                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                   >
                     {isScrapingWebsite ? t("knowledge.scraping") : t("knowledge.finishAndSync")}
                   </button>
@@ -605,7 +605,7 @@ export default function KnowledgePageClient({
                       value={fileName}
                       onChange={(event) => setFileName(event.target.value)}
                       placeholder={t("knowledge.fileNamePlaceholder")}
-                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
+                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -614,7 +614,7 @@ export default function KnowledgePageClient({
                       value={fileDescription}
                       onChange={(event) => setFileDescription(event.target.value)}
                       placeholder={t("knowledge.fileDescriptionPlaceholder")}
-                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-sm outline-none"
+                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                     />
                   </div>
                 </div>
@@ -643,7 +643,7 @@ export default function KnowledgePageClient({
                   <button
                     onClick={() => void handleUploadFileSource()}
                     disabled={isUploadingFile || !selectedFile || !fileName}
-                    className="signature-gradient h-11 rounded-full px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:scale-105 disabled:opacity-50"
+                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:border-primary/25 hover:bg-primary/8 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                   >
                     {isUploadingFile ? t("common.uploading") : t("knowledge.importDocument")}
                   </button>
@@ -661,7 +661,7 @@ export default function KnowledgePageClient({
                         setSelectedDriveConnectionId(event.target.value);
                         setDriveFiles([]);
                       }}
-                      className="min-w-[220px] rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-2.5 text-sm outline-none"
+                      className="min-w-[220px] rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                     >
                       <option value="">{t("knowledge.selectDriveAccount")}</option>
                       {driveConnections.map((connection) => (
@@ -677,7 +677,7 @@ export default function KnowledgePageClient({
                       value={driveSearch}
                       onChange={(event) => setDriveSearch(event.target.value)}
                       placeholder={t("knowledge.driveSearchPlaceholder")}
-                      className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest pl-11 pr-4 py-2.5 text-sm outline-none"
+                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest pl-11 pr-4 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
                     />
                   </div>
                   <button
@@ -757,7 +757,7 @@ export default function KnowledgePageClient({
               value={sourceSearch}
               onChange={(event) => setSourceSearch(event.target.value)}
               placeholder={t("knowledge.filterPlaceholder")}
-              className="w-full rounded-full border border-outline-variant/10 bg-surface-container-low px-10 py-2 text-[12px] text-on-surface outline-none transition-all focus:bg-surface-container focus:ring-1 focus:ring-primary/10 sm:w-64"
+              className="w-full rounded-md border border-outline-variant/30 bg-surface-container-low px-10 py-2 text-[12px] text-on-surface outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 sm:w-64"
             />
           </div>
         </div>

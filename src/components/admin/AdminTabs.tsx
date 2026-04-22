@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
-export type AdminWorkspaceTab = "analytics" | "agents" | "widgets";
+export type AdminWorkspaceTab = "customer" | "analytics" | "agents" | "widgets";
 
 interface AdminTabsProps {
   currentTab: AdminWorkspaceTab;
@@ -13,6 +13,7 @@ interface AdminTabsProps {
 export function AdminTabs({ currentTab, workspaceId }: AdminTabsProps) {
   const { t } = useLanguage();
   const tabs: Array<{ key: AdminWorkspaceTab; label: string }> = [
+    { key: "customer", label: t("admin.customer") },
     { key: "analytics", label: t("admin.analytics") },
     { key: "agents", label: t("admin.agents") },
     { key: "widgets", label: t("admin.widgets") },

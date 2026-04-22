@@ -236,13 +236,14 @@ export async function getWorkspaceDetail(
   if (!workspaceResult.data) return null;
 
   const workspace = workspaceResult.data as WorkspaceRow;
-  const [ownerResult, agentsResult, threadsResult, messagesResult, widgetsResult] =
+  const [ownerResult, agentsResult, threadsResult, messagesResult, widgetsResult, subscriptionResult] =
     await Promise.all([
       admin.from("profiles").select("email").eq("id", workspace.owner_id).maybeSingle(),
       admin.from("agents").select("id, workspace_id, name, created_at, archived_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
       admin.from("chat_threads").select("id, workspace_id, agent_id").eq("workspace_id", workspaceId),
       admin.from("messages").select("thread_id, workspace_id, created_at").eq("workspace_id", workspaceId),
       admin.from("widgets").select("id, workspace_id, name, widget_public_key, created_at, status").eq("workspace_id", workspaceId),
+      admin.from("workspace_subscriptions").select("plan_tier, messages_limit, messages_used, agents_limit, integrations_enabled").eq("workspace_id", workspaceId).maybeSingle(),
     ]);
 
   throwOnError(ownerResult.error, "Failed to load workspace owner.");
@@ -250,6 +251,7 @@ export async function getWorkspaceDetail(
   throwOnError(threadsResult.error, "Failed to load workspace conversations.");
   throwOnError(messagesResult.error, "Failed to load workspace messages.");
   throwOnError(widgetsResult.error, "Failed to load workspace widgets.");
+  throwOnError(subscriptionResult.error, "Failed to load workspace subscription.");
 
   const agents = ((agentsResult.data ?? []) as AgentRow[]).filter((agent) => !agent.archived_at);
   const threadAgentById = new Map(
@@ -332,6 +334,15 @@ export async function getWorkspaceDetail(
     }
   }
 
+  // Map the subscription row. Default to free-plan limits if the record is missing.
+  const sub = subscriptionResult.data as {
+    plan_tier: string;
+    messages_limit: number;
+    messages_used: number;
+    agents_limit: number;
+    integrations_enabled: boolean;
+  } | null;
+
   return {
     workspace: {
       id: workspace.id,
@@ -344,6 +355,11 @@ export async function getWorkspaceDetail(
       conversationCount: totalConversationCount,
       messageCount: totalMessageCount,
       lastActiveAt: workspaceLastActiveAt,
+      planTier: (sub?.plan_tier ?? "free") as "free" | "starter" | "premium",
+      messagesLimit: sub?.messages_limit ?? 50,
+      messagesUsed: sub?.messages_used ?? 0,
+      agentsLimit: sub?.agents_limit ?? 1,
+      integrationsEnabled: sub?.integrations_enabled ?? false,
     },
     agents: agents
       .map((agent) => ({
