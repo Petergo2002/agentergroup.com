@@ -15,6 +15,7 @@ const PLAN_FEATURES = {
 };
 
 const PLAN_PRICES = { free: '$0', starter: '$30', premium: '$110' };
+const TIER_LEVELS: Record<string, number> = { free: 0, starter: 1, premium: 2 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -282,35 +283,43 @@ export default function BillingSettingsPage() {
                 ))}
               </ul>
 
-              <button
-                disabled={!isAdmin || currentPlan === plan || plan === 'free' || checkoutLoading === plan}
-                onClick={() => handleUpgrade(plan)}
-                title={!isAdmin ? 'Only workspace admins can upgrade plans' : undefined}
-                className={`mt-8 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold uppercase tracking-widest transition-all ${
-                  currentPlan === plan
-                    ? 'bg-surface-container text-on-surface-variant cursor-default'
-                    : plan === 'free'
-                    ? 'bg-surface-container text-on-surface-variant cursor-default'
-                    : !isAdmin
-                    ? 'bg-surface-container text-on-surface-variant cursor-not-allowed opacity-50'
-                    : 'bg-primary text-white hover:opacity-90 shadow-lg shadow-primary/20 disabled:opacity-60'
-                }`}
-              >
-                {checkoutLoading === plan ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Redirecting…
-                  </>
-                ) : currentPlan === plan ? (
-                  t('common.active')
-                ) : plan === 'free' ? (
-                  'Free'
-                ) : !isAdmin ? (
-                  'Admin Only'
-                ) : (
-                  `Upgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`
-                )}
-              </button>
+              {(() => {
+                const isDowngrade = TIER_LEVELS[plan] < TIER_LEVELS[currentPlan];
+                const isUpgrade = TIER_LEVELS[plan] > TIER_LEVELS[currentPlan];
+                const buttonDisabled = !isAdmin || currentPlan === plan || checkoutLoading === plan || (portalLoading && isDowngrade);
+
+                return (
+                  <button
+                    disabled={buttonDisabled}
+                    onClick={() => isDowngrade ? handlePortal() : handleUpgrade(plan)}
+                    title={!isAdmin ? 'Only workspace admins can change plans' : undefined}
+                    className={`mt-8 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold uppercase tracking-widest transition-all ${
+                      currentPlan === plan
+                        ? 'bg-surface-container text-on-surface-variant cursor-default'
+                        : !isAdmin
+                        ? 'bg-surface-container text-on-surface-variant cursor-not-allowed opacity-50'
+                        : isDowngrade
+                        ? 'bg-surface-container hover:bg-surface-container-highest text-on-surface transition-colors disabled:opacity-60'
+                        : 'bg-primary text-white hover:opacity-90 shadow-lg shadow-primary/20 disabled:opacity-60'
+                    }`}
+                  >
+                    {checkoutLoading === plan || (portalLoading && isDowngrade) ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Redirecting…
+                      </>
+                    ) : currentPlan === plan ? (
+                      t('common.active')
+                    ) : !isAdmin ? (
+                      'Admin Only'
+                    ) : isDowngrade ? (
+                      plan === 'free' ? 'Cancel Subscription' : `Downgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`
+                    ) : (
+                      `Upgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`
+                    )}
+                  </button>
+                );
+              })()}
             </div>
           ))}
         </div>
