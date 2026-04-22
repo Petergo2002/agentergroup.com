@@ -30,7 +30,7 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
   }
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-center p-8 bg-[#0F172A] font-body text-white overflow-hidden">
+    <main className="relative min-h-screen flex flex-col items-center justify-center p-8 bg-[#141414] font-body text-white overflow-hidden">
       {/* Subtle Grid Background */}
       <div className="absolute inset-0 z-0 opacity-[0.03]" 
            style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />

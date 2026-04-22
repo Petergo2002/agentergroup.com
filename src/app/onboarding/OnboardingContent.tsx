@@ -85,7 +85,7 @@ export default function OnboardingContent({
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#0F172A] font-body text-white selection:bg-primary/30">
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#141414] font-body text-white selection:bg-primary/30">
       {/* Subtle Grid Background */}
       <div className="absolute inset-0 z-0 opacity-[0.03]" 
            style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
