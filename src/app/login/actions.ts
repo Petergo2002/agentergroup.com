@@ -108,6 +108,8 @@ export async function updatePassword(formData: FormData) {
   const supabase = await createClient();
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  const companyName = String(formData.get("companyName") ?? "").trim();
   const messages = await getLoginMessages();
 
   if (password !== confirmPassword) {
@@ -118,8 +120,13 @@ export async function updatePassword(formData: FormData) {
     redirect(`/complete-signup?error=${encodeURIComponent(messages.passwordPlaceholder)}`);
   }
 
+  // Update password and store profile/workspace metadata
   const { error } = await supabase.auth.updateUser({
     password: password,
+    data: {
+      full_name: fullName,
+      workspace_name: companyName,
+    },
   });
 
   if (error) {

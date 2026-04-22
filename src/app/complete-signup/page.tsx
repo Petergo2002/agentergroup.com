@@ -68,6 +68,34 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-1">
+                Full Name
+              </label>
+              <input
+                className="w-full rounded-2xl border border-white/5 bg-white/[0.03] px-5 py-4 text-sm text-white outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-white/20"
+                name="fullName"
+                type="text"
+                placeholder="John Doe"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-1">
+                Company Name
+              </label>
+              <input
+                className="w-full rounded-2xl border border-white/5 bg-white/[0.03] px-5 py-4 text-sm text-white outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-white/20"
+                name="companyName"
+                type="text"
+                placeholder="Agentergroup AB"
+                required
+              />
+            </div>
+
+            <div className="h-px w-full bg-white/5 my-4" />
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-1">
                 {messages.login.setPassword}
               </label>
               <input
