@@ -578,6 +578,7 @@ export async function runAgentChat({
   audience,
   knowledgeAccessToken,
   widgetPublicKey,
+  widgetSessionId,
   calendarTimezone,
   googleCalendarSelection,
   calSelection,

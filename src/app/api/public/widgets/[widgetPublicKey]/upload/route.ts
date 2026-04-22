@@ -239,10 +239,13 @@ export async function POST(
           .single();
 
         if (source && !sourceError) {
+          const typedSource = source as { id: string };
           // Trigger the Edge Function to index the document immediately.
-          // We don't await this as it can run in the background.
-          void supabase.functions.invoke('process-knowledge-source', {
-            body: { sourceId: source.id }
+          // We use a fresh admin client here because the widget-scoped client 
+          // might have restricted types.
+          const admin = createAdminClient();
+          void admin.functions.invoke('process-knowledge-source', {
+            body: { sourceId: typedSource.id }
           });
         }
       } catch (err) {
