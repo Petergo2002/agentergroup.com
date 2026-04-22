@@ -24,6 +24,14 @@ export const login = {
   confirmEmailNotice: "Kontrollera din e-post för att bekräfta ditt konto.",
   signInError: "Det gick inte att logga in med de uppgifterna.",
   createAccountError: "Det gick inte att skapa kontot just nu. Försök igen.",
+  signupTitle: "Skapa ditt konto",
+  signupSubtitle: "Ange din e-post för att få en startlänk.",
+  completeSignupTitle: "Slutför din registrering",
+  completeSignupSubtitle: "Välj ett säkert lösenord för ditt nya konto.",
+  setPassword: "Välj lösenord",
+  confirmPassword: "Bekräfta lösenord",
+  finishSignup: "Slutför registrering",
+  passwordsDoNotMatch: "Lösenorden matchar inte.",
   legal:
     "Bygg framtiden med Agentergroup. När du loggar in godkänner du våra användarvillkor och vår integritetspolicy.",
   legalPrefix:

@@ -24,6 +24,14 @@ export const login = {
   confirmEmailNotice: "Check your email to confirm your account.",
   signInError: "We could not sign you in with those credentials.",
   createAccountError: "We could not create your account right now. Please try again.",
+  signupTitle: "Create your account",
+  signupSubtitle: "Enter your email to receive a setup link.",
+  completeSignupTitle: "Complete your signup",
+  completeSignupSubtitle: "Choose a secure password for your new account.",
+  setPassword: "Set Password",
+  confirmPassword: "Confirm Password",
+  finishSignup: "Finish Signup",
+  passwordsDoNotMatch: "Passwords do not match.",
   legal:
     "Build your future with Agentergroup. By signing in, you agree to our Terms of Service and Privacy Policy.",
   legalPrefix:

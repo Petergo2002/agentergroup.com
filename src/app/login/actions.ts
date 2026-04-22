@@ -6,6 +6,7 @@ import { sanitizeRedirectTo } from "@/lib/auth-redirect";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
+import { getAppUrl } from "@/lib/env";
 
 function getCredentials(formData: FormData) {
   return {
@@ -69,14 +70,18 @@ export async function login(formData: FormData) {
 
 export async function signup(formData: FormData) {
   const supabase = await createClient();
-  const credentials = getCredentials(formData);
+  const email = String(formData.get("email") ?? "").trim();
+  const redirectTo = sanitizeRedirectTo(String(formData.get("redirectTo") ?? "/dashboard"));
   const messages = await getLoginMessages();
 
-  const { data, error } = await supabase.auth.signUp({
-    email: credentials.email,
-    password: credentials.password,
+  if (!email) {
+    redirect(buildLoginRedirectUrl({ error: "Email is required.", redirectTo }));
+  }
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/onboarding`,
+      emailRedirectTo: `${getAppUrl()}/auth/confirm?next=/complete-signup`,
     },
   });
 
@@ -84,21 +89,43 @@ export async function signup(formData: FormData) {
     redirect(
       buildLoginRedirectUrl({
         error: messages.createAccountError,
-        redirectTo: credentials.redirectTo,
+        redirectTo,
       }),
     );
   }
 
   revalidatePath("/", "layout");
 
-  if (!data.session) {
-    redirect(
-      buildLoginRedirectUrl({
-        notice: messages.confirmEmailNotice,
-        redirectTo: credentials.redirectTo,
-      }),
-    );
+  redirect(
+    buildLoginRedirectUrl({
+      notice: messages.confirmEmailNotice,
+      redirectTo,
+    }),
+  );
+}
+
+export async function updatePassword(formData: FormData) {
+  const supabase = await createClient();
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+  const messages = await getLoginMessages();
+
+  if (password !== confirmPassword) {
+    redirect(`/complete-signup?error=${encodeURIComponent(messages.passwordsDoNotMatch)}`);
   }
 
-  redirect(credentials.redirectTo);
+  if (password.length < 6) {
+    redirect(`/complete-signup?error=${encodeURIComponent(messages.passwordPlaceholder)}`);
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: password,
+  });
+
+  if (error) {
+    redirect(`/complete-signup?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/onboarding");
 }

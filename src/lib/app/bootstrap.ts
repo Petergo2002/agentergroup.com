@@ -177,14 +177,28 @@ async function getOrCreateUserWorkspaces(
   supabase: SupabaseLike,
   user: User,
 ) {
+  // 1. First attempt to load existing memberships
   const existingWorkspaces = await loadWorkspaceMemberships(supabase, user.id);
 
   if (existingWorkspaces.length > 0) {
     return existingWorkspaces;
   }
 
-  const createdWorkspace = await createWorkspaceForUser(supabase, user);
-  return [createdWorkspace];
+  // 2. If none exist, we try to create one.
+  // We use a small delay or a retry logic to handle potential race conditions
+  // where two concurrent requests both try to create a workspace.
+  try {
+    const createdWorkspace = await createWorkspaceForUser(supabase, user);
+    return [createdWorkspace];
+  } catch (error) {
+    // 3. If creation fails (e.g. due to a slug conflict or other race condition), 
+    // we do a final check for memberships that might have been created by another process.
+    const finalCheck = await loadWorkspaceMemberships(supabase, user.id);
+    if (finalCheck.length > 0) {
+      return finalCheck;
+    }
+    throw error;
+  }
 }
 
 async function resolveActiveWorkspace(

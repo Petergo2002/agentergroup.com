@@ -128,6 +128,8 @@ Important implementation docs:
 - `src/app/data-processing/page.tsx`
 - `src/app/login/page.tsx`
 - `src/app/login/actions.ts`
+- `src/app/auth/confirm/route.ts`
+- `src/app/complete-signup/page.tsx`
 
 ### Server APIs
 
@@ -296,12 +298,14 @@ This is the current foundation for agency-style multi-client management.
 
 ### Authentication flow
 
-Authentication is handled by Supabase Auth.
+Authentication is handled by Supabase Auth with a professional "Email-first" flow.
 
-- login and signup actions live in `src/app/login/actions.ts`
-- browser/server Supabase clients are created in:
-  - `src/lib/supabase/client.ts`
-  - `src/lib/supabase/server.ts`
+- **Signup/Login**: Users enter only their email. The system uses `signInWithOtp` to send a branded Magic Link.
+- **Verification**: The link directs users to `/auth/confirm`, which verifies the token and redirects to `/complete-signup`.
+- **Completion**: New users set their password on `/complete-signup` before being redirected to `/onboarding`.
+- **SMTP**: External emails are delivered via **Resend** (SMTP) to ensure professional branding (`@agentergroup.com`) and high deliverability.
+- **Actions**: Login, signup, and password update actions live in `src/app/login/actions.ts`.
+- **Redirects**: Environment-agnostic redirects are managed via `getAppUrl()` in `src/lib/env.ts`.
 
 ### Workspace bootstrap flow
 
@@ -312,11 +316,17 @@ Authentication is handled by Supabase Auth.
 - at least one workspace membership
 - one active workspace in app context
 
+**Concurrency & Race Conditions:**
+The bootstrap logic is hardened against concurrent requests (e.g., a user opening multiple tabs during their first login). 
+- `getOrCreateUserWorkspaces` uses a `try/catch` block during workspace creation.
+- If a creation fails due to a race condition (duplicate slug), it fallbacks to a secondary check for existing memberships before failing.
+- Workspace slugs use a retry-loop with incremental suffixes to ensure uniqueness.
+
 Current behavior:
 
 1. Upsert profile from authenticated user data
 2. Load all workspace memberships for the user
-3. If none exist, create a default owner workspace
+3. If none exist, attempt to create a default owner workspace (with concurrency protection)
 4. Resolve the active workspace using:
    - `active_workspace_id` cookie if it still matches a valid membership
    - otherwise the first owner workspace
@@ -326,6 +336,7 @@ Current behavior:
    - active workspace
    - active membership
    - all available workspaces
+   - subscription (automatic 'free' plan via DB trigger)
 
 This logic is important because almost all app data is workspace-scoped.
 

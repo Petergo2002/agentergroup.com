@@ -24,6 +24,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const error = getSearchValue(params.error);
   const notice = getSearchValue(params.notice);
   const redirectTo = sanitizeRedirectTo(getSearchValue(params.redirectTo));
+  const view = getSearchValue(params.view) === "signup" ? "signup" : "login";
 
   if (!hasSupabaseEnv()) {
     return (
@@ -117,10 +118,10 @@ COMPOSIO_API_KEY=`}
               {messages.login.workspacePortal}
             </p>
             <h2 className="font-headline text-3xl font-bold tracking-tight text-on-background">
-              {messages.login.signInTitle}
+              {view === "login" ? messages.login.signInTitle : messages.login.signupTitle}
             </h2>
             <p className="text-sm text-on-surface-variant font-medium">
-              {messages.login.signInSubtitle}
+              {view === "login" ? messages.login.signInSubtitle : messages.login.signupSubtitle}
             </p>
           </div>
 
@@ -152,35 +153,62 @@ COMPOSIO_API_KEY=`}
               />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
-                  {messages.login.password}
-                </label>
+            {view === "login" && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
+                    {messages.login.password}
+                  </label>
+                </div>
+                <input
+                  className="w-full rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm text-on-surface outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-on-surface-variant/40"
+                  name="password"
+                  type="password"
+                  placeholder={messages.login.passwordPlaceholder}
+                  minLength={6}
+                  required
+                />
               </div>
-              <input
-                className="w-full rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm text-on-surface outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-on-surface-variant/40"
-                name="password"
-                type="password"
-                placeholder={messages.login.passwordPlaceholder}
-                minLength={6}
-                required
-              />
-            </div>
+            )}
 
-            <div className="grid gap-3 pt-4 sm:grid-cols-2">
-              <button
-                formAction={login}
-                className="rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm font-bold text-on-surface transition-all hover:border-primary/20 hover:bg-surface-container active:scale-[0.98]"
-              >
-                {messages.login.signIn}
-              </button>
-              <button
-                formAction={signup}
-                className="signature-gradient rounded-2xl px-5 py-4 text-sm font-bold shadow-premium transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-[0.98]"
-              >
-                {messages.login.createAccount}
-              </button>
+            <div className="pt-4">
+              {view === "login" ? (
+                <div className="space-y-4">
+                  <button
+                    formAction={login}
+                    className="w-full signature-gradient rounded-2xl px-5 py-4 text-sm font-bold shadow-premium transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-[0.98]"
+                  >
+                    {messages.login.signIn}
+                  </button>
+                  <p className="text-center text-sm text-on-surface-variant font-medium">
+                    New to Agentergroup?{" "}
+                    <Link
+                      href={`/login?view=signup&redirectTo=${encodeURIComponent(redirectTo)}`}
+                      className="text-primary hover:underline"
+                    >
+                      {messages.login.createAccount}
+                    </Link>
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <button
+                    formAction={signup}
+                    className="w-full signature-gradient rounded-2xl px-5 py-4 text-sm font-bold shadow-premium transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-[0.98]"
+                  >
+                    {messages.login.createAccount}
+                  </button>
+                  <p className="text-center text-sm text-on-surface-variant font-medium">
+                    Already have an account?{" "}
+                    <Link
+                      href={`/login?view=login&redirectTo=${encodeURIComponent(redirectTo)}`}
+                      className="text-primary hover:underline"
+                    >
+                      {messages.login.signIn}
+                    </Link>
+                  </p>
+                </div>
+              )}
             </div>
           </form>
 
