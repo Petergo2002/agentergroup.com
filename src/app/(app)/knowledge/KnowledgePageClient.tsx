@@ -841,7 +841,7 @@ export default function KnowledgePageClient({
         onClose={() => setIsDeleteOpen(false)}
         onConfirm={confirmDelete}
         title={t("knowledge.deleteTitle")}
-        description={t("knowledge.deleteConfirm", { name: sourceToDelete?.name })}
+        description={t("knowledge.deleteConfirm", { name: sourceToDelete?.name ?? "" })}
         confirmLabel={t("common.delete")}
         isProcessing={deletingSourceId !== null}
       />    </div>
