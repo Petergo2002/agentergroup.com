@@ -17,6 +17,7 @@ export const SAFE_DOWNLOAD_HOST_ALLOWLIST = [
   "googleusercontent.com",
   "googleapis.com",
   "storage.googleapis.com",
+  "cloudflarestorage.com",
 ] as const;
 
 const DEFAULT_MAX_REDIRECTS = 5;

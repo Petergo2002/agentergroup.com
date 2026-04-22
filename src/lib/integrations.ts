@@ -127,6 +127,7 @@ export const DRIVE_IMPORT_SUPPORTED_MIME_TYPES = [
   "text/plain",
   "text/markdown",
   "application/pdf",
+  "application/vnd.google-apps.document", // Google Docs
 ] as const;
 
 export function getSupportedIntegration(slug: string) {

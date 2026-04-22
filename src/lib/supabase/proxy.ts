@@ -36,7 +36,9 @@ const PUBLIC_PATH_PREFIXES = [
 ] as const;
 
 const PROTECTED_PATH_PREFIXES = [
+  "/onboarding",
   "/dashboard",
+  "/assistants",
   "/agents",
   "/widgets",
   "/api/dashboard",
@@ -61,16 +63,24 @@ function isProtectedPath(pathname: string) {
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  // We set x-url so layouts can detect the current path for redirect logic
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-url", request.url);
+
   if (isExplicitPublicPath(pathname) || !isProtectedPath(pathname)) {
     return NextResponse.next({
-      request,
+      request: {
+        headers: requestHeaders,
+      },
     });
   }
 
   const { url, publishableKey } = getSupabaseEnv();
 
   let supabaseResponse = NextResponse.next({
-    request,
+    request: {
+      headers: requestHeaders,
+    },
   });
 
   const supabase = createServerClient(url, publishableKey, {
@@ -80,7 +90,11 @@ export async function updateSession(request: NextRequest) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        supabaseResponse = NextResponse.next({ request });
+        supabaseResponse = NextResponse.next({
+          request: {
+            headers: requestHeaders,
+          },
+        });
         cookiesToSet.forEach(({ name, value, options }) => {
           supabaseResponse.cookies.set(name, value, options);
         });

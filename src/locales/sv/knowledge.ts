@@ -15,6 +15,7 @@ export const knowledge = {
   queuedForProcessing: "Kunskapskälla köad för bearbetning.",
   deleteError: "Det gick inte att radera kunskapskällan.",
   removed: "Kunskapskälla borttagen.",
+  deleteTitle: "Radera källa",
   connectDriveStatus:
     "Anslut Google Drive för att bläddra och importera filer till workspace-biblioteket.",
   browseDriveStatus:

@@ -12,6 +12,7 @@ import {
   Search,
   TriangleAlert,
   Upload,
+  Database,
   type LucideIcon,
 } from "lucide-react";
 import { AppIcon } from "@/components/icons/AppIcon";
@@ -26,10 +27,12 @@ import type {
   ConnectionRecord,
   DriveImportFileRecord,
   KnowledgeSourceRecord,
+  WorkspaceSubscriptionRecord,
 } from "@/lib/types";
 import { SourceBentoGrid } from "@/components/knowledge/SourceBentoGrid";
 import { SourceTable } from "@/components/knowledge/SourceTable";
 import { ViewSourceModal } from "@/components/modals/ViewSourceModal";
+import { ConfirmSimpleModal } from "@/components/modals/ConfirmSimpleModal";
 import { formatRelativeDate } from "@/lib/utils";
 
 const ACCEPTED_FILE_TYPES = [...SUPPORTED_KNOWLEDGE_MIME_TYPES, ...SUPPORTED_KNOWLEDGE_EXTENSIONS].join(",");
@@ -61,9 +64,11 @@ type InputTab = "text" | "file" | "drive" | "website" | null;
 export default function KnowledgePageClient({
   initialSources,
   initialDriveConnections,
+  subscription,
 }: {
   initialSources: KnowledgeSourceRecord[];
   initialDriveConnections: ConnectionRecord[];
+  subscription: WorkspaceSubscriptionRecord;
 }) {
   const [supabase] = useState(() => createClient());
   const { language, t } = useLanguage();
@@ -101,6 +106,8 @@ export default function KnowledgePageClient({
   const [activeTab, setActiveTab] = useState<InputTab>(null);
   const [selectedSource, setSelectedSource] = useState<KnowledgeSourceRecord | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteOpen] = useState(false);
+  const [sourceToDelete, setSourceToDelete] = useState<KnowledgeSourceRecord | null>(null);
 
   const filteredSources = useMemo(() => {
     if (!sourceSearch.trim()) return sources;
@@ -112,6 +119,18 @@ export default function KnowledgePageClient({
         s.source_type.toLowerCase().includes(search),
     );
   }, [sources, sourceSearch]);
+
+  const storageStats = useMemo(() => {
+    const usedBytes = sources.reduce((acc, curr) => acc + (curr.file_size_bytes ?? 0), 0);
+    const limitBytes = subscription?.storage_limit_bytes ?? 10485760;
+    const percent = Math.min(Math.round((usedBytes / limitBytes) * 100), 100);
+    
+    return {
+      usedMB: (usedBytes / 1024 / 1024).toFixed(2),
+      limitMB: (limitBytes / 1024 / 1024).toFixed(0),
+      percent,
+    };
+  }, [sources, subscription]);
 
   const stats = useMemo(() => ({
     total: sources.length,
@@ -409,19 +428,19 @@ export default function KnowledgePageClient({
     }
   };
 
-  const handleDelete = async (source: KnowledgeSourceRecord) => {
-    const confirmed = window.confirm(
-      t("knowledge.deleteConfirm", { name: source.name }),
-    );
+  const handleDeleteClick = (source: KnowledgeSourceRecord) => {
+    setSourceToDelete(source);
+    setIsDeleteOpen(true);
+  };
 
-    if (!confirmed) {
-      return;
-    }
+  const confirmDelete = async () => {
+    if (!sourceToDelete) return;
 
-    setDeletingSourceId(source.id);
+    setDeletingSourceId(sourceToDelete.id);
+    setIsDeleteOpen(false);
 
     try {
-      const response = await fetch(`/api/knowledge/sources/${source.id}`, {
+      const response = await fetch(`/api/knowledge/sources/${sourceToDelete.id}`, {
         method: "DELETE",
       });
       const payload = await response.json();
@@ -439,13 +458,14 @@ export default function KnowledgePageClient({
       );
     } finally {
       setDeletingSourceId(null);
+      setSourceToDelete(null);
     }
   };
 
   const renderStatPill = (
     Icon: LucideIcon,
     label: string,
-    value: number,
+    value: string | number,
     colorClass: string,
   ) => (
     <div className="flex flex-col gap-1 px-4 py-2 border-r border-outline-variant/10 last:border-0">
@@ -472,6 +492,22 @@ export default function KnowledgePageClient({
           <p className="mt-4 text-[13px] font-medium leading-relaxed text-on-surface-variant/80 max-w-lg">
             {t("knowledge.description")}
           </p>
+          
+          <div className="mt-8 space-y-2 max-w-[320px]">
+            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/60">
+              <span className="flex items-center gap-1.5">
+                <Database className="h-3 w-3" />
+                Knowledge Storage
+              </span>
+              <span>{storageStats.usedMB} MB / {storageStats.limitMB} MB</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container">
+              <div 
+                className={`h-full transition-all duration-500 ${storageStats.percent > 90 ? 'bg-error' : 'bg-primary'}`}
+                style={{ width: `${storageStats.percent}%` }}
+              />
+            </div>
+          </div>
         </div>
         
         <div className="flex rounded-2xl bg-surface-container-low/40 p-1 ring-1 ring-outline-variant/5">
@@ -696,34 +732,51 @@ export default function KnowledgePageClient({
                       <p className="text-xs font-bold uppercase tracking-widest">{driveStatus}</p>
                     </div>
                   ) : (
-                    driveFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="group/item flex items-center justify-between rounded-xl bg-surface-container-lowest p-3 ring-1 ring-outline-variant/10 transition-all hover:bg-surface-container hover:ring-primary/20 hover:shadow-sm"
-                      >
-                        <div className="flex items-center gap-3 truncate">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container group-hover/item:bg-primary/10 group-hover/item:text-primary transition-colors">
-                            <FileText className="h-4 w-4" />
-                          </div>
-                          <div className="truncate">
-                            <p className="truncate text-xs font-bold text-on-surface">{file.name}</p>
-                            <p className="mt-0.5 text-[10px] text-on-surface-variant/50">
-                              {formatRelativeDate(file.modifiedTime, language)}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => void handleDriveImport(file)}
-                          disabled={
-                            isImportingDriveFileId === file.id ||
-                            (driveConnections.length > 1 && !selectedDriveConnectionId)
-                          }
-                          className="rounded-full bg-primary/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary/18 hover:text-on-surface disabled:opacity-50"
+                    driveFiles.map((file) => {
+                      const isPdf = file.mimeType === "application/pdf";
+                      const isGoogleDoc = file.mimeType === "application/vnd.google-apps.document";
+                      
+                      return (
+                        <div
+                          key={file.id}
+                          className="group/item flex items-center justify-between rounded-xl bg-surface-container-lowest p-3 ring-1 ring-outline-variant/10 transition-all hover:bg-surface-container hover:ring-primary/20 hover:shadow-sm"
                         >
-                          {isImportingDriveFileId === file.id ? "..." : t("common.import")}
-                        </button>
-                      </div>
-                    ))
+                          <div className="flex items-center gap-3 truncate">
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                              isPdf ? "bg-error/10 text-error" : 
+                              isGoogleDoc ? "bg-primary/10 text-primary" : 
+                              "bg-surface-container"
+                            } transition-colors`}>
+                              <FileText className="h-4 w-4" />
+                            </div>
+                            <div className="truncate">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate text-xs font-bold text-on-surface">{file.name}</p>
+                                {isPdf && (
+                                  <span className="rounded-md bg-error/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-error">PDF</span>
+                                )}
+                                {isGoogleDoc && (
+                                  <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">DOC</span>
+                                )}
+                              </div>
+                              <p className="mt-0.5 text-[10px] text-on-surface-variant/50">
+                                {formatRelativeDate(file.modifiedTime, language)}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => void handleDriveImport(file)}
+                            disabled={
+                              isImportingDriveFileId === file.id ||
+                              (driveConnections.length > 1 && !selectedDriveConnectionId)
+                            }
+                            className="rounded-full bg-primary/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary/18 hover:text-on-surface disabled:opacity-50"
+                          >
+                            {isImportingDriveFileId === file.id ? "..." : t("common.import")}
+                          </button>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -766,7 +819,7 @@ export default function KnowledgePageClient({
           sources={filteredSources}
           isLoading={isLoading}
           onProcess={handleProcess}
-          onDelete={handleDelete}
+          onDelete={handleDeleteClick}
           onView={handleView}
           processingId={processingSourceId}
           deletingId={deletingSourceId}
@@ -782,6 +835,15 @@ export default function KnowledgePageClient({
         source={selectedSource}
         onSourceUpdated={loadSources}
       />
-    </div>
+
+      <ConfirmSimpleModal
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={confirmDelete}
+        title={t("knowledge.deleteTitle")}
+        description={t("knowledge.deleteConfirm", { name: sourceToDelete?.name })}
+        confirmLabel={t("common.delete")}
+        isProcessing={deletingSourceId !== null}
+      />    </div>
   );
 }

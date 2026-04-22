@@ -7,6 +7,7 @@ import {
 } from "@/lib/connections";
 import {
   downloadDriveFile,
+  exportDriveFile,
   getDriveFileMetadata,
   syncConnectedAccountsToDatabase,
 } from "@/lib/composio";
@@ -33,41 +34,50 @@ function getNestedRecord(value: unknown) {
 }
 
 async function getFilePayloadBytes(payload: Record<string, unknown>) {
-  const nestedCandidates = [
-    getNestedRecord(payload.downloaded_file_content),
-    getNestedRecord(payload.downloadedFileContent),
-    getNestedRecord(payload.file),
-  ].filter(Boolean) as Record<string, unknown>[];
+  try {
+    const nestedCandidates = [
+      getNestedRecord(payload.downloaded_file_content),
+      getNestedRecord(payload.downloadedFileContent),
+      getNestedRecord(payload.file),
+    ].filter(Boolean) as Record<string, unknown>[];
 
-  const urlCandidates = [
-    getString(payload.s3url),
-    getString(payload.url),
-    getString(payload.file_url),
-    ...nestedCandidates.flatMap((candidate) => [
-      getString(candidate.s3url),
-      getString(candidate.url),
-      getString(candidate.file_url),
-    ]),
-  ].filter(Boolean) as string[];
+    const urlCandidates = [
+      getString(payload.s3url),
+      getString(payload.url),
+      getString(payload.file_url),
+      ...nestedCandidates.flatMap((candidate) => [
+        getString(candidate.s3url),
+        getString(candidate.url),
+        getString(candidate.file_url),
+      ]),
+    ].filter(Boolean) as string[];
 
-  for (const url of urlCandidates) {
-    try {
-      return await fetchSafeDownloadBytes(url);
-    } catch {
-      continue;
+    for (const url of urlCandidates) {
+      try {
+        const bytes = await fetchSafeDownloadBytes(url);
+        if (bytes) return bytes;
+      } catch (err) {
+        console.warn("[knowledge/drive/import] Failed to fetch from URL candidate:", url, err);
+        continue;
+      }
     }
+
+    const inlineContent =
+      getString(payload.content) ??
+      nestedCandidates.map((candidate) => getString(candidate.content)).find(Boolean) ??
+      null;
+
+    if (inlineContent) {
+      return new TextEncoder().encode(inlineContent);
+    }
+
+    console.error("[knowledge/drive/import] Could not find readable content in payload:", JSON.stringify(payload).slice(0, 500));
+    throw new Error("Google Drive download did not return readable file content.");
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("readable file content")) throw err;
+    console.error("[knowledge/drive/import] getFilePayloadBytes error:", err);
+    throw new Error("Failed to process Google Drive file content.");
   }
-
-  const inlineContent =
-    getString(payload.content) ??
-    nestedCandidates.map((candidate) => getString(candidate.content)).find(Boolean) ??
-    null;
-
-  if (inlineContent) {
-    return new TextEncoder().encode(inlineContent);
-  }
-
-  throw new Error("Google Drive download did not return readable file content.");
 }
 
 export async function POST(request: NextRequest) {
@@ -139,13 +149,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Calculate current storage usage
+    const { data: usageData, error: usageError } = await supabase
+      .from("knowledge_sources")
+      .select("file_size_bytes")
+      .eq("workspace_id", context.workspace.id);
+
+    if (usageError) {
+      return NextResponse.json({ error: usageError.message }, { status: 500 });
+    }
+
+    const currentTotalBytes = (usageData ?? []).reduce((acc, curr) => acc + (curr.file_size_bytes ?? 0), 0);
+    const storageLimit = context.subscription?.storage_limit_bytes ?? 10485760; // Default to 10MB
+
+    const isGoogleDoc = metadata.mimeType === "application/vnd.google-apps.document";
+    
     const downloadPayload = await downloadDriveFile(
       composioUserId,
       fileId,
       connectedAccountId,
     );
+
     const fileBytes = await getFilePayloadBytes(downloadPayload);
-    const fileName = overrideName || metadata.name;
+
+    if (currentTotalBytes + fileBytes.byteLength > storageLimit) {
+      return NextResponse.json(
+        { error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.` },
+        { status: 402 }
+      );
+    }
+
+    let fileName = overrideName || metadata.name;
+    const finalMimeType = isGoogleDoc ? "application/pdf" : metadata.mimeType;
+
+    if (isGoogleDoc && !fileName.toLowerCase().endsWith(".pdf")) {
+      fileName = `${fileName}.pdf`;
+    }
 
     const { data: source, error: sourceError } = await supabase
       .from("knowledge_sources")
@@ -153,12 +192,12 @@ export async function POST(request: NextRequest) {
         workspace_id: context.workspace.id,
         created_by: user.id,
         name: fileName,
-        description: "Imported from Google Drive.",
+        description: isGoogleDoc ? "Imported from Google Drive (Converted to PDF)." : "Imported from Google Drive.",
         source_type: "file",
         status: "pending",
         storage_bucket: KNOWLEDGE_BUCKET,
         storage_path: "",
-        mime_type: metadata.mimeType,
+        mime_type: finalMimeType,
         file_size_bytes: fileBytes.byteLength,
         metadata: {
           origin: "googledrive",
@@ -166,6 +205,7 @@ export async function POST(request: NextRequest) {
           drive_mime_type: metadata.mimeType,
           drive_web_view_link: metadata.webViewLink,
           drive_last_modified_at: metadata.modifiedTime,
+          is_converted_pdf: isGoogleDoc,
         },
       })
       .select()
@@ -178,11 +218,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const storagePath = `${context.workspace.id}/${source.id}/${sanitizeFileName(metadata.name)}`;
+    const storagePath = `${context.workspace.id}/${source.id}/${sanitizeFileName(fileName)}`;
     const uploadResult = await supabase.storage
       .from(KNOWLEDGE_BUCKET)
       .upload(storagePath, fileBytes, {
-        contentType: metadata.mimeType,
+        contentType: finalMimeType,
         upsert: true,
       });
 
@@ -230,6 +270,7 @@ export async function POST(request: NextRequest) {
       processStatus: "processing",
     });
   } catch (error) {
+    console.error("[knowledge/drive/import] Critical error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to import Google Drive file.",

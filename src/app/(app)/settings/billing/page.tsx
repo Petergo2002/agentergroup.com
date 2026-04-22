@@ -9,9 +9,9 @@ import { useSearchParams, useRouter } from 'next/navigation';
 // ─── Static plan data ─────────────────────────────────────────────────────────
 
 const PLAN_FEATURES = {
-  free:    ['50 messages per month', '1 active agent', 'Community support'],
-  starter: ['500 messages per month', 'Up to 3 agents', 'Full integrations', 'Priority support'],
-  premium: ['4000 messages per month', 'Unlimited agents', 'Full integrations', 'Dedicated support'],
+  free:    ['50 messages per month', '1 active agent', '10 MB Knowledge Base storage', 'Community support'],
+  starter: ['500 messages per month', 'Up to 3 agents', '25 MB Knowledge Base storage', 'Full integrations', 'Priority support'],
+  premium: ['4000 messages per month', 'Unlimited agents', '50 MB Knowledge Base storage', 'Full integrations', 'Dedicated support'],
 };
 
 const PLAN_PRICES = { free: '$0', starter: '$30', premium: '$110' };

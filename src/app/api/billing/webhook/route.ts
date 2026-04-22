@@ -51,6 +51,7 @@ async function updateWorkspaceSubscription(
       messages_limit: limits.messages_limit,
       agents_limit: limits.agents_limit,
       integrations_enabled: limits.integrations_enabled,
+      storage_limit_bytes: limits.storage_limit_bytes,
       stripe_customer_id: stripeCustomerId,
       stripe_subscription_id: stripeSubscriptionId,
       billing_cycle_start: now.toISOString(),
@@ -92,6 +93,7 @@ async function downgradeToFree(workspaceId: string) {
       messages_limit: limits.messages_limit,
       agents_limit: limits.agents_limit,
       integrations_enabled: limits.integrations_enabled,
+      storage_limit_bytes: limits.storage_limit_bytes,
       stripe_subscription_id: null,
       updated_at: new Date().toISOString(),
     })

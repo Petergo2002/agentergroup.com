@@ -38,8 +38,8 @@ export const STRIPE_PRICE_TO_PLAN: Record<string, string> = {
  * Plan tier limits — mirrors the DB defaults.
  * Used by the webhook to update workspace_subscriptions correctly.
  */
-export const PLAN_LIMITS: Record<string, { messages_limit: number; agents_limit: number; integrations_enabled: boolean }> = {
-  free:    { messages_limit: 50,   agents_limit: 1,    integrations_enabled: false },
-  starter: { messages_limit: 500,  agents_limit: 3,    integrations_enabled: true  },
-  premium: { messages_limit: 4000, agents_limit: 9999, integrations_enabled: true  },
+export const PLAN_LIMITS: Record<string, { messages_limit: number; agents_limit: number; integrations_enabled: boolean; storage_limit_bytes: number }> = {
+  free:    { messages_limit: 50,   agents_limit: 1,    integrations_enabled: false, storage_limit_bytes: 10485760 },
+  starter: { messages_limit: 500,  agents_limit: 3,    integrations_enabled: true,  storage_limit_bytes: 26214400 },
+  premium: { messages_limit: 4000, agents_limit: 9999, integrations_enabled: true,  storage_limit_bytes: 52428800 },
 };

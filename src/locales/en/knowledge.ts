@@ -14,6 +14,7 @@ export const knowledge = {
   queuedForProcessing: "Knowledge source queued for processing.",
   deleteError: "Failed to delete knowledge source.",
   removed: "Knowledge source removed.",
+  deleteTitle: "Delete Source",
   connectDriveStatus:
     "Connect Google Drive to browse and import files into the workspace library.",
   browseDriveStatus:

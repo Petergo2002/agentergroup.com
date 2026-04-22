@@ -60,15 +60,17 @@ async function loadKnowledgePageData() {
   return {
     initialSources: (sourcesData ?? []) as KnowledgeSourceRecord[],
     initialDriveConnections: connectionRows,
+    subscription: context.subscription,
   };
 }
 
 export default async function KnowledgePage() {
-  const { initialSources, initialDriveConnections } = await loadKnowledgePageData();
+  const { initialSources, initialDriveConnections, subscription } = await loadKnowledgePageData();
   return (
     <KnowledgePageClient
       initialSources={initialSources}
       initialDriveConnections={initialDriveConnections}
+      subscription={subscription}
     />
   );
 }

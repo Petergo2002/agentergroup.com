@@ -8,6 +8,7 @@ export interface WorkspaceSubscriptionRecord {
   messages_used: number;
   agents_limit: number;
   integrations_enabled: boolean;
+  storage_limit_bytes: number;
   billing_cycle_start: string;
   billing_cycle_end: string;
   stripe_customer_id: string | null;

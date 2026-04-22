@@ -6,16 +6,18 @@ import { CheckCircle2, Loader2, Zap, Shield, Sparkles, XCircle } from "lucide-re
 import { completeOnboarding } from "./actions";
 
 const PLAN_FEATURES = {
-  free: ["50 messages per month", "1 active agent", "Community support"],
+  free: ["50 messages per month", "1 active agent", "10 MB Knowledge Base storage", "Community support"],
   starter: [
     "500 messages per month",
     "Up to 3 agents",
+    "25 MB Knowledge Base storage",
     "Full integrations",
     "Priority support",
   ],
   premium: [
     "4000 messages per month",
     "Unlimited agents",
+    "50 MB Knowledge Base storage",
     "Full integrations",
     "Dedicated support",
   ],

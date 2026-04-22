@@ -76,7 +76,7 @@ export async function signup(formData: FormData) {
     email: credentials.email,
     password: credentials.password,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/dashboard`,
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/onboarding`,
     },
   });
 

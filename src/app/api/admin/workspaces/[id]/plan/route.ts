@@ -11,12 +11,12 @@ import type { PlanTier } from "@/lib/types/subscription";
  */
 const PLAN_LIMITS: Record<
   PlanTier,
-  { messages_limit: number; agents_limit: number; integrations_enabled: boolean }
+  { messages_limit: number; agents_limit: number; integrations_enabled: boolean; storage_limit_bytes: number }
 > = {
-  free: { messages_limit: 50, agents_limit: 1, integrations_enabled: false },
-  starter: { messages_limit: 500, agents_limit: 3, integrations_enabled: true },
+  free: { messages_limit: 50, agents_limit: 1, integrations_enabled: false, storage_limit_bytes: 10485760 },
+  starter: { messages_limit: 500, agents_limit: 3, integrations_enabled: true, storage_limit_bytes: 26214400 },
   // agents_limit of 9999 represents "unlimited" since the column is an integer.
-  premium: { messages_limit: 4000, agents_limit: 9999, integrations_enabled: true },
+  premium: { messages_limit: 4000, agents_limit: 9999, integrations_enabled: true, storage_limit_bytes: 52428800 },
 };
 
 const VALID_PLANS = new Set<PlanTier>(["free", "starter", "premium"]);
@@ -77,10 +77,11 @@ export async function PATCH(
       messages_limit: limits.messages_limit,
       agents_limit: limits.agents_limit,
       integrations_enabled: limits.integrations_enabled,
+      storage_limit_bytes: limits.storage_limit_bytes,
       updated_at: new Date().toISOString(),
     })
     .eq("workspace_id", workspaceId)
-    .select("plan_tier, messages_limit, messages_used, agents_limit, integrations_enabled")
+    .select("plan_tier, messages_limit, messages_used, agents_limit, integrations_enabled, storage_limit_bytes")
     .maybeSingle();
 
   if (error) {

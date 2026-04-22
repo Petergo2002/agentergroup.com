@@ -86,11 +86,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "sourceType must be text, file, or website." }, { status: 400 });
   }
 
+  // Calculate current storage usage
+  const { data: usageData, error: usageError } = await supabase
+    .from("knowledge_sources")
+    .select("file_size_bytes")
+    .eq("workspace_id", context.workspace.id);
+
+  if (usageError) {
+    return NextResponse.json({ error: usageError.message }, { status: 500 });
+  }
+
+  const currentTotalBytes = (usageData ?? []).reduce((acc, curr) => acc + (curr.file_size_bytes ?? 0), 0);
+  const storageLimit = context.subscription?.storage_limit_bytes ?? 10485760; // Default to 10MB if missing
+
   if (sourceType === "text") {
     const rawText = String(body.rawText ?? "").trim();
 
     if (!rawText) {
       return NextResponse.json({ error: "rawText is required for text sources." }, { status: 400 });
+    }
+
+    const newSizeBytes = Buffer.byteLength(rawText, "utf8");
+    if (currentTotalBytes + newSizeBytes > storageLimit) {
+      return NextResponse.json(
+        { error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.` },
+        { status: 402 }
+      );
     }
 
     const { data: source, error } = await supabase
@@ -102,6 +123,7 @@ export async function POST(request: NextRequest) {
         description,
         source_type: "text",
         raw_text: rawText,
+        file_size_bytes: newSizeBytes,
         status: "pending",
       })
       .select()
@@ -175,6 +197,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const newSizeBytes = Buffer.byteLength(rawText, "utf8");
+    if (currentTotalBytes + newSizeBytes > storageLimit) {
+      return NextResponse.json(
+        { error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.` },
+        { status: 402 }
+      );
+    }
+
     const { data: source, error } = await supabase
       .from("knowledge_sources")
       .insert({
@@ -184,6 +214,7 @@ export async function POST(request: NextRequest) {
         description,
         source_type: "website",
         raw_text: rawText,
+        file_size_bytes: newSizeBytes,
         status: "pending",
         metadata: { sourceUrl: url },
       })
@@ -235,8 +266,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!SUPPORTED_MIME_SET.has(mimeType)) {
-    return NextResponse.json({ error: "Unsupported file type." }, { status: 400 });
+  if (currentTotalBytes + fileSizeBytes > storageLimit) {
+    return NextResponse.json(
+      { error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.` },
+      { status: 402 }
+    );
   }
 
   const { data: source, error } = await supabase
