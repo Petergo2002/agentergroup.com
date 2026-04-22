@@ -38,19 +38,28 @@ export function buildKnowledgeContext(matches: KnowledgeMatchRecord[]) {
   }
 
   const sections = matches.map((match, index) => {
+    // Check metadata to see if this is an ephemeral user upload
+    const isUserUpload = match.metadata?.ephemeral === true;
+    const sourceLabel = isUserUpload 
+      ? `[USER UPLOADED FILE: ${match.source_name}]` 
+      : `[LIBRARY SOURCE: ${match.source_name}]`;
+
     const lines = [
-      `Source ${index + 1}: ${match.source_name}`,
-      `Similarity: ${(match.similarity * 100).toFixed(1)}%`,
+      `Source ${index + 1}: ${sourceLabel}`,
+      `Similarity Score: ${(match.similarity * 100).toFixed(1)}%`,
+      `--- START CONTENT ---`,
       match.content,
+      `--- END CONTENT ---`,
     ];
 
     return lines.join("\n");
   });
 
   return [
-    "Knowledge base context:",
-    "Use these excerpts when they are relevant. Prefer them over guessing.",
-    "If the excerpts are insufficient, say so plainly instead of inventing facts.",
+    "KNOWLEDGE BASE CONTEXT (including user-uploaded files):",
+    "Below are relevant excerpts from your library and any documents the user has uploaded during this session.",
+    "If a user asks about a file they sent, refer to the excerpts labeled '[USER UPLOADED FILE]'.",
+    "IMPORTANT: You CAN read these files. If information is present below, do NOT claim you cannot access attachments.",
     sections.join("\n\n---\n\n"),
   ].join("\n\n");
 }

@@ -215,8 +215,12 @@ export async function POST(
     // If the uploaded file is a document (PDF, Text), we create an ephemeral 
     // knowledge source record so the Edge Function can index it for the agent 
     // to "read" during the current session.
-    if (file.type === 'application/pdf' || file.type === 'text/plain') {
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const isText = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
+
+    if (isPdf || isText) {
       try {
+        const effectiveMimeType = isPdf ? 'application/pdf' : 'text/plain';
         const { data: source, error: sourceError } = await supabase
           .from('knowledge_sources')
           .insert({
@@ -226,7 +230,7 @@ export async function POST(
             status: 'pending',
             storage_bucket: 'widget-attachments',
             storage_path: storagePath,
-            mime_type: file.type,
+            mime_type: effectiveMimeType,
             file_size_bytes: file.size,
             widget_session_id: sessionId,
             metadata: {

@@ -657,6 +657,17 @@ export async function runAgentChat({
     systemInstructionBlocks.push(endChatGuidance);
   }
 
+  // ─── File Upload Capability Instruction ──────────────────────────────────
+  // If we are in a widget session, explicitly tell the agent it can read 
+  // uploaded files via RAG context.
+  if (audience === "widget" && widgetSessionId) {
+    systemInstructionBlocks.push(
+      "CAPABILITY: You CAN read and analyze documents (PDFs, Text) that the user uploads. " +
+      "When a user uploads a file, it is automatically indexed and provided to you as context. " +
+      "If you see information about an uploaded file in your context, analyze it and answer the user's questions about it."
+    );
+  }
+
   const toolsPromise = getWrappedTools(toolUserId, enabledToolkits);
   let knowledgeMatches: KnowledgeMatchRecord[] = [];
 
