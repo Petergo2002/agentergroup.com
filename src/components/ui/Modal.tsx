@@ -10,10 +10,22 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  size?: 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | 'full';
 }
 
-export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+export const Modal = ({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) => {
   const { t } = useLanguage();
+
+  const sizeClasses = {
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
+    '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
+    '5xl': 'max-w-5xl',
+    '6xl': 'max-w-6xl',
+    full: 'max-w-[calc(100vw-2rem)]',
+  }[size];
 
   // Handle escape key
   useEffect(() => {
@@ -41,7 +53,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       />
       
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg glass-panel border border-outline-variant/20 rounded-xl shadow-xl animate-in zoom-in-95 duration-300 overflow-hidden">
+      <div className={`relative w-full ${sizeClasses} glass-panel border border-outline-variant/20 rounded-xl shadow-xl animate-in zoom-in-95 duration-300 overflow-hidden`}>
         {/* Physical Top-Light Detail */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         

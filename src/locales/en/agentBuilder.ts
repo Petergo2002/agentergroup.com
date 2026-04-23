@@ -21,6 +21,7 @@ export const agentBuilder = {
   },
   blueprintNode: "Blueprint Node",
   confidence: "Confidence",
+  setupReadiness: "Setup Readiness",
   triggerType: "Trigger",
   coreType: "Core",
   knowledgeType: "Knowledge",
@@ -218,4 +219,8 @@ export const agentBuilder = {
   rollback: "Rollback",
   runtimeReady: "Connected & Ready",
   newSession: "New Session",
+  optimizePrompt: "Optimize Instructions",
+  optimizing: "Optimizing...",
+  optimizeEmptyWarning: "Add some draft text first.",
+  optimizeSuccess: "Instructions optimized successfully.",
 };

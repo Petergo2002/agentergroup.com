@@ -88,4 +88,5 @@ export const common = {
   decline: "Avböj",
   declined: "Inbjudan avböjd.",
   declineConfirm: "Är du säker på att du vill avböja den här inbjudan?",
+  done: "Klar",
 };

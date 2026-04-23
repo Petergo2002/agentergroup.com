@@ -52,20 +52,40 @@ export function Sidebar({
     100
   );
 
-  const navItems = [
-    { name: t("nav.dashboard"), href: "/dashboard", icon: LayoutGrid },
-    { name: t("nav.analytics"), href: "/analytics", icon: BarChart3 },
-    { name: t("nav.agents"), href: "/agents", icon: Bot },
-    ...(internalAssistantsEnabled
-      ? [{ name: t("nav.assistants"), href: "/assistants", icon: MessageCircle, beta: true }]
-      : []),
-    { name: t("nav.widgets"), href: "/widgets", icon: MessageSquare },
-    { name: t("nav.knowledge"), href: "/knowledge", icon: Database },
-    ...(subscription?.integrations_enabled
-      ? [{ name: t("nav.connections"), href: "/connections", icon: Network }]
-      : []),
-    { name: t("nav.settings"), href: "/settings", icon: Settings },
-  ] satisfies Array<{ name: string; href: string; icon: LucideIcon; beta?: boolean }>;
+  const navGroups = [
+    {
+      title: t("nav.groups.overview"),
+      items: [
+        { name: t("nav.dashboard"), href: "/dashboard", icon: LayoutGrid },
+        { name: t("nav.analytics"), href: "/analytics", icon: BarChart3 },
+      ],
+    },
+    {
+      title: t("nav.groups.specialists"),
+      items: [
+        { name: t("nav.agents"), href: "/agents", icon: Bot },
+        ...(internalAssistantsEnabled
+          ? [{ name: t("nav.assistants"), href: "/assistants", icon: MessageCircle, beta: true }]
+          : []),
+        { name: t("nav.widgets"), href: "/widgets", icon: MessageSquare },
+      ],
+    },
+    {
+      title: t("nav.groups.data"),
+      items: [
+        { name: t("nav.knowledge"), href: "/knowledge", icon: Database },
+        ...(subscription?.integrations_enabled
+          ? [{ name: t("nav.connections"), href: "/connections", icon: Network }]
+          : []),
+      ],
+    },
+    {
+      title: t("nav.groups.configuration"),
+      items: [
+        { name: t("nav.settings"), href: "/settings", icon: Settings },
+      ],
+    },
+  ];
 
   return (
     <aside
@@ -126,58 +146,71 @@ export function Sidebar({
         </div>
       </div>
       
-      <nav className={`mt-1 flex-1 space-y-1.5 font-label transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-4'}`}>
-        {navItems.map((item) => {
-          const isActive = pathname?.startsWith(item.href);
-          const Icon = item.icon;
-          
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={`group relative flex items-center gap-3 rounded-xl py-3 transition-all duration-200 ${
-                isCollapsed && !mobile ? 'justify-center px-0' : 'px-4'
-              } ${
-                isActive 
-                  ? "bg-surface-container-high text-on-surface shadow-sm ring-1 ring-primary/20" 
-                  : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
-              }`}
-            >
-              {isActive && (
-                <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-full bg-primary ${isCollapsed && !mobile ? 'hidden' : ''}`} />
-              )}
-              <Icon
-                className={`h-[1.125rem] w-[1.125rem] shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-primary" : "text-on-surface-variant/70 group-hover:text-primary"}`}
-                strokeWidth={isActive ? 2.5 : 2}
-              />
-              {(!isCollapsed || mobile) && (
-                <span className={`text-sm tracking-tight whitespace-nowrap overflow-hidden transition-all duration-300 ${isActive ? "font-bold" : "font-medium"}`}>
-                  {item.name}
-                </span>
-              )}
-              {(!isCollapsed || mobile) && item.beta ? (
-                <span
-                  className={`ml-auto rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${
-                    isActive
-                      ? "bg-primary/12 text-primary"
-                      : "bg-surface-container-high text-on-surface-variant"
+      <nav className={`mt-1 flex-1 space-y-6 font-label transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-4'} overflow-y-auto overflow-x-hidden`}>
+        {navGroups.map((group, groupIndex) => (
+          <div key={groupIndex} className="space-y-1.5 relative">
+            {(!isCollapsed || mobile) && (
+              <h3 className="px-4 mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/50">
+                {group.title}
+              </h3>
+            )}
+            {isCollapsed && !mobile && groupIndex > 0 && (
+              <div className="mx-auto w-8 border-t border-outline-variant/10 my-4" />
+            )}
+            
+            {group.items.map((item) => {
+              const isActive = pathname?.startsWith(item.href);
+              const Icon = item.icon;
+              
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={`group relative flex items-center gap-3 rounded-xl py-3 transition-all duration-200 ${
+                    isCollapsed && !mobile ? 'justify-center px-0' : 'px-4'
+                  } ${
+                    isActive 
+                      ? "bg-surface-container-high text-on-surface shadow-sm ring-1 ring-primary/20" 
+                      : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
                   }`}
                 >
-                  {t("common.beta")}
-                </span>
-              ) : null}
+                  {isActive && (
+                    <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-full bg-primary ${isCollapsed && !mobile ? 'hidden' : ''}`} />
+                  )}
+                  <Icon
+                    className={`h-[1.125rem] w-[1.125rem] shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-primary" : "text-on-surface-variant/70 group-hover:text-primary"}`}
+                    strokeWidth={isActive ? 2.5 : 2}
+                  />
+                  {(!isCollapsed || mobile) && (
+                    <span className={`text-sm tracking-tight whitespace-nowrap overflow-hidden transition-all duration-300 ${isActive ? "font-bold" : "font-medium"}`}>
+                      {item.name}
+                    </span>
+                  )}
+                  {(!isCollapsed || mobile) && item.beta ? (
+                    <span
+                      className={`ml-auto rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${
+                        isActive
+                          ? "bg-primary/12 text-primary"
+                          : "bg-surface-container-high text-on-surface-variant"
+                      }`}
+                    >
+                      {t("common.beta")}
+                    </span>
+                  ) : null}
 
-              {/* Tooltip for collapsed mode */}
-              {isCollapsed && !mobile && (
-                <div className="fixed left-[70px] rounded-md bg-on-surface px-3 py-2 text-xs font-bold text-background opacity-0 shadow-xl ring-1 ring-outline-variant pointer-events-none transition-opacity duration-200 group-hover:opacity-100 z-[9999] whitespace-nowrap">
-                  {item.name}
-                  {item.beta && ` (${t("common.beta")})`}
-                </div>
-              )}
-            </Link>
-          );
-        })}
+                  {/* Tooltip for collapsed mode */}
+                  {isCollapsed && !mobile && (
+                    <div className="fixed left-[70px] rounded-md bg-on-surface px-3 py-2 text-xs font-bold text-background opacity-0 shadow-xl ring-1 ring-outline-variant pointer-events-none transition-opacity duration-200 group-hover:opacity-100 z-[9999] whitespace-nowrap">
+                      {item.name}
+                      {item.beta && ` (${t("common.beta")})`}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className={`mt-auto p-4 space-y-3 transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-4'}`}>

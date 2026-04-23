@@ -19,4 +19,10 @@ export const nav = {
   createWorkspace: "Skapa workspace",
   guestWorkspace: "Gästworkspace",
   switchWorkspace: "Byt Workspace",
+  groups: {
+    overview: "Översikt",
+    specialists: "Specialister & Ytor",
+    data: "Data & Integrationer",
+    configuration: "Konfiguration"
+  }
 };

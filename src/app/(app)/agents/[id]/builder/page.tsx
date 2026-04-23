@@ -14,6 +14,9 @@ import {
   ReactFlow,
   ReactFlowInstance,
   useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useParams, useRouter } from 'next/navigation';
@@ -23,6 +26,7 @@ import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/ToastProvider';
+import { Modal } from '@/components/ui/Modal';
 import { canEditAgentRecord } from '@/lib/agents/access';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { buildInitialDefinition } from '@/lib/agents/defaults';
@@ -1177,7 +1181,7 @@ export default function AgentBuilderPage() {
   const { showToast } = useToast();
   const agentId = params.id;
   const [nodes, setNodes, onNodesChange] = useNodesState<BuilderFlowNode>([]);
-  const [edges, setEdges] = useState<BuilderFlowEdge[]>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<BuilderFlowEdge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [flowInstance, setFlowInstance] =
     useState<ReactFlowInstance<BuilderFlowNode, BuilderFlowEdge> | null>(null);
@@ -1208,6 +1212,8 @@ export default function AgentBuilderPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
+  const [isInstructionsModalOpen, setIsInstructionsModalOpen] = useState(false);
+  const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
   const [model, setModel] = useState('openai/gpt-4o-mini');
   const [timezone, setTimezone] = useState('UTC');
   const [starterPromptFields, setStarterPromptFields] = useState<string[]>(['', '', '']);
@@ -1246,6 +1252,11 @@ export default function AgentBuilderPage() {
       );
     },
     [setNodes],
+  );
+
+  const onConnect = useCallback(
+    (params: Edge | Connection) => setEdges((eds) => addEdge({ ...params, style: DEFAULT_EDGE_STYLE }, eds)),
+    [setEdges],
   );
 
   const updateGoogleCalendarSettings = useCallback(
@@ -1322,7 +1333,38 @@ export default function AgentBuilderPage() {
     ...getNodeLibraryText(item.key, t),
     disabled: item.key === 'tools' && !subscription?.integrations_enabled,
   }));
-  const displayNodes = nodes.map((node) => enrichNodeForDisplay(node, connections, t));
+  
+  const displayNodes = nodes.map((node) => {
+    const enriched = enrichNodeForDisplay(node, connections, t);
+    
+    if (enriched.data.kind === 'agent') {
+      let score = 0;
+      
+      // Points for basics
+      if (name && name !== 'Agent' && name !== t('agentBuilder.agentTitleFallback')) score += 20;
+      if (description && description.trim().length > 0) score += 10;
+      
+      // Points for robust instructions
+      if (instructions && instructions.trim().length > 50) score += 40;
+      
+      // Points for conversation starters
+      if (starterPromptFields.some((p) => p.trim().length > 0)) score += 10;
+
+      // Points for extending the agent with context or actions
+      const hasKnowledge = nodes.some(
+        (n) => n.data.kind === 'knowledge' && (n.data as KnowledgeBuilderNodeData).sourceIds.length > 0
+      );
+      const hasTools = nodes.some((n) => isToolNodeData(n.data) && n.data.connectionId);
+      
+      if (hasKnowledge || hasTools) score += 20;
+
+      enriched.data.confidenceValue = Math.min(100, score);
+      enriched.data.confidenceLabel = t('agentBuilder.setupReadiness');
+    }
+    
+    return enriched;
+  });
+  
   const selectedNode = displayNodes.find((node) => node.id === selectedNodeId) ?? null;
   const canEditCurrentAgent = agent
     ? canEditAgentRecord(agent, user.id, membership.role)
@@ -2084,6 +2126,41 @@ export default function AgentBuilderPage() {
     }
   };
 
+  const handleOptimizePrompt = async () => {
+    if (!instructions.trim()) {
+      showToast(t('agentBuilder.optimizeEmptyWarning'), 'warning');
+      return;
+    }
+
+    setIsOptimizingPrompt(true);
+
+    try {
+      const response = await fetch(`/api/agents/${agentId}/optimize-prompt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instructions,
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? t('common.errors'));
+      }
+
+      setInstructions(payload.optimizedInstructions);
+      showToast(t('agentBuilder.optimizeSuccess'), 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('common.errors');
+      showToast(message, 'error');
+    } finally {
+      setIsOptimizingPrompt(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -2187,9 +2264,18 @@ export default function AgentBuilderPage() {
               </select>
             </div>
             <div>
-              <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
-                {t('agentBuilder.operationalInstructions')}
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+                  {t('agentBuilder.operationalInstructions')}
+                </label>
+                <button
+                  onClick={() => setIsInstructionsModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-primary/5 text-primary/60 hover:text-primary transition-all active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[18px]">open_in_full</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{t('common.expand')}</span>
+                </button>
+              </div>
               <textarea
                 value={instructions}
                 onChange={(event) => setInstructions(event.target.value)}
@@ -2201,6 +2287,55 @@ export default function AgentBuilderPage() {
               <p className="mt-3 text-[11px] leading-relaxed text-on-surface-variant/60 italic">
                 {t('agentBuilder.operationalInstructionsHelp')}
               </p>
+
+              <Modal
+                isOpen={isInstructionsModalOpen}
+                onClose={() => setIsInstructionsModalOpen(false)}
+                title={t('agentBuilder.operationalInstructions')}
+                size="5xl"
+              >
+                <div className="space-y-4">
+                  <div className="relative">
+                    <textarea
+                      value={instructions}
+                      onChange={(event) => setInstructions(event.target.value)}
+                      onKeyDown={stopBuilderFieldKeyDown}
+                      rows={20}
+                      disabled={isOptimizingPrompt}
+                      placeholder={t('agentBuilder.operationalInstructions')}
+                      className={`min-h-[500px] w-full resize-none rounded-2xl border border-outline-variant/10 px-6 py-6 text-base font-medium leading-relaxed outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high ${
+                        isOptimizingPrompt ? 'bg-surface-container-lowest opacity-50 cursor-not-allowed' : 'bg-surface-container-low'
+                      }`}
+                      autoFocus
+                    />
+                    {isOptimizingPrompt && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-surface-container-highest/10 backdrop-blur-[2px]">
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-outline-variant/20 border-t-primary" />
+                        <p className="mt-4 text-sm font-bold tracking-widest text-on-surface uppercase animate-pulse">
+                          {t('agentBuilder.optimizing')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={handleOptimizePrompt}
+                      disabled={isOptimizingPrompt}
+                      className="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-2.5 text-sm font-bold uppercase tracking-widest text-primary shadow-sm transition-all hover:bg-surface-container-high hover:shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">auto_fix_high</span>
+                      {t('agentBuilder.optimizePrompt')}
+                    </button>
+                    <button
+                      onClick={() => setIsInstructionsModalOpen(false)}
+                      disabled={isOptimizingPrompt}
+                      className="rounded-full bg-primary px-8 py-3 text-sm font-bold uppercase tracking-widest text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {t('common.done')}
+                    </button>
+                  </div>
+                </div>
+              </Modal>
             </div>
             <div>
               <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
@@ -3014,6 +3149,8 @@ export default function AgentBuilderPage() {
               edges={edges}
               nodeTypes={nodeTypes}
               onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
               onNodeClick={(_, node) => setSelectedNodeId(node.id)}
               onPaneClick={() => setSelectedNodeId(null)}
               onInit={setFlowInstance}

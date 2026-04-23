@@ -435,6 +435,15 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
         throw new Error(identityPayload?.error || t('widgetBuilder.saveError'));
       }
 
+      // Automatically sync changes if the widget is already live
+      if (summary?.widget.status === 'deployed' && (options?.reloadAfterSave ?? true)) {
+        await fetch(`/api/widgets/${widgetId}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'deployed' }),
+        });
+      }
+
       if (options?.reloadAfterSave ?? true) await loadWidget();
       if (options?.showSuccessToast ?? true) showToast(t('widgetBuilder.saved'), 'success');
       return true;

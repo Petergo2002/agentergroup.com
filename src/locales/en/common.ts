@@ -88,4 +88,5 @@ export const common = {
   decline: "Decline",
   declined: "Invite declined.",
   declineConfirm: "Are you sure you want to decline this invitation?",
+  done: "Done",
 };

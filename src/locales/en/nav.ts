@@ -19,4 +19,10 @@ export const nav = {
   createWorkspace: "Create workspace",
   guestWorkspace: "Guest Workspace",
   switchWorkspace: "Switch Workspace",
+  groups: {
+    overview: "Overview",
+    specialists: "Specialists & Surfaces",
+    data: "Data & Integrations",
+    configuration: "Configuration"
+  }
 };

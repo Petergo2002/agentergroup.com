@@ -9,7 +9,7 @@ import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { EntityActionsMenu } from '@/components/ui/EntityActionsMenu';
 import { StatusToggle } from '@/components/ui/StatusToggle';
 import { useToast } from '@/components/ui/ToastProvider';
-import { MessageSquare, Loader2 } from 'lucide-react';
+import { MessageSquare, Loader2, RefreshCw } from 'lucide-react';
 import { formatRelativeDate } from '@/lib/utils';
 
 interface WidgetListItem {
@@ -304,10 +304,17 @@ export default function WidgetsPageClient({
   const [widgetToEdit, setWidgetToEdit] = useState<WidgetListItem | null>(null);
   const [deletingWidgetId, setDeletingWidgetId] = useState<string | null>(null);
   const [togglingWidgetId, setTogglingWidgetId] = useState<string | null>(null);
+  const [syncingWidgetId, setSyncingWidgetId] = useState<string | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [widgetToDelete, setWidgetToDelete] = useState<WidgetListItem | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const highlightedAgentId = searchParams.get('agent');
   const isLoading = false;
+
+  const needsSyncCount = useMemo(
+    () => widgets.filter((w) => w.needsRedeploy && w.status === 'deployed').length,
+    [widgets],
+  );
 
   const sortedWidgets = useMemo(
     () =>
@@ -317,6 +324,85 @@ export default function WidgetsPageClient({
       ),
     [widgets],
   );
+
+  const handleSync = async (widgetId: string) => {
+    setSyncingWidgetId(widgetId);
+    try {
+      const response = await fetch(`/api/widgets/${widgetId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'deployed',
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || t('widgetBuilder.updateDeploymentError'));
+      }
+
+      setWidgets((current) =>
+        current.map((w) =>
+          w.id === widgetId ? { ...w, needsRedeploy: false, updatedAt: new Date().toISOString() } : w
+        )
+      );
+      showToast(t('widgetBuilder.deployed'), 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : t('widgetBuilder.updateDeploymentError'),
+        'error',
+      );
+    } finally {
+      setSyncingWidgetId(null);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    const toSync = widgets.filter((w) => w.needsRedeploy && w.status === 'deployed');
+    if (toSync.length === 0) return;
+
+    setIsSyncingAll(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const widget of toSync) {
+      try {
+        const response = await fetch(`/api/widgets/${widget.id}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'deployed' }),
+        });
+        if (response.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch {
+        failCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      setWidgets((current) =>
+        current.map((w) => {
+          const match = toSync.find((ts) => ts.id === w.id);
+          if (match) {
+            return { ...w, needsRedeploy: false, updatedAt: new Date().toISOString() };
+          }
+          return w;
+        })
+      );
+      showToast(t('widgetBuilder.deployed'), 'success');
+    }
+
+    if (failCount > 0) {
+      showToast(t('widgetBuilder.updateDeploymentError'), 'error');
+    }
+
+    setIsSyncingAll(false);
+  };
 
   /**
    * Actually creates the widget once the user has confirmed a name.
@@ -505,16 +591,30 @@ export default function WidgetsPageClient({
             {t('widgets.description')}
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          disabled={isCreating}
-          className="group relative flex items-center gap-3 overflow-hidden rounded-full bg-on-surface px-8 py-4 text-sm font-bold uppercase tracking-[0.16em] text-background shadow-xl transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60"
-        >
-          <span className="relative z-10">
-            {isCreating ? t('widgets.creatingWorkspace') : highlightedAgentId ? t('widgets.newWidgetFromAgent') : t('widgets.initializeWidget')}
-          </span>
-          <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-primary/12 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
-        </button>
+        <div className="flex flex-wrap items-center gap-4">
+          {needsSyncCount > 0 && (
+            <button
+              onClick={() => void handleSyncAll()}
+              disabled={isSyncingAll}
+              className="group relative flex items-center gap-3 overflow-hidden rounded-full border border-primary/20 bg-primary/5 px-8 py-4 text-sm font-bold uppercase tracking-[0.16em] text-primary transition-all hover:bg-primary/10 active:scale-95 disabled:opacity-60"
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncingAll ? 'animate-spin' : ''}`} />
+              <span className="relative z-10">
+                {isSyncingAll ? t('widgetBuilder.syncing') : `${t('widgetBuilder.syncChanges')} (${needsSyncCount})`}
+              </span>
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            disabled={isCreating}
+            className="group relative flex items-center gap-3 overflow-hidden rounded-full bg-on-surface px-8 py-4 text-sm font-bold uppercase tracking-[0.16em] text-background shadow-xl transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+          >
+            <span className="relative z-10">
+              {isCreating ? t('widgets.creatingWorkspace') : highlightedAgentId ? t('widgets.newWidgetFromAgent') : t('widgets.initializeWidget')}
+            </span>
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-primary/12 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
+          </button>
+        </div>
       </div>
 
       {highlightedAgentId && (
@@ -600,6 +700,16 @@ export default function WidgetsPageClient({
                     />
                     
                     <div className="flex items-center gap-2">
+                       {widget.needsRedeploy && (
+                         <button
+                           onClick={() => void handleSync(widget.id)}
+                           disabled={syncingWidgetId === widget.id || togglingWidgetId === widget.id || deletingWidgetId === widget.id}
+                           title={t('widgetBuilder.syncChanges')}
+                           className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-all hover:bg-primary hover:text-background disabled:opacity-50"
+                         >
+                           <RefreshCw className={`h-4 w-4 ${syncingWidgetId === widget.id ? 'animate-spin' : ''}`} />
+                         </button>
+                       )}
                        <Link
                          href={`/widgets/${widget.id}`}
                          className="rounded-full border border-outline-variant/15 px-5 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant transition-all hover:bg-on-surface hover:text-background"

@@ -21,6 +21,7 @@ export const agentBuilder = {
   },
   blueprintNode: "Blueprint-nod",
   confidence: "Säkerhet",
+  setupReadiness: "Status (Redo)",
   triggerType: "Trigger",
   coreType: "Kärna",
   knowledgeType: "Kunskap",
@@ -220,4 +221,8 @@ export const agentBuilder = {
   rollback: "Rulla tillbaka",
   runtimeReady: "Ansluten och redo",
   newSession: "Ny session",
+  optimizePrompt: "Optimera instruktioner",
+  optimizing: "Optimerar...",
+  optimizeEmptyWarning: "Lägg till lite utkast-text först.",
+  optimizeSuccess: "Instruktionerna har optimerats framgångsrikt.",
 };

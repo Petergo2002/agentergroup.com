@@ -111,9 +111,21 @@ When the `agent` node is selected, the right panel edits:
 - `name`
 - `description`
 - `model`
-- `instructions`
+- `instructions` (includes an **Expanded Editor** modal and an AI-powered **Magic Wand** optimizer)
 - `timezone`
 - `starter prompts` (up to 3 visible inputs)
+
+**New AI Features:**
+- **Expanded Editor:** A large-scale modal for deep prompt engineering, accessible via the "Expand" button.
+- **Magic Wand Optimizer:** An OpenRouter-powered feature that rewrites raw instructions into structured, industry-standard system prompts (using the `/api/agents/[id]/optimize-prompt` endpoint).
+
+**Agent Metrics:**
+- **Setup Readiness Score:** Replaces the static "Confidence" bar. This is a dynamic score (0-100%) calculated in the UI based on:
+  - Custom name (+20%)
+  - Description presence (+10%)
+  - Robust instructions > 50 chars (+40%)
+  - Starter prompts presence (+10%)
+  - Attached tools or knowledge (+20%)
 
 Current model options are hardcoded:
 
@@ -363,7 +375,8 @@ So the builder affects widgets in two stages:
 ### Supported interactions
 
 - select nodes
-- edit the selected node in the inspector
+- edit the selected node in the inspector (Trigger node inspector is currently hidden for a cleaner UI)
+- draw manual edges/connections between nodes
 - add knowledge
 - add Gmail
 - add Google Calendar
@@ -378,7 +391,7 @@ So the builder affects widgets in two stages:
 
 - no autosave
 - no multi-step workflow logic
-- no arbitrary branches or custom edges
+- no custom node types
 - no multiple knowledge nodes
 - no multiple accounts per node
 - no per-tool custom action permissions in the UI
