@@ -368,6 +368,7 @@ Each plan defines limits for:
 - monthly message allowance (`messages_limit`)
 - active agent count (`agents_limit`)
 - integration access (`integrations_enabled`)
+- website crawling limits (hardcoded per tier)
 
 ### Data model
 
@@ -382,6 +383,7 @@ Key fields:
 - `messages_used`: messages consumed in the current cycle
 - `agents_limit`: maximum active agents
 - `integrations_enabled`: whether external tool integrations are unlocked
+- `storage_limit_bytes`: maximum knowledge base storage (default 10MB, premium 50MB)
 - `billing_cycle_start` / `billing_cycle_end`: current cycle window
 - `stripe_customer_id` / `stripe_subscription_id`: Stripe identifiers (nullable for free plans)
 
@@ -434,14 +436,15 @@ Accepts `{ plan_tier: "free" | "starter" | "premium" }`. Protected by `isAdminUs
 
 **Plan tier → limits mapping:**
 
-| Plan | `messages_limit` | `agents_limit` | `integrations_enabled` |
-| --- | --- | --- | --- |
-| `free` | 50 | 1 | false |
-| `starter` | 500 | 3 | true |
-| `premium` | 4000 | 9999 (unlimited) | true |
+| Plan | `messages_limit` | `agents_limit` | `integrations_enabled` | `crawl_limit` | `sitemap_mapping` |
+| --- | --- | --- | --- | --- | --- |
+| `free` | 50 | 1 | false | 1 page | No |
+| `starter` | 500 | 3 | true | 1 page | No |
+| `premium` | 4000 | 9999 (unlimited) | true | 30 pages | Yes |
 
 **Important behavioral notes:**
 
+- `crawl_limit` and `sitemap_mapping` are functional limits enforced at the API and UI layers based on the `plan_tier`, rather than stored as columns in `workspace_subscriptions` yet.
 - Stripe is **not involved** — this is a direct database override for internal ops use (trials, billing corrections, etc.)
 - `messages_used` is **not reset** when the plan changes — usage history is preserved
 - The workspace user's billing UI will reflect the new plan tier immediately after their next page load (the `AppWorkspaceContext` is reloaded on each authenticated request via bootstrap)
@@ -1456,6 +1459,9 @@ Current supported source types:
 - uploaded files (previewable)
 - Google Drive imported files (previewable)
 - website scraping via Firecrawl (previewable and editable as markdown)
+  - **Single Page Scrape**: Available to all users.
+  - **Multi-page Crawl**: Up to 30 pages (Premium Only).
+  - **Sitemap Selection**: Interactive page discovery and picking (Premium Only).
 
 ### Supported file formats
 
@@ -1465,8 +1471,24 @@ Current supported knowledge file types:
 - `.md`
 - `.pdf`
 - website URLs (converted to markdown)
+  - Support for domain-only input (e.g., `example.com` automatically prepends `https://`)
 
-MIME types:
+### Website Scraping & Discovery
+
+The platform uses **Firecrawl** to ingest website content.
+
+#### Discovery (Mapping)
+For premium users, the system can "map" a website to find all public URLs.
+- **Route**: `POST /api/knowledge/sources/map`
+- **Behavior**: Uses Firecrawl's `map` feature to return a list of discovered URLs.
+- **UI**: Users can search and select up to 30 specific pages to ingest.
+
+#### Ingestion (Scraping/Crawling)
+- **Route**: `POST /api/knowledge/sources`
+- **Single Page Mode**: Default behavior. Only the primary URL provided is ingested. The UI displays a "Single Page Mode" badge to confirm this.
+- **Selection Mode**: Activated via "Find Pages" (Premium Only). Allows discovery and manual selection of up to 30 specific URLs. The UI displays a "Selection Mode" badge and a list of discovered pages. The system scrapes only these targeted URLs and joins them into a single knowledge source.
+
+### Storage architecture
 
 - `text/plain`
 - `text/markdown`

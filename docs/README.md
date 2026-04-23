@@ -8,6 +8,7 @@ Detailed overview of the system design, database schema, and agent orchestration
 ## 📘 Guides
 Practical instructions for common tasks:
 - **[Agent Builder](./guides/agent-builder.md)** - How the flow-based builder works.
+- **[Knowledge Base](./architecture/core.md#knowledge-base-architecture)** - Multi-page website scraping, sitemap mapping, and document ingestion.
 - **[Adding Integrations](./guides/adding-integrations.md)** - Guide for extending toolkits.
 - **[Composio Integration](./guides/composio-integrations.md)** - Details on our tool execution engine.
 - **[Widget Security](./guides/widget-embed-security.md)** - Security protocols for public embeds.

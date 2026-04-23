@@ -26,6 +26,31 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
+interface AnalyticsIdentitySummary {
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+function resolveIdentityDisplay(
+  identity: AnalyticsIdentitySummary | null,
+  anonymousLabel: string,
+  fallbackContext?: string | null,
+) {
+  const primary = identity?.name || identity?.email || anonymousLabel;
+  const secondary =
+    identity?.name && identity.email
+      ? identity.email
+      : fallbackContext ?? null;
+  const initials = (identity?.name?.[0] || identity?.email?.[0] || "U").toUpperCase();
+
+  return {
+    primary,
+    secondary,
+    initials,
+  };
+}
+
 interface DashboardAnalyticsState {
   isLoading: boolean;
   isLoadingMore: boolean;
@@ -173,21 +198,11 @@ function ConversationRow({
   language: "en" | "sv";
 }) {
   const { t } = useLanguage();
-  
-  // Personalization logic: Prioritize Lead name > Lead email > Agent name
-  const primaryDisplay = conversation.leadSummary?.name || 
-                        conversation.leadSummary?.email || 
-                        conversation.agentLabel || 
-                        conversation.agentName || 
-                        t("analytics.anonymousUser");
-
-  const secondaryDisplay = (conversation.leadSummary?.name && conversation.leadSummary?.email) 
-                           ? conversation.leadSummary.email 
-                           : (conversation.agentLabel || conversation.agentName);
-
-  const initials = (conversation.leadSummary?.name?.[0] || 
-                   conversation.leadSummary?.email?.[0] || 
-                   "U").toUpperCase();
+  const identityDisplay = resolveIdentityDisplay(
+    conversation.identitySummary,
+    t("analytics.anonymousUser"),
+    conversation.agentLabel || conversation.agentName,
+  );
 
   return (
     <button
@@ -210,13 +225,13 @@ function ConversationRow({
             ? "bg-primary-container text-white ring-primary-container/10" 
             : "bg-surface-container-highest text-on-surface-variant ring-transparent"
         }`}>
-          {initials}
+          {identityDisplay.initials}
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
             <p className="truncate font-headline text-[15px] font-bold text-on-surface group-hover:text-primary-container transition-colors">
-              {primaryDisplay}
+              {identityDisplay.primary}
             </p>
             <span className="shrink-0 text-[10px] font-medium text-on-surface-variant/60">
               {formatRelativeDate(conversation.lastActivityAt, language)}
@@ -225,7 +240,7 @@ function ConversationRow({
 
           <div className="flex items-center gap-2 mt-0.5">
             <p className="truncate text-[12px] font-medium text-on-surface-variant/70">
-              {secondaryDisplay}
+              {identityDisplay.secondary}
             </p>
             {conversation.hasLead && (
               <span className="flex h-1.5 w-1.5 rounded-full bg-primary-container" />
@@ -359,6 +374,18 @@ function ConversationDetail({
   onClose?: () => void;
 }) {
   const { t, language } = useLanguage();
+  const identityDisplay = detail
+    ? resolveIdentityDisplay(
+        detail.identitySummary,
+        t("analytics.anonymousUser"),
+        detail.conversation.agentLabel || detail.conversation.agentName,
+      )
+    : null;
+  const contactEmail = detail?.lead?.email || detail?.identitySummary?.email || null;
+  const contactName = detail?.lead?.name || detail?.identitySummary?.name || null;
+  const contactPhone = detail?.lead?.phone || detail?.identitySummary?.phone || null;
+  const capturedAt = detail?.lead?.createdAt ?? null;
+  const showContactDetails = Boolean(contactName || contactPhone || capturedAt);
   return (
     <section className="flex h-full flex-col bg-surface relative overflow-hidden">
       <div className="shrink-0 p-8 pb-6 border-b border-outline-variant/5">
@@ -366,7 +393,7 @@ function ConversationDetail({
           <div className="min-w-0">
             <h2 className="font-headline text-3xl font-bold tracking-tight text-on-surface truncate">
               {detail
-                ? (detail.lead?.name || detail.lead?.email || t("analytics.anonymousUser"))
+                ? identityDisplay?.primary
                 : t("analytics.operationalPreview")}
             </h2>
             
@@ -383,6 +410,11 @@ function ConversationDetail({
                 <span className="text-[11px] font-medium text-on-surface-variant">
                   {t("analytics.sessionInitialized")} {formatRelativeDate(detail.conversation.startedAt, language)}
                 </span>
+                {detail?.lead && (
+                  <span className="rounded-full bg-primary-container/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary-container">
+                    {t("analytics.leadCaptured")}
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -396,40 +428,41 @@ function ConversationDetail({
           </div>
         </div>
 
-        {/* Lead Contact Card (CRM Style) */}
-        {detail?.lead && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-primary-container/5 flex items-center justify-center text-primary-container">
-                <span className="material-symbols-outlined text-[18px]">mail</span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-tighter">Email</p>
-                <p className="text-[13px] font-medium text-on-surface truncate">{detail.lead.email}</p>
-              </div>
-            </div>
-            
-            {detail.lead.phone && (
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-primary-container/5 flex items-center justify-center text-primary-container">
-                  <span className="material-symbols-outlined text-[18px]">call</span>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-tighter">Phone</p>
-                  <p className="text-[13px] font-medium text-on-surface truncate">{detail.lead.phone}</p>
-                </div>
+        {/* Secondary contact details — name / phone / captured at only. Email is already shown as the heading above. */}
+        {showContactDetails && (
+          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+            {contactName && (
+              <div className="rounded-xl bg-surface-container-lowest border border-outline-variant/5 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/40">
+                  Name
+                </p>
+                <p className="mt-1 truncate text-[13px] font-semibold text-on-surface">
+                  {contactName}
+                </p>
               </div>
             )}
 
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-primary-container/5 flex items-center justify-center text-primary-container">
-                <span className="material-symbols-outlined text-[18px]">history</span>
+            {contactPhone && (
+              <div className="rounded-xl bg-surface-container-lowest border border-outline-variant/5 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/40">
+                  Phone
+                </p>
+                <p className="mt-1 truncate text-[13px] font-semibold text-on-surface">
+                  {contactPhone}
+                </p>
               </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-tighter">Captured</p>
-                <p className="text-[13px] font-medium text-on-surface truncate">{formatRelativeDate(detail.lead.createdAt, language)}</p>
+            )}
+
+            {capturedAt && (
+              <div className="rounded-xl bg-surface-container-lowest border border-outline-variant/5 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/40">
+                  Captured
+                </p>
+                <p className="mt-1 truncate text-[13px] font-semibold text-on-surface">
+                  {formatRelativeDate(capturedAt, language)}
+                </p>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -465,14 +498,16 @@ function ConversationDetail({
                       ? "bg-on-surface-variant/10 text-on-surface-variant ring-transparent" 
                       : "bg-primary-container text-white ring-primary-container/10"
                   }`}>
-                    {message.role === "user" ? (detail.lead?.name?.[0] || "U") : <span className="material-symbols-outlined text-sm">smart_toy</span>}
+                    {message.role === "user"
+                      ? (identityDisplay?.initials || "U")
+                      : <span className="material-symbols-outlined text-sm">smart_toy</span>}
                   </div>
                   
                   <div className={`space-y-3 ${message.role === "user" ? "text-right" : ""}`}>
                     <div className={`flex items-baseline gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
                       <span className={`font-headline font-bold text-[13px] ${message.role === "user" ? "text-on-surface" : "text-primary-container"}`}>
                         {message.role === "user"
-                          ? (detail.lead?.name || t("analytics.anonymousUser"))
+                          ? (identityDisplay?.primary || t("analytics.anonymousUser"))
                           : (detail.conversation.agentLabel || t("analytics.aiAgent"))}
                       </span>
                       <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">{formatRelativeDate(message.createdAt, language)}</span>

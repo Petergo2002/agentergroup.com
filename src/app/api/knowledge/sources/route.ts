@@ -1,11 +1,11 @@
+import { Buffer } from "node:buffer";
 import { NextRequest, NextResponse } from "next/server";
-import Firecrawl from "@mendable/firecrawl-js";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { KNOWLEDGE_BUCKET, SUPPORTED_KNOWLEDGE_MIME_TYPES } from "@/lib/knowledge";
+import { KNOWLEDGE_BUCKET } from "@/lib/knowledge";
 import type { KnowledgeSourceRecord, KnowledgeSourceType } from "@/lib/types";
 
-const SUPPORTED_MIME_SET = new Set<string>(SUPPORTED_KNOWLEDGE_MIME_TYPES);
+const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
@@ -31,6 +31,12 @@ function inferMimeType(fileName: string, mimeType: string) {
   }
 
   return "";
+}
+
+function buildStorageLimitError(storageLimitBytes: number) {
+  return `Storage limit exceeded. Your current plan allows ${
+    storageLimitBytes / 1024 / 1024
+  }MB total knowledge base storage.`;
 }
 
 export async function GET() {
@@ -96,8 +102,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: usageError.message }, { status: 500 });
   }
 
-  const currentTotalBytes = (usageData ?? []).reduce((acc, curr) => acc + (curr.file_size_bytes ?? 0), 0);
-  const storageLimit = context.subscription?.storage_limit_bytes ?? 10485760; // Default to 10MB if missing
+  const currentTotalBytes = (usageData ?? []).reduce(
+    (acc, curr) => acc + (curr.file_size_bytes ?? 0),
+    0,
+  );
+  const storageLimit =
+    context.subscription?.storage_limit_bytes ??
+    DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES;
 
   if (sourceType === "text") {
     const rawText = String(body.rawText ?? "").trim();
@@ -109,8 +120,8 @@ export async function POST(request: NextRequest) {
     const newSizeBytes = Buffer.byteLength(rawText, "utf8");
     if (currentTotalBytes + newSizeBytes > storageLimit) {
       return NextResponse.json(
-        { error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.` },
-        { status: 402 }
+        { error: buildStorageLimitError(storageLimit) },
+        { status: 402 },
       );
     }
 
@@ -136,16 +147,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const processResponse = await supabase.functions.invoke("process-knowledge-source", {
-      headers: session?.access_token
-        ? {
-            Authorization: `Bearer ${session.access_token}`,
-          }
-        : undefined,
-      body: {
-        sourceId: source.id,
+    const processResponse = await supabase.functions.invoke(
+      "process-knowledge-source",
+      {
+        headers: session?.access_token
+          ? {
+              Authorization: `Bearer ${session.access_token}`,
+            }
+          : undefined,
+        body: {
+          sourceId: source.id,
+        },
       },
-    });
+    );
 
     if (processResponse.error) {
       return NextResponse.json(
@@ -164,10 +178,15 @@ export async function POST(request: NextRequest) {
   }
 
   if (sourceType === "website") {
-    const url = String(body.url ?? "").trim();
+    let url = String(body.url ?? "").trim();
 
     if (!url) {
       return NextResponse.json({ error: "url is required for website sources." }, { status: 400 });
+    }
+
+    // Prepend https:// if no protocol is provided
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
     }
 
     try {
@@ -181,30 +200,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "FIRECRAWL_API_KEY is not configured." }, { status: 500 });
     }
 
-    const firecrawl = new Firecrawl({ apiKey: firecrawlApiKey });
-    let rawText = "";
+    const isPremium = context.subscription?.plan_tier === "premium";
+    const requestedLimit = Math.min(Math.max(Number(body.limit ?? 1), 1), 30);
+    const crawlLimit = isPremium ? requestedLimit : 1;
+    const selectedUrls = Array.isArray(body.urls) ? (body.urls as unknown[]).filter((u): u is string => typeof u === "string").slice(0, 30) : [];
 
-    try {
-      const scrapeResult = await firecrawl.scrape(url, { formats: ["markdown"] });
-      if (!scrapeResult.markdown) {
-        throw new Error("Failed to extract markdown from website.");
-      }
-      rawText = scrapeResult.markdown;
-    } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Failed to scrape website." },
-        { status: 500 }
-      );
-    }
-
-    const newSizeBytes = Buffer.byteLength(rawText, "utf8");
-    if (currentTotalBytes + newSizeBytes > storageLimit) {
-      return NextResponse.json(
-        { error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.` },
-        { status: 402 }
-      );
-    }
-
+    // Create the source immediately without waiting for Firecrawl
     const { data: source, error } = await supabase
       .from("knowledge_sources")
       .insert({
@@ -213,10 +214,15 @@ export async function POST(request: NextRequest) {
         name,
         description,
         source_type: "website",
-        raw_text: rawText,
-        file_size_bytes: newSizeBytes,
+        raw_text: "", // Will be filled by the edge function
+        file_size_bytes: 0,
         status: "pending",
-        metadata: { sourceUrl: url },
+        metadata: { 
+          sourceUrl: url,
+          crawlLimit,
+          selectedUrls,
+          isPremium 
+        },
       })
       .select()
       .single();
@@ -228,16 +234,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const processResponse = await supabase.functions.invoke("process-knowledge-source", {
-      headers: session?.access_token
-        ? {
-            Authorization: `Bearer ${session.access_token}`,
-          }
-        : undefined,
-      body: {
-        sourceId: source.id,
+    // Invoke the edge function which will now handle the scraping
+    const processResponse = await supabase.functions.invoke(
+      "process-knowledge-source",
+      {
+        headers: session?.access_token
+          ? {
+              Authorization: `Bearer ${session.access_token}`,
+            }
+          : undefined,
+        body: {
+          sourceId: source.id,
+        },
       },
-    });
+    );
 
     if (processResponse.error) {
       return NextResponse.json(
@@ -268,8 +278,8 @@ export async function POST(request: NextRequest) {
 
   if (currentTotalBytes + fileSizeBytes > storageLimit) {
     return NextResponse.json(
-      { error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.` },
-      { status: 402 }
+      { error: buildStorageLimitError(storageLimit) },
+      { status: 402 },
     );
   }
 

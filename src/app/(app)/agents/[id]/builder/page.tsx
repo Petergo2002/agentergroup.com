@@ -1974,6 +1974,7 @@ export default function AgentBuilderPage() {
       setStatusNote({ kind: 'lastSaved', date: new Date().toISOString() });
       showToast(t('agentBuilder.draftSaved'), 'success');
     } catch (error) {
+      await loadBuilder().catch(() => undefined);
       const message = error instanceof Error ? error.message : t('agentBuilder.saveError');
       showToast(message, 'error');
       throw error;

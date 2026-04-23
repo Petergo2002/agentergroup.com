@@ -1,36 +1,41 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+// @ts-expect-error -- npm: specifier is resolved by the Deno runtime, not the TS compiler
+import Firecrawl from "npm:@mendable/firecrawl-js";
 import { buildClientSafeError, json } from "../_shared/http.ts";
 import { chunkKnowledgeText, extractTextFromFile, normalizeKnowledgeText } from "../_shared/knowledge.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
 const model = new Supabase.ai.Session("gte-small");
+const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
+
+function buildStorageLimitError(storageLimitBytes: number) {
+  return `Storage limit exceeded. Your current plan allows ${
+    storageLimitBytes / 1024 / 1024
+  }MB total knowledge base storage.`;
+}
+
+function isEphemeralWidgetUploadSource(source: Record<string, unknown> | null) {
+  if (!source) {
+    return false;
+  }
+
+  const metadata =
+    source.metadata && typeof source.metadata === "object"
+      ? (source.metadata as Record<string, unknown>)
+      : null;
+
+  return (
+    metadata?.ephemeral === true &&
+    typeof source.widget_session_id === "string" &&
+    source.widget_session_id.length > 0
+  );
+}
 
 Deno.serve(async (request) => {
-  const authHeader = request.headers.get("Authorization");
-
-  if (!authHeader) {
-    return json({ error: "Missing Authorization header." }, 401);
-  }
-
-  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: authHeader,
-      },
-    },
-  });
   const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
-  const {
-    data: { user },
-    error: userError,
-  } = await userClient.auth.getUser();
-
-  if (userError || !user) {
-    return json({ error: "Unauthorized" }, 401);
-  }
-
   const body = await request.json().catch(() => ({}));
   const sourceId = String(body.sourceId ?? "").trim();
 
@@ -38,28 +43,176 @@ Deno.serve(async (request) => {
     return json({ error: "sourceId is required." }, 400);
   }
 
-  const { data: source, error: sourceError } = await userClient
+  const authHeader = request.headers.get("Authorization");
+  console.log(`[Process] Starting job for source: ${sourceId}`);
+
+  const { data: source, error: sourceError } = await adminClient
     .from("knowledge_sources")
     .select("*")
     .eq("id", sourceId)
     .single();
 
   if (sourceError || !source) {
+    console.error(`[Process] Source ${sourceId} not found:`, sourceError);
     return json({ error: "Knowledge source not found." }, 404);
+  }
+
+  const allowUnauthenticatedEphemeral = isEphemeralWidgetUploadSource(
+    source as Record<string, unknown>,
+  );
+
+  if (authHeader) {
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser();
+
+    if (userError || !user) {
+      console.error("[Process] Unauthorized access attempt:", userError);
+      return json({ error: "Unauthorized" }, 401);
+    }
+  } else if (!allowUnauthenticatedEphemeral) {
+    console.error("[Process] Missing Authorization header");
+    return json({ error: "Missing Authorization header." }, 401);
   }
 
   await adminClient
     .from("knowledge_sources")
-    .update({
-      status: "processing",
-      error_message: null,
-    })
+    .update({ status: "processing", error_message: null })
     .eq("id", sourceId);
 
   try {
-    let rawText = source.raw_text as string | null;
+    let finalRawText = source.raw_text as string | null;
 
-    if (source.source_type === "file") {
+    // Phase 1: Ingestion
+    if (source.source_type === "website" && (!finalRawText || finalRawText.trim() === "")) {
+      console.log(`[Process] Ingesting website source...`);
+      if (!firecrawlApiKey) {
+        throw new Error("FIRECRAWL_API_KEY is not configured in Supabase secrets.");
+      }
+
+      const firecrawl = new Firecrawl({ apiKey: firecrawlApiKey });
+      const metadata = source.metadata || {};
+      const url = metadata.sourceUrl;
+      const crawlLimit = metadata.crawlLimit || 1;
+      const selectedUrls = metadata.selectedUrls || [];
+      const isPremium = metadata.isPremium || false;
+
+      if (!url) throw new Error("Missing sourceUrl in website metadata.");
+
+      let targetUrl = url;
+      if (!/^https?:\/\//i.test(targetUrl)) targetUrl = `https://${targetUrl}`;
+
+      let scrapedText = "";
+
+      // Priority 1: User picked specific pages via the /map tool
+      // (The /map endpoint is already premium-gated so selectedUrls are always trusted)
+      if (selectedUrls.length > 0) {
+        console.log(`[Process] Scraping ${selectedUrls.length} selected URLs one by one...`);
+        const results: string[] = [];
+        for (const u of selectedUrls) {
+          let scrapeUrl = u;
+          if (!/^https?:\/\//i.test(scrapeUrl)) scrapeUrl = `https://${scrapeUrl}`;
+          
+          console.log(`[Process] Scraping individual URL: ${scrapeUrl}`);
+          try {
+            const res = await firecrawl.scrape(scrapeUrl, { formats: ["markdown"] });
+            if (res.markdown) {
+              results.push(res.markdown);
+              console.log(`[Process] Successfully scraped ${scrapeUrl} (${res.markdown.length} chars)`);
+            } else {
+              console.warn(`[Process] No markdown returned for ${scrapeUrl}`);
+            }
+          } catch (err) {
+            console.error(`[Process] Scrape error for ${scrapeUrl}:`, err);
+          }
+        }
+        scrapedText = results.join("\n\n---\n\n");
+      } else if (crawlLimit > 1 && isPremium) {
+        console.log(`[Process] Crawling website: ${targetUrl} (Limit: ${crawlLimit})`);
+        // firecrawl.crawl() polls until done and returns a CrawlJob ({ status, data[], total, completed })
+        const crawlResult = await firecrawl.crawl(targetUrl, {
+          limit: crawlLimit,
+          scrapeOptions: { formats: ["markdown"] },
+        });
+
+        // CrawlJob.status is 'completed' | 'failed' | 'cancelled' | 'scraping'
+        if (crawlResult.status === "failed" || crawlResult.status === "cancelled") {
+          console.error(`[Process] Crawl failed with status: ${crawlResult.status}`, crawlResult);
+          throw new Error(`Website crawl ended with status: ${crawlResult.status}`);
+        }
+
+        const pages = Array.isArray(crawlResult.data) ? crawlResult.data : [];
+        scrapedText = pages
+          .map((page: { markdown?: string }) => page.markdown)
+          .filter(Boolean)
+          .join("\n\n---\n\n");
+        console.log(`[Process] Crawl finished. Status: ${crawlResult.status}, pages: ${pages.length}/${crawlResult.total ?? '?'}.`);
+      } else {
+        console.log(`[Process] Scraping single page: ${targetUrl}`);
+        const scrapeResult = await firecrawl.scrape(targetUrl, { formats: ["markdown"] });
+        if (!scrapeResult.markdown) {
+          console.error(`[Process] Single scrape failed:`, scrapeResult);
+          throw new Error(`Failed to extract markdown from ${targetUrl}.`);
+        }
+        scrapedText = scrapeResult.markdown;
+        console.log(`[Process] Single scrape successful (${scrapedText.length} chars)`);
+      }
+
+      if (!scrapedText || scrapedText.trim().length === 0) {
+        throw new Error(`No readable content could be extracted from the website. Check if the URL is accessible.`);
+      }
+
+      const newSizeBytes = new TextEncoder().encode(scrapedText).length;
+      const subscriptionResult = await adminClient
+        .from("workspace_subscriptions")
+        .select("storage_limit_bytes")
+        .eq("workspace_id", source.workspace_id)
+        .maybeSingle();
+
+      if (subscriptionResult.error) {
+        throw new Error(`Failed to load workspace subscription: ${subscriptionResult.error.message}`);
+      }
+
+      const usageResult = await adminClient
+        .from("knowledge_sources")
+        .select("file_size_bytes")
+        .eq("workspace_id", source.workspace_id)
+        .neq("id", source.id);
+
+      if (usageResult.error) {
+        throw new Error(`Failed to load knowledge storage usage: ${usageResult.error.message}`);
+      }
+
+      const currentTotalBytes = (usageResult.data ?? []).reduce(
+        (total, row) => total + (row.file_size_bytes ?? 0),
+        0,
+      );
+      const storageLimitBytes =
+        subscriptionResult.data?.storage_limit_bytes ??
+        DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES;
+
+      if (currentTotalBytes + newSizeBytes > storageLimitBytes) {
+        throw new Error(buildStorageLimitError(storageLimitBytes));
+      }
+
+      console.log(`[Process] Saving extracted text to DB (${newSizeBytes} bytes)...`);
+      
+      const { error: updateError } = await adminClient
+        .from("knowledge_sources")
+        .update({
+          raw_text: scrapedText,
+          file_size_bytes: newSizeBytes,
+        })
+        .eq("id", source.id);
+
+      if (updateError) throw new Error(`DB Update Error: ${updateError.message}`);
+      finalRawText = scrapedText;
+    } else if (source.source_type === "file") {
+      console.log(`[Process] Processing file source...`);
       if (!source.storage_bucket || !source.storage_path || !source.mime_type) {
         throw new Error("File source is missing storage metadata.");
       }
@@ -73,56 +226,60 @@ Deno.serve(async (request) => {
       }
 
       const bytes = new Uint8Array(await download.data.arrayBuffer());
-      rawText = await extractTextFromFile(bytes, source.mime_type);
+      finalRawText = await extractTextFromFile(bytes, source.mime_type);
+      console.log(`[Process] File text extracted (${finalRawText?.length ?? 0} chars)`);
     }
 
-    const normalizedText = normalizeKnowledgeText(rawText ?? "");
+    // Phase 2: Processing
+    console.log(`[Process] Normalizing and chunking text...`);
+    const normalizedText = normalizeKnowledgeText(finalRawText ?? "");
     const chunks = chunkKnowledgeText(normalizedText);
 
     if (chunks.length === 0) {
-      throw new Error("No readable text was found in this source.");
+      console.error(`[Process] Zero chunks generated. Text length: ${finalRawText?.length ?? 0}`);
+      throw new Error("No readable text was found in this source after normalization.");
     }
 
+    console.log(`[Process] Generating embeddings for ${chunks.length} chunks...`);
     const chunkRows: Array<Record<string, unknown>> = [];
 
     for (const chunk of chunks) {
-      const embedding = await model.run(chunk.content, {
-        mean_pool: true,
-        normalize: true,
-      });
+      try {
+        const embedding = await model.run(chunk.content, {
+          mean_pool: true,
+          normalize: true,
+        });
 
-      chunkRows.push({
-        source_id: source.id,
-        workspace_id: source.workspace_id,
-        chunk_index: chunk.chunkIndex,
-        content: chunk.content,
-        content_length: chunk.contentLength,
-        embedding: JSON.stringify(embedding),
-        metadata: {
-          sourceType: source.source_type,
-          sourceName: source.name,
-          chunkIndex: chunk.chunkIndex,
-          contentLength: chunk.contentLength,
-          ingestionVersion: 1,
-        },
-      });
+        chunkRows.push({
+          source_id: source.id,
+          workspace_id: source.workspace_id,
+          chunk_index: chunk.chunkIndex,
+          content: chunk.content,
+          content_length: chunk.contentLength,
+          embedding: JSON.stringify(embedding),
+          metadata: {
+            sourceType: source.source_type,
+            sourceName: source.name,
+            chunkIndex: chunk.chunkIndex,
+            contentLength: chunk.contentLength,
+            ingestionVersion: 1,
+          },
+        });
+      } catch (embErr) {
+        console.error(`[Process] Embedding error for chunk ${chunk.chunkIndex}:`, embErr);
+        throw embErr;
+      }
     }
 
-    const deleteResult = await adminClient
-      .from("knowledge_chunks")
-      .delete()
-      .eq("source_id", source.id);
+    console.log(`[Process] Deleting old chunks...`);
+    await adminClient.from("knowledge_chunks").delete().eq("source_id", source.id);
 
-    if (deleteResult.error) {
-      throw deleteResult.error;
-    }
-
+    console.log(`[Process] Inserting ${chunkRows.length} new chunks...`);
     const insertResult = await adminClient.from("knowledge_chunks").insert(chunkRows);
+    if (insertResult.error) throw insertResult.error;
 
-    if (insertResult.error) {
-      throw insertResult.error;
-    }
-
+    // Phase 3: Finalize
+    console.log(`[Process] Finalizing source status...`);
     const updateResult = await adminClient
       .from("knowledge_sources")
       .update({
@@ -133,21 +290,14 @@ Deno.serve(async (request) => {
       })
       .eq("id", source.id);
 
-    if (updateResult.error) {
-      throw updateResult.error;
-    }
+    if (updateResult.error) throw updateResult.error;
 
-    return json({
-      ok: true,
-      sourceId: source.id,
-      chunkCount: chunkRows.length,
-    });
+    console.log(`[Process] Job completed successfully for source: ${sourceId}`);
+    return json({ ok: true, sourceId: source.id, chunkCount: chunkRows.length });
+
   } catch (error) {
-    const safeError = buildClientSafeError(
-      "process-knowledge-source",
-      error,
-      "Knowledge processing failed.",
-    );
+    console.error(`[Process] CRITICAL ERROR for source ${sourceId}:`, error);
+    
     await adminClient
       .from("knowledge_sources")
       .update({
@@ -155,8 +305,9 @@ Deno.serve(async (request) => {
         chunk_count: 0,
         error_message: error instanceof Error ? error.message : "Knowledge processing failed.",
       })
-      .eq("id", source.id);
+      .eq("id", sourceId);
 
+    const safeError = buildClientSafeError("process-knowledge-source", error, "Knowledge processing failed.");
     return json(safeError, 500);
   }
 });

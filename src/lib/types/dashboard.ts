@@ -47,6 +47,11 @@ export interface DashboardAnalyticsConversationListItem {
     email: string | null;
     phone: string | null;
   } | null;
+  identitySummary: {
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+  } | null;
 }
 
 export interface DashboardAnalyticsResponse {
@@ -99,6 +104,11 @@ export interface DashboardConversationDetailResponse {
     phone: string | null;
     message: string | null;
     createdAt: string;
+  } | null;
+  identitySummary: {
+    name: string | null;
+    email: string | null;
+    phone: string | null;
   } | null;
   transcript: Array<{
     id: string;

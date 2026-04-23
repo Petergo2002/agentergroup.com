@@ -50,12 +50,14 @@ export async function POST(
     ),
   );
 
-  const { data: agents, error: agentsError } = await supabase
-    .from("agents")
-    .select("*")
-    .eq("workspace_id", context.workspace.id)
-    .eq("surface", "widget")
-    .in("id", requestedAgentIds);
+  const { data: agents, error: agentsError } = requestedAgentIds.length
+    ? await supabase
+        .from("agents")
+        .select("*")
+        .eq("workspace_id", context.workspace.id)
+        .eq("surface", "widget")
+        .in("id", requestedAgentIds)
+    : { data: [], error: null };
 
   if (agentsError) {
     return NextResponse.json(
@@ -82,20 +84,6 @@ export async function POST(
   const removedWidgetAgentIds = loaded.widgetAgents
     .filter(({ widgetAgent }) => !requestedAgentIdSet.has(widgetAgent.agent_id))
     .map(({ widgetAgent }) => widgetAgent.id);
-
-  if (removedWidgetAgentIds.length > 0) {
-    const { error: deleteError } = await supabase
-      .from("widget_agents")
-      .delete()
-      .in("id", removedWidgetAgentIds);
-
-    if (deleteError) {
-      return NextResponse.json(
-        { error: deleteError.message || "Failed to remove attached agents." },
-        { status: 500 },
-      );
-    }
-  }
 
   if (items.length > 0) {
     const rows = items.map((item, index) => {
@@ -149,6 +137,20 @@ export async function POST(
     if (upsertError) {
       return NextResponse.json(
         { error: upsertError.message || "Failed to save attached agents." },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (removedWidgetAgentIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("widget_agents")
+      .delete()
+      .in("id", removedWidgetAgentIds);
+
+    if (deleteError) {
+      return NextResponse.json(
+        { error: deleteError.message || "Failed to remove attached agents." },
         { status: 500 },
       );
     }

@@ -385,52 +385,61 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
     if (!form) return false;
     setIsSaving(true);
     try {
-      const [identityResponse, agentsResponse] = await Promise.all([
-        fetch(`/api/widgets/${widgetId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: form.name,
-            brandName: form.brandName,
-            logoUrl: form.logoUrl,
-            primaryColor: form.primaryColor,
-            secondaryColor: form.secondaryColor,
-            theme: form.theme,
-            language: form.language,
-            homeTitle: form.homeTitle || null,
-            homeSubtitle: form.homeSubtitle || null,
-            hostedEnabled: form.hostedEnabled,
-            showBranding: form.showBranding,
-            privacyPolicyUrl: form.privacyPolicyUrl,
-            allowedOrigins: form.allowedOrigins,
-          }),
+      const agentsResponse = await fetch(`/api/widgets/${widgetId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agents: attachedAgents.map((item, index) => ({
+            agentId: item.agentId,
+            label: item.label,
+            description: item.description,
+            icon: item.icon || null,
+            sortOrder: index,
+            interactionMode: item.interactionMode,
+            greeting: item.greeting,
+            placeholder: item.placeholder,
+            showQuickActions: item.showQuickActions,
+            quickActions: item.quickActions,
+            contactFormSettings: item.contactFormSettings,
+          })),
         }),
-        fetch(`/api/widgets/${widgetId}/agents`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agents: attachedAgents.map((item, index) => ({
-              agentId: item.agentId,
-              label: item.label,
-              description: item.description,
-              icon: item.icon || null,
-              sortOrder: index,
-              interactionMode: item.interactionMode,
-              greeting: item.greeting,
-              placeholder: item.placeholder,
-              showQuickActions: item.showQuickActions,
-              quickActions: item.quickActions,
-              contactFormSettings: item.contactFormSettings,
-            })),
-          }),
-        }),
-      ]);
+      });
+      const agentsPayload = await agentsResponse.json().catch(() => null);
 
-      if (!identityResponse.ok || !agentsResponse.ok) throw new Error(t('widgetBuilder.saveError'));
+      if (!agentsResponse.ok) {
+        throw new Error(agentsPayload?.error || t('widgetBuilder.saveError'));
+      }
+
+      const identityResponse = await fetch(`/api/widgets/${widgetId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          brandName: form.brandName,
+          logoUrl: form.logoUrl,
+          primaryColor: form.primaryColor,
+          secondaryColor: form.secondaryColor,
+          theme: form.theme,
+          language: form.language,
+          homeTitle: form.homeTitle || null,
+          homeSubtitle: form.homeSubtitle || null,
+          hostedEnabled: form.hostedEnabled,
+          showBranding: form.showBranding,
+          privacyPolicyUrl: form.privacyPolicyUrl,
+          allowedOrigins: form.allowedOrigins,
+        }),
+      });
+      const identityPayload = await identityResponse.json().catch(() => null);
+
+      if (!identityResponse.ok) {
+        throw new Error(identityPayload?.error || t('widgetBuilder.saveError'));
+      }
+
       if (options?.reloadAfterSave ?? true) await loadWidget();
       if (options?.showSuccessToast ?? true) showToast(t('widgetBuilder.saved'), 'success');
       return true;
     } catch (error) {
+      await loadWidget().catch(() => undefined);
       showToast(error instanceof Error ? error.message : t('widgetBuilder.saveError'), 'error');
       return false;
     } finally {

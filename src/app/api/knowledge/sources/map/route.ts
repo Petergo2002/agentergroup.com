@@ -1,0 +1,93 @@
+import { NextRequest, NextResponse } from "next/server";
+import Firecrawl from "@mendable/firecrawl-js";
+import { createClient } from "@/lib/supabase/server";
+import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+
+export async function POST(request: NextRequest) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const context = await ensureWorkspaceContext(supabase as never, user);
+  
+  // Only allow premium users to use the map feature
+  if (context.subscription?.plan_tier !== "premium") {
+    return NextResponse.json({ error: "Sitemap mapping is a premium feature." }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  let url = String(body.url ?? "").trim();
+
+  if (!url) {
+    return NextResponse.json({ error: "URL is required." }, { status: 400 });
+  }
+
+  // Prepend https:// if no protocol is provided
+  if (!/^https?:\/\//i.test(url)) {
+    url = `https://${url}`;
+  }
+
+  try {
+    new URL(url);
+  } catch {
+    return NextResponse.json({ error: "Invalid URL provided." }, { status: 400 });
+  }
+
+  const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+  if (!firecrawlApiKey) {
+    return NextResponse.json({ error: "FIRECRAWL_API_KEY is not configured." }, { status: 500 });
+  }
+
+  const firecrawl = new Firecrawl({ apiKey: firecrawlApiKey });
+
+  try {
+    console.log(`[Firecrawl Map] Mapping URL: ${url}`);
+    
+    if (typeof firecrawl.map !== 'function') {
+      console.error(`[Firecrawl Map] firecrawl.map is not a function. Available methods:`, Object.keys(firecrawl));
+      throw new Error("Firecrawl SDK error: map method not found.");
+    }
+
+    const mapResult = await firecrawl.map(url, {
+      includeSubdomains: false,
+    });
+    const mapResultRecord = mapResult as typeof mapResult & {
+      success?: boolean;
+      error?: string;
+    };
+
+    // Handle cases where the SDK might return links even if success property is missing
+    const hasLinks = Array.isArray(mapResult.links);
+    const isSuccessful =
+      mapResultRecord.success === true ||
+      (mapResultRecord.success === undefined && hasLinks);
+
+    if (!isSuccessful) {
+      console.error(`[Firecrawl Map] Error result:`, mapResult);
+      throw new Error(mapResultRecord.error || "Failed to map website.");
+    }
+
+    // Filter out common useless URLs and normalize to strings
+    const rawLinks = (mapResult.links ?? []).slice(0, 500);
+    const links = (rawLinks as unknown[]).map((item) => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object' && 'url' in item && typeof item.url === 'string') return item.url;
+      return null;
+    }).filter((u): u is string => u !== null);
+
+    console.log(`[Firecrawl Map] Found ${links.length} valid links`);
+
+    return NextResponse.json({ links });
+  } catch (error) {
+    console.error(`[Firecrawl Map] Caught error:`, error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to map website." },
+      { status: 500 }
+    );
+  }
+}

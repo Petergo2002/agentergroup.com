@@ -13,6 +13,7 @@ import {
   TriangleAlert,
   Upload,
   Database,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import { AppIcon } from "@/components/icons/AppIcon";
@@ -84,6 +85,10 @@ export default function KnowledgePageClient({
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [websiteName, setWebsiteName] = useState("");
   const [websiteDescription, setWebsiteDescription] = useState("");
+  const [discoveredUrls, setDiscoveredUrls] = useState<string[]>([]);
+  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
+  const [isMappingWebsite, setIsMappingWebsite] = useState(false);
+  const [pageSearch, setPageSearch] = useState("");
   const [isScrapingWebsite, setIsScrapingWebsite] = useState(false);
   const isLoading = false;
   const [isCreatingText, setIsCreatingText] = useState(false);
@@ -116,9 +121,15 @@ export default function KnowledgePageClient({
       (s) =>
         s.name.toLowerCase().includes(search) ||
         s.description?.toLowerCase().includes(search) ||
-        s.source_type.toLowerCase().includes(search),
+        s.metadata?.sourceUrl != null && typeof s.metadata.sourceUrl === "string" && s.metadata.sourceUrl.toLowerCase().includes(search),
     );
   }, [sources, sourceSearch]);
+
+  const filteredDiscoveredUrls = useMemo(() => {
+    if (!pageSearch.trim()) return discoveredUrls;
+    const search = pageSearch.toLowerCase();
+    return discoveredUrls.filter((url) => url.toLowerCase().includes(search));
+  }, [discoveredUrls, pageSearch]);
 
   const storageStats = useMemo(() => {
     const usedBytes = sources.reduce((acc, curr) => acc + (curr.file_size_bytes ?? 0), 0);
@@ -313,17 +324,66 @@ export default function KnowledgePageClient({
     }
   };
 
+  const handleFindPages = async () => {
+    let targetUrl = websiteUrl.trim();
+    if (!targetUrl) {
+      showToast(t("knowledge.missingUrl"), "error");
+      return;
+    }
+
+    // Prepend https:// if no protocol is provided
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = `https://${targetUrl}`;
+    }
+
+    try {
+      new URL(targetUrl);
+    } catch {
+      showToast(t("knowledge.missingUrl"), "error");
+      return;
+    }
+
+    setIsMappingWebsite(true);
+    setDiscoveredUrls([]);
+    setSelectedUrls([]);
+
+    try {
+      const response = await fetch("/api/knowledge/sources/map", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: targetUrl }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || t("knowledge.scrapeError"));
+
+      setDiscoveredUrls(data.links || []);
+      if (data.links?.length === 0) {
+        showToast(t("knowledge.noPagesFound"), "info");
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t("knowledge.scrapeError"), "error");
+    } finally {
+      setIsMappingWebsite(false);
+    }
+  };
+
   const handleScrapeWebsite = async () => {
-    const trimmedUrl = websiteUrl.trim();
+    let targetUrl = websiteUrl.trim();
     const trimmedName = websiteName.trim();
 
-    if (!trimmedUrl || !trimmedName) {
+    if (!targetUrl || !trimmedName) {
       showToast(t("knowledge.missingTextNameOrContent"), "error");
       return;
     }
 
+    // Prepend https:// if no protocol is provided
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = `https://${targetUrl}`;
+    }
+
     try {
-      new URL(trimmedUrl);
+      new URL(targetUrl);
     } catch {
       showToast(t("knowledge.missingUrl"), "error");
       return;
@@ -341,7 +401,8 @@ export default function KnowledgePageClient({
           name: trimmedName,
           description: websiteDescription.trim(),
           sourceType: "website",
-          url: trimmedUrl,
+          url: targetUrl,
+          urls: selectedUrls,
         }),
       });
       const payload = await response.json();
@@ -353,6 +414,8 @@ export default function KnowledgePageClient({
       setWebsiteUrl("");
       setWebsiteName("");
       setWebsiteDescription("");
+      setDiscoveredUrls([]);
+      setSelectedUrls([]);
       await loadSources();
       showToast(t("knowledge.websiteScraped"), "success");
     } catch (error) {
@@ -611,19 +674,140 @@ export default function KnowledgePageClient({
                     />
                   </div>
                 </div>
+
                 <div className="space-y-1.5 focus-within:text-primary transition-colors">
                   <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.websiteUrl")}</label>
-                  <input
-                    value={websiteUrl}
-                    onChange={(event) => setWebsiteUrl(event.target.value)}
-                    placeholder={t("knowledge.urlPlaceholder")}
-                    className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      value={websiteUrl}
+                      onChange={(event) => setWebsiteUrl(event.target.value)}
+                      placeholder={t("knowledge.urlPlaceholder")}
+                      className="flex-1 rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                    />
+                    <button
+                      onClick={() => void handleFindPages()}
+                      disabled={isMappingWebsite || !websiteUrl}
+                      className="bg-primary/10 text-primary px-6 rounded-md text-[10px] font-bold uppercase tracking-widest hover:bg-primary/18 transition-all disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {isMappingWebsite ? (
+                        <>
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                          <span>{t("knowledge.findingPages")}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-3 h-3" />
+                          <span>{t("knowledge.findPages")}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {subscription?.plan_tier !== "premium" && (
+                    <p className="text-[10px] text-primary font-medium ml-1 mt-1 flex items-center gap-1">
+                      <TriangleAlert className="w-3 h-3" />
+                      {t("knowledge.premiumOnly")} - {t("knowledge.sitemapRequiredForMulti")}
+                    </p>
+                  )}
+                  {discoveredUrls.length === 0 && (
+                    <p className="text-[10px] text-on-surface-variant/60 ml-1 mt-2 italic">
+                      {t("knowledge.singlePageDirectHint")}
+                    </p>
+                  )}
                 </div>
+
+                {discoveredUrls.length > 0 && (
+                  <div className="space-y-3 p-4 bg-surface-container rounded-lg border border-outline-variant/20 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-outline-variant/10">
+                      <Database className="w-3 h-3 text-primary" />
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface">
+                        {t("knowledge.multiPageMode")}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 flex-1">
+                        <Search className="w-3.5 h-3.5 text-on-surface-variant/40" />
+                        <input
+                          value={pageSearch}
+                          onChange={(e) => setPageSearch(e.target.value)}
+                          placeholder={t("knowledge.searchPages")}
+                          className="bg-transparent text-xs outline-none flex-1"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setSelectedUrls(discoveredUrls.slice(0, 30))}
+                          className="text-[9px] font-bold uppercase tracking-wider text-primary hover:underline"
+                        >
+                          {t("knowledge.selectAll")}
+                        </button>
+                        <button
+                          onClick={() => setSelectedUrls([])}
+                          className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/60 hover:underline"
+                        >
+                          {t("knowledge.deselectAll")}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto space-y-1 custom-scrollbar pr-1">
+                      {filteredDiscoveredUrls.length > 0 ? (
+                        filteredDiscoveredUrls.map((url) => {
+                          const isSelected = selectedUrls.includes(url);
+                          const isDisabled = !isSelected && selectedUrls.length >= 30;
+                          return (
+                            <label
+                              key={url}
+                              className={`flex items-center gap-3 p-2 rounded-md transition-all cursor-pointer ${
+                                isSelected 
+                                  ? "bg-primary/8 text-primary" 
+                                  : "hover:bg-surface-container-highest text-on-surface-variant/80"
+                              } ${isDisabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                disabled={isDisabled}
+                                onChange={() => {
+                                  if (isSelected) {
+                                    setSelectedUrls(selectedUrls.filter((u) => u !== url));
+                                  } else if (selectedUrls.length < 30) {
+                                    setSelectedUrls([...selectedUrls, url]);
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 rounded border-outline-variant/50 text-primary focus:ring-primary/40 transition-all cursor-pointer"
+                              />
+                              <span className="text-[11px] truncate flex-1">{url}</span>
+                            </label>
+                          );
+                        })
+                      ) : (
+                        <div className="py-8 text-center">
+                          <p className="text-xs text-on-surface-variant/50">{t("knowledge.noPagesFound")}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className={`text-[9px] font-bold uppercase tracking-widest ${selectedUrls.length >= 30 ? "text-error" : "text-primary"}`}>
+                        {selectedUrls.length >= 30 ? t("knowledge.maxPagesReached") : t("knowledge.pagesSelected", { count: selectedUrls.length })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {isScrapingWebsite && (selectedUrls.length > 1) && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 rounded-md border border-primary/10 animate-pulse">
+                    <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                    <p className="text-[10px] text-primary font-medium">
+                      {t("knowledge.crawlingWait")}
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex justify-end pt-2">
                   <button
                     onClick={() => void handleScrapeWebsite()}
-                    disabled={isScrapingWebsite || !websiteName || !websiteUrl}
+                    disabled={isScrapingWebsite || !websiteName || !websiteUrl || (discoveredUrls.length > 0 && selectedUrls.length === 0)}
                     className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:bg-slate-50 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                   >
                     {isScrapingWebsite ? t("knowledge.scraping") : t("knowledge.finishAndSync")}

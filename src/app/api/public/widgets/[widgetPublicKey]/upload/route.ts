@@ -220,12 +220,30 @@ export async function POST(
 
     if (isPdf || isText) {
       try {
+        const workspaceResult = await supabase
+          .from("workspaces")
+          .select("owner_id")
+          .eq("id", loaded.widget.workspace_id)
+          .maybeSingle();
+        const workspaceOwner = workspaceResult.data as
+          | { owner_id: string | null }
+          | null;
+
+        if (workspaceResult.error || !workspaceOwner?.owner_id) {
+          throw new Error(
+            workspaceResult.error?.message ||
+              "Could not resolve the workspace owner for ephemeral knowledge.",
+          );
+        }
+
         const effectiveMimeType = isPdf ? 'application/pdf' : 'text/plain';
         const { data: source, error: sourceError } = await supabase
           .from('knowledge_sources')
           .insert({
             workspace_id: loaded.widget.workspace_id,
+            created_by: workspaceOwner.owner_id,
             name: file.name,
+            description: "",
             source_type: 'file',
             status: 'pending',
             storage_bucket: 'widget-attachments',

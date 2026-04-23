@@ -94,6 +94,19 @@ interface DashboardCursorPayload {
   widgetSessionId: string;
 }
 
+interface AnalyticsIdentitySummary {
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+const EMAIL_PATTERN =
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
+const STRUCTURED_NAME_PATTERN =
+  /\b(?:name|namn)\s*[:\-]\s*([^\n,]+?)(?=(?:\s+(?:email|e-post|mail)\b)|$)/i;
+const INTRO_NAME_PATTERN =
+  /\b(?:my name is|this is|jag heter|mitt namn är)\s+([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,79})/i;
+
 function chunkArray<T>(items: T[], chunkSize: number) {
   const chunks: T[][] = [];
 
@@ -124,6 +137,65 @@ function trimSnippet(content: string | null | undefined, maxLength = 120) {
     : normalized;
 }
 
+function normalizeIdentityName(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value
+    .replace(/\s+/g, " ")
+    .replace(/[.!?;,:\-–—]+$/, "")
+    .trim();
+
+  if (!normalized || normalized.length < 2 || normalized.length > 80) {
+    return null;
+  }
+
+  if (EMAIL_PATTERN.test(normalized) || /\d/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function extractIdentityFromText(content: string | null | undefined) {
+  const normalized = (content ?? "").replace(/\s+/g, " ").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const emailMatch = normalized.match(EMAIL_PATTERN);
+  const structuredNameMatch = normalized.match(STRUCTURED_NAME_PATTERN);
+  const introNameMatch = normalized.match(INTRO_NAME_PATTERN);
+  const name =
+    normalizeIdentityName(structuredNameMatch?.[1]) ??
+    normalizeIdentityName(introNameMatch?.[1]);
+  const email = emailMatch?.[0]?.trim().toLowerCase() ?? null;
+
+  if (!name && !email) {
+    return null;
+  }
+
+  return {
+    name,
+    email,
+    phone: null,
+  } satisfies AnalyticsIdentitySummary;
+}
+
+function buildDisplayIdentitySummary(summary: AnalyticsIdentitySummary | null) {
+  if (!summary) {
+    return null;
+  }
+
+  if (summary.name || summary.email || summary.phone) {
+    return summary;
+  }
+
+  return null;
+}
+
 function compareConversationRows(
   left: DashboardAnalyticsConversationListItem,
   right: DashboardAnalyticsConversationListItem,
@@ -148,6 +220,8 @@ function matchesSearch(
     row.agentLabel,
     row.agentName,
     row.latestSnippet,
+    row.identitySummary?.name,
+    row.identitySummary?.email,
     row.leadSummary?.name,
     row.leadSummary?.email,
   ]
@@ -685,6 +759,13 @@ export async function listDashboardConversations(
       latestCreatedAt: string | null;
     }
   >();
+  const inferredIdentityBySessionId = new Map<
+    string,
+    {
+      identitySummary: AnalyticsIdentitySummary;
+      latestCreatedAt: string | null;
+    }
+  >();
 
   for (const lead of leads) {
     if (!lead.widget_session_id) {
@@ -710,6 +791,27 @@ export async function listDashboardConversations(
     leadSummaryBySessionId.set(lead.widget_session_id, current);
   }
 
+  for (const message of messages) {
+    if (message.role !== "user") {
+      continue;
+    }
+
+    const identity = extractIdentityFromText(message.content);
+
+    if (!identity) {
+      continue;
+    }
+
+    const current = inferredIdentityBySessionId.get(message.widget_session_id);
+
+    if (!current || !current.latestCreatedAt || message.created_at > current.latestCreatedAt) {
+      inferredIdentityBySessionId.set(message.widget_session_id, {
+        identitySummary: identity,
+        latestCreatedAt: message.created_at,
+      });
+    }
+  }
+
   const allRows = candidateSessions
     .map((session) => {
       const widget = widgetById.get(session.widget_id);
@@ -731,6 +833,11 @@ export async function listDashboardConversations(
         : null;
       const messageSummary = messageSummaryBySessionId.get(session.id);
       const leadSummary = leadSummaryBySessionId.get(session.id);
+      const identitySummary = buildDisplayIdentitySummary(
+        leadSummary?.leadSummary ??
+          inferredIdentityBySessionId.get(session.id)?.identitySummary ??
+          null,
+      );
 
       return {
         widgetSessionId: session.id,
@@ -755,6 +862,7 @@ export async function listDashboardConversations(
         hasLead: (leadSummary?.leadCount ?? 0) > 0,
         leadCount: leadSummary?.leadCount ?? 0,
         leadSummary: leadSummary?.leadSummary ?? null,
+        identitySummary,
       } satisfies DashboardAnalyticsConversationListItem;
     })
     .filter(Boolean) as DashboardAnalyticsConversationListItem[];
@@ -889,6 +997,29 @@ export async function getDashboardConversationDetail(
       : null);
 
   const agent = (agentResult.data ?? null) as AnalyticsAgentRow | null;
+  const transcriptRows = (transcriptData.data ?? []) as AnalyticsTranscriptRow[];
+  let inferredIdentitySummary: AnalyticsIdentitySummary | null = null;
+
+  for (const message of [...transcriptRows].reverse()) {
+    if (message.role !== "user") {
+      continue;
+    }
+
+    inferredIdentitySummary = extractIdentityFromText(message.content);
+
+    if (inferredIdentitySummary) {
+      break;
+    }
+  }
+
+  const resolvedIdentitySummary = buildDisplayIdentitySummary(inferredIdentitySummary);
+  const leadSummary = leadData.data
+    ? {
+        name: leadData.data.name,
+        email: leadData.data.email,
+        phone: leadData.data.phone,
+      }
+    : null;
 
   return buildConversationDetailForViewer({
     conversation: {
@@ -917,8 +1048,9 @@ export async function getDashboardConversationDetail(
           createdAt: leadData.data.created_at,
         }
       : null,
+    identitySummary: buildDisplayIdentitySummary(leadSummary ?? resolvedIdentitySummary),
     transcript: buildTranscriptWithDebugTrace(
-      (transcriptData.data ?? []) as AnalyticsTranscriptRow[],
+      transcriptRows,
     ),
   }, input.viewerRole);
 }
