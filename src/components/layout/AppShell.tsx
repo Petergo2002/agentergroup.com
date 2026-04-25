@@ -26,9 +26,9 @@ export function AppShell({ children, context, user }: AppShellProps) {
   useEffect(() => {
     const saved = localStorage.getItem("agenter_sidebar_collapsed") === "true";
     if (saved) {
-      setTimeout(() => setIsSidebarCollapsed(true), 0);
+      setIsSidebarCollapsed(true);
     }
-    setTimeout(() => setMounted(true), 0);
+    setMounted(true);
   }, []);
 
   const toggleSidebarCollapse = () => {
