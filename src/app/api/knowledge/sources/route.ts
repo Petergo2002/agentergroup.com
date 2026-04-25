@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import Firecrawl from "@mendable/firecrawl-js";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { KNOWLEDGE_BUCKET, SUPPORTED_KNOWLEDGE_MIME_TYPES } from "@/lib/knowledge";
+import { KNOWLEDGE_BUCKET } from "@/lib/knowledge";
 import type { KnowledgeSourceRecord, KnowledgeSourceType } from "@/lib/types";
-
-const SUPPORTED_MIME_SET = new Set<string>(SUPPORTED_KNOWLEDGE_MIME_TYPES);
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();

@@ -237,6 +237,8 @@ export function ViewSourceModal({ isOpen, onClose, source, onSourceUpdated }: Vi
             src={content.url}
             alt={content.name}
             className="max-h-full max-w-full object-contain"
+            loading="lazy"
+            decoding="async"
           />
         </div>
       );

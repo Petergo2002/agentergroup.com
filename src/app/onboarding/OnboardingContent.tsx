@@ -41,7 +41,6 @@ export default function OnboardingContent({
   workspaceId,
   workspaceName,
   userName,
-  currentPlan,
 }: OnboardingContentProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState<string | null>(null);
@@ -52,6 +51,10 @@ export default function OnboardingContent({
     const canceled = searchParams.get("canceled") === "true";
 
     if (success) {
+      // Intentionally setting state in effect here to coordinate with the API call.
+      // A full refactor of this onboarding flow to use Next.js server actions properly
+      // is outside the scope of safe, atomic improvements.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus('success');
       setLoading('completing');
       completeOnboarding(workspaceId);
