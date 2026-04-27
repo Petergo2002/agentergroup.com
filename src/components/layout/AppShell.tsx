@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
@@ -22,6 +22,8 @@ export function AppShell({ children, context, user }: AppShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("agenter_sidebar_collapsed") === "true";
@@ -36,6 +38,75 @@ export function AppShell({ children, context, user }: AppShellProps) {
     setIsSidebarCollapsed(newState);
     localStorage.setItem("agenter_sidebar_collapsed", String(newState));
   };
+
+  const closeMobileSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+    previouslyFocusedRef.current?.focus();
+    previouslyFocusedRef.current = null;
+  }, []);
+
+  const openMobileSidebar = useCallback(() => {
+    previouslyFocusedRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setIsSidebarOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+
+    const drawer = mobileDrawerRef.current;
+    if (!drawer) return;
+
+    const focusableSelector = [
+      "a[href]",
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(",");
+
+    const getFocusableElements = () =>
+      Array.from(drawer.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) => !element.hasAttribute("aria-hidden"),
+      );
+
+    const focusableElements = getFocusableElements();
+    (focusableElements[0] ?? drawer).focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMobileSidebar();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const elements = getFocusableElements();
+      if (elements.length === 0) {
+        event.preventDefault();
+        drawer.focus();
+        return;
+      }
+
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeMobileSidebar, isSidebarOpen]);
 
   const pathname = usePathname();
   const isFocusedAgentRoute =
@@ -66,23 +137,31 @@ export function AppShell({ children, context, user }: AppShellProps) {
                 className={`fixed inset-0 z-40 bg-black/60 transition-opacity duration-200 lg:hidden ${
                   isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
                 }`}
-                onClick={() => setIsSidebarOpen(false)}
+                onClick={closeMobileSidebar}
               />
 
               <div
+                ref={mobileDrawerRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="mobile-navigation-title"
+                tabIndex={-1}
                 className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transition-transform duration-200 lg:hidden ${
                   isSidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
               >
+                <h2 id="mobile-navigation-title" className="sr-only">
+                  Navigation
+                </h2>
                 <Sidebar
                   mobile
-                  onNavigate={() => setIsSidebarOpen(false)}
+                  onNavigate={closeMobileSidebar}
                   userEmail={user.email}
                 />
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                <Topbar onOpenSidebar={() => setIsSidebarOpen(true)} />
+                <Topbar onOpenSidebar={openMobileSidebar} />
                 <main
                   className={`flex-1 w-full ${
                     isAnalyticsRoute ? "overflow-hidden" : "overflow-y-auto"

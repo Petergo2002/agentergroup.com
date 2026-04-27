@@ -10,12 +10,10 @@ import {
   MessageCircle,
   MessageSquare,
   Network,
-  Settings,
   Database,
   X,
   ChevronLeft,
   ChevronRight,
-  type LucideIcon,
 } from "lucide-react";
 import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
@@ -79,12 +77,6 @@ export function Sidebar({
           : []),
       ],
     },
-    {
-      title: t("nav.groups.configuration"),
-      items: [
-        { name: t("nav.settings"), href: "/settings", icon: Settings },
-      ],
-    },
   ];
 
   return (
@@ -124,6 +116,7 @@ export function Sidebar({
             <button
               onClick={onToggleCollapse}
               className="flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+              aria-label={isCollapsed ? t("common.expand") : t("common.collapse")}
               title={isCollapsed ? t("common.expand") : t("common.collapse")}
             >
               {isCollapsed ? (
@@ -167,6 +160,16 @@ export function Sidebar({
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
+                  aria-label={
+                    isCollapsed && !mobile
+                      ? `${item.name}${item.beta ? ` (${t("common.beta")})` : ""}`
+                      : undefined
+                  }
+                  title={
+                    isCollapsed && !mobile
+                      ? `${item.name}${item.beta ? ` (${t("common.beta")})` : ""}`
+                      : undefined
+                  }
                   className={`group relative flex items-center gap-3 rounded-xl py-3 transition-all duration-200 ${
                     isCollapsed && !mobile ? 'justify-center px-0' : 'px-4'
                   } ${
@@ -201,7 +204,7 @@ export function Sidebar({
 
                   {/* Tooltip for collapsed mode */}
                   {isCollapsed && !mobile && (
-                    <div className="fixed left-[70px] rounded-md bg-on-surface px-3 py-2 text-xs font-bold text-background opacity-0 shadow-xl ring-1 ring-outline-variant pointer-events-none transition-opacity duration-200 group-hover:opacity-100 z-[9999] whitespace-nowrap">
+                    <div className="fixed left-[70px] rounded-md bg-on-surface px-3 py-2 text-xs font-bold text-background opacity-0 shadow-xl ring-1 ring-outline-variant pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 z-[9999] whitespace-nowrap">
                       {item.name}
                       {item.beta && ` (${t("common.beta")})`}
                     </div>
@@ -282,7 +285,11 @@ export function Sidebar({
           </div>
         )}
 
-        <WorkspaceSwitcher isCollapsed={isCollapsed} mobile={mobile} />
+        <WorkspaceSwitcher
+          isCollapsed={isCollapsed}
+          mobile={mobile}
+          onNavigate={onNavigate}
+        />
       </div>
     </aside>
   );

@@ -6,6 +6,7 @@ export const knowledge = {
   createTextError: "Det gick inte att skapa textkällan.",
   textCreated: "Textkälla skapad och köad för bearbetning.",
   missingFileNameOrFile: "Välj en fil och ge den ett namn först.",
+  unsupportedFileType: "Filtypen stöds inte. Ladda upp TXT-, MD- eller PDF-filer.",
   createFileError: "Det gick inte att skapa filkällan.",
   processStartError: "Det gick inte att starta kunskapsbearbetningen.",
   fileUploaded: "Fil uppladdad och köad för bearbetning.",

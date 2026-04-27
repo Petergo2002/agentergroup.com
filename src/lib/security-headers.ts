@@ -15,13 +15,17 @@ export function buildAppContentSecurityPolicy() {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     "https://rklntfzmqayziqesjoih.supabase.co",
   );
+  const scriptSrc =
+    process.env.NODE_ENV === "development"
+      ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${widgetAppOrigin}`
+      : `script-src 'self' ${widgetAppOrigin}`;
 
   return [
     "default-src 'self'",
     "base-uri 'self'",
-    `object-src 'self' ${supabaseOrigin}`,
+    "object-src 'none'",
     "frame-ancestors 'none'",
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${widgetAppOrigin}`,
+    scriptSrc,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com data:`,
     "img-src 'self' data: blob: https:",

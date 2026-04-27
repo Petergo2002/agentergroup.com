@@ -5,6 +5,7 @@ export const knowledge = {
   createTextError: "Failed to create text knowledge source.",
   textCreated: "Text source created and queued for processing.",
   missingFileNameOrFile: "Choose a file and give it a name first.",
+  unsupportedFileType: "Unsupported file type. Upload TXT, MD, or PDF files.",
   createFileError: "Failed to create file knowledge source.",
   processStartError: "Failed to start knowledge processing.",
   fileUploaded: "File uploaded and queued for processing.",

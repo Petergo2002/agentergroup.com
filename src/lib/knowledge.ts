@@ -15,6 +15,40 @@ export const SUPPORTED_KNOWLEDGE_MIME_TYPES = [
 
 export const SUPPORTED_KNOWLEDGE_EXTENSIONS = [".txt", ".md", ".pdf"] as const;
 
+export function inferKnowledgeMimeType(fileName: string, mimeType: string) {
+  if (mimeType.trim()) {
+    return mimeType.trim().toLowerCase();
+  }
+
+  const lower = fileName.toLowerCase();
+
+  if (lower.endsWith(".md")) {
+    return "text/markdown";
+  }
+
+  if (lower.endsWith(".txt")) {
+    return "text/plain";
+  }
+
+  if (lower.endsWith(".pdf")) {
+    return "application/pdf";
+  }
+
+  return "";
+}
+
+export function isSupportedKnowledgeMimeType(
+  mimeType: string,
+): mimeType is (typeof SUPPORTED_KNOWLEDGE_MIME_TYPES)[number] {
+  return SUPPORTED_KNOWLEDGE_MIME_TYPES.includes(
+    mimeType as (typeof SUPPORTED_KNOWLEDGE_MIME_TYPES)[number],
+  );
+}
+
+export function getSupportedKnowledgeFileTypesLabel() {
+  return "TXT, MD, and PDF";
+}
+
 export function isReadyKnowledgeSource(source: KnowledgeSourceRecord) {
   return source.status === "ready";
 }

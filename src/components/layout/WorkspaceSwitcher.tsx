@@ -1,17 +1,19 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
-import { LogOut, ChevronsUpDown, Check, Plus, Building2 } from 'lucide-react';
+import { LogOut, ChevronsUpDown, Check, Plus, Building2, Settings } from 'lucide-react';
 import { CreateWorkspaceModal } from '@/components/modals/CreateWorkspaceModal';
 
 interface WorkspaceSwitcherProps {
   isCollapsed: boolean;
   mobile?: boolean;
+  onNavigate?: () => void;
 }
 
-export function WorkspaceSwitcher({ isCollapsed, mobile }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: WorkspaceSwitcherProps) {
   const { workspace, workspaces, membership, user } = useAppContext();
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -143,11 +145,6 @@ export function WorkspaceSwitcher({ isCollapsed, mobile }: WorkspaceSwitcherProp
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{ws.name}</p>
-                    <p className="truncate text-[10px] text-on-surface-variant">
-                       {/* This could dynamically state their role in the other workspace if needed, 
-                           but to keep it fast, we just show the name */}
-                       {ws.slug}
-                    </p>
                   </div>
                   {isActive && <Check className="h-4 w-4 shrink-0" />}
                 </button>
@@ -156,6 +153,18 @@ export function WorkspaceSwitcher({ isCollapsed, mobile }: WorkspaceSwitcherProp
           </div>
 
           <div className="my-2 h-px w-full bg-outline-variant/10" />
+
+          <Link
+            href="/settings"
+            onClick={() => {
+              setIsOpen(false);
+              onNavigate?.();
+            }}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-all duration-150 active:scale-[0.98] hover:bg-on-surface/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <Settings className="h-4 w-4 text-on-surface-variant" />
+            {t('nav.settings') || 'Settings'}
+          </Link>
 
           {/* Create New Workspace */}
           <button

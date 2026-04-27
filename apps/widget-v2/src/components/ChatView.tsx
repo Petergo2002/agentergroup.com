@@ -18,6 +18,8 @@ function TypingCursor() {
 const TRANSLATIONS = {
   en: {
     copy: "Copy",
+    attachFile: "Attach file",
+    sendMessage: "Send message",
     agentSubtext: "AI Agent",
     privacyText: "By sending a message, you acknowledge our ",
     privacyLink: "privacy policy",
@@ -29,6 +31,8 @@ const TRANSLATIONS = {
   },
   sv: {
     copy: "Kopiera",
+    attachFile: "Bifoga fil",
+    sendMessage: "Skicka meddelande",
     agentSubtext: "AI-Agent",
     privacyText: "När du skickar ett meddelande bekräftar du vår ",
     privacyLink: "integritetspolicy",
@@ -54,6 +58,7 @@ function MessageActions({
       <button
         onClick={onCopy}
         className="widget-icon-button p-1.5 rounded-lg"
+        aria-label={t.copy}
         title={t.copy}
       >
         <Copy className="w-3.5 h-3.5" />
@@ -468,6 +473,8 @@ export function ChatView({
                     ? "opacity-50 cursor-not-allowed"
                     : "cursor-pointer"
                 }`}
+                aria-label={t.attachFile}
+                title={t.attachFile}
               >
                 <input
                   type="file"
@@ -505,6 +512,8 @@ export function ChatView({
                 isStreaming
               }
               className="p-2.5 rounded-xl bg-transparent text-widget-muted hover:text-[var(--widget-secondary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 mr-1"
+              aria-label={t.sendMessage}
+              title={t.sendMessage}
             >
               <Send className="w-5 h-5" />
             </button>

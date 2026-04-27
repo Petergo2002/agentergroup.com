@@ -8,6 +8,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { stripe } from '@/lib/stripe';
+import {
+  BillingAuthorizationError,
+  assertWorkspaceBillingAdmin,
+  type BillingAuthorizationClient,
+} from '@/lib/billing-authorization';
 
 export async function GET(req: Request) {
   try {
@@ -26,6 +31,12 @@ export async function GET(req: Request) {
     if (!workspaceId) {
       return NextResponse.json({ error: 'Missing workspaceId' }, { status: 400 });
     }
+
+    await assertWorkspaceBillingAdmin(
+      supabase as unknown as BillingAuthorizationClient,
+      workspaceId,
+      user.id,
+    );
 
     // Get the Stripe customer ID for this workspace
     const { data: subscription } = await supabase
@@ -61,6 +72,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ invoices });
 
   } catch (err) {
+    if (err instanceof BillingAuthorizationError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+
     console.error('[billing/invoices] Error:', err);
     return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 });
   }

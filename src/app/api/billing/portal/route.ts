@@ -12,6 +12,11 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAppUrl } from '@/lib/env';
 import { stripe } from '@/lib/stripe';
+import {
+  BillingAuthorizationError,
+  assertWorkspaceBillingAdmin,
+  type BillingAuthorizationClient,
+} from '@/lib/billing-authorization';
 
 export async function POST(req: Request) {
   try {
@@ -30,17 +35,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing workspaceId' }, { status: 400 });
     }
 
-    // Verify RBAC: only owner/admin can manage billing
-    const { data: memberData, error: memberError } = await supabase
-      .from('workspace_members')
-      .select('role')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError || !memberData || !['owner', 'admin'].includes(memberData.role)) {
-      return NextResponse.json({ error: 'Unauthorized. Only workspace admins can manage billing.' }, { status: 403 });
-    }
+    await assertWorkspaceBillingAdmin(
+      supabase as unknown as BillingAuthorizationClient,
+      workspaceId,
+      user.id,
+    );
 
     // Get the Stripe customer ID for this workspace
     const { data: subscription, error: subError } = await supabase
@@ -71,6 +70,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: portalSession.url });
 
   } catch (err) {
+    if (err instanceof BillingAuthorizationError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+
     console.error('[billing/portal] Error:', err);
     return NextResponse.json({ error: 'Failed to create portal session' }, { status: 500 });
   }

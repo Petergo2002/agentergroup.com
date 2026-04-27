@@ -5,6 +5,15 @@ import {
   getAppSecurityHeaders,
 } from "../../src/lib/security-headers.ts";
 
+function getCspDirective(csp: string, directiveName: string) {
+  return (
+    csp
+      .split(";")
+      .map((directive) => directive.trim())
+      .find((directive) => directive.startsWith(`${directiveName} `)) ?? ""
+  );
+}
+
 test("app security headers include baseline browser protections", () => {
   const headers = getAppSecurityHeaders();
   const headerMap = new Map(headers.map((entry) => [entry.key, entry.value]));
@@ -17,11 +26,30 @@ test("app security headers include baseline browser protections", () => {
 });
 
 test("content security policy protects framing while allowing current widget preview assets", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
   const csp = buildAppContentSecurityPolicy();
+  process.env.NODE_ENV = previousNodeEnv;
 
   assert.match(csp, /frame-ancestors 'none'/);
   assert.match(csp, /fonts\.googleapis\.com/);
   assert.match(csp, /fonts\.gstatic\.com/);
   assert.match(csp, /frame-src 'self'/);
   assert.match(csp, /connect-src 'self'/);
+  assert.match(csp, /object-src 'none'/);
+
+  const scriptSrc = getCspDirective(csp, "script-src");
+  assert.doesNotMatch(scriptSrc, /'unsafe-inline'/);
+  assert.doesNotMatch(scriptSrc, /'unsafe-eval'/);
+});
+
+test("development CSP allows Next.js inline bootstrap and eval-based debugging", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "development";
+  const csp = buildAppContentSecurityPolicy();
+  process.env.NODE_ENV = previousNodeEnv;
+
+  const scriptSrc = getCspDirective(csp, "script-src");
+  assert.match(scriptSrc, /'unsafe-inline'/);
+  assert.match(scriptSrc, /'unsafe-eval'/);
 });

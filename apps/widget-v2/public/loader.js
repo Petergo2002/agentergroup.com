@@ -38,6 +38,28 @@
 
   // Get configuration from script tag
   const currentScript = document.currentScript;
+  const debugEnabled =
+    currentScript?.getAttribute("data-debug") === "1" ||
+    currentScript?.getAttribute("data-debug") === "true" ||
+    window.AG_WIDGET_DEBUG === true;
+  const debugLogger = {
+    warn(message, detail) {
+      if (!debugEnabled) return;
+      if (detail === undefined) {
+        console.warn(message);
+        return;
+      }
+      console.warn(message, detail);
+    },
+    error(message, detail) {
+      if (!debugEnabled) return;
+      if (detail === undefined) {
+        console.error(message);
+        return;
+      }
+      console.error(message, detail);
+    },
+  };
   const widgetPublicKey =
     currentScript?.getAttribute("data-widget") ||
     currentScript?.getAttribute("data-id") ||
@@ -46,7 +68,7 @@
     !currentScript?.getAttribute("data-widget") &&
     currentScript?.getAttribute("data-id")
   ) {
-    console.warn(
+    debugLogger.warn(
       "[AgenterGroup Widget] 'data-id' is deprecated. Use 'data-widget' instead.",
     );
   }
@@ -96,7 +118,7 @@
   }
 
   if (!widgetPublicKey) {
-    console.error("[AgenterGroup Widget] Missing data-widget attribute");
+    debugLogger.error("[AgenterGroup Widget] Missing data-widget attribute");
     return;
   }
 
@@ -501,7 +523,7 @@
       applyWidgetTheme();
       postBootstrapToIframe();
     } catch (error) {
-      console.error("[AgenterGroup Widget] Bootstrap refresh failed", error);
+      debugLogger.error("[AgenterGroup Widget] Bootstrap refresh failed", error);
       postBootstrapErrorToIframe(
         error instanceof Error
           ? error.message
@@ -987,15 +1009,51 @@
     `;
   }
 
+  function getLoaderLanguage() {
+    const configuredLanguage = bootstrapPayload?.config?.widget?.language;
+    if (configuredLanguage === "sv" || configuredLanguage === "en") {
+      return configuredLanguage;
+    }
+
+    const documentLanguage =
+      document.documentElement.getAttribute("lang") || navigator.language || "";
+    return documentLanguage.toLowerCase().startsWith("sv") ? "sv" : "en";
+  }
+
+  function getLoaderLabel(key) {
+    const labels = {
+      en: {
+        openChat: "Open chat",
+        closeChat: "Close chat",
+        close: "Close",
+        chatDialog: "chat",
+      },
+      sv: {
+        openChat: "Öppna chatt",
+        closeChat: "Stäng chatt",
+        close: "Stäng",
+        chatDialog: "chatt",
+      },
+    };
+    const language = getLoaderLanguage();
+    return labels[language][key] || labels.en[key];
+  }
+
   function updateBubbleContent() {
     if (!bubble) return;
 
     bubble.innerHTML = getBubbleMarkup();
-    bubble.setAttribute("aria-label", isOpen ? "Stäng chatt" : "Öppna chatt");
+    bubble.setAttribute(
+      "aria-label",
+      isOpen ? getLoaderLabel("closeChat") : getLoaderLabel("openChat"),
+    );
 
     if (iframeContainer) {
       const brandName = bootstrapPayload?.config?.brand?.name || "Agent";
-      iframeContainer.setAttribute("aria-label", `${brandName} chat`);
+      iframeContainer.setAttribute(
+        "aria-label",
+        `${brandName} ${getLoaderLabel("chatDialog")}`,
+      );
     }
   }
 
@@ -1095,7 +1153,10 @@
 
     if (bubble) {
       bubble.classList.toggle("open", isOpen);
-      bubble.setAttribute("aria-label", isOpen ? "Stäng chatt" : "Öppna chatt");
+      bubble.setAttribute(
+        "aria-label",
+        isOpen ? getLoaderLabel("closeChat") : getLoaderLabel("openChat"),
+      );
       bubble.setAttribute("aria-expanded", isOpen ? "true" : "false");
     }
 
@@ -1124,7 +1185,7 @@
         container.style.setProperty("--ag-widget-primary-fg", bubbleTextColor);
       }
     } catch (error) {
-      console.warn("[AgenterGroup Widget] Failed to load theme", error);
+      debugLogger.warn("[AgenterGroup Widget] Failed to load theme", error);
     } finally {
       if (container) {
         container.classList.add("ag-widget-ready");
@@ -1164,7 +1225,7 @@
     bubble.className = "ag-widget-bubble";
     bubble.type = "button";
     bubble.innerHTML = getBubbleMarkup();
-    bubble.setAttribute("aria-label", "Öppna chatt");
+    bubble.setAttribute("aria-label", getLoaderLabel("openChat"));
     bubble.setAttribute("aria-expanded", "false");
     bubble.onclick = () => {
       void toggleWidget();
@@ -1174,7 +1235,7 @@
     closeButton.className = "ag-widget-close-button";
     closeButton.type = "button";
     closeButton.innerHTML = closeIconSvg;
-    closeButton.setAttribute("aria-label", "Stäng chatt");
+    closeButton.setAttribute("aria-label", getLoaderLabel("close"));
     closeButton.setAttribute("aria-hidden", "true");
     closeButton.tabIndex = -1;
     closeButton.onclick = closeWidget;
@@ -1223,7 +1284,7 @@
     try {
       await ensureRuntimeReady();
     } catch (error) {
-      console.error("[AgenterGroup Widget] Bootstrap failed", error);
+      debugLogger.error("[AgenterGroup Widget] Bootstrap failed", error);
       bubble.disabled = false;
       bubble.removeAttribute("aria-busy");
       return;

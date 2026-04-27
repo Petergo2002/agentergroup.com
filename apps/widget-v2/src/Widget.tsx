@@ -19,6 +19,7 @@ import { HomeTab } from "./components/HomeTab";
 import { MessagesTab } from "./components/MessagesTab";
 import { WidgetMark } from "./components/WidgetMark";
 import { useSession } from "./hooks/useSession";
+import { useWidgetViewportUnit } from "./hooks/useWidgetViewportUnit";
 import {
   completeWidgetSession as requestWidgetSessionCompletion,
   getWidgetBootstrap,
@@ -30,6 +31,7 @@ import {
 import { createJsonError, hasErrorCode, getRetryAfterSeconds, buildRequestContextFromBootstrap } from "./lib/api-errors";
 import { buildChatRateLimitMessage } from "./lib/localization";
 import { normalizeWidgetConfig, resolveWidgetLanguage, resolveSelectedAgent } from "./lib/config";
+import { widgetDebug } from "./lib/debug";
 import { buildLocalizedPrivacyPolicyUrl } from "./lib/localization";
 import {
   PREVIEW_REQUEST_MESSAGE_TYPE,
@@ -125,6 +127,7 @@ export default function Widget({
   const inactivityTimerRef = useRef<number | null>(null);
   const bootstrapRefreshPromiseRef = useRef<Promise<WidgetBootstrapResponse> | null>(null);
   const activeStreamAbortControllerRef = useRef<AbortController | null>(null);
+  useWidgetViewportUnit();
 
   const bootstrapContext = useMemo<WidgetRequestContext>(
     () => ({
@@ -359,7 +362,7 @@ export default function Widget({
             }
           })
           .catch((nextError) => {
-            console.error("Failed to complete inactive chat:", nextError);
+            widgetDebug.error("Failed to complete inactive chat:", nextError);
           });
       }, timeoutSeconds * 1000);
     },
@@ -470,27 +473,6 @@ export default function Widget({
   );
 
   useEffect(() => {
-    const updateVh = () => {
-      const height = window.visualViewport?.height ?? window.innerHeight;
-      document.documentElement.style.setProperty(
-        "--widget-vh",
-        `${height * 0.01}px`,
-      );
-    };
-
-    updateVh();
-    window.addEventListener("resize", updateVh);
-    window.visualViewport?.addEventListener("resize", updateVh);
-    window.visualViewport?.addEventListener("scroll", updateVh);
-
-    return () => {
-      window.removeEventListener("resize", updateVh);
-      window.visualViewport?.removeEventListener("resize", updateVh);
-      window.visualViewport?.removeEventListener("scroll", updateVh);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!widgetPublicKey) {
       setError("Missing widget key.");
       return;
@@ -510,7 +492,7 @@ export default function Widget({
         }
       } catch (nextError) {
         if (!cancelled) {
-          console.error("Failed to bootstrap widget:", nextError);
+          widgetDebug.error("Failed to bootstrap widget:", nextError);
           setError(
             nextError instanceof Error
               ? nextError.message
@@ -756,12 +738,10 @@ export default function Widget({
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    console.log("File selected:", file);
     if (!file) return;
     
     e.target.value = "";
     if (file.size > 5 * 1024 * 1024) {
-      console.error("File size must be under 5MB");
       setError("File size must be under 5MB");
       return;
     }
@@ -769,12 +749,10 @@ export default function Widget({
     try {
       setIsUploadingAttachment(true);
       setError(null);
-      console.log("Uploading file...", file.name);
       const attachment = await uploadWidgetAttachment(widgetPublicKey, sessionId, file, requestContext);
-      console.log("Upload successful:", attachment);
       setPendingAttachments(prev => [...prev, attachment]);
     } catch (err) {
-      console.error("Upload error:", err);
+      widgetDebug.error("Upload error:", err);
       setError(err instanceof Error ? err.message : "Failed to upload file");
     } finally {
       setIsUploadingAttachment(false);
@@ -1011,7 +989,7 @@ export default function Widget({
         return;
       }
 
-      console.error("Chat error:", nextError);
+      widgetDebug.error("Chat error:", nextError);
       const isSessionCompletedError = hasErrorCode(nextError, "SESSION_COMPLETED");
 
       if (isSessionCompletedError) {

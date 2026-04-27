@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import Widget from "./Widget";
+import { widgetDebug } from "./lib/debug";
 import "./index.css";
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -12,7 +13,7 @@ const legacyWidgetId =
 const widgetPublicKey = widgetFromUrl || legacyWidgetId || "";
 
 if (!widgetFromUrl && legacyWidgetId) {
-  console.warn(
+  widgetDebug.warn(
     "[AgenterGroup Widget] '?id=' is deprecated. Use '?widget=' instead.",
   );
 }

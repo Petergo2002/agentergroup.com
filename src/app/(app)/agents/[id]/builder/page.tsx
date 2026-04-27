@@ -1255,7 +1255,13 @@ export default function AgentBuilderPage() {
   );
 
   const onConnect = useCallback(
-    (params: Edge | Connection) => setEdges((eds) => addEdge({ ...params, style: DEFAULT_EDGE_STYLE }, eds)),
+    (params: Connection) =>
+      setEdges((eds) =>
+        addEdge(
+          { ...params, style: DEFAULT_EDGE_STYLE } as unknown as BuilderFlowEdge,
+          eds,
+        ),
+      ),
     [setEdges],
   );
 

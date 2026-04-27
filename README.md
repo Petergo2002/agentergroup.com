@@ -61,6 +61,7 @@ Root app variables:
 | `WIDGET_APP_URL` | No | Legacy fallback alias for the hosted widget origin |
 | `WIDGET_ACCESS_SECRET` | Yes | Secret used to sign public widget access tokens |
 | `WIDGET_PREVIEW_SECRET` | Yes | Secret used to sign widget preview tokens |
+| `RATE_LIMIT_SECRET` | Yes in production | Dedicated secret used to hash public rate-limit identities |
 | `GDPR_RETENTION_CRON_SECRET` | Yes for retention job | Secret for the internal privacy retention route |
 
 Widget package variables:

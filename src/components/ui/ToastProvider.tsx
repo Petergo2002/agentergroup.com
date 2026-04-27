@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 
-type ToastType = 'success' | 'error' | 'info';
+type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface Toast {
   id: string;
@@ -57,6 +57,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               w-8 h-8 rounded-full flex items-center justify-center
               ${toast.type === 'success' ? 'bg-emerald-500/10 text-emerald-600' : ''}
               ${toast.type === 'error' ? 'bg-error/10 text-error' : ''}
+              ${toast.type === 'warning' ? 'bg-amber-500/10 text-amber-600' : ''}
               ${toast.type === 'info' ? 'bg-primary/10 text-primary' : ''}
             `}>
               <AppIcon
@@ -65,7 +66,9 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                     ? 'task_alt'
                     : toast.type === 'error'
                       ? 'warning'
-                      : 'info'
+                      : toast.type === 'warning'
+                        ? 'warning'
+                        : 'info'
                 }
                 className="h-[18px] w-[18px]"
               />
@@ -74,6 +77,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               <p className="text-[13px] font-bold text-on-surface">
                 {toast.type === 'success' ? t('toast.success') : ''}
                 {toast.type === 'error' ? t('toast.error') : ''}
+                {toast.type === 'warning' ? t('toast.warning') : ''}
                 {toast.type === 'info' ? t('toast.notice') : ''}
               </p>
               <p className="text-[11px] text-on-surface-variant font-medium">

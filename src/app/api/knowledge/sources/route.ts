@@ -2,35 +2,18 @@ import { Buffer } from "node:buffer";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { KNOWLEDGE_BUCKET } from "@/lib/knowledge";
+import {
+  KNOWLEDGE_BUCKET,
+  getSupportedKnowledgeFileTypesLabel,
+  inferKnowledgeMimeType,
+  isSupportedKnowledgeMimeType,
+} from "@/lib/knowledge";
 import type { KnowledgeSourceRecord, KnowledgeSourceType } from "@/lib/types";
 
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
-}
-
-function inferMimeType(fileName: string, mimeType: string) {
-  if (mimeType) {
-    return mimeType;
-  }
-
-  const lower = fileName.toLowerCase();
-
-  if (lower.endsWith(".md")) {
-    return "text/markdown";
-  }
-
-  if (lower.endsWith(".txt")) {
-    return "text/plain";
-  }
-
-  if (lower.endsWith(".pdf")) {
-    return "application/pdf";
-  }
-
-  return "";
 }
 
 function buildStorageLimitError(storageLimitBytes: number) {
@@ -266,12 +249,24 @@ export async function POST(request: NextRequest) {
   }
 
   const fileName = String(body.fileName ?? "").trim();
-  const mimeType = inferMimeType(fileName, String(body.mimeType ?? "").trim());
+  const mimeType = inferKnowledgeMimeType(
+    fileName,
+    String(body.mimeType ?? "").trim(),
+  );
   const fileSizeBytes = Number(body.fileSizeBytes ?? 0);
 
   if (!fileName || !mimeType || !Number.isFinite(fileSizeBytes) || fileSizeBytes <= 0) {
     return NextResponse.json(
       { error: "fileName, mimeType, and fileSizeBytes are required for file sources." },
+      { status: 400 },
+    );
+  }
+
+  if (!isSupportedKnowledgeMimeType(mimeType)) {
+    return NextResponse.json(
+      {
+        error: `Unsupported file type: ${mimeType}. Supported types are ${getSupportedKnowledgeFileTypesLabel()}.`,
+      },
       { status: 400 },
     );
   }

@@ -23,6 +23,8 @@ import { useToast } from "@/components/ui/ToastProvider";
 import {
   SUPPORTED_KNOWLEDGE_EXTENSIONS,
   SUPPORTED_KNOWLEDGE_MIME_TYPES,
+  inferKnowledgeMimeType,
+  isSupportedKnowledgeMimeType,
 } from "@/lib/knowledge";
 import type {
   ConnectionRecord,
@@ -37,28 +39,6 @@ import { ConfirmSimpleModal } from "@/components/modals/ConfirmSimpleModal";
 import { formatRelativeDate } from "@/lib/utils";
 
 const ACCEPTED_FILE_TYPES = [...SUPPORTED_KNOWLEDGE_MIME_TYPES, ...SUPPORTED_KNOWLEDGE_EXTENSIONS].join(",");
-
-function inferMimeType(file: File) {
-  if (file.type) {
-    return file.type;
-  }
-
-  const lower = file.name.toLowerCase();
-
-  if (lower.endsWith(".md")) {
-    return "text/markdown";
-  }
-
-  if (lower.endsWith(".txt")) {
-    return "text/plain";
-  }
-
-  if (lower.endsWith(".pdf")) {
-    return "application/pdf";
-  }
-
-  return "";
-}
 
 type InputTab = "text" | "file" | "drive" | "website" | null;
 
@@ -264,6 +244,12 @@ export default function KnowledgePageClient({
       return;
     }
 
+    const mimeType = inferKnowledgeMimeType(file.name, file.type);
+    if (!isSupportedKnowledgeMimeType(mimeType)) {
+      showToast(t("knowledge.unsupportedFileType"), "error");
+      return;
+    }
+
     setIsUploadingFile(true);
 
     try {
@@ -277,7 +263,7 @@ export default function KnowledgePageClient({
           description: fileDescription.trim(),
           sourceType: "file",
           fileName: file.name,
-          mimeType: inferMimeType(file),
+          mimeType,
           fileSizeBytes: file.size,
         }),
       });
@@ -293,7 +279,7 @@ export default function KnowledgePageClient({
       const uploadResult = await supabase.storage.from(upload.bucket).upload(upload.path, file, {
         cacheControl: "3600",
         upsert: true,
-        contentType: inferMimeType(file) || undefined,
+        contentType: mimeType,
       });
 
       if (uploadResult.error) {

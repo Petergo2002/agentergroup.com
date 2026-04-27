@@ -17,8 +17,16 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Agent Platform",
-  description: "Manage your platform preferences and workspace configuration.",
+  title: {
+    default: "Agentergroup",
+    template: "%s | Agentergroup",
+  },
+  description: "Build, manage, and deploy Agentergroup AI agents and widgets.",
+  openGraph: {
+    title: "Agentergroup",
+    description: "Build, manage, and deploy Agentergroup AI agents and widgets.",
+    siteName: "Agentergroup",
+  },
   icons: {
     icon: "/2.svg",
     shortcut: "/2.svg",

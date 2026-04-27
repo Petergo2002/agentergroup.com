@@ -11,7 +11,9 @@ export default function ErrorState({
 }) {
   useEffect(() => {
     // Optionally log the error to an error reporting service
-    console.error('App Route Error:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('App Route Error:', error);
+    }
   }, [error]);
 
   return (
@@ -25,7 +27,7 @@ export default function ErrorState({
         <div className="space-y-2">
           <h2 className="text-xl font-bold tracking-tight text-on-surface">Something went wrong</h2>
           <p className="text-sm text-on-surface-variant">
-            {error.message || "An unexpected error occurred while loading this page. Please try again."}
+            An unexpected error occurred while loading this page. Please try again.
           </p>
         </div>
         <button

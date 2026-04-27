@@ -1,10 +1,10 @@
-µ# Agent Platform Architecture
+# Agentergroup Architecture
 
 Last updated: 2026-04-22
 
 ## Purpose
 
-This document is the implementation-level architecture reference for the current `Agent Platform` codebase. It explains:
+This document is the implementation-level architecture reference for the current Agentergroup codebase. It explains:
 
 - what the system does today
 - which services and APIs it depends on
@@ -72,7 +72,7 @@ Browser (Next.js App Router UI)
 
 ### Frontend and app server
 
-- Next.js `16.1.6`
+- Next.js `16.2.2`
 - React `19.2.3`
 - TypeScript
 - Tailwind CSS v4
