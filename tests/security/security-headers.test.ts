@@ -25,10 +25,18 @@ test("app security headers include baseline browser protections", () => {
   assert.ok(headerMap.get("Content-Security-Policy"));
 });
 
+test("app security headers can omit CSP when a request nonce is required", () => {
+  const headers = getAppSecurityHeaders({ contentSecurityPolicy: false });
+  const headerMap = new Map(headers.map((entry) => [entry.key, entry.value]));
+
+  assert.ok(headerMap.get("Strict-Transport-Security"));
+  assert.equal(headerMap.has("Content-Security-Policy"), false);
+});
+
 test("content security policy protects framing while allowing current widget preview assets", () => {
   const previousNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = "production";
-  const csp = buildAppContentSecurityPolicy();
+  const csp = buildAppContentSecurityPolicy({ nonce: "test-nonce" });
   process.env.NODE_ENV = previousNodeEnv;
 
   assert.match(csp, /frame-ancestors 'none'/);
@@ -39,6 +47,7 @@ test("content security policy protects framing while allowing current widget pre
   assert.match(csp, /object-src 'none'/);
 
   const scriptSrc = getCspDirective(csp, "script-src");
+  assert.match(scriptSrc, /'nonce-test-nonce'/);
   assert.doesNotMatch(scriptSrc, /'unsafe-inline'/);
   assert.doesNotMatch(scriptSrc, /'unsafe-eval'/);
 });

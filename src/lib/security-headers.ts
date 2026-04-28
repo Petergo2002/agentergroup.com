@@ -6,7 +6,17 @@ function resolveOrigin(value: string | undefined, fallback: string) {
   }
 }
 
-export function buildAppContentSecurityPolicy() {
+type AppContentSecurityPolicyOptions = {
+  nonce?: string;
+};
+
+type AppSecurityHeadersOptions = {
+  contentSecurityPolicy?: string | false;
+};
+
+export function buildAppContentSecurityPolicy({
+  nonce,
+}: AppContentSecurityPolicyOptions = {}) {
   const widgetAppOrigin = resolveOrigin(
     process.env.NEXT_PUBLIC_WIDGET_APP_URL ?? process.env.WIDGET_APP_URL,
     "http://localhost:5173",
@@ -15,17 +25,22 @@ export function buildAppContentSecurityPolicy() {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     "https://rklntfzmqayziqesjoih.supabase.co",
   );
-  const scriptSrc =
-    process.env.NODE_ENV === "development"
-      ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${widgetAppOrigin}`
-      : `script-src 'self' ${widgetAppOrigin}`;
+  const scriptSrcTokens = ["'self'"];
+
+  if (process.env.NODE_ENV === "development") {
+    scriptSrcTokens.push("'unsafe-inline'", "'unsafe-eval'");
+  } else if (nonce) {
+    scriptSrcTokens.push(`'nonce-${nonce}'`);
+  }
+
+  scriptSrcTokens.push(widgetAppOrigin);
 
   return [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
-    scriptSrc,
+    `script-src ${scriptSrcTokens.join(" ")}`,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com data:`,
     "img-src 'self' data: blob: https:",
@@ -36,8 +51,10 @@ export function buildAppContentSecurityPolicy() {
   ].join("; ");
 }
 
-export function getAppSecurityHeaders() {
-  return [
+export function getAppSecurityHeaders({
+  contentSecurityPolicy,
+}: AppSecurityHeadersOptions = {}) {
+  const headers = [
     {
       key: "Strict-Transport-Security",
       value: "max-age=31536000; includeSubDomains; preload",
@@ -54,9 +71,14 @@ export function getAppSecurityHeaders() {
       key: "Referrer-Policy",
       value: "strict-origin-when-cross-origin",
     },
-    {
-      key: "Content-Security-Policy",
-      value: buildAppContentSecurityPolicy(),
-    },
   ];
+
+  if (contentSecurityPolicy !== false) {
+    headers.push({
+      key: "Content-Security-Policy",
+      value: contentSecurityPolicy ?? buildAppContentSecurityPolicy(),
+    });
+  }
+
+  return headers;
 }

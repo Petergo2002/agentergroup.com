@@ -2,7 +2,8 @@ import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 
 /**
- * Only authenticated app surfaces run through the auth proxy.
+ * All application routes run through middleware so rendered HTML can receive a
+ * per-request CSP nonce. Only authenticated app surfaces are auth-gated.
  *
  * Public and never auth-gated here:
  * - /api/public/*
@@ -24,24 +25,14 @@ import { updateSession } from "@/lib/supabase/proxy";
  * - /connections/*
  * - /settings/*
  *
- * Keep this matcher list aligned with the explicit prefix checks in
- * src/lib/supabase/proxy.ts.
+ * Auth-gated route prefixes still live in src/lib/supabase/proxy.ts.
  */
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   return updateSession(request);
 }
 
 export const config = {
   matcher: [
-    "/onboarding/:path*",
-    "/dashboard/:path*",
-    "/assistants/:path*",
-    "/agents/:path*",
-    "/widgets/:path*",
-    "/api/dashboard/:path*",
-    "/api/agents/:path*",
-    "/api/widgets/:path*",
-    "/connections/:path*",
-    "/settings/:path*",
+    "/((?!_next/|favicon.ico|.*\\..*).*)",
   ],
 };

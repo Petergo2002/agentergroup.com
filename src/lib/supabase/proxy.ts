@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "@/lib/env";
+import {
+  buildAppContentSecurityPolicy,
+  getAppSecurityHeaders,
+} from "@/lib/security-headers";
 
 /**
  * Public paths that must never be auth-gated here:
@@ -48,6 +52,26 @@ const PROTECTED_PATH_PREFIXES = [
   "/settings",
 ] as const;
 
+function createNonce() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary);
+}
+
+function withSecurityHeaders(response: NextResponse, contentSecurityPolicy: string) {
+  getAppSecurityHeaders({ contentSecurityPolicy }).forEach(({ key, value }) => {
+    response.headers.set(key, value);
+  });
+
+  return response;
+}
+
 function matchesPathPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
@@ -65,23 +89,34 @@ export async function updateSession(request: NextRequest) {
 
   // We set x-url so layouts can detect the current path for redirect logic
   const requestHeaders = new Headers(request.headers);
+  const nonce = createNonce();
+  const contentSecurityPolicy = buildAppContentSecurityPolicy({ nonce });
+
   requestHeaders.set("x-url", request.url);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
 
   if (isExplicitPublicPath(pathname) || !isProtectedPath(pathname)) {
-    return NextResponse.next({
-      request: {
-        headers: requestHeaders,
-      },
-    });
+    return withSecurityHeaders(
+      NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      }),
+      contentSecurityPolicy,
+    );
   }
 
   const { url, publishableKey } = getSupabaseEnv();
 
-  let supabaseResponse = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+  let supabaseResponse = withSecurityHeaders(
+    NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    }),
+    contentSecurityPolicy,
+  );
 
   const supabase = createServerClient(url, publishableKey, {
     cookies: {
@@ -90,11 +125,14 @@ export async function updateSession(request: NextRequest) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        supabaseResponse = NextResponse.next({
-          request: {
-            headers: requestHeaders,
-          },
-        });
+        supabaseResponse = withSecurityHeaders(
+          NextResponse.next({
+            request: {
+              headers: requestHeaders,
+            },
+          }),
+          contentSecurityPolicy,
+        );
         cookiesToSet.forEach(({ name, value, options }) => {
           supabaseResponse.cookies.set(name, value, options);
         });
@@ -109,7 +147,7 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", request.nextUrl.pathname);
-    return NextResponse.redirect(url);
+    return withSecurityHeaders(NextResponse.redirect(url), contentSecurityPolicy);
   }
 
   return supabaseResponse;
