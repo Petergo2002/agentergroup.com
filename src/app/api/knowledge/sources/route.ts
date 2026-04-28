@@ -11,7 +11,6 @@ import {
 import type { KnowledgeSourceRecord, KnowledgeSourceType } from "@/lib/types";
 
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
-
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
 }

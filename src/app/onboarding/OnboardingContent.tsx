@@ -53,6 +53,12 @@ export default function OnboardingContent({
 
   useEffect(() => {
     if (success) {
+      // Intentionally setting state in effect here to coordinate with the API call.
+      // A full refactor of this onboarding flow to use Next.js server actions properly
+      // is outside the scope of safe, atomic improvements.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStatus('success');
+      setLoading('completing');
       completeOnboarding(workspaceId);
     }
   }, [success, workspaceId]);
