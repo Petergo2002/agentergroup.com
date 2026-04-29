@@ -7,6 +7,7 @@ import {
 import { AdminWidgetsTable } from "@/components/admin/AdminWidgetsTable";
 import { AdminWorkspaceAnalytics } from "@/components/admin/AdminWorkspaceAnalytics";
 import { AdminWorkspaceSummaryPanel } from "@/components/admin/AdminWorkspaceSummaryPanel";
+import { AdminExtraCreditsGrant } from "@/components/admin/AdminExtraCreditsGrant";
 import { AdminInternalAssistantsToggle } from "@/components/admin/AdminInternalAssistantsToggle";
 import { AdminPlanSelector } from "@/components/admin/AdminPlanSelector";
 import { requireAdminUser } from "@/lib/admin/auth";
@@ -97,6 +98,11 @@ export default async function AdminWorkspaceDetailPage({
               <AdminPlanSelector
                 workspaceId={workspace.id}
                 currentPlan={workspace.planTier}
+              />
+              <AdminExtraCreditsGrant
+                workspaceId={workspace.id}
+                messagesLimit={workspace.messagesLimit}
+                messagesUsed={workspace.messagesUsed}
               />
               <AdminInternalAssistantsToggle
                 workspaceId={workspace.id}

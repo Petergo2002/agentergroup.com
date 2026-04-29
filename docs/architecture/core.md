@@ -449,6 +449,22 @@ Accepts `{ plan_tier: "free" | "starter" | "premium" }`. Protected by `isAdminUs
 - `messages_used` is **not reset** when the plan changes — usage history is preserved
 - The workspace user's billing UI will reflect the new plan tier immediately after their next page load (the `AppWorkspaceContext` is reloaded on each authenticated request via bootstrap)
 
+### Admin extra message credits
+
+Internal admins can add fixed extra message credits to a workspace from `/admin/workspaces/[id]`.
+
+**API route:**
+
+`POST /api/admin/workspaces/[id]/extra-credits`
+
+Accepts `{ amount: 50 | 100 | 500 }`. Protected by `isAdminUser()` check. The route calls the service-role-only `grant_workspace_extra_messages()` RPC, which atomically increases `workspace_subscriptions.messages_limit` and writes an `audit_logs` entry.
+
+Important notes:
+
+- only `50`, `100`, and `500` are accepted; arbitrary client-provided amounts are rejected
+- extra credits increase `messages_limit`; `messages_used` is preserved
+- the RPC is revoked from `anon` and `authenticated`, and is granted only to `service_role`
+
 
 ## Team Management
 
