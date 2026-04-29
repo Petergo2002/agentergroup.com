@@ -2,6 +2,49 @@ import type { AgentRecord, AgentVersionRecord, WidgetAgentRecord, WidgetRecord }
 import type { WidgetAdminSupabase, WidgetOrderedSelectBuilder, WidgetInSelectBuilder, WidgetQueryResult } from "./server-types";
 import type { WidgetAgentWithAgent } from "@/lib/widgets";
 
+interface WorkspacePlanTierRow {
+  plan_tier: string | null;
+}
+
+async function loadCanHideWidgetBranding(
+  supabase: WidgetAdminSupabase,
+  workspaceId: string,
+) {
+  const { data, error } = (await supabase
+    .from("workspace_subscriptions")
+    .select("plan_tier")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle()) as {
+    data: WorkspacePlanTierRow | null;
+    error: { message: string } | null;
+  };
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.plan_tier === "premium";
+}
+
+async function normalizeWidgetBrandingEntitlement(
+  supabase: WidgetAdminSupabase,
+  widget: WidgetRecord,
+) {
+  const canHideBranding = await loadCanHideWidgetBranding(
+    supabase,
+    widget.workspace_id,
+  );
+
+  if (canHideBranding || widget.show_branding) {
+    return widget;
+  }
+
+  return {
+    ...widget,
+    show_branding: true,
+  };
+}
+
 async function loadWidgetAgentsWithAgents(
   supabase: WidgetAdminSupabase,
   widgetId: string,
@@ -77,7 +120,10 @@ export async function loadWidgetById(
     return null;
   }
 
-  const row = data as WidgetRecord;
+  const row = await normalizeWidgetBrandingEntitlement(
+    supabase,
+    data as WidgetRecord,
+  );
   return {
     widget: row,
     widgetAgents: await loadWidgetAgentsWithAgents(supabase, row.id),
@@ -102,7 +148,10 @@ export async function loadWidgetByPublicKey(
     return null;
   }
 
-  const row = data as WidgetRecord;
+  const row = await normalizeWidgetBrandingEntitlement(
+    supabase,
+    data as WidgetRecord,
+  );
   return {
     widget: row,
     widgetAgents: await loadWidgetAgentsWithAgents(supabase, row.id),
@@ -127,7 +176,12 @@ export async function loadAllWidgetsWithAgents(
     return [];
   }
 
-  const widgets = widgetsData;
+  const canHideBranding = await loadCanHideWidgetBranding(supabase, workspaceId);
+  const widgets = widgetsData.map((widget) =>
+    canHideBranding || widget.show_branding
+      ? widget
+      : { ...widget, show_branding: true },
+  );
   const widgetIds = widgets.map((w) => w.id);
 
   const { data: widgetAgentsData, error: widgetAgentsError } = await (supabase

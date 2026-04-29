@@ -173,6 +173,9 @@ export async function POST(
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const draft = parseDraftPreviewInput(body);
+  if (context.subscription?.plan_tier !== "premium") {
+    draft.widget.showBranding = true;
+  }
   const uniqueAgentIds = Array.from(new Set(draft.agents.map((agent) => agent.agentId)));
   const admin = createAdminClient() as unknown as WidgetAdminSupabase;
   const availableAgents = await loadWidgetAgentsByIds(

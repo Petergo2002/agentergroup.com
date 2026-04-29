@@ -126,6 +126,7 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => ({}));
+  const canHideBranding = context.subscription?.plan_tier === "premium";
   const payload = {
     name: parseString(body.name) ?? loaded.widget.name,
     description:
@@ -148,7 +149,9 @@ export async function PATCH(
     home_title: parseString(body.homeTitle),
     home_subtitle: parseString(body.homeSubtitle),
     hosted_enabled: parseBoolean(body.hostedEnabled, loaded.widget.hosted_enabled),
-    show_branding: parseBoolean(body.showBranding, loaded.widget.show_branding),
+    show_branding: canHideBranding
+      ? parseBoolean(body.showBranding, loaded.widget.show_branding)
+      : true,
     privacy_policy_url:
       parseString(body.privacyPolicyUrl) ?? loaded.widget.privacy_policy_url,
     allowed_origins: Array.isArray(body.allowedOrigins)

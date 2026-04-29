@@ -17,6 +17,8 @@ export const nav = {
   activeWorkspace: "Active workspace",
   switchClientContext: "Switch client context",
   createWorkspace: "Create workspace",
+  upgradeForWorkspaces: "Upgrade for more workspaces",
+  workspaceLimitReached: "Workspace limit reached",
   guestWorkspace: "Guest Workspace",
   switchWorkspace: "Switch Workspace",
   groups: {

@@ -6,6 +6,10 @@ import { ensureWorkspaceContext } from '@/lib/app/bootstrap';
 import { createClient } from '@/lib/supabase/server';
 import { slugify } from '@/lib/utils';
 import { buildDefaultWidgetInput } from '@/lib/widgets';
+import {
+  buildWidgetLimitError,
+  canCreateWidget,
+} from '@/lib/widget-limits';
 
 function buildWidgetSlug(name: string) {
   const base = slugify(name) || 'widget';
@@ -29,6 +33,24 @@ export async function createWidgetAction(formData: FormData) {
   }
 
   const context = await ensureWorkspaceContext(supabase, user);
+
+  const { count: widgetCount, error: widgetCountError } = await supabase
+    .from('widgets')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', context.workspace.id);
+
+  if (widgetCountError) {
+    return { error: widgetCountError.message };
+  }
+
+  if (
+    !canCreateWidget({
+      plan: context.subscription?.plan_tier,
+      widgetCount: widgetCount ?? 0,
+    })
+  ) {
+    return { error: buildWidgetLimitError(context.subscription?.plan_tier) };
+  }
   
   const parsed = createWidgetSchema.safeParse({
     name: formData.get('name'),

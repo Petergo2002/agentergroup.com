@@ -15,6 +15,12 @@ export const widgets = {
   creatingWorkspace: "Skapar widget...",
   newWidgetFromAgent: "Ny widget från agent",
   initializeWidget: "Initiera ny widget",
+  widgetLimitLabel: "widgets använda",
+  limitReached: "Widget-gräns nådd",
+  limitReachedDescription: "Din nuvarande plan har nått sin widget-gräns.",
+  upgradeForMoreWidgets: "Uppgradera för fler widgets",
+  upgradeForMoreWidgetsDescription:
+    "Uppgradera din plan för att skapa fler kundnära widgets.",
   managementSessionActive:
     "Widgethantering aktiv. Skapa en widget för att koppla den valda specialisten.",
   noWidgets: "Inga registrerade widgets",

@@ -2,6 +2,7 @@
 
 import { useWidgetBuilder } from '../WidgetBuilderContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
+import { useAppContext } from '@/components/app/AppContext';
 
 const fieldLabelClassName = 'text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1';
 const sectionDescClassName = 'text-sm text-on-surface-variant/60 leading-relaxed max-w-2xl';
@@ -9,9 +10,12 @@ const inputFieldClassName = 'relative z-10 w-full rounded-[14px] border border-o
 
 export function BehaviorTab() {
   const { t } = useLanguage();
+  const { subscription } = useAppContext();
   const { form, setForm } = useWidgetBuilder();
 
   if (!form) return null;
+
+  const canHideBranding = subscription?.plan_tier === 'premium';
 
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -37,6 +41,45 @@ export function BehaviorTab() {
                 <option value="sv">Svenska</option>
               </select>
             </label>
+
+            <div className="flex flex-col gap-4 rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-low p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-on-surface">
+                  {t('widgetBuilder.behavior.showBranding')}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-on-surface-variant/60">
+                  {canHideBranding
+                    ? t('widgetBuilder.behavior.brandingDescription')
+                    : t('widgetBuilder.behavior.brandingPremiumDescription')}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={canHideBranding ? form.showBranding : true}
+                disabled={!canHideBranding}
+                onClick={() =>
+                  setForm((current) =>
+                    current
+                      ? { ...current, showBranding: !current.showBranding }
+                      : current,
+                  )
+                }
+                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 ${
+                  (canHideBranding ? form.showBranding : true)
+                    ? 'bg-primary'
+                    : 'bg-outline-variant/30'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 h-5 w-5 rounded-full bg-background shadow-sm transition-transform ${
+                    (canHideBranding ? form.showBranding : true)
+                      ? 'translate-x-6'
+                      : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </div>
       </section>

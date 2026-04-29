@@ -11,6 +11,7 @@ import { StatusToggle } from '@/components/ui/StatusToggle';
 import { useToast } from '@/components/ui/ToastProvider';
 import { MessageSquare, Loader2, RefreshCw } from 'lucide-react';
 import { formatRelativeDate } from '@/lib/utils';
+import { canCreateWidget, getWidgetLimitForPlan } from '@/lib/widget-limits';
 
 interface WidgetListItem {
   id: string;
@@ -294,7 +295,7 @@ export default function WidgetsPageClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { membership } = useAppContext();
+  const { membership, subscription } = useAppContext();
   const { language, t } = useLanguage();
   const { showToast } = useToast();
   const [widgets, setWidgets] = useState<WidgetListItem[]>(initialWidgets);
@@ -310,6 +311,11 @@ export default function WidgetsPageClient({
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const highlightedAgentId = searchParams.get('agent');
   const isLoading = false;
+  const widgetLimit = getWidgetLimitForPlan(subscription?.plan_tier);
+  const hasWidgetCapacity = canCreateWidget({
+    plan: subscription?.plan_tier,
+    widgetCount: widgets.length,
+  });
 
   const needsSyncCount = useMemo(
     () => widgets.filter((w) => w.needsRedeploy && w.status === 'deployed').length,
@@ -409,6 +415,15 @@ export default function WidgetsPageClient({
    * The API already supports a `name` field in the POST body.
    */
   const createWidget = async (name: string, description: string) => {
+    if (!hasWidgetCapacity) {
+      showToast(t('widgets.limitReachedDescription'), 'error');
+      setShowCreateModal(false);
+      if (subscription?.plan_tier !== 'premium') {
+        router.push('/settings/billing');
+      }
+      return;
+    }
+
     setIsCreating(true);
 
     try {
@@ -605,16 +620,50 @@ export default function WidgetsPageClient({
             </button>
           )}
           <button
-            onClick={() => setShowCreateModal(true)}
-            disabled={isCreating}
-            className="group relative flex items-center gap-3 overflow-hidden rounded-full bg-on-surface px-8 py-4 text-sm font-bold uppercase tracking-[0.16em] text-background shadow-xl transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+            onClick={() => {
+              if (hasWidgetCapacity) {
+                setShowCreateModal(true);
+              } else if (subscription?.plan_tier !== 'premium') {
+                router.push('/settings/billing');
+              }
+            }}
+            disabled={isCreating || (!hasWidgetCapacity && subscription?.plan_tier === 'premium')}
+            title={!hasWidgetCapacity ? t('widgets.limitReachedDescription') : undefined}
+            className={`group relative flex items-center gap-3 overflow-hidden rounded-full px-8 py-4 text-sm font-bold uppercase tracking-[0.16em] shadow-xl transition-all active:scale-95 disabled:opacity-60 ${
+              hasWidgetCapacity
+                ? 'bg-on-surface text-background hover:scale-[1.02]'
+                : subscription?.plan_tier === 'premium'
+                  ? 'cursor-not-allowed bg-on-surface/10 text-on-surface-variant'
+                  : 'bg-primary text-background hover:scale-[1.02]'
+            }`}
           >
             <span className="relative z-10">
-              {isCreating ? t('widgets.creatingWorkspace') : highlightedAgentId ? t('widgets.newWidgetFromAgent') : t('widgets.initializeWidget')}
+              {isCreating
+                ? t('widgets.creatingWorkspace')
+                : hasWidgetCapacity
+                  ? highlightedAgentId
+                    ? t('widgets.newWidgetFromAgent')
+                    : t('widgets.initializeWidget')
+                  : subscription?.plan_tier === 'premium'
+                    ? t('widgets.limitReached')
+                    : t('widgets.upgradeForMoreWidgets')}
             </span>
             <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-primary/12 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
           </button>
         </div>
+      </div>
+
+      <div className="mb-8 rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm text-on-surface-variant/70">
+        <span className="font-semibold text-on-surface">
+          {widgets.length}/{widgetLimit} {t('widgets.widgetLimitLabel')}
+        </span>
+        {!hasWidgetCapacity && (
+          <span className="ml-2">
+            {subscription?.plan_tier === 'premium'
+              ? t('widgets.limitReachedDescription')
+              : t('widgets.upgradeForMoreWidgetsDescription')}
+          </span>
+        )}
       </div>
 
       {highlightedAgentId && (

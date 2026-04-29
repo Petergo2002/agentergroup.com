@@ -1253,6 +1253,19 @@ export default function Widget({
           </AnimatePresence>
         </main>
 
+        {config.widget.showBranding ? (
+          <div className="shrink-0 px-6 pb-3 pt-2 text-center">
+            <a
+              href="https://agentergroup.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-widget-muted transition-colors hover:text-widget-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-widget-primary/40"
+            >
+              Powered by Agentergroup
+            </a>
+          </div>
+        ) : null}
+
         <AnimatePresence>
           {selectedAgent &&
             !isChooserMode &&

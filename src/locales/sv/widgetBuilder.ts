@@ -29,8 +29,10 @@ export const widgetBuilder = {
     interactionDescription:
       "Styr hur widgeten beter sig när en användare först interagerar med den.",
     primaryLanguage: "Primärt språk",
-    showBranding: "Visa Agenter-branding",
-    brandingDescription: 'Växla sidfoten "Powered by Agenter"',
+    showBranding: "Visa Agentergroup-branding",
+    brandingDescription: 'Växla sidfoten "Powered by Agentergroup".',
+    brandingPremiumDescription:
+      'Premium-workspaces kan dölja sidfoten "Powered by Agentergroup".',
     homeCopywriting: "Copy för hemskärm",
     homeCopywritingDescription:
       "Den första texten som visas i väljarvyn när flera specialister är aktiva.",

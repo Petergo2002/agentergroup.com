@@ -17,6 +17,8 @@ export const nav = {
   activeWorkspace: "Aktivt workspace",
   switchClientContext: "Byt kundkontext",
   createWorkspace: "Skapa workspace",
+  upgradeForWorkspaces: "Uppgradera för fler workspaces",
+  workspaceLimitReached: "Workspace-gräns nådd",
   guestWorkspace: "Gästworkspace",
   switchWorkspace: "Byt Workspace",
   groups: {

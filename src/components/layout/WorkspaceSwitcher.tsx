@@ -6,6 +6,11 @@ import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { LogOut, ChevronsUpDown, Check, Plus, Building2, Settings } from 'lucide-react';
 import { CreateWorkspaceModal } from '@/components/modals/CreateWorkspaceModal';
+import {
+  canCreateWorkspace,
+  getOwnedWorkspaceCount,
+  getWorkspaceLimitForPlan,
+} from '@/lib/workspace-limits';
 
 interface WorkspaceSwitcherProps {
   isCollapsed: boolean;
@@ -14,7 +19,7 @@ interface WorkspaceSwitcherProps {
 }
 
 export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: WorkspaceSwitcherProps) {
-  const { workspace, workspaces, membership, user } = useAppContext();
+  const { workspace, workspaces, membership, subscription, user } = useAppContext();
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
@@ -26,6 +31,16 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
 
   // Format array to ensure it's not nested incorrectly due to joins
   const availableWorkspaces = Array.isArray(workspaces) ? workspaces : [];
+  const ownedWorkspaceCount = getOwnedWorkspaceCount(availableWorkspaces);
+  const workspaceLimit = getWorkspaceLimitForPlan(subscription?.plan_tier);
+  const hasWorkspaceCapacity = canCreateWorkspace({
+    plan: subscription?.plan_tier,
+    ownedWorkspaceCount,
+  });
+  const createWorkspaceLimitLabel =
+    subscription?.plan_tier === 'premium'
+      ? `Premium allows up to ${workspaceLimit} workspaces.`
+      : 'Upgrade to Premium to create more workspaces.';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -170,12 +185,37 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
           <button
             onClick={() => {
               setIsOpen(false);
-              setIsCreateModalOpen(true);
+              if (hasWorkspaceCapacity) {
+                setIsCreateModalOpen(true);
+              } else if (subscription?.plan_tier !== 'premium') {
+                window.location.assign('/settings/billing');
+              }
             }}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-all duration-150 active:scale-[0.98] hover:bg-on-surface/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            disabled={!hasWorkspaceCapacity && subscription?.plan_tier === 'premium'}
+            title={!hasWorkspaceCapacity ? createWorkspaceLimitLabel : undefined}
+            className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              hasWorkspaceCapacity
+                ? 'text-on-surface hover:bg-on-surface/5'
+                : subscription?.plan_tier === 'premium'
+                  ? 'cursor-not-allowed text-on-surface-variant/50'
+                  : 'text-primary hover:bg-primary/10'
+            }`}
           >
-            <Plus className="h-4 w-4 text-on-surface-variant" />
-            {t('nav.createWorkspace') || 'Create workspace'}
+            <Plus className={`h-4 w-4 ${hasWorkspaceCapacity ? 'text-on-surface-variant' : 'text-current'}`} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">
+                {hasWorkspaceCapacity
+                  ? t('nav.createWorkspace') || 'Create workspace'
+                  : subscription?.plan_tier === 'premium'
+                    ? t('nav.workspaceLimitReached') || 'Workspace limit reached'
+                    : t('nav.upgradeForWorkspaces') || 'Upgrade for more workspaces'}
+              </span>
+              {!hasWorkspaceCapacity && (
+                <span className="mt-0.5 block truncate text-[10px] font-medium text-on-surface-variant/60">
+                  {ownedWorkspaceCount}/{workspaceLimit} workspaces
+                </span>
+              )}
+            </span>
           </button>
 
           <form action="/auth/logout" method="post" className="w-full">

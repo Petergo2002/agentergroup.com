@@ -8,6 +8,11 @@ import {
   buildDefaultWidgetInput,
 } from "@/lib/widgets";
 import { buildWidgetSummary, loadAllWidgetsWithAgents } from "@/lib/widgets/server";
+import {
+  buildWidgetLimitError,
+  canCreateWidget,
+  getWidgetLimitForPlan,
+} from "@/lib/widget-limits";
 
 function buildWidgetSlug(name: string) {
   const base = slugify(name) || "widget";
@@ -76,6 +81,38 @@ export async function POST(request: NextRequest) {
   const requestedAgentId =
     typeof body.agentId === "string" && body.agentId.trim() ? body.agentId.trim() : null;
   let seededAgent: AgentRecord | null = null;
+
+  const { count: widgetCount, error: widgetCountError } = await supabase
+    .from("widgets")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", context.workspace.id);
+
+  if (widgetCountError) {
+    return NextResponse.json(
+      { error: widgetCountError.message || "Failed to check widget limit." },
+      { status: 500 },
+    );
+  }
+
+  const currentWidgetCount = widgetCount ?? 0;
+  const widgetLimit = getWidgetLimitForPlan(context.subscription?.plan_tier);
+
+  if (
+    !canCreateWidget({
+      plan: context.subscription?.plan_tier,
+      widgetCount: currentWidgetCount,
+    })
+  ) {
+    return NextResponse.json(
+      {
+        error: buildWidgetLimitError(context.subscription?.plan_tier),
+        code: "widget_limit_reached",
+        widgetLimit,
+        widgetCount: currentWidgetCount,
+      },
+      { status: 403 },
+    );
+  }
 
   if (requestedAgentId) {
     const { data: agent, error: agentError } = await supabase

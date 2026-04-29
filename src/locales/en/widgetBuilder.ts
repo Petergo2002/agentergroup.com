@@ -29,8 +29,10 @@ export const widgetBuilder = {
     interactionDescription:
       "Control how the widget behaves when a user first interacts with it.",
     primaryLanguage: "Primary Language",
-    showBranding: "Show Agenter Branding",
-    brandingDescription: 'Toggle "Powered by Agenter" footer',
+    showBranding: "Show Agentergroup branding",
+    brandingDescription: 'Toggle the "Powered by Agentergroup" footer.',
+    brandingPremiumDescription:
+      'Premium workspaces can hide the "Powered by Agentergroup" footer.',
     homeCopywriting: "Home Screen Copywriting",
     homeCopywritingDescription:
       "The initial text shown in the home chooser screen when multiple specialists are active.",

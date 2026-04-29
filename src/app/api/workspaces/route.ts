@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createWorkspaceForUser, ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
+import {
+  canCreateWorkspace,
+  getOwnedWorkspaceCount,
+  getWorkspaceLimitForPlan,
+} from "@/lib/workspace-limits";
 
 export async function GET() {
   const supabase = await createClient();
@@ -36,6 +41,30 @@ export async function POST(request: Request) {
 
   if (!name) {
     return NextResponse.json({ error: "Workspace name is required." }, { status: 400 });
+  }
+
+  const context = await ensureWorkspaceContext(supabase as never, user);
+  const ownedWorkspaceCount = getOwnedWorkspaceCount(context.workspaces);
+  const workspaceLimit = getWorkspaceLimitForPlan(context.subscription?.plan_tier);
+
+  if (
+    !canCreateWorkspace({
+      plan: context.subscription?.plan_tier,
+      ownedWorkspaceCount,
+    })
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          context.subscription?.plan_tier === "premium"
+            ? `Your Premium plan allows up to ${workspaceLimit} workspaces.`
+            : "Upgrade to Premium to create more workspaces.",
+        code: "workspace_limit_reached",
+        workspaceLimit,
+        ownedWorkspaceCount,
+      },
+      { status: 403 },
+    );
   }
 
   const createdWorkspace = await createWorkspaceForUser(supabase as never, user, {
