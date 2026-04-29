@@ -178,9 +178,19 @@
   }
 }
 
+@layer components {
+
+}
+
 @keyframes loading {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+@keyframes rate-limit-upgrade-border {
+  to {
+    transform: rotate(1turn);
+  }
 }
 
 @keyframes admin-fade-in {

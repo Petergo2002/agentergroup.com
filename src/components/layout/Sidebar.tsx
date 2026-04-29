@@ -7,6 +7,7 @@ import {
   BarChart3,
   Bot,
   LayoutGrid,
+  ArrowUpRight,
   MessageCircle,
   MessageSquare,
   Network,
@@ -49,6 +50,7 @@ export function Sidebar({
     Math.round((messagesUsed / messagesLimit) * 100),
     100
   );
+  const isFreePlan = subscription?.plan_tier === "free";
 
   const navGroups = [
     {
@@ -265,6 +267,27 @@ export function Sidebar({
                       date: new Date(subscription.billing_cycle_end).toLocaleDateString(language === 'sv' ? 'sv-SE' : 'en-US', { day: 'numeric', month: 'short' })
                     })}
                   </p>
+                  {isFreePlan && (
+                    <Link
+                      href="/settings/billing"
+                      onClick={onNavigate}
+                      className="group/upgrade relative mt-4 flex w-full items-center justify-center overflow-hidden rounded-xl p-[1.5px] shadow-sm transition-all duration-300 hover:shadow-md"
+                      aria-label="Upgrade plan"
+                    >
+                      {/* Rotating gradient background */}
+                      <div className="absolute inset-[-200%] animate-[spin_3s_linear_infinite] [animation-play-state:paused] group-hover/upgrade:[animation-play-state:running] bg-[conic-gradient(from_90deg_at_50%_50%,transparent_0%,transparent_30%,rgba(255,92,0,0.6)_40%,#ff5c00_48%,#ffffff_50%,#ff5c00_52%,rgba(255,92,0,0.6)_60%,transparent_70%,transparent_100%)] opacity-50 transition-opacity duration-300 group-hover/upgrade:opacity-100" />
+                      
+                      {/* Inner button surface */}
+                      <div className="relative flex h-10 w-full items-center justify-center gap-2.5 rounded-[10.5px] bg-surface-container-lowest transition-colors duration-300 group-hover/upgrade:bg-surface-container-lowest dark:bg-surface-container-low dark:group-hover/upgrade:bg-surface-container-high">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-on-surface text-background shadow-sm transition-transform duration-300 group-hover/upgrade:scale-110">
+                          <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.5} />
+                        </span>
+                        <span className="text-sm font-bold text-on-surface">
+                          Upgrade
+                        </span>
+                      </div>
+                    </Link>
+                  )}
                 </>
               )}
             </div>
