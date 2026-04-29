@@ -22,6 +22,9 @@ export default function SettingsPage() {
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
   const [privacyEmail, setPrivacyEmail] = useState('');
   const [privacySessionId, setPrivacySessionId] = useState('');
   const [privacyLookupResult, setPrivacyLookupResult] =
@@ -132,6 +135,44 @@ export default function SettingsPage() {
       showToast(message, 'error');
     } finally {
       setIsDeletingWorkspace(false);
+    }
+  };
+
+  // Sends a password reset email to the currently logged-in user
+  const handleResetPassword = async () => {
+    if (!user.email) return;
+    setIsResettingPassword(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+      });
+      if (error) throw error;
+      showToast('Password reset email sent — check your inbox.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send reset email.';
+      showToast(message, 'error');
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  // Sends email change confirmation to both the old and new email addresses
+  const handleChangeEmail = async () => {
+    if (!newEmail.trim() || newEmail === user.email) return;
+    setIsChangingEmail(true);
+    try {
+      const { error } = await supabase.auth.updateUser(
+        { email: newEmail.trim() },
+        { emailRedirectTo: `${window.location.origin}/auth/callback?next=/settings` }
+      );
+      if (error) throw error;
+      showToast('Verification emails sent to both addresses. Please confirm to finalize the change.', 'success');
+      setNewEmail('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send email change confirmation.';
+      showToast(message, 'error');
+    } finally {
+      setIsChangingEmail(false);
     }
   };
 
@@ -306,6 +347,61 @@ export default function SettingsPage() {
                 value={user.email ?? ''}
                 className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-3 text-sm text-on-surface-variant outline-none"
               />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Security ─────────────────────────────────────────────── */}
+        <div className="rounded-[1.7rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
+            Security
+          </p>
+          <div className="mt-6 space-y-4">
+            {/* Email Address Change */}
+            <div className="rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-on-surface">Email Address</p>
+                  <p className="mt-1 text-xs text-on-surface-variant max-w-sm">
+                    Update your email address. You will need to confirm the change from both your old and new email addresses.
+                  </p>
+                  <div className="mt-3">
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder={user.email ?? 'New email address'}
+                      className="w-full max-w-sm rounded-xl border border-outline-variant/10 bg-background px-4 py-2.5 text-sm outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleChangeEmail}
+                  disabled={isChangingEmail || !newEmail.trim() || newEmail === user.email}
+                  className="mt-4 shrink-0 rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0"
+                >
+                  {isChangingEmail ? 'Sending…' : 'Update Email'}
+                </button>
+              </div>
+            </div>
+
+            {/* Password Reset */}
+            <div className="rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-on-surface">Password</p>
+                  <p className="mt-1 text-xs text-on-surface-variant">
+                    Send a reset link to <strong>{user.email}</strong> to change your password.
+                  </p>
+                </div>
+                <button
+                  onClick={handleResetPassword}
+                  disabled={isResettingPassword}
+                  className="shrink-0 rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isResettingPassword ? 'Sending…' : 'Send Reset Email'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -159,6 +159,12 @@ COMPOSIO_API_KEY=`}
                   <label className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
                     {messages.login.password}
                   </label>
+                  <Link
+                    href="/login/forgot-password"
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
                 </div>
                 <input
                   className="w-full rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm text-on-surface outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-on-surface-variant/40"

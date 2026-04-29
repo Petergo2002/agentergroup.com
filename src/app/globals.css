@@ -187,10 +187,43 @@
   100% { background-position: -200% 0; }
 }
 
-@keyframes rate-limit-upgrade-border {
+@property --upgrade-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes upgrade-border-spin {
   to {
-    transform: rotate(1turn);
+    --upgrade-angle: 360deg;
   }
+}
+
+/* The upgrade button border wrapper */
+.upgrade-btn-border {
+  --upgrade-angle: 0deg;
+  position: relative;
+  border-radius: 0.75rem; /* rounded-xl = 12px */
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--upgrade-angle) at 50% 50%,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 92, 0, 0.5) 40%,
+    #ff5c00 48%,
+    #ffffff 50%,
+    #ff5c00 52%,
+    rgba(255, 92, 0, 0.5) 60%,
+    transparent 70%,
+    transparent 100%
+  );
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+
+.upgrade-btn-border:hover {
+  opacity: 1;
+  animation: upgrade-border-spin 3s linear infinite;
 }
 
 @keyframes admin-fade-in {
