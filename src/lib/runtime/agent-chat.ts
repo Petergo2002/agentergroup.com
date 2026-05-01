@@ -21,6 +21,7 @@ import {
 } from "@/lib/knowledge";
 import { createOpenRouterChatCompletion } from "@/lib/openrouter";
 import { getSupabaseEnv, getSupabaseServiceRoleKey } from "@/lib/env";
+import type { EnabledToolSelection } from "@/lib/tool-actions";
 import type {
   AgentRecord,
   CalSelection,
@@ -139,6 +140,7 @@ export interface AgentRuntimeInput {
   calSelection?: CalSelection | null;
   endChatPolicy?: EndChatPolicy | null;
   gmailRecipientPolicy?: GmailRecipientPolicy | null;
+  enabledToolsByToolkit?: EnabledToolSelection | null;
   abortSignal?: AbortSignal;
 }
 
@@ -584,6 +586,7 @@ export async function runAgentChat({
   calSelection,
   endChatPolicy,
   gmailRecipientPolicy,
+  enabledToolsByToolkit,
   abortSignal,
   onToken,
   onStatus,
@@ -668,7 +671,11 @@ export async function runAgentChat({
     );
   }
 
-  const toolsPromise = getWrappedTools(toolUserId, enabledToolkits);
+  const toolsPromise = getWrappedTools(
+    toolUserId,
+    enabledToolkits,
+    enabledToolsByToolkit,
+  );
   let knowledgeMatches: KnowledgeMatchRecord[] = [];
 
   const hasGlobalKnowledge = readyKnowledgeSources.length > 0;

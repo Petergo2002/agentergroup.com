@@ -1,3 +1,5 @@
+import { OPENROUTER_DEFAULT_AGENT_MODEL } from "@/lib/openrouter-models";
+
 /** Shared environment helpers for the dashboard app and widget runtime. */
 
 function requireEnv(value: string | undefined, name: string): string {
@@ -73,7 +75,7 @@ export function hasSupabaseServiceRoleEnv(): boolean {
  * @returns The configured model id, or the repo default.
  */
 export function getOpenRouterModel(): string {
-  return process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
+  return process.env.OPENROUTER_MODEL ?? OPENROUTER_DEFAULT_AGENT_MODEL;
 }
 
 /**

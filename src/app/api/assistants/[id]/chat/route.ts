@@ -25,7 +25,9 @@ import {
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
+import { extractCalSelectionFromDefinition } from "@/lib/cal";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
+import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
 import {
   completeRunStep,
   createAuditLog,
@@ -116,6 +118,12 @@ export async function POST(
     draft?.definition ?? null,
   );
   const googleCalendarSelection = extractGoogleCalendarSelectionFromDefinition(
+    draft?.definition ?? null,
+  );
+  const calSelection = extractCalSelectionFromDefinition(
+    draft?.definition ?? null,
+  );
+  const enabledToolsByToolkit = extractEnabledToolsFromDefinition(
     draft?.definition ?? null,
   );
   const calendarTimezone = googleCalendarSelection.timezone;
@@ -302,8 +310,10 @@ export async function POST(
           knowledgeAccessToken: session?.access_token ?? null,
           calendarTimezone,
           googleCalendarSelection,
+          calSelection,
           endChatPolicy,
           gmailRecipientPolicy,
+          enabledToolsByToolkit,
           onToken: (token) => {
             send({
               type: "delta",

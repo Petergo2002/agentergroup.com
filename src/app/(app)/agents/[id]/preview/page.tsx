@@ -14,6 +14,7 @@ import { getEffectiveConnectionStatus } from '@/lib/connections';
 import { extractEndChatPolicyFromDefinition } from '@/lib/end-chat';
 import { isChatIntegrationSlug } from '@/lib/integrations';
 import { getKnowledgeStatusTone } from '@/lib/knowledge';
+import { getOpenRouterModelLabel } from '@/lib/openrouter-models';
 import type {
   AgentRecord,
   ConnectionRecord,
@@ -709,7 +710,7 @@ export default function AgentPreviewPage() {
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               <div className="px-3 py-1.5 rounded-full border border-outline-variant/10 bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                {agent?.model?.split('/').pop() || 'GPT-4o'}
+                {agent?.model ? getOpenRouterModelLabel(agent.model) : 'Default'}
               </div>
               <div className="px-3 py-1.5 rounded-full border border-outline-variant/10 bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 {t('agentPreview.previewMode')}

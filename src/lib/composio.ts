@@ -15,14 +15,16 @@ import type {
 } from "@/lib/types";
 import {
   getDriveImportMimeTypes,
-  getAllowedChatToolsForToolkits,
+  getRecommendedChatToolsForToolkit,
   getInternalAssistantToolkitSlugs,
   getSupportedIntegration,
   isInternalAssistantToolkitSlug,
   isSupportedIntegrationSlug,
+  isToolNameForToolkit,
   SUPPORTED_INTEGRATIONS,
   type SupportedIntegrationSlug,
 } from "@/lib/integrations";
+import type { EnabledToolSelection } from "@/lib/tool-actions";
 
 interface ComposioToolkitRef {
   slug?: string;
@@ -67,6 +69,12 @@ export interface SyncedConnectedAccount {
 interface MCPSessionInfo {
   url: string;
   headers: Record<string, string>;
+}
+
+export interface ToolkitActionOption {
+  name: string;
+  description: string;
+  recommended: boolean;
 }
 
 interface ConnectionSyncRow {
@@ -648,7 +656,120 @@ export async function deleteConnectedAccount(connectedAccountId: string) {
   return composio.connectedAccounts.delete(connectedAccountId);
 }
 
-export async function getWrappedTools(userId: string, toolkitSlugs: string[]) {
+function getSelectedChatToolsForToolkits(
+  toolkitSlugs: string[],
+  enabledToolsByToolkit?: EnabledToolSelection | null,
+) {
+  return Array.from(
+    new Set(
+      toolkitSlugs.flatMap((toolkitSlug) => {
+        const configuredTools = enabledToolsByToolkit?.[toolkitSlug];
+        const candidates = Array.isArray(configuredTools)
+          ? configuredTools
+          : getRecommendedChatToolsForToolkit(toolkitSlug);
+
+        return candidates.filter((toolName) =>
+          isToolNameForToolkit(toolName, toolkitSlug),
+        );
+      }),
+    ),
+  );
+}
+
+function extractToolDefinitionName(tool: unknown) {
+  if (!tool || typeof tool !== "object") {
+    return null;
+  }
+
+  const record = tool as Record<string, unknown>;
+  const directName = record.name;
+  const functionValue = record.function;
+  const functionName =
+    functionValue && typeof functionValue === "object"
+      ? (functionValue as Record<string, unknown>).name
+      : null;
+
+  return typeof functionName === "string"
+    ? functionName
+    : typeof directName === "string"
+      ? directName
+      : null;
+}
+
+function extractToolDefinitionDescription(tool: unknown) {
+  if (!tool || typeof tool !== "object") {
+    return "";
+  }
+
+  const record = tool as Record<string, unknown>;
+  const directDescription = record.description;
+  const functionValue = record.function;
+  const functionDescription =
+    functionValue && typeof functionValue === "object"
+      ? (functionValue as Record<string, unknown>).description
+      : null;
+
+  return typeof functionDescription === "string"
+    ? functionDescription
+    : typeof directDescription === "string"
+      ? directDescription
+      : "";
+}
+
+export async function listToolkitChatActions(userId: string, toolkitSlug: string) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  // Fetch ALL tools for the toolkit.
+  // IMPORTANT: Without `important: false`, the Composio SDK auto-applies an
+  // "important=true" filter when querying by toolkit name — silently returning
+  // only ~30 "highlighted" tools instead of all 301+ (e.g. Outlook).
+  // We also set a high limit so pagination doesn't truncate the list.
+  const tools = await composio.tools.get(userId, {
+    toolkits: [toolkitSlug],
+    important: false,
+    limit: 500,
+  });
+  const recommendedTools = new Set(getRecommendedChatToolsForToolkit(toolkitSlug));
+
+  return Array.from(
+    new Map(
+      (tools as unknown[])
+        .map((tool) => {
+          const name = extractToolDefinitionName(tool);
+
+          if (!name || !isToolNameForToolkit(name, toolkitSlug)) {
+            return null;
+          }
+
+          return [
+            name,
+            {
+              name,
+              description: extractToolDefinitionDescription(tool),
+              recommended: recommendedTools.has(name),
+            } satisfies ToolkitActionOption,
+          ] as const;
+        })
+        .filter(Boolean) as Array<readonly [string, ToolkitActionOption]>,
+    ).values(),
+  ).sort((left, right) => {
+    if (left.recommended !== right.recommended) {
+      return left.recommended ? -1 : 1;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+}
+
+export async function getWrappedTools(
+  userId: string,
+  toolkitSlugs: string[],
+  enabledToolsByToolkit?: EnabledToolSelection | null,
+) {
   const composio = createComposioClient();
 
   if (!composio) {
@@ -656,18 +777,21 @@ export async function getWrappedTools(userId: string, toolkitSlugs: string[]) {
     return [];
   }
 
-  const allowedTools = getAllowedChatToolsForToolkits(toolkitSlugs);
+  const selectedTools = getSelectedChatToolsForToolkits(
+    toolkitSlugs,
+    enabledToolsByToolkit,
+  );
   const builtInToolkits = toolkitSlugs.filter(isInternalAssistantToolkitSlug);
 
-  if (allowedTools.length === 0 && builtInToolkits.length === 0) {
+  if (selectedTools.length === 0 && builtInToolkits.length === 0) {
     return [];
   }
 
   try {
     const toolCollections = await Promise.all([
-      allowedTools.length > 0
+      selectedTools.length > 0
         ? composio.tools.get(userId, {
-            tools: allowedTools,
+            tools: selectedTools,
           })
         : Promise.resolve([]),
       builtInToolkits.length > 0

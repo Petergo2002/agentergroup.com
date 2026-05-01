@@ -18,6 +18,7 @@ import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import { extractCalSelectionFromDefinition } from "@/lib/cal";
+import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
@@ -113,6 +114,9 @@ export async function POST(
     draft?.definition ?? null,
   );
   const calSelection = extractCalSelectionFromDefinition(
+    draft?.definition ?? null,
+  );
+  const enabledToolsByToolkit = extractEnabledToolsFromDefinition(
     draft?.definition ?? null,
   );
   const calendarTimezone = googleCalendarSelection.timezone;
@@ -304,6 +308,7 @@ export async function POST(
           calSelection,
           endChatPolicy,
           gmailRecipientPolicy,
+          enabledToolsByToolkit,
           onToken: (token) => {
             send({
               type: "delta",

@@ -28,7 +28,6 @@ interface SidebarProps {
   userEmail?: string | null;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
-  mounted?: boolean;
 }
 
 export function Sidebar({
@@ -36,7 +35,6 @@ export function Sidebar({
   onNavigate,
   isCollapsed = false,
   onToggleCollapse,
-  mounted = false,
 }: SidebarProps) {
   const pathname = usePathname();
   const { membership, workspace, subscription } = useAppContext();
@@ -108,11 +106,9 @@ export function Sidebar({
         </Link>
         
         <div className={`flex ${isCollapsed && !mobile ? 'flex-col items-center gap-4' : 'items-center gap-3'}`}>
-          {mounted && (
-            <div className="flex shrink-0 items-center">
-              <ThemeToggle />
-            </div>
-          )}
+          <div className="flex shrink-0 items-center">
+            <ThemeToggle />
+          </div>
 
           {!mobile && onToggleCollapse && (
             <button

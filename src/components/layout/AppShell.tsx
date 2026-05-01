@@ -20,18 +20,13 @@ interface AppShellProps {
 
 export function AppShell({ children, context, user }: AppShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      localStorage.getItem("agenter_sidebar_collapsed") === "true",
+  );
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("agenter_sidebar_collapsed") === "true";
-    if (saved) {
-      setIsSidebarCollapsed(true);
-    }
-    setMounted(true);
-  }, []);
 
   const toggleSidebarCollapse = () => {
     const newState = !isSidebarCollapsed;
@@ -128,7 +123,6 @@ export function AppShell({ children, context, user }: AppShellProps) {
                   userEmail={user.email} 
                   isCollapsed={isSidebarCollapsed}
                   onToggleCollapse={toggleSidebarCollapse}
-                  mounted={mounted}
                 />
               </div>
 

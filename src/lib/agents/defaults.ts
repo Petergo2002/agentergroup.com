@@ -1,5 +1,6 @@
 import { slugify } from "@/lib/utils";
 import { SUPPORTED_INTEGRATIONS } from "@/lib/integrations";
+import { OPENROUTER_DEFAULT_AGENT_MODEL } from "@/lib/openrouter-models";
 import type { AgentSurface, BuilderDefinition } from "@/lib/types";
 
 export const SUPPORTED_TOOLKITS = SUPPORTED_INTEGRATIONS.map((integration) => ({
@@ -128,7 +129,7 @@ export function buildInitialDefinition(templateId: string): BuilderDefinition {
     ],
     viewport: { x: 0, y: 0, zoom: 0.95 },
     config: {
-      model: "openai/gpt-4o-mini",
+      model: OPENROUTER_DEFAULT_AGENT_MODEL,
       instructions: preset.instructions,
       starterPrompts: [...preset.starterPrompts],
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -150,7 +151,7 @@ export function buildAgentPayload(
     description: preset.description,
     status: "draft" as const,
     surface,
-    model: "openai/gpt-4o-mini",
+    model: OPENROUTER_DEFAULT_AGENT_MODEL,
     instructions: preset.instructions,
     starter_prompts: [...preset.starterPrompts],
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,

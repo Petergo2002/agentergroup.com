@@ -1,6 +1,6 @@
 # End-to-End Integration Guide — Adding New Toolkits
 
-Last updated: 2026-04-19
+Last updated: 2026-04-30
 
 This document defines the complete workflow for adding a new Composio toolkit (integration) to the Agenter platform. Follow these steps in order to ensure the integration is registered, secured, and properly exposed in the Agent Builder and Runtime.
 
@@ -25,8 +25,10 @@ Register the new integration in the central registry.
   - `icon`: Material Symbols icon name.
   - `simpleIcon`: The `si<Brand>` key from `SimpleIcon.tsx`.
   - `simpleIconColor`: Brand hex code.
-  - `allowedChatTools`: Array of specific tool names (e.g., `GMAIL_SEND_EMAIL`).
+  - `recommendedChatTools`: Small default action set shown under **Recommended** in the builder (e.g., `GMAIL_SEND_EMAIL`).
   - `surface`: `"chat"` (tools used during conversation) or `"knowledge"` (tools used for importing data).
+
+Do not add a platform-level chat allow list for new Composio toolkits. Chat integrations should expose the toolkit's available Composio actions through `/api/connections/toolkits/[toolkitSlug]/tools`, then store the user's selected action slugs in the builder node as `enabledTools`.
 
 ---
 
@@ -41,6 +43,16 @@ Update the default version mapping.
 Define constants for the tools you'll be intercepting or using.
 - **File:** `src/lib/composio.ts`
 - **Action:** `const <NAME>_TOOL = "<COMPOSIO_UPPERCASE_NAME>";`
+- **Use only when needed:** Constants are required for policy interception, argument patching, or response masking. They are not the source of available actions.
+
+### Action Discovery
+Expose the full action list for the toolkit.
+- **File:** `src/lib/integrations.ts`
+- **Action:** Add the toolkit's Composio tool-name prefix in `getToolNamePrefixForToolkit()`.
+- **File:** `src/lib/composio.ts`
+- **Action:** Reuse `listToolkitChatActions()` to fetch all Composio tools for the toolkit and mark `recommendedChatTools` as recommended.
+- **File:** `src/app/api/connections/toolkits/[toolkitSlug]/tools/route.ts`
+- **Action:** This route should work for every `surface: "chat"` integration once the toolkit is registered and has a prefix.
 
 ### Security Policies
 If the toolkit involves sensitive actions (like sending emails), you must apply interception logic.
@@ -85,7 +97,7 @@ Define the data shape for the builder node.
 ### Helper Functions
 Update the following functions in `src/app/(app)/agents/[id]/builder/page.tsx`:
 - `getBuilderNodeText`: Add localized labels and descriptions.
-- `getToolActionLabels`: Define which actions appear in the "Allowed Actions" badge.
+- `formatToolActionName` and `getEnabledToolNames`: Keep action labels generic; the builder should render the toolkit's Composio actions dynamically.
 - `isToolNodeKind` & `isBuilderNodeKind`: Add the new kind.
 - `buildEdges`: Add logic to draw the edge from Agent Core to the new node.
 - `inferNodeKind`: Add logic to detect the node kind from raw database labels.
@@ -94,7 +106,8 @@ Update the following functions in `src/app/(app)/agents/[id]/builder/page.tsx`:
 - **File:** `src/app/(app)/agents/[id]/builder/page.tsx`
 - **Action:**
   1. Implement `create<Name>Node()` helper.
-  2. Update `normalizeDefinition()` to correctly restore the node from the database.
+  2. Initialize `enabledTools` with `getRecommendedChatToolsForToolkit("<slug>")`.
+  3. Update `normalizeDefinition()` to restore existing `enabledTools`; when absent, fall back to `recommendedChatTools` so old drafts keep working.
 
 ### Sidebar Inspector (JSX)
 Update the `renderInspectorBody()` function in the `AgentBuilderPage` component.
@@ -102,6 +115,7 @@ Update the `renderInspectorBody()` function in the `AgentBuilderPage` component.
 - **Action:**
   - Update variable assignments (e.g., `emailRecipientEmail`).
   - Add JSX for the specific settings (inputs, selects, etc.) required by the toolkit.
+  - Keep the **Enabled Actions** editor available for the toolkit node. Recommended actions should be one-click defaults; more actions should come from Composio and be user-enabled explicitly.
   - Update the "Remove Node" button logic.
 
 ---
@@ -113,6 +127,10 @@ Update the `renderInspectorBody()` function in the `AgentBuilderPage` component.
 - **Action:**
   - Update `buildToolGuidance()` to include specific system prompts/instructions for the new toolkit. This tells the LLM *how* and *when* to use these tools.
   - Update the `enabledToolkits` filter logic if the toolkit should be hidden when certain security conditions aren't met.
+- **File:** `src/lib/tool-actions.ts`
+- **Action:** Runtime action selection is extracted from the saved builder definition. The stored `enabledTools` are validated against the toolkit prefix before `getWrappedTools()` loads them from Composio.
+- **File:** `src/lib/composio.ts`
+- **Action:** `getWrappedTools()` receives `enabledToolsByToolkit`. If a node has no stored `enabledTools`, it falls back to `recommendedChatTools` for backward compatibility.
 
 ---
 

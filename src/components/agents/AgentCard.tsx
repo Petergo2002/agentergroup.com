@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { getOpenRouterModelLabel } from "@/lib/openrouter-models";
 import { EntityActionsMenu } from "@/components/ui/EntityActionsMenu";
 import type { AgentRecord } from "@/lib/types";
 
@@ -51,11 +52,7 @@ export function AgentCard({
     return "bg-on-surface-variant/35";
   };
 
-  const modelLabel = agent.model?.toLowerCase().includes("gpt-4o") 
-    ? "GPT-4o" 
-    : agent.model?.toLowerCase().includes("claude") 
-      ? "Claude 3.5" 
-      : agent.model || "Standard";
+  const modelLabel = getOpenRouterModelLabel(agent.model);
 
   const toggleDisabled = Boolean(agent.archived_at) || isBusy || !canEdit || (agent.surface === 'widget' && agent.status !== 'active' && !agent.published_version_id);
 

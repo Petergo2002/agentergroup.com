@@ -11,6 +11,7 @@ export interface BaseBuilderNodeData extends Record<string, unknown> {
   badgeText?: string;
   badgeTone?: BuilderNodeBadgeTone;
   locked?: boolean;
+  enabledTools?: string[];
 }
 
 export interface TriggerBuilderNodeData extends BaseBuilderNodeData {
@@ -22,6 +23,7 @@ export interface AgentBuilderNodeData extends BaseBuilderNodeData {
   kind: "agent";
   showConfidence?: boolean;
   confidenceValue?: number;
+  confidenceLabel?: string;
   locked: true;
 }
 

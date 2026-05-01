@@ -45,7 +45,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'lg' }: ModalPr
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
@@ -53,12 +53,14 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'lg' }: ModalPr
       />
       
       {/* Modal Container */}
-      <div className={`relative w-full ${sizeClasses} glass-panel border border-outline-variant/20 rounded-xl shadow-xl animate-in zoom-in-95 duration-300 overflow-hidden`}>
+      <div
+        className={`relative flex max-h-[calc(100vh-1.5rem)] w-full flex-col overflow-hidden rounded-xl border border-outline-variant/20 glass-panel shadow-xl animate-in zoom-in-95 duration-300 sm:max-h-[calc(100vh-2rem)] ${sizeClasses}`}
+      >
         {/* Physical Top-Light Detail */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         
         {/* Header */}
-        <div className="px-8 pt-8 pb-4 flex items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between px-5 pb-4 pt-5 sm:px-8 sm:pt-8">
           <h3 className="text-2xl font-headline font-bold text-on-surface tracking-tight">
             {title || t('modals.defaultTitle')}
           </h3>
@@ -72,7 +74,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'lg' }: ModalPr
         </div>
         
         {/* Content */}
-        <div className="p-6">
+        <div className="min-h-0 overflow-y-auto p-5 sm:p-6">
           {children}
         </div>
       </div>

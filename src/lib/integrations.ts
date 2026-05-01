@@ -12,7 +12,7 @@ export interface SupportedIntegration {
   category: string;
   connectionPurpose: string;
   surface: IntegrationSurface;
-  allowedChatTools: string[];
+  recommendedChatTools: string[];
   allowedKnowledgeTools: string[];
 }
 
@@ -33,7 +33,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     category: "Communication",
     connectionPurpose: "Used by agents to send emails during the current conversation.",
     surface: "chat",
-    allowedChatTools: ["GMAIL_SEND_EMAIL"],
+    recommendedChatTools: ["GMAIL_SEND_EMAIL"],
     allowedKnowledgeTools: [],
   },
   {
@@ -46,7 +46,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     category: "Communication",
     connectionPurpose: "Used by agents to send emails during the current conversation.",
     surface: "chat",
-    allowedChatTools: ["OUTLOOK_SEND_EMAIL"],
+    recommendedChatTools: ["OUTLOOK_SEND_EMAIL"],
     allowedKnowledgeTools: [],
   },
   {
@@ -59,7 +59,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     category: "Scheduling",
     connectionPurpose: "Used by agents to check availability and book meetings.",
     surface: "chat",
-    allowedChatTools: [
+    recommendedChatTools: [
       "GOOGLECALENDAR_CREATE_EVENT",
       "GOOGLECALENDAR_QUICK_ADD",
       "GOOGLECALENDAR_GET_CURRENT_DATE_TIME",
@@ -78,7 +78,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     category: "Scheduling",
     connectionPurpose: "Used by agents to check availability and book meetings using Cal.com.",
     surface: "chat",
-    allowedChatTools: [
+    recommendedChatTools: [
       "CAL_GET_AVAILABLE_SLOTS_INFO",
       "CAL_CREATE_BOOKING_VERSION_2",
     ],
@@ -94,7 +94,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     category: "Knowledge",
     connectionPurpose: "Used to import files into the knowledge base.",
     surface: "knowledge",
-    allowedChatTools: [],
+    recommendedChatTools: [],
     allowedKnowledgeTools: [
       "GOOGLEDRIVE_FIND_FILE",
       "GOOGLEDRIVE_GET_FILE_METADATA",
@@ -142,14 +142,38 @@ export function isChatIntegrationSlug(slug: string): slug is SupportedIntegratio
   return CHAT_INTEGRATION_SLUGS.has(slug as SupportedIntegrationSlug);
 }
 
-export function getAllowedChatToolsForToolkits(toolkitSlugs: string[]) {
+export function getRecommendedChatToolsForToolkit(toolkitSlug: string) {
+  return getSupportedIntegration(toolkitSlug)?.recommendedChatTools ?? [];
+}
+
+export function getRecommendedChatToolsForToolkits(toolkitSlugs: string[]) {
   return Array.from(
     new Set(
       toolkitSlugs.flatMap(
-        (toolkitSlug) => getSupportedIntegration(toolkitSlug)?.allowedChatTools ?? [],
+        (toolkitSlug) => getRecommendedChatToolsForToolkit(toolkitSlug),
       ),
     ),
   );
+}
+
+export function getToolNamePrefixForToolkit(toolkitSlug: string) {
+  switch (toolkitSlug) {
+    case "gmail":
+      return "GMAIL_";
+    case "outlook":
+      return "OUTLOOK_";
+    case "googlecalendar":
+      return "GOOGLECALENDAR_";
+    case "cal":
+      return "CAL_";
+    default:
+      return null;
+  }
+}
+
+export function isToolNameForToolkit(toolName: string, toolkitSlug: string) {
+  const prefix = getToolNamePrefixForToolkit(toolkitSlug);
+  return Boolean(prefix && toolName.startsWith(prefix));
 }
 
 export function isInternalAssistantToolkitSlug(

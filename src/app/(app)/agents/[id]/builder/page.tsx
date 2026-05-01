@@ -1,7 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  memo,
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -27,6 +37,7 @@ import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/ToastProvider';
 import { Modal } from '@/components/ui/Modal';
+import { AgentModelPicker } from '@/components/agents/AgentModelPicker';
 import { canEditAgentRecord } from '@/lib/agents/access';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { buildInitialDefinition } from '@/lib/agents/defaults';
@@ -36,8 +47,20 @@ import { normalizeGmailRecipientEmail } from '@/lib/gmail';
 import { formatLocaleDateTime, type PlatformLanguage } from '@/lib/i18n';
 import type { GoogleCalendarListItem } from '@/lib/google-calendar';
 import { CalEventTypeListItem, } from '@/lib/cal';
-import { getSupportedIntegration, isChatIntegrationSlug } from '@/lib/integrations';
+import {
+  getRecommendedChatToolsForToolkit,
+  getSupportedIntegration,
+  isChatIntegrationSlug,
+  isToolNameForToolkit,
+} from '@/lib/integrations';
 import { getKnowledgeStatusTone, isReadyKnowledgeSource } from '@/lib/knowledge';
+import {
+  createLegacyOpenRouterModelOption,
+  getFallbackOpenRouterModelSections,
+  getOpenRouterModelOptionById,
+  OPENROUTER_DEFAULT_AGENT_MODEL,
+  type OpenRouterModelSection,
+} from '@/lib/openrouter-models';
 import { formatRelativeDate } from '@/lib/utils';
 import type {
   AgentRecord,
@@ -79,6 +102,18 @@ interface NormalizedBuilderDefinition {
   nodes: BuilderFlowNode[];
   edges: BuilderFlowEdge[];
   requiresToolReview: boolean;
+}
+
+interface ToolkitActionOption {
+  name: string;
+  description: string;
+  recommended: boolean;
+}
+
+interface OpenRouterModelsApiResponse {
+  defaultModel?: string;
+  sections?: OpenRouterModelSection[];
+  source?: 'openrouter' | 'fallback';
 }
 
 const FIXED_NODE_IDS = {
@@ -135,13 +170,6 @@ const NODE_LIBRARY: NodeLibraryItem[] = [
     icon: 'stop_circle',
     description: 'Define when the backend should close the conversation.',
   },
-];
-
-const MODEL_OPTIONS = [
-  'openai/gpt-4o-mini',
-  'openai/gpt-4.1-mini',
-  'anthropic/claude-3.7-sonnet',
-  'google/gemini-2.5-flash',
 ];
 
 const TIMEZONE_OPTIONS = [
@@ -297,25 +325,43 @@ function translateKnowledgeStatus(status: string, t: Translate) {
   }
 }
 
-function getToolActionLabels(kind: ToolNodeKind, t: Translate) {
-  if (kind === 'gmail' || kind === 'outlook') {
-    return [t('agentBuilder.sendEmailAction')];
+function formatToolActionName(toolName: string) {
+  return toolName
+    .replace(/^(GMAIL|OUTLOOK|GOOGLECALENDAR|CAL)_/, '')
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getEnabledToolNames(kind: ToolNodeKind, data?: { enabledTools?: unknown }) {
+  const configuredTools = Array.isArray(data?.enabledTools)
+    ? data.enabledTools.filter(
+        (toolName): toolName is string =>
+          typeof toolName === 'string' && isToolNameForToolkit(toolName, kind),
+      )
+    : null;
+
+  return configuredTools ?? getRecommendedChatToolsForToolkit(kind);
+}
+
+function matchesToolActionQuery(action: ToolkitActionOption, query: string) {
+  if (!query) {
+    return true;
   }
 
-  if (kind === 'cal') {
-    return [
-      t('agentBuilder.getAvailableSlotsAction'),
-      t('agentBuilder.createBookingAction'),
-    ];
+  const normalizedQuery = query.trim().toLowerCase();
+
+  if (!normalizedQuery) {
+    return true;
   }
 
-  return [
-    t('agentBuilder.createEventAction'),
-    t('agentBuilder.quickAddAction'),
-    t('agentBuilder.getCurrentDateTimeAction'),
-    t('agentBuilder.findFreeSlotsAction'),
-    t('agentBuilder.listCalendarsAction'),
-  ];
+  return (
+    formatToolActionName(action.name).toLowerCase().includes(normalizedQuery) ||
+    action.name.toLowerCase().includes(normalizedQuery) ||
+    action.description.toLowerCase().includes(normalizedQuery)
+  );
 }
 
 function formatBuilderStatusNote(
@@ -342,7 +388,7 @@ function formatBuilderStatusNote(
   }
 }
 
-function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
+const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
   const { t } = useLanguage();
   const nodeText = getBuilderNodeText(data.kind, t);
   
@@ -443,7 +489,9 @@ function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
       />
     </div>
   );
-}
+});
+
+AgentNode.displayName = 'AgentNode';
 
 // nodeTypes is now memoized inside AgentBuilderPage to prevent Fast Refresh warnings
 
@@ -639,6 +687,7 @@ function createGmailNode(
       connectionId,
       recipientMode: 'ai_decides',
       recipientEmail: null,
+      enabledTools: getRecommendedChatToolsForToolkit('gmail'),
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -666,6 +715,7 @@ function createOutlookNode(
       connectionId,
       recipientMode: 'ai_decides',
       recipientEmail: null,
+      enabledTools: getRecommendedChatToolsForToolkit('outlook'),
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -696,6 +746,7 @@ function createGoogleCalendarNode(
       calendarId: null,
       calendarLabel: null,
       includePrimaryCalendar: false,
+      enabledTools: getRecommendedChatToolsForToolkit('googlecalendar'),
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -726,6 +777,7 @@ function createCalNode(
       eventTypeMode: 'ai_decides',
       eventTypeId: null,
       eventTypeLabel: null,
+      enabledTools: getRecommendedChatToolsForToolkit('cal'),
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -826,6 +878,12 @@ function pickPreferredConnectionId(
   return attachedMatching[0]?.id ?? null;
 }
 
+function pickEnabledToolsFromNode(kind: ToolNodeKind, node: BuilderFlowNode | undefined) {
+  return node && isToolNodeData(node.data)
+    ? getEnabledToolNames(kind, node.data)
+    : getRecommendedChatToolsForToolkit(kind);
+}
+
 function normalizeDefinition(
   definition: BuilderDefinition,
   surface: AgentRecord['surface'],
@@ -917,6 +975,7 @@ function normalizeDefinition(
                 typeof gmailNode.data.recipientEmail === 'string'
                   ? gmailNode.data.recipientEmail
                   : null,
+              enabledTools: pickEnabledToolsFromNode('gmail', gmailNode),
             }
           : undefined,
       ),
@@ -938,6 +997,7 @@ function normalizeDefinition(
                 typeof outlookNode.data.recipientEmail === 'string'
                   ? outlookNode.data.recipientEmail
                   : null,
+              enabledTools: pickEnabledToolsFromNode('outlook', outlookNode),
             }
           : undefined,
       ),
@@ -968,6 +1028,7 @@ function normalizeDefinition(
                   ? calendarNode.data.calendarLabel
                   : null,
               includePrimaryCalendar: calendarNode.data.includePrimaryCalendar === true,
+              enabledTools: pickEnabledToolsFromNode('googlecalendar', calendarNode),
             }
           : undefined,
       ),
@@ -1001,6 +1062,7 @@ function normalizeDefinition(
                 typeof calNode.data.eventTypeLabel === 'string'
                   ? calNode.data.eventTypeLabel
                   : null,
+              enabledTools: pickEnabledToolsFromNode('cal', calNode),
             }
           : undefined,
       ),
@@ -1214,7 +1276,14 @@ export default function AgentBuilderPage() {
   const [instructions, setInstructions] = useState('');
   const [isInstructionsModalOpen, setIsInstructionsModalOpen] = useState(false);
   const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
-  const [model, setModel] = useState('openai/gpt-4o-mini');
+  const [model, setModel] = useState(OPENROUTER_DEFAULT_AGENT_MODEL);
+  const [modelSections, setModelSections] = useState<OpenRouterModelSection[]>(
+    getFallbackOpenRouterModelSections,
+  );
+  const [isModelCatalogLoading, setIsModelCatalogLoading] = useState(true);
+  const [modelCatalogSource, setModelCatalogSource] = useState<'openrouter' | 'fallback' | null>(
+    null,
+  );
   const [timezone, setTimezone] = useState('UTC');
   const [starterPromptFields, setStarterPromptFields] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState(true);
@@ -1223,6 +1292,14 @@ export default function AgentBuilderPage() {
   const [isRollingBackVersionId, setIsRollingBackVersionId] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<BuilderStatusNote>({ kind: 'draftInitial' });
   const [isToolPickerOpen, setIsToolPickerOpen] = useState(false);
+  const [actionEditorNodeId, setActionEditorNodeId] = useState<string | null>(null);
+  const [actionSearchQuery, setActionSearchQuery] = useState('');
+  const [toolkitActionsBySlug, setToolkitActionsBySlug] = useState<
+    Record<string, ToolkitActionOption[]>
+  >({});
+  const [toolkitActionsStatusBySlug, setToolkitActionsStatusBySlug] = useState<
+    Record<string, 'idle' | 'loading' | 'ready' | 'error'>
+  >({});
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [pastStates, setPastStates] = useState<{ nodes: BuilderFlowNode[]; edges: BuilderFlowEdge[] }[]>([]);
   const [futureStates, setFutureStates] = useState<{ nodes: BuilderFlowNode[]; edges: BuilderFlowEdge[] }[]>([]);
@@ -1239,11 +1316,17 @@ export default function AgentBuilderPage() {
     },
     [],
   );
-  const stopBuilderFieldKeyDown = (
-    event: ReactKeyboardEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-  ) => {
+  const stopBuilderFieldKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
     event.stopPropagation();
   };
+
+  const legacyModelOption = useMemo(() => {
+    if (!model || getOpenRouterModelOptionById(modelSections, model)) {
+      return null;
+    }
+
+    return createLegacyOpenRouterModelOption(model);
+  }, [model, modelSections]);
 
   const updateNode = useCallback(
     (nodeId: string, updater: (node: BuilderFlowNode) => BuilderFlowNode) => {
@@ -1334,44 +1417,89 @@ export default function AgentBuilderPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  const nodeLibraryItems = NODE_LIBRARY.map((item) => ({
-    ...item,
-    ...getNodeLibraryText(item.key, t),
-    disabled: item.key === 'tools' && !subscription?.integrations_enabled,
-  }));
-  
-  const displayNodes = nodes.map((node) => {
-    const enriched = enrichNodeForDisplay(node, connections, t);
-    
-    if (enriched.data.kind === 'agent') {
+  const nodeLibraryItems = useMemo(
+    () =>
+      NODE_LIBRARY.map((item) => ({
+        ...item,
+        ...getNodeLibraryText(item.key, t),
+        disabled: item.key === 'tools' && !subscription?.integrations_enabled,
+      })),
+    [subscription?.integrations_enabled, t],
+  );
+  const hasKnowledgeNode = useMemo(
+    () => nodes.some((node) => node.data.kind === 'knowledge'),
+    [nodes],
+  );
+  const hasEndChatNode = useMemo(
+    () => nodes.some((node) => node.data.kind === 'endchat'),
+    [nodes],
+  );
+  const hasConfiguredKnowledge = useMemo(
+    () =>
+      nodes.some(
+        (node) =>
+          node.data.kind === 'knowledge' &&
+          (node.data as KnowledgeBuilderNodeData).sourceIds.length > 0,
+      ),
+    [nodes],
+  );
+  const hasConfiguredTools = useMemo(
+    () => nodes.some((node) => isToolNodeData(node.data) && Boolean(node.data.connectionId)),
+    [nodes],
+  );
+  const displayNodes = useMemo(() => {
+    const agentTitleFallback = t('agentBuilder.agentTitleFallback');
+    const hasStarterPrompt = starterPromptFields.some((prompt) => prompt.trim().length > 0);
+
+    return nodes.map((node) => {
+      const enriched = enrichNodeForDisplay(node, connections, t);
+
+      if (enriched.data.kind !== 'agent') {
+        return enriched;
+      }
+
       let score = 0;
-      
-      // Points for basics
-      if (name && name !== 'Agent' && name !== t('agentBuilder.agentTitleFallback')) score += 20;
-      if (description && description.trim().length > 0) score += 10;
-      
-      // Points for robust instructions
-      if (instructions && instructions.trim().length > 50) score += 40;
-      
-      // Points for conversation starters
-      if (starterPromptFields.some((p) => p.trim().length > 0)) score += 10;
 
-      // Points for extending the agent with context or actions
-      const hasKnowledge = nodes.some(
-        (n) => n.data.kind === 'knowledge' && (n.data as KnowledgeBuilderNodeData).sourceIds.length > 0
-      );
-      const hasTools = nodes.some((n) => isToolNodeData(n.data) && n.data.connectionId);
-      
-      if (hasKnowledge || hasTools) score += 20;
+      if (name && name !== 'Agent' && name !== agentTitleFallback) {
+        score += 20;
+      }
+      if (description.trim().length > 0) {
+        score += 10;
+      }
+      if (instructions.trim().length > 50) {
+        score += 40;
+      }
+      if (hasStarterPrompt) {
+        score += 10;
+      }
+      if (hasConfiguredKnowledge || hasConfiguredTools) {
+        score += 20;
+      }
 
-      enriched.data.confidenceValue = Math.min(100, score);
-      enriched.data.confidenceLabel = t('agentBuilder.setupReadiness');
-    }
-    
-    return enriched;
-  });
-  
-  const selectedNode = displayNodes.find((node) => node.id === selectedNodeId) ?? null;
+      return {
+        ...enriched,
+        data: {
+          ...enriched.data,
+          confidenceValue: Math.min(100, score),
+          confidenceLabel: t('agentBuilder.setupReadiness'),
+        },
+      };
+    });
+  }, [
+    connections,
+    description,
+    hasConfiguredKnowledge,
+    hasConfiguredTools,
+    instructions,
+    name,
+    nodes,
+    starterPromptFields,
+    t,
+  ]);
+  const selectedNode = useMemo(
+    () => displayNodes.find((node) => node.id === selectedNodeId) ?? null,
+    [displayNodes, selectedNodeId],
+  );
   const canEditCurrentAgent = agent
     ? canEditAgentRecord(agent, user.id, membership.role)
     : true;
@@ -1516,7 +1644,7 @@ export default function AgentBuilderPage() {
     if (normalized.requiresToolReview) {
       showToast(t('agentBuilder.multipleOldConnections'), 'error');
     }
-  }, [agentId, setNodes, showToast, supabase, t]);
+  }, [agentId, setNodes, setEdges, showToast, supabase, t]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1542,6 +1670,59 @@ export default function AgentBuilderPage() {
       isMounted = false;
     };
   }, [loadBuilder, showToast, t]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const loadModelCatalog = async () => {
+      try {
+        const response = await fetch('/api/openrouter/models', {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load model catalog.');
+        }
+
+        const payload = (await response.json()) as OpenRouterModelsApiResponse;
+        const nextSections =
+          Array.isArray(payload.sections) && payload.sections.length > 0
+            ? payload.sections
+            : getFallbackOpenRouterModelSections();
+        const nextSource = payload.source === 'openrouter' ? 'openrouter' : 'fallback';
+
+        if (!isMounted) {
+          return;
+        }
+
+        startTransition(() => {
+          setModelSections(nextSections);
+          setModelCatalogSource(nextSource);
+        });
+      } catch {
+        if (!isMounted || controller.signal.aborted) {
+          return;
+        }
+
+        startTransition(() => {
+          setModelSections(getFallbackOpenRouterModelSections());
+          setModelCatalogSource('fallback');
+        });
+      } finally {
+        if (isMounted) {
+          setIsModelCatalogLoading(false);
+        }
+      }
+    };
+
+    void loadModelCatalog();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (!agent || agent.surface !== 'assistant' || hasInternalAssistantsEnabled(workspace)) {
@@ -1570,7 +1751,7 @@ export default function AgentBuilderPage() {
     }
 
     setEdges(buildEdges(nodes));
-  }, [nodes]);
+  }, [nodes, setEdges]);
 
   useEffect(() => {
     calendarOptionsStatusRef.current = calendarOptionsStatusByConnectionId;
@@ -1805,6 +1986,80 @@ export default function AgentBuilderPage() {
     }
   }, [nodes, selectedNodeId]);
 
+  const actionEditorNode =
+    actionEditorNodeId
+      ? nodes.find((node) => node.id === actionEditorNodeId && isToolNodeData(node.data)) ?? null
+      : null;
+  const actionEditorToolkitSlug =
+    actionEditorNode && isToolNodeData(actionEditorNode.data)
+      ? actionEditorNode.data.kind
+      : null;
+  const deferredActionSearchQuery = useDeferredValue(actionSearchQuery);
+
+  useEffect(() => {
+    setActionSearchQuery('');
+  }, [actionEditorNodeId]);
+
+  useEffect(() => {
+    if (!actionEditorToolkitSlug) {
+      return;
+    }
+
+    const currentStatus = toolkitActionsStatusBySlug[actionEditorToolkitSlug] ?? 'idle';
+
+    if (currentStatus === 'ready' || currentStatus === 'loading') {
+      return;
+    }
+
+    setToolkitActionsStatusBySlug((current) => ({
+      ...current,
+      [actionEditorToolkitSlug]: 'loading',
+    }));
+
+    const loadActions = async () => {
+      try {
+        const response = await fetch(
+          `/api/connections/toolkits/${actionEditorToolkitSlug}/tools`,
+          { cache: 'no-store' },
+        );
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? t('agentBuilder.loadActionsError'));
+        }
+
+        const actions = Array.isArray(payload.actions)
+          ? (payload.actions as ToolkitActionOption[])
+          : [];
+
+        setToolkitActionsBySlug((current) => ({
+          ...current,
+          [actionEditorToolkitSlug]: actions,
+        }));
+        setToolkitActionsStatusBySlug((current) => ({
+          ...current,
+          [actionEditorToolkitSlug]: 'ready',
+        }));
+      } catch (error) {
+        setToolkitActionsStatusBySlug((current) => ({
+          ...current,
+          [actionEditorToolkitSlug]: 'error',
+        }));
+        showToast(
+          error instanceof Error ? error.message : t('agentBuilder.loadActionsError'),
+          'error',
+        );
+      }
+    };
+
+    void loadActions();
+  }, [actionEditorToolkitSlug, showToast, t, toolkitActionsStatusBySlug]);
+
+  const closeActionEditor = () => {
+    setActionEditorNodeId(null);
+    setActionSearchQuery('');
+  };
+
   const handleAddKnowledgeNode = () => {
     if (nodes.some((node) => node.data.kind === 'knowledge')) {
       showToast(t('agentBuilder.knowledgeAlreadyOnCanvas'), 'error');
@@ -1928,6 +2183,24 @@ export default function AgentBuilderPage() {
         data: {
           ...node.data,
           ...updates,
+        },
+      };
+    });
+  };
+
+  const updateToolActions = (nodeId: string, enabledTools: string[]) => {
+    updateNode(nodeId, (node) => {
+      if (!isToolNodeData(node.data)) {
+        return node;
+      }
+
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          enabledTools: enabledTools.filter((toolName) =>
+            isToolNameForToolkit(toolName, node.data.kind),
+          ),
         },
       };
     });
@@ -2225,22 +2498,55 @@ export default function AgentBuilderPage() {
     }
 
     if (selectedNode.data.kind === 'agent') {
+      const confidence = selectedNode.data.confidenceValue ?? 0;
+      
       return (
-        <div className="space-y-6">
-          <div>
-            <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
-              {t('agentBuilder.identity')}
-            </label>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              onKeyDown={stopBuilderFieldKeyDown}
-              placeholder={t('agents.createModal.agentNamePlaceholder')}
-              className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
-            />
+        <div className="space-y-8">
+          {/* Setup Readiness Indicator */}
+          <div className="relative overflow-hidden rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">
+                    {selectedNode.data.confidenceLabel}
+                  </span>
+                  <span className="mt-1 text-lg font-bold text-on-surface">
+                    {confidence === 100 ? t('common.complete') : `${confidence}%`}
+                  </span>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/5 text-primary">
+                  <span className="material-symbols-outlined text-xl">
+                    {confidence === 100 ? 'check_circle' : 'bolt'}
+                  </span>
+                </div>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
+                <div 
+                  className="h-full bg-primary transition-all duration-1000 ease-out"
+                  style={{ width: `${confidence}%` }}
+                />
+              </div>
+            </div>
+            {/* Background Accent */}
+            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-primary/5 blur-2xl" />
           </div>
+
+          <div className="space-y-6">
             <div>
-              <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+              <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+                {t('agentBuilder.identity')}
+              </label>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                onKeyDown={stopBuilderFieldKeyDown}
+                placeholder={t('agents.createModal.agentNamePlaceholder')}
+                className="w-full rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
                 {t('agentBuilder.contextualNote')}
               </label>
               <textarea
@@ -2249,37 +2555,33 @@ export default function AgentBuilderPage() {
                 onKeyDown={stopBuilderFieldKeyDown}
                 rows={3}
                 placeholder={t('common.description')}
-                className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
+                className="w-full resize-none rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-medium leading-relaxed text-on-surface shadow-sm outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
               />
             </div>
+
             <div>
-              <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
-                {t('agentBuilder.cognitiveModel')}
-              </label>
-              <select
+              <AgentModelPicker
                 value={model}
-                onChange={(event) => setModel(event.target.value)}
+                sections={modelSections}
+                legacyOption={legacyModelOption}
+                isLoading={isModelCatalogLoading}
+                source={modelCatalogSource}
+                onChange={setModel}
                 onKeyDown={stopBuilderFieldKeyDown}
-                className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high appearance-none cursor-pointer"
-              >
-                {MODEL_OPTIONS.map((modelOption) => (
-                  <option key={modelOption} value={modelOption}>
-                    {modelOption}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
+
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+              <div className="flex items-center justify-between mb-2.5 ml-1">
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
                   {t('agentBuilder.operationalInstructions')}
                 </label>
                 <button
                   onClick={() => setIsInstructionsModalOpen(true)}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-primary/5 text-primary/60 hover:text-primary transition-all active:scale-95"
+                  className="flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1.5 text-primary transition-all hover:bg-primary/10 active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-[18px]">open_in_full</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{t('common.expand')}</span>
+                  <span className="material-symbols-outlined text-[16px]">open_in_full</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider">{t('common.expand')}</span>
                 </button>
               </div>
               <textarea
@@ -2288,11 +2590,14 @@ export default function AgentBuilderPage() {
                 onKeyDown={stopBuilderFieldKeyDown}
                 rows={10}
                 placeholder={t('agentBuilder.operationalInstructions')}
-                className="min-h-[300px] w-full resize-y rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-4 text-sm font-medium leading-relaxed outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
+                className="min-h-[250px] w-full resize-y rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest px-6 py-6 text-sm font-medium leading-relaxed text-on-surface shadow-sm outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
               />
-              <p className="mt-3 text-[11px] leading-relaxed text-on-surface-variant/60 italic">
-                {t('agentBuilder.operationalInstructionsHelp')}
-              </p>
+              <div className="mt-3 flex items-start gap-2 px-1">
+                <span className="material-symbols-outlined text-sm text-primary/60 mt-0.5">info</span>
+                <p className="text-[11px] leading-relaxed text-on-surface-variant/60 font-medium">
+                  {t('agentBuilder.operationalInstructionsHelp')}
+                </p>
+              </div>
 
               <Modal
                 isOpen={isInstructionsModalOpen}
@@ -2300,42 +2605,42 @@ export default function AgentBuilderPage() {
                 title={t('agentBuilder.operationalInstructions')}
                 size="5xl"
               >
-                <div className="space-y-4">
-                  <div className="relative">
+                <div className="flex flex-col gap-5">
+                  <div className="relative group/modal">
                     <textarea
                       value={instructions}
                       onChange={(event) => setInstructions(event.target.value)}
                       onKeyDown={stopBuilderFieldKeyDown}
-                      rows={20}
+                      rows={16}
                       disabled={isOptimizingPrompt}
                       placeholder={t('agentBuilder.operationalInstructions')}
-                      className={`min-h-[500px] w-full resize-none rounded-2xl border border-outline-variant/10 px-6 py-6 text-base font-medium leading-relaxed outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high ${
-                        isOptimizingPrompt ? 'bg-surface-container-lowest opacity-50 cursor-not-allowed' : 'bg-surface-container-low'
+                      className={`h-[min(58vh,720px)] min-h-[320px] w-full resize-y rounded-[2rem] border border-outline-variant/10 px-5 py-5 text-base font-medium leading-relaxed outline-none shadow-inner transition-all sm:px-8 sm:py-8 sm:text-lg focus:border-primary/30 ${
+                        isOptimizingPrompt ? 'bg-surface-container-lowest opacity-50 cursor-not-allowed' : 'bg-surface-container-low focus:bg-surface-container-lowest'
                       }`}
                       autoFocus
                     />
                     {isOptimizingPrompt && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-surface-container-highest/10 backdrop-blur-[2px]">
-                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-outline-variant/20 border-t-primary" />
-                        <p className="mt-4 text-sm font-bold tracking-widest text-on-surface uppercase animate-pulse">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-[2rem] bg-surface-container-highest/10 backdrop-blur-[4px]">
+                        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+                        <p className="mt-6 text-sm font-black tracking-[0.3em] text-primary uppercase animate-pulse">
                           {t('agentBuilder.optimizing')}
                         </p>
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col-reverse gap-3 px-1 sm:flex-row sm:items-center sm:justify-between sm:px-2">
                     <button
                       onClick={handleOptimizePrompt}
                       disabled={isOptimizingPrompt}
-                      className="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-2.5 text-sm font-bold uppercase tracking-widest text-primary shadow-sm transition-all hover:bg-surface-container-high hover:shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center gap-3 rounded-[1.25rem] bg-surface-container-high px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-primary shadow-sm transition-all hover:bg-primary/5 hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <span className="material-symbols-outlined text-[18px]">auto_fix_high</span>
+                      <span className="material-symbols-outlined text-xl">auto_fix_high</span>
                       {t('agentBuilder.optimizePrompt')}
                     </button>
                     <button
                       onClick={() => setIsInstructionsModalOpen(false)}
                       disabled={isOptimizingPrompt}
-                      className="rounded-full bg-primary px-8 py-3 text-sm font-bold uppercase tracking-widest text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="rounded-[1.25rem] bg-primary px-10 py-4 text-xs font-black uppercase tracking-[0.2em] text-on-primary shadow-xl shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-2xl active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {t('common.done')}
                     </button>
@@ -2343,49 +2648,61 @@ export default function AgentBuilderPage() {
                 </div>
               </Modal>
             </div>
+
             <div>
-              <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+              <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
                 {t('agentBuilder.temporalOrientation')}
               </label>
-              <select
-                value={timezone}
-                onChange={(event) => setTimezone(event.target.value)}
-                onKeyDown={stopBuilderFieldKeyDown}
-                className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high appearance-none cursor-pointer"
-              >
-                {TIMEZONE_OPTIONS.map((tz) => (
-                  <option key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={timezone}
+                  onChange={(event) => setTimezone(event.target.value)}
+                  onKeyDown={stopBuilderFieldKeyDown}
+                  className="w-full appearance-none rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5 cursor-pointer"
+                >
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60">
+                  unfold_more
+                </span>
+              </div>
             </div>
+
             <div>
-              <label className="mb-3 block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70">
+              <label className="mb-3 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
                 {t('agentBuilder.conversationStarters')}
               </label>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {starterPromptFields.map((prompt, index) => (
-                  <input
-                    key={`starter-prompt-${index}`}
-                    value={prompt}
-                    onChange={(event) =>
-                      setStarterPromptFields((current) =>
-                        current.map((item, itemIndex) =>
-                          itemIndex === index ? event.target.value : item,
-                        ),
-                      )
-                    }
-                    onKeyDown={stopBuilderFieldKeyDown}
-                    className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:bg-surface-container-high"
-                    placeholder={t('agentBuilder.starterChipPlaceholder', {
-                      index: index + 1,
-                    })}
-                  />
+                  <div key={`starter-prompt-${index}`} className="relative group">
+                    <input
+                      value={prompt}
+                      onChange={(event) =>
+                        setStarterPromptFields((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? event.target.value : item,
+                          ),
+                        )
+                      }
+                      onKeyDown={stopBuilderFieldKeyDown}
+                      className="w-full rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 pl-12 text-sm font-medium text-on-surface shadow-sm outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+                      placeholder={t('agentBuilder.starterChipPlaceholder', {
+                        index: index + 1,
+                      })}
+                    />
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-lg text-primary/30 group-focus-within:text-primary transition-colors">
+                      chat_bubble
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
           </div>
+        </div>
       );
     }
 
@@ -2396,27 +2713,38 @@ export default function AgentBuilderPage() {
       );
 
       return (
-          <div className="space-y-8">
-            <div className="flex flex-col gap-4 rounded-3xl border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface">{t('agentBuilder.dataSources')}</h3>
-                <div className="flex shrink-0 items-center gap-1.5 rounded-full ring-1 ring-inset ring-primary/20 bg-primary/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-primary">
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  {validAttachedSourceIds.length === 1
-                    ? t('agentBuilder.sourceCount', { count: validAttachedSourceIds.length })
-                    : t('agentBuilder.sourceCountPlural', { count: validAttachedSourceIds.length })}
+          <div className="space-y-10">
+            <div className="relative overflow-hidden rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">{t('agentBuilder.dataSources')}</h3>
+                  <div className="flex shrink-0 items-center gap-2 rounded-full ring-1 ring-inset ring-primary/20 bg-primary/5 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-primary">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                    </span>
+                    {validAttachedSourceIds.length === 1
+                      ? t('agentBuilder.sourceCount', { count: validAttachedSourceIds.length })
+                      : t('agentBuilder.sourceCountPlural', { count: validAttachedSourceIds.length })}
+                  </div>
                 </div>
+                <p className="text-xs leading-relaxed text-on-surface-variant/70 font-medium">
+                  {t('agentBuilder.semanticSourcesDescription')}
+                </p>
               </div>
-              <p className="text-xs leading-relaxed text-on-surface-variant/70">
-                {t('agentBuilder.semanticSourcesDescription')}
-              </p>
+              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-primary/5 blur-2xl" />
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-4">
               {knowledgeSources.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 rounded-[2rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-6 py-10 text-center">
-                  <span className="material-symbols-outlined text-3xl text-primary/40">library_books</span>
-                  <span className="text-xs font-medium text-on-surface-variant/60">{t('agentBuilder.noIndexedSources')}</span>
+                <div className="flex flex-col items-center gap-4 rounded-[2.5rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-8 py-16 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/5 text-primary/40">
+                    <span className="material-symbols-outlined text-4xl">library_books</span>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-on-surface">{t('agentBuilder.noIndexedSources')}</p>
+                    <p className="text-xs text-on-surface-variant/60">{t('agentBuilder.noSourcesBadge')}</p>
+                  </div>
                 </div>
               ) : (
                 knowledgeSources.map((source) => {
@@ -2426,39 +2754,47 @@ export default function AgentBuilderPage() {
                   return (
                     <label
                       key={source.id}
-                      className={`group flex items-center justify-between gap-4 rounded-[2rem] border p-4 transition-all duration-300 ease-out cursor-pointer ${
+                      className={`group relative flex items-center justify-between gap-4 rounded-[1.75rem] border p-5 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] cursor-pointer ${
                         isReady
                           ? checked 
-                            ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-sm' 
-                            : 'border-outline-variant/15 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low hover:shadow-md'
-                          : 'border-outline-variant/10 bg-surface-container-high/30 grayscale opacity-70 cursor-not-allowed'
+                            ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-lg shadow-primary/5' 
+                            : 'border-outline-variant/10 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low hover:shadow-xl hover:shadow-black/5'
+                          : 'border-outline-variant/5 bg-surface-container-high/20 grayscale opacity-60 cursor-not-allowed'
                       }`}
                     >
                       <div className="min-w-0 flex-1 pl-1">
-                        <p className="text-sm font-bold text-on-surface tracking-tight truncate pr-4">{source.name}</p>
-                        <div className="flex items-center gap-3 mt-1.5">
+                        <p className={`text-sm font-bold tracking-tight truncate pr-4 transition-colors ${checked ? 'text-primary' : 'text-on-surface'}`}>
+                          {source.name}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] ${getKnowledgeStatusTone(source.status)}`}
+                            className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] ${getKnowledgeStatusTone(source.status)}`}
                           >
                             {translateKnowledgeStatus(source.status, t)}
                           </span>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/40">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/30">
                             {t('agentBuilder.knowledgeChunks', {
                               count: source.chunk_count,
                             })}
                           </span>
                         </div>
                       </div>
-                      <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+                      <div className="relative flex h-7 w-7 shrink-0 items-center justify-center">
                         <input
                           type="checkbox"
                           checked={checked}
                           disabled={!isReady}
                           onChange={(event) => updateKnowledgeSources(source.id, event.target.checked)}
-                          className="peer absolute h-full w-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                          className="peer absolute h-full w-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
                         />
-                        <div className="h-6 w-6 rounded-lg border-2 border-outline-variant/20 transition-all peer-checked:border-primary peer-checked:bg-primary group-hover:border-primary/50" />
-                        <span className="material-symbols-outlined absolute scale-0 text-white text-[16px] transition-transform peer-checked:scale-100 peer-disabled:opacity-50">check</span>
+                        <div className={`h-7 w-7 rounded-xl border-2 transition-all duration-300 ${
+                          checked 
+                            ? 'border-primary bg-primary scale-110' 
+                            : 'border-outline-variant/20 bg-background group-hover:border-primary/50'
+                        }`} />
+                        <span className={`material-symbols-outlined absolute text-white text-[18px] transition-all duration-300 ${
+                          checked ? 'scale-100 opacity-100 rotate-0' : 'scale-50 opacity-0 rotate-12'
+                        }`}>check</span>
                       </div>
                     </label>
                   );
@@ -2466,20 +2802,21 @@ export default function AgentBuilderPage() {
               )}
             </div>
             
-            <div className="flex items-center gap-3 pt-6 border-t border-outline-variant/10">
+            <div className="flex flex-col gap-3 pt-8 border-t border-outline-variant/10">
               <Link
                 href="/knowledge"
-                className="flex-[4] flex items-center justify-center gap-2 rounded-[1.5rem] border border-outline-variant/20 bg-surface-container-lowest px-5 py-3.5 text-xs font-bold uppercase tracking-widest text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/30 hover:shadow-sm active:scale-[0.98]"
+                className="flex items-center justify-center gap-3 rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-lowest px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/30 hover:shadow-md active:scale-[0.98]"
               >
-                <span className="material-symbols-outlined text-sm">sync</span>
+                <span className="material-symbols-outlined text-lg">sync</span>
                 {t('agentBuilder.syncOperations')}
               </Link>
               <button
                 onClick={() => removeOptionalNode('knowledge')}
-                className="flex-1 flex h-[50px] items-center justify-center rounded-[1.5rem] bg-error-container/50 text-on-error-container transition-all hover:bg-error hover:text-on-error hover:shadow-error/20 active:scale-[0.98]"
+                className="flex items-center justify-center gap-3 rounded-[1.25rem] bg-error/5 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-error transition-all hover:bg-error hover:text-on-error hover:shadow-lg hover:shadow-error/20 active:scale-[0.98]"
                 title={t('agentBuilder.removeNode')}
               >
-                <span className="material-symbols-outlined text-[20px]">delete</span>
+                <span className="material-symbols-outlined text-lg">delete</span>
+                {t('agentBuilder.removeNode')}
               </button>
             </div>
           </div>
@@ -2531,293 +2868,301 @@ export default function AgentBuilderPage() {
         (toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook') &&
         toolNode.data.recipientMode === 'specific_email' &&
         Boolean(normalizeGmailRecipientEmail(toolNode.data.recipientEmail));
-      const lockedActions = getToolActionLabels(toolNode.data.kind, t);
+      const enabledToolNames = getEnabledToolNames(toolNode.data.kind, toolNode.data);
+      const enabledActionLabels = enabledToolNames.map(formatToolActionName);
 
       return (
-        <div className="space-y-5">
-          <p className="text-sm leading-6 text-on-surface-variant">
-            {toolNode.data.kind === 'gmail'
-              ? t('agentBuilder.useGmail')
-              : toolNode.data.kind === 'outlook'
-                ? t('agentBuilder.useOutlook')
-                : toolNode.data.kind === 'cal'
-                  ? t('agentBuilder.useCal')
-                  : t('agentBuilder.useCalendar')}
-          </p>
+        <div className="space-y-8">
+          <div className="rounded-[2rem] border border-outline-variant/10 bg-primary/5 p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <span className="material-symbols-outlined text-xl">info</span>
+              </div>
+              <p className="text-sm leading-relaxed text-on-surface-variant font-medium">
+                {toolNode.data.kind === 'gmail'
+                  ? t('agentBuilder.useGmail')
+                  : toolNode.data.kind === 'outlook'
+                    ? t('agentBuilder.useOutlook')
+                    : toolNode.data.kind === 'cal'
+                      ? t('agentBuilder.useCal')
+                      : t('agentBuilder.useCalendar')}
+              </p>
+            </div>
+          </div>
+
           {selectedConnection && selectedConnection.status !== 'connected' ? (
-            <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-sm text-on-surface-variant">
-              {t('agentBuilder.currentAccountStatus', {
-                status: translateConnectionStatus(selectedConnection.status, t),
-              })}
+            <div className="rounded-[1.5rem] border border-error/20 bg-error/5 px-5 py-4 flex items-center gap-3">
+              <span className="material-symbols-outlined text-error text-xl">error</span>
+              <p className="text-sm font-bold text-error">
+                {t('agentBuilder.currentAccountStatus', {
+                  status: translateConnectionStatus(selectedConnection.status, t),
+                })}
+              </p>
             </div>
           ) : null}
-          {hasConnectedOptions || selectedConnection ? (
-            <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                {t('agentBuilder.connectedAccount')}
-              </label>
-              <select
-                value={toolNode.data.connectionId ?? ''}
-                onChange={(event) => updateToolConnection(toolNode.id, event.target.value || null)}
-                className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-              >
-                <option value="">{t('agentBuilder.selectAccount')}</option>
-                {selectableConnections.map((connection) => (
-                  <option key={connection.id} value={connection.id}>
-                    {connection.account_label || connection.display_name}
-                    {connection.status === 'connected'
-                      ? ''
-                      : ` (${translateConnectionStatus(connection.status, t)})`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-sm text-on-surface-variant">
-              {t('agentBuilder.noConnectedAccount', { label: toolNode.data.label })}
-              <div className="mt-4">
+
+          <div className="space-y-6">
+            {(hasConnectedOptions || selectedConnection) ? (
+              <div>
+                <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+                  {t('agentBuilder.connectedAccount')}
+                </label>
+                <div className="relative">
+                  <select
+                    value={toolNode.data.connectionId ?? ''}
+                    onChange={(event) => updateToolConnection(toolNode.id, event.target.value || null)}
+                    className="w-full appearance-none rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5 cursor-pointer"
+                  >
+                    <option value="">{t('agentBuilder.selectAccount')}</option>
+                    {selectableConnections.map((connection) => (
+                      <option key={connection.id} value={connection.id}>
+                        {connection.account_label || connection.display_name}
+                        {connection.status === 'connected'
+                          ? ''
+                          : ` (${translateConnectionStatus(connection.status, t)})`}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60">
+                    expand_more
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-[2rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-6 py-8 text-center">
+                <span className="material-symbols-outlined text-3xl text-on-surface-variant/30 mb-3">account_circle</span>
+                <p className="text-xs font-medium text-on-surface-variant/60 mb-5">
+                  {t('agentBuilder.noConnectedAccount', { label: toolNode.data.label })}
+                </p>
                 <Link
                   href="/connections"
-                  className="inline-flex rounded-full border border-outline-variant/15 px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                  className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-primary transition-all hover:bg-primary/20 active:scale-95"
                 >
+                  <span className="material-symbols-outlined text-lg">link</span>
                   {t('agentBuilder.connectLabel', { label: toolNode.data.label })}
                 </Link>
               </div>
-            </div>
-          )}
-          {(toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook') && (
-            <div className="space-y-3">
-              <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                  {t('agentBuilder.sendEmailTo')}
-                </label>
-                <select
-                  value={toolNode.data.recipientMode}
-                  onChange={(event) =>
-                    updateEmailRecipientSettings(toolNode.id, {
-                      recipientMode:
-                        event.target.value === 'specific_email'
-                          ? 'specific_email'
-                          : 'ai_decides',
-                    })
-                  }
-                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-                >
-                  <option value="ai_decides">{t('agentBuilder.aiDecides')}</option>
-                  <option value="specific_email">{t('agentBuilder.specificEmail')}</option>
-                </select>
-              </div>
-              <p className="text-sm leading-6 text-on-surface-variant">
-                {toolNode.data.recipientMode === 'specific_email'
-                  ? t('agentBuilder.specificEmailDescription')
-                  : t('agentBuilder.aiDecidesDescription')}
-              </p>
-              {toolNode.data.recipientMode === 'specific_email' && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                      {t('agentBuilder.specificEmailLabel')}
-                    </label>
-                    <input
-                      type="email"
-                      value={emailRecipientEmail}
+            )}
+
+            {(toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook') && (
+              <div className="space-y-4 pt-2">
+                <div>
+                  <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+                    {t('agentBuilder.sendEmailTo')}
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={toolNode.data.recipientMode}
                       onChange={(event) =>
                         updateEmailRecipientSettings(toolNode.id, {
-                          recipientEmail: event.target.value || null,
+                          recipientMode:
+                            event.target.value === 'specific_email'
+                              ? 'specific_email'
+                              : 'ai_decides',
                         })
                       }
-                      placeholder={t('agentBuilder.specificEmailPlaceholder')}
-                      className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-                    />
+                      className="w-full appearance-none rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5 cursor-pointer"
+                    >
+                      <option value="ai_decides">{t('agentBuilder.aiDecides')}</option>
+                      <option value="specific_email">{t('agentBuilder.specificEmail')}</option>
+                    </select>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60">
+                      expand_more
+                    </span>
                   </div>
-                  {!hasValidSpecificRecipient ? (
-                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-sm text-on-surface-variant">
-                      {t('agentBuilder.specificEmailWarning')}
-                    </div>
-                  ) : null}
                 </div>
-              )}
-            </div>
-          )}
-          <div className="group relative">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              {t('agentBuilder.allowedActions')}
-            </p>
-            <div className="mt-2 flex min-w-[120px] items-center justify-center rounded-full bg-background px-3 py-2 text-[11px] font-semibold text-on-surface-variant">
-              {lockedActions.length} {lockedActions.length === 1 ? 'action' : 'actions'}
-            </div>
-            <div className="absolute left-0 top-full z-50 mt-1 hidden w-48 rounded-xl border border-outline-variant/20 bg-surface-container p-2 shadow-lg group-hover:block">
-              <div className="space-y-1">
-                {lockedActions.map((action) => (
-                  <div
-                    key={action}
-                    className="rounded-lg px-3 py-2 text-xs font-medium text-on-surface hover:bg-surface-container-high"
-                  >
-                    {action}
+                
+                {toolNode.data.recipientMode === 'specific_email' && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div>
+                      <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+                        {t('agentBuilder.specificEmailLabel')}
+                      </label>
+                      <input
+                        type="email"
+                        value={emailRecipientEmail}
+                        onChange={(event) =>
+                          updateEmailRecipientSettings(toolNode.id, {
+                            recipientEmail: event.target.value || null,
+                          })
+                        }
+                        placeholder={t('agentBuilder.specificEmailPlaceholder')}
+                        className="w-full rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+                      />
+                    </div>
+                    {!hasValidSpecificRecipient ? (
+                      <div className="rounded-[1.25rem] border border-amber-500/20 bg-amber-500/5 px-5 py-4 flex items-start gap-3">
+                        <span className="material-symbols-outlined text-amber-500 text-xl mt-0.5">warning</span>
+                        <p className="text-xs leading-relaxed text-on-surface-variant/70 font-medium">
+                          {t('agentBuilder.specificEmailWarning')}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-          </div>
-          {toolNode.data.kind === 'googlecalendar' && (
-            <div className="space-y-5">
-              <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                  {t('agentBuilder.bookingCalendar')}
-                </label>
-                <select
-                  value={(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ?? ''}
-                  onChange={(event) => {
-                    const nextCalendarId = event.target.value || null;
-                    const selectedCalendar = resolveCalendarOption(calendarOptions, nextCalendarId);
-                    updateGoogleCalendarSettings(toolNode.id, {
-                      calendarId: nextCalendarId,
-                      calendarLabel: nextCalendarId ? selectedCalendar?.summary ?? null : null,
-                      timezone: selectedCalendar?.timezone ?? null,
-                    });
-                  }}
-                  onKeyDown={stopBuilderFieldKeyDown}
-                  disabled={!selectedCalendarConnectionId || calendarOptionsStatus === 'loading'}
-                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="">{t('agentBuilder.primaryCalendar')}</option>
-                  {calendarOptions.map((calendar) => (
-                    <option key={calendar.id} value={calendar.id}>
-                      {calendar.primary
-                        ? `${calendar.summary} (${t('agentBuilder.primaryCalendarSuffix')})`
-                        : calendar.summary}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-2 text-xs text-on-surface-variant">
-                  {calendarOptionsStatus === 'loading'
-                    ? t('agentBuilder.loadingCalendars')
-                    : calendarOptionsStatus === 'error'
-                      ? t('agentBuilder.loadCalendarsFailed')
-                      : t('agentBuilder.bookingCalendarDescription')}
-                </p>
-              </div>
-              {(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ? (
-                <label className="flex items-start gap-3 rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
-                  <input
-                    type="checkbox"
-                    checked={(toolNode.data as GoogleCalendarBuilderNodeData).includePrimaryCalendar}
-                    onChange={(event) => {
-                      updateGoogleCalendarSettings(toolNode.id, {
-                        includePrimaryCalendar: event.target.checked,
-                      });
-                    }}
-                    onKeyDown={stopBuilderFieldKeyDown}
-                    className="mt-1 h-4 w-4 rounded border-outline-variant/30 text-primary focus:ring-primary"
-                  />
-                  <span className="space-y-1">
-                    <span className="block text-sm font-semibold text-on-surface">
-                      {t('agentBuilder.alsoBookPrimary')}
-                    </span>
-                    <span className="block text-xs leading-5 text-on-surface-variant">
-                      {t('agentBuilder.alsoBookPrimaryDescription')}
-                    </span>
+            )}
+
+            <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">
+                    {t('agentBuilder.enabledActions')}
                   </span>
-                </label>
-              ) : null}
-              <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                  {t('agentBuilder.bookingTimezone')}
-                </p>
-                <p className="mt-2 text-sm font-semibold text-on-surface">
-                  {resolvedCalendarTimezone ?? timezone}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-                  {resolvedCalendarTimezone
-                    ? resolvedCalendar?.primary && !(toolNode.data as GoogleCalendarBuilderNodeData).calendarId
-                      ? t('agentBuilder.primaryCalendarResolved')
-                      : t('agentBuilder.selectedCalendarResolved')
-                    : t('agentBuilder.bookingTimezoneFallback')}
-                </p>
+                  <span className="mt-1 text-lg font-bold text-on-surface">
+                    {enabledToolNames.length} {enabledToolNames.length === 1 ? 'action' : 'actions'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActionEditorNodeId(toolNode.id)}
+                  className="flex h-12 items-center gap-3 rounded-2xl border border-outline-variant/15 px-5 text-xs font-black uppercase tracking-widest text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface hover:border-outline-variant/30 active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-xl">tune</span>
+                  {t('agentBuilder.editActions')}
+                </button>
+              </div>
+              
+              <div className="flex flex-wrap gap-2.5">
+                {enabledActionLabels.length > 0 ? (
+                  <>
+                    {enabledActionLabels.slice(0, 4).map((action) => (
+                      <span
+                        key={action}
+                        className="rounded-full bg-primary/5 px-4 py-1.5 text-[11px] font-bold text-primary border border-primary/10"
+                      >
+                        {action}
+                      </span>
+                    ))}
+                    {enabledActionLabels.length > 4 ? (
+                      <span className="rounded-full bg-surface-container px-4 py-1.5 text-[11px] font-bold text-on-surface-variant border border-outline-variant/10">
+                        +{enabledActionLabels.length - 4}
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="text-xs font-medium text-on-surface-variant/40 italic py-2">
+                    {t('agentBuilder.noMatchingActions')}
+                  </p>
+                )}
               </div>
             </div>
-          )}
-          {toolNode.data.kind === 'cal' && (
-            <div className="space-y-4">
-              <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                  {t('agentBuilder.schedulingMode')}
-                </label>
-                <select
-                  value={(toolNode.data as CalBuilderNodeData).eventTypeMode}
-                  onChange={(event) => {
-                    const nextMode = event.target.value === 'specific_event_type' 
-                      ? 'specific_event_type' 
-                      : 'ai_decides';
-                    updateNode(toolNode.id, (node) => {
-                      if (node.data.kind !== 'cal') {
-                        return node;
-                      }
-                      return {
-                        ...node,
-                        data: {
-                          ...node.data,
-                          eventTypeMode: nextMode,
-                          eventTypeId: nextMode === 'ai_decides' ? null : node.data.eventTypeId,
-                          eventTypeLabel: nextMode === 'ai_decides' ? null : node.data.eventTypeLabel,
-                        } as CalBuilderNodeData,
-                      };
-                    });
-                  }}
-                  onKeyDown={stopBuilderFieldKeyDown}
-                  className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-                >
-                  <option value="ai_decides">{t('agentBuilder.aiDecides')}</option>
-                  <option value="specific_event_type">{t('agentBuilder.specificEventType')}</option>
-                </select>
-                <p className="mt-2 text-xs text-on-surface-variant">
-                  {(toolNode.data as CalBuilderNodeData).eventTypeMode === 'specific_event_type'
-                    ? t('agentBuilder.specificEventTypeDesc')
-                    : t('agentBuilder.aiDecidesEventTypeDesc')}
-                </p>
-              </div>
-              {(toolNode.data as CalBuilderNodeData).eventTypeMode === 'specific_event_type' && (
+
+            {toolNode.data.kind === 'googlecalendar' && (
+              <div className="space-y-6 pt-2">
                 <div>
-                  <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                    {t('agentBuilder.eventType')}
+                  <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+                    {t('agentBuilder.bookingCalendar')}
                   </label>
-                  {calEventTypes.length > 0 ? (
+                  <div className="relative">
                     <select
-                      value={(toolNode.data as CalBuilderNodeData).eventTypeId ?? ''}
+                      value={(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ?? ''}
                       onChange={(event) => {
-                        const nextEventTypeId = event.target.value || null;
-                        const selectedEventType = calEventTypes.find(et => et.id === nextEventTypeId);
-                        updateNode(toolNode.id, (node) => {
-                          if (node.data.kind !== 'cal') {
-                            return node;
-                          }
-                          return {
-                            ...node,
-                            data: {
-                              ...node.data,
-                              eventTypeId: nextEventTypeId,
-                              eventTypeLabel: nextEventTypeId && selectedEventType ? selectedEventType.title : null,
-                            } as CalBuilderNodeData,
-                          };
+                        const nextCalendarId = event.target.value || null;
+                        const selectedCalendar = resolveCalendarOption(calendarOptions, nextCalendarId);
+                        updateGoogleCalendarSettings(toolNode.id, {
+                          calendarId: nextCalendarId,
+                          calendarLabel: nextCalendarId ? selectedCalendar?.summary ?? null : null,
+                          timezone: selectedCalendar?.timezone ?? null,
                         });
                       }}
                       onKeyDown={stopBuilderFieldKeyDown}
-                      disabled={calEventTypesStatus === 'loading'}
-                      className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={!selectedCalendarConnectionId || calendarOptionsStatus === 'loading'}
+                      className="w-full appearance-none rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5 cursor-pointer disabled:opacity-50"
                     >
-                      <option value="">{t('agentBuilder.selectEventType')}</option>
-                      {calEventTypes.map((eventType) => (
-                        <option key={eventType.id} value={eventType.id}>
-                          {eventType.title}
+                      <option value="">{t('agentBuilder.primaryCalendar')}</option>
+                      {calendarOptions.map((calendar) => (
+                        <option key={calendar.id} value={calendar.id}>
+                          {calendar.primary
+                            ? `${calendar.summary} (${t('agentBuilder.primaryCalendarSuffix')})`
+                            : calendar.summary}
                         </option>
                       ))}
                     </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={(toolNode.data as CalBuilderNodeData).eventTypeId ?? ''}
+                    <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60">
+                      expand_more
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 px-1">
+                    <span className="material-symbols-outlined text-sm text-primary/60 mt-0.5">
+                      {calendarOptionsStatus === 'loading' ? 'sync' : calendarOptionsStatus === 'error' ? 'error' : 'help'}
+                    </span>
+                    <p className={`text-[11px] leading-relaxed font-medium ${calendarOptionsStatus === 'error' ? 'text-error' : 'text-on-surface-variant/60'}`}>
+                      {calendarOptionsStatus === 'loading'
+                        ? t('agentBuilder.loadingCalendars')
+                        : calendarOptionsStatus === 'error'
+                          ? t('agentBuilder.loadCalendarsFailed')
+                          : t('agentBuilder.bookingCalendarDescription')}
+                    </p>
+                  </div>
+                </div>
+
+                {(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ? (
+                  <label className="group flex items-start gap-4 rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-5 transition-all hover:bg-surface-container-low cursor-pointer shadow-sm">
+                    <div className="relative flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={(toolNode.data as GoogleCalendarBuilderNodeData).includePrimaryCalendar}
+                        onChange={(event) => {
+                          updateGoogleCalendarSettings(toolNode.id, {
+                            includePrimaryCalendar: event.target.checked,
+                          });
+                        }}
+                        onKeyDown={stopBuilderFieldKeyDown}
+                        className="peer absolute h-full w-full opacity-0 cursor-pointer z-10"
+                      />
+                      <div className="h-6 w-6 rounded-lg border-2 border-outline-variant/20 transition-all peer-checked:border-primary peer-checked:bg-primary group-hover:border-primary/50" />
+                      <span className="material-symbols-outlined absolute scale-0 text-white text-[16px] transition-transform peer-checked:scale-100">check</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-bold text-on-surface">
+                        {t('agentBuilder.alsoBookPrimary')}
+                      </p>
+                      <p className="text-xs leading-relaxed text-on-surface-variant/60 font-medium">
+                        {t('agentBuilder.alsoBookPrimaryDescription')}
+                      </p>
+                    </div>
+                  </label>
+                ) : null}
+
+                <div className="rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1 mb-3">
+                    {t('agentBuilder.bookingTimezone')}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/5 text-primary">
+                      <span className="material-symbols-outlined text-xl">schedule</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-on-surface truncate">
+                        {resolvedCalendarTimezone ?? timezone}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/60 font-medium">
+                        {resolvedCalendarTimezone
+                          ? resolvedCalendar?.primary && !(toolNode.data as GoogleCalendarBuilderNodeData).calendarId
+                            ? t('agentBuilder.primaryCalendarResolved')
+                            : t('agentBuilder.selectedCalendarResolved')
+                          : t('agentBuilder.bookingTimezoneFallback')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {toolNode.data.kind === 'cal' && (
+              <div className="space-y-6 pt-2">
+                <div>
+                  <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+                    {t('agentBuilder.schedulingMode')}
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={(toolNode.data as CalBuilderNodeData).eventTypeMode}
                       onChange={(event) => {
-                        const nextEventTypeId = event.target.value || null;
+                        const nextMode = event.target.value === 'specific_event_type' 
+                          ? 'specific_event_type' 
+                          : 'ai_decides';
                         updateNode(toolNode.id, (node) => {
                           if (node.data.kind !== 'cal') {
                             return node;
@@ -2826,53 +3171,147 @@ export default function AgentBuilderPage() {
                             ...node,
                             data: {
                               ...node.data,
-                              eventTypeId: nextEventTypeId,
+                              eventTypeMode: nextMode,
+                              eventTypeId: nextMode === 'ai_decides' ? null : node.data.eventTypeId,
+                              eventTypeLabel: nextMode === 'ai_decides' ? null : node.data.eventTypeLabel,
                             } as CalBuilderNodeData,
                           };
                         });
                       }}
                       onKeyDown={stopBuilderFieldKeyDown}
-                      placeholder={t('agentBuilder.eventTypeIdPlaceholder')}
-                      className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-                    />
-                  )}
-                  {calEventTypesStatus === 'loading' && (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-on-surface-variant">
-                      <div className="h-3 w-3 animate-spin rounded-full border border-primary/30 border-t-primary" />
-                      {t('agentBuilder.loadingEventTypes')}
-                    </div>
-                  )}
-                  {calEventTypesStatus === 'error' && calEventTypes.length === 0 && (
-                    <div className="mt-2 rounded-xl border border-outline-variant/10 bg-surface-container px-3 py-2 text-xs text-on-surface-variant">
-                      {t('agentBuilder.eventTypeManualHint')}{' '}
-                      <a
-                        href={t('agentBuilder.eventTypeHelpUrl')}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline"
-                      >
-                        {t('agentBuilder.eventTypeManualHintLink')}
-                      </a>
-                    </div>
-                  )}
+                      className="w-full appearance-none rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5 cursor-pointer"
+                    >
+                      <option value="ai_decides">{t('agentBuilder.aiDecides')}</option>
+                      <option value="specific_event_type">{t('agentBuilder.specificEventType')}</option>
+                    </select>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60">
+                      expand_more
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 px-1">
+                    <span className="material-symbols-outlined text-sm text-primary/60 mt-0.5">info</span>
+                    <p className="text-[11px] leading-relaxed text-on-surface-variant/60 font-medium">
+                      {(toolNode.data as CalBuilderNodeData).eventTypeMode === 'specific_event_type'
+                        ? t('agentBuilder.specificEventTypeDesc')
+                        : t('agentBuilder.aiDecidesEventTypeDesc')}
+                    </p>
+                  </div>
                 </div>
-              )}
-              <div className="rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-                  {t('agentBuilder.bookingTimezone')}
-                </p>
-                <p className="mt-2 text-sm font-semibold text-on-surface">
-                  {(toolNode.data as CalBuilderNodeData).timezone ?? timezone}
-                </p>
+
+                {(toolNode.data as CalBuilderNodeData).eventTypeMode === 'specific_event_type' && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+                      {t('agentBuilder.eventType')}
+                    </label>
+                    <div className="relative">
+                      {calEventTypes.length > 0 ? (
+                        <select
+                          value={(toolNode.data as CalBuilderNodeData).eventTypeId ?? ''}
+                          onChange={(event) => {
+                            const nextEventTypeId = event.target.value || null;
+                            const selectedEventType = calEventTypes.find(et => et.id === nextEventTypeId);
+                            updateNode(toolNode.id, (node) => {
+                              if (node.data.kind !== 'cal') {
+                                return node;
+                              }
+                              return {
+                                ...node,
+                                data: {
+                                  ...node.data,
+                                  eventTypeId: nextEventTypeId,
+                                  eventTypeLabel: nextEventTypeId && selectedEventType ? selectedEventType.title : null,
+                                } as CalBuilderNodeData,
+                              };
+                            });
+                          }}
+                          onKeyDown={stopBuilderFieldKeyDown}
+                          disabled={calEventTypesStatus === 'loading'}
+                          className="w-full appearance-none rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5 cursor-pointer disabled:opacity-50"
+                        >
+                          <option value="">{t('agentBuilder.selectEventType')}</option>
+                          {calEventTypes.map((eventType) => (
+                            <option key={eventType.id} value={eventType.id}>
+                              {eventType.title}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={(toolNode.data as CalBuilderNodeData).eventTypeId ?? ''}
+                          onChange={(event) => {
+                            const nextEventTypeId = event.target.value || null;
+                            updateNode(toolNode.id, (node) => {
+                              if (node.data.kind !== 'cal') {
+                                return node;
+                              }
+                              return {
+                                ...node,
+                                data: {
+                                  ...node.data,
+                                  eventTypeId: nextEventTypeId,
+                                } as CalBuilderNodeData,
+                              };
+                            });
+                          }}
+                          onKeyDown={stopBuilderFieldKeyDown}
+                          placeholder={t('agentBuilder.eventTypeIdPlaceholder')}
+                          className="w-full rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+                        />
+                      )}
+                      <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60">
+                        {calEventTypes.length > 0 ? 'expand_more' : 'edit'}
+                      </span>
+                    </div>
+                    {calEventTypesStatus === 'loading' && (
+                      <div className="mt-3 flex items-center gap-2 px-1 text-[11px] text-primary font-medium animate-pulse">
+                        <span className="material-symbols-outlined text-sm animate-spin">sync</span>
+                        {t('agentBuilder.loadingEventTypes')}
+                      </div>
+                    )}
+                    {calEventTypesStatus === 'error' && calEventTypes.length === 0 && (
+                      <div className="mt-3 rounded-[1.25rem] border border-outline-variant/10 bg-surface-container px-5 py-4 text-[11px] leading-relaxed text-on-surface-variant/60 font-medium">
+                        <span className="material-symbols-outlined text-sm text-primary/60 inline-block align-middle mr-1">info</span>
+                        {t('agentBuilder.eventTypeManualHint')}{' '}
+                        <a
+                          href={t('agentBuilder.eventTypeHelpUrl')}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline font-bold"
+                        >
+                          {t('agentBuilder.eventTypeManualHintLink')}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1 mb-3">
+                    {t('agentBuilder.bookingTimezone')}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/5 text-primary">
+                      <span className="material-symbols-outlined text-xl">schedule</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-on-surface truncate">
+                        {(toolNode.data as CalBuilderNodeData).timezone ?? timezone}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-          <button
-            onClick={() => removeOptionalNode(toolNode.data.kind)}
-            className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-          >
-            {t('agentBuilder.removeNode')}
-          </button>
+            )}
+            
+            <button
+              onClick={() => removeOptionalNode(toolNode.data.kind)}
+              className="w-full flex items-center justify-center gap-3 rounded-[1.25rem] bg-error/5 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-error transition-all hover:bg-error hover:text-on-error hover:shadow-lg hover:shadow-error/20 active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-lg">delete</span>
+              {t('agentBuilder.removeNode')}
+            </button>
+          </div>
         </div>
       );
     }
@@ -2884,69 +3323,94 @@ export default function AgentBuilderPage() {
           : '';
 
       return (
-        <div className="space-y-5">
-          <p className="text-sm leading-6 text-on-surface-variant">
-            {t('agentBuilder.endChatDescription')}
-          </p>
-          <label className="flex items-start gap-3 rounded-2xl border border-outline-variant/10 bg-background px-4 py-4">
-            <input
-              type="checkbox"
-              checked={endChatNode.data.allowAssistantSuggestion}
-              onChange={(event) =>
-                updateNode(endChatNode.id, (node) => ({
-                  ...node,
-                  data: {
-                    ...node.data,
-                    allowAssistantSuggestion: event.target.checked,
-                  },
-                }))
-              }
-              className="mt-1"
-            />
-            <div>
-              <p className="text-sm font-semibold text-on-surface">
-                {t('agentBuilder.assistantMaySuggestEnding')}
-              </p>
-              <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-                {t('agentBuilder.assistantMaySuggestEndingDescription')}
+        <div className="space-y-8">
+          <div className="rounded-[2rem] border border-outline-variant/10 bg-primary/5 p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <span className="material-symbols-outlined text-xl">info</span>
+              </div>
+              <p className="text-sm leading-relaxed text-on-surface-variant font-medium">
+                {t('agentBuilder.endChatDescription')}
               </p>
             </div>
-          </label>
-          <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              {t('agentBuilder.inactivityTimeout')}
-            </label>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={timeoutValue}
-              onChange={(event) => {
-                const rawValue = event.target.value.trim();
-                updateNode(endChatNode.id, (node) => ({
-                  ...node,
-                  data: {
-                    ...node.data,
-                    inactivityTimeoutSeconds: rawValue
-                      ? Math.max(1, Math.round(Number(rawValue) || 0))
-                      : null,
-                  },
-                }));
-              }}
-              onKeyDown={stopBuilderFieldKeyDown}
-              placeholder={t('agentBuilder.inactivityTimeoutPlaceholder')}
-              className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm outline-none"
-            />
-            <p className="mt-2 text-xs text-on-surface-variant">
-              {t('agentBuilder.inactivityTimeoutHelp')}
-            </p>
           </div>
-          <button
-            onClick={() => removeOptionalNode('endchat')}
-            className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-          >
-            {t('agentBuilder.removeNode')}
-          </button>
+
+          <div className="space-y-6">
+            <label className="group flex items-start gap-4 rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 transition-all hover:bg-surface-container-low cursor-pointer shadow-sm">
+              <div className="relative flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={endChatNode.data.allowAssistantSuggestion}
+                  onChange={(event) =>
+                    updateNode(endChatNode.id, (node) => ({
+                      ...node,
+                      data: {
+                        ...node.data,
+                        allowAssistantSuggestion: event.target.checked,
+                      },
+                    }))
+                  }
+                  className="peer absolute h-full w-full opacity-0 cursor-pointer z-10"
+                />
+                <div className="h-6 w-6 rounded-lg border-2 border-outline-variant/20 transition-all peer-checked:border-primary peer-checked:bg-primary group-hover:border-primary/50" />
+                <span className="material-symbols-outlined absolute scale-0 text-white text-[16px] transition-transform peer-checked:scale-100">check</span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-on-surface">
+                  {t('agentBuilder.assistantMaySuggestEnding')}
+                </p>
+                <p className="text-xs leading-relaxed text-on-surface-variant/60 font-medium">
+                  {t('agentBuilder.assistantMaySuggestEndingDescription')}
+                </p>
+              </div>
+            </label>
+
+            <div>
+              <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+                {t('agentBuilder.inactivityTimeout')}
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={timeoutValue}
+                  onChange={(event) => {
+                    const rawValue = event.target.value.trim();
+                    updateNode(endChatNode.id, (node) => ({
+                      ...node,
+                      data: {
+                        ...node.data,
+                        inactivityTimeoutSeconds: rawValue
+                          ? Math.max(1, Math.round(Number(rawValue) || 0))
+                          : null,
+                      },
+                    }));
+                  }}
+                  onKeyDown={stopBuilderFieldKeyDown}
+                  placeholder={t('agentBuilder.inactivityTimeoutPlaceholder')}
+                  className="w-full rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-on-surface-variant/40">
+                  {t('common.seconds')}
+                </span>
+              </div>
+              <div className="mt-3 flex items-start gap-2 px-1">
+                <span className="material-symbols-outlined text-sm text-primary/60 mt-0.5">help</span>
+                <p className="text-[11px] leading-relaxed text-on-surface-variant/60 font-medium">
+                  {t('agentBuilder.inactivityTimeoutHelp')}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => removeOptionalNode('endchat')}
+              className="w-full flex items-center justify-center gap-3 rounded-[1.25rem] bg-error/5 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-error transition-all hover:bg-error hover:text-on-error hover:shadow-lg hover:shadow-error/20 active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-lg">delete</span>
+              {t('agentBuilder.removeNode')}
+            </button>
+          </div>
         </div>
       );
     }
@@ -3063,27 +3527,37 @@ export default function AgentBuilderPage() {
             : 'xl:grid-cols-[minmax(0,1fr)]'
         }`}
       >
-        <div className="group absolute bottom-0 left-0 top-0 z-20 w-80 -translate-x-[calc(100%-1.25rem)] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] hover:translate-x-0">
-          <aside className="relative flex h-full flex-col border-r border-outline-variant/10 bg-surface/80 p-8 shadow-[0_0_50px_rgba(0,0,0,0.1)] backdrop-blur-2xl">
-            <div className="absolute bottom-0 right-0 top-0 flex w-5 items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
-              <div className="h-12 w-[2px] rounded-full bg-primary/30 transition-all group-hover:bg-primary/50" />
+        <div className="group absolute bottom-0 left-0 top-0 z-30 w-85 -translate-x-[calc(100%-1.5rem)] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] hover:translate-x-0">
+          <aside className="relative flex h-full flex-col border-r border-outline-variant/10 bg-surface/90 p-8 shadow-[20px_0_80px_rgba(0,0,0,0.15)] backdrop-blur-3xl">
+            {/* The Handle */}
+            <div className="absolute bottom-0 right-0 top-0 flex w-6 items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
+              <div className="flex h-32 w-full flex-col items-center justify-center gap-4">
+                <div className="h-full w-[2px] rounded-full bg-primary/20" />
+                <span className="[writing-mode:vertical-lr] text-[10px] font-bold uppercase tracking-[0.3em] text-primary/40 rotate-180">
+                  {t('agentBuilder.nodeLibraryTitle')}
+                </span>
+                <div className="h-full w-[2px] rounded-full bg-primary/20" />
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto opacity-0 transition-opacity duration-300 delay-100 group-hover:opacity-100">
-              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-                {t('agentBuilder.nodeLibraryTitle')}
-              </p>
-              <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+            <div className="flex-1 overflow-y-auto opacity-0 transition-all duration-500 delay-100 group-hover:opacity-100 translate-x-[-10px] group-hover:translate-x-0">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <span className="material-symbols-outlined text-lg">grid_view</span>
+                </div>
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">
+                  {t('agentBuilder.nodeLibraryTitle')}
+                </p>
+              </div>
+              
+              <p className="mt-4 text-xs leading-6 text-on-surface-variant/70 font-medium">
                 {t('agentBuilder.nodeLibraryDescription')}
               </p>
-              <div className="mt-5 space-y-3">
+
+              <div className="mt-8 space-y-4">
                 {nodeLibraryItems.map((item) => {
-                  const isKnowledgeAdded =
-                    item.key === 'knowledge' &&
-                    nodes.some((node) => node.data.kind === 'knowledge');
-                  const isEndChatAdded =
-                    item.key === 'endchat' &&
-                    nodes.some((node) => node.data.kind === 'endchat');
+                  const isKnowledgeAdded = item.key === 'knowledge' && hasKnowledgeNode;
+                  const isEndChatAdded = item.key === 'endchat' && hasEndChatNode;
                   const isFixed = item.fixed;
                   const isDisabled = isKnowledgeAdded || isEndChatAdded || isFixed || item.disabled;
 
@@ -3102,37 +3576,48 @@ export default function AgentBuilderPage() {
                           : undefined
                       }
                       disabled={isDisabled && !item.disabled}
-                      className={`group/item flex w-full items-start gap-4 rounded-2xl border transition-all ${
+                      className={`group/item relative flex w-full items-start gap-4 rounded-[2rem] border p-5 text-left transition-all duration-300 ${
                         item.disabled
-                          ? 'border-outline-variant/10 bg-surface-container-low opacity-60 cursor-pointer grayscale'
+                          ? 'border-outline-variant/5 bg-surface-container-low/40 opacity-50 grayscale cursor-not-allowed'
                           : isFixed
-                          ? 'border-dashed border-outline-variant/20 bg-surface-container-lowest/50 cursor-default opacity-80'
-                          : 'border-outline-variant/10 bg-surface-container-low hover:border-primary/40 hover:bg-surface-container-high hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]'
-                      } p-5 text-left`}
+                          ? 'border-dashed border-outline-variant/20 bg-surface-container-lowest/30 cursor-default opacity-80'
+                          : isDisabled
+                          ? 'border-outline-variant/10 bg-surface-container-low/50 opacity-60 cursor-not-allowed'
+                          : 'border-outline-variant/10 bg-surface-container-lowest hover:border-primary/40 hover:bg-surface-container-low hover:shadow-xl hover:shadow-primary/5 active:scale-[0.98]'
+                      }`}
                     >
-                      <span className={`material-symbols-outlined ${item.disabled ? 'text-on-surface-variant/40' : isFixed ? 'text-on-surface-variant/40' : 'text-primary'}`}>
-                        {item.icon}
-                      </span>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className={`text-sm font-semibold ${item.disabled ? 'text-on-surface-variant' : isFixed ? 'text-on-surface-variant' : 'text-on-surface'}`}>
+                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 ${
+                        item.disabled || isFixed || isDisabled 
+                        ? 'bg-surface-container-high text-on-surface-variant/40' 
+                        : 'bg-primary/10 text-primary group-hover/item:bg-primary group-hover/item:text-on-primary'
+                      }`}>
+                        <span className="material-symbols-outlined text-xl">
+                          {item.icon}
+                        </span>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`text-sm font-bold tracking-tight ${
+                            item.disabled || isFixed || isDisabled ? 'text-on-surface-variant' : 'text-on-surface'
+                          }`}>
                             {item.label}
                           </p>
                           {item.disabled ? (
-                            <span className="rounded-full bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant border border-outline-variant/10">
-                              {t('common.locked') || 'Locked'}
+                            <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60 border border-outline-variant/10">
+                              {t('common.locked')}
                             </span>
                           ) : isFixed ? (
-                            <span className="rounded-full bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                            <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60">
                               {t('common.fixed')}
                             </span>
                           ) : isKnowledgeAdded || isEndChatAdded ? (
-                            <span className="rounded-full bg-background px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-primary">
                               {t('common.added')}
                             </span>
                           ) : null}
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                        <p className="mt-1.5 text-[11px] leading-relaxed text-on-surface-variant/60 line-clamp-2">
                           {item.description}
                         </p>
                       </div>
@@ -3171,36 +3656,50 @@ export default function AgentBuilderPage() {
         </section>
 
         {selectedNode ? (
-          <aside className="border-l border-outline-variant/10 overflow-y-auto bg-surface/70 p-8 backdrop-blur-xl">
-            <div className="space-y-8">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
-                    <span className="material-symbols-outlined text-xl">{selectedNode.data.icon}</span>
+          <aside className="border-l border-outline-variant/10 overflow-y-auto bg-surface/90 backdrop-blur-3xl flex flex-col">
+            {/* ── Compact node header ── */}
+            <div className="shrink-0 sticky top-0 z-10 border-b border-outline-variant/10 bg-surface/95 backdrop-blur-xl px-6 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Small icon chip */}
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <span className="material-symbols-outlined text-base">
+                      {selectedNode.data.icon || 'smart_toy'}
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
-                      {selectedNode.data.type}
-                    </p>
-                    <h2 className="mt-1.5 font-headline text-2xl font-bold tracking-tight text-on-surface">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                      <p className="text-[9px] font-black uppercase tracking-[0.28em] text-primary/60 leading-none">
+                        {selectedNode.data.type}
+                      </p>
+                    </div>
+                    <h2 className="mt-0.5 text-sm font-black tracking-tight text-on-surface truncate">
                       {selectedNode.data.label}
                     </h2>
-                    <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/80">
-                      {selectedNode.data.description}
-                    </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedNodeId(null)}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                  className="group flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-90"
                   aria-label={t('common.close')}
                   title={t('common.close')}
                 >
-                  <span className="material-symbols-outlined text-lg">close</span>
+                  <span className="material-symbols-outlined text-base transition-transform group-hover:rotate-90">close</span>
                 </button>
               </div>
-              <div className="mt-6">{renderInspectorBody()}</div>
+              {/* description strip */}
+              {selectedNode.data.description ? (
+                <p className="mt-2 text-[11px] leading-relaxed text-on-surface-variant/60 font-medium line-clamp-2 pl-11">
+                  {selectedNode.data.description}
+                </p>
+              ) : null}
+            </div>
+
+            {/* ── Body ── */}
+            <div className="flex-1 overflow-y-auto p-8">
+              {renderInspectorBody()}
             </div>
           </aside>
         ) : null}
@@ -3260,6 +3759,171 @@ export default function AgentBuilderPage() {
           </div>
         </div>
       ) : null}
+
+      {actionEditorNode && isToolNodeData(actionEditorNode.data) ? (() => {
+        const toolkitSlug = actionEditorNode.data.kind;
+        const actions = toolkitActionsBySlug[toolkitSlug] ?? [];
+        const actionStatus = toolkitActionsStatusBySlug[toolkitSlug] ?? 'idle';
+        const enabledTools = getEnabledToolNames(toolkitSlug, actionEditorNode.data);
+        const enabledSet = new Set(enabledTools);
+        const filteredActions = actions.filter((action) =>
+          matchesToolActionQuery(action, deferredActionSearchQuery),
+        );
+        const toggleAction = (toolName: string, checked: boolean) => {
+          updateToolActions(
+            actionEditorNode.id,
+            checked
+              ? Array.from(new Set([...enabledTools, toolName]))
+              : enabledTools.filter((item) => item !== toolName),
+          );
+        };
+
+        return (
+          <div className="absolute inset-0 z-50 flex justify-end bg-background/40 backdrop-blur-sm transition-all animate-in fade-in duration-300">
+            <div className="flex h-full w-full max-w-md flex-col border-l border-outline-variant/10 bg-surface/90 shadow-[0_0_100px_rgba(0,0,0,0.2)] backdrop-blur-3xl animate-in slide-in-from-right duration-500 ease-[cubic-bezier(0.2,0,0,1)]">
+              <div className="shrink-0 border-b border-outline-variant/10 bg-surface-container-lowest/50 p-8">
+                <div className="flex items-start justify-between gap-6">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <span className="material-symbols-outlined text-sm">construction</span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/70">
+                        {actionEditorNode.data.label}
+                      </span>
+                    </div>
+                    <h3 className="mt-3 text-2xl font-black tracking-tight text-on-surface">
+                      {t('agentBuilder.enabledActions')}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={closeActionEditor}
+                    className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/15 bg-surface-container-low text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-90"
+                  >
+                    <span className="material-symbols-outlined text-lg transition-transform group-hover:rotate-90">close</span>
+                  </button>
+                </div>
+                
+                {actionStatus === 'ready' && (
+                  <div className="mt-8 flex flex-col gap-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/40">
+                        {t('agentBuilder.actionsSelectedSummary', {
+                          enabled: enabledTools.length,
+                          total: actions.length,
+                        })}
+                      </span>
+                      {enabledTools.length > 0 && (
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                      )}
+                    </div>
+                    <label className="relative flex items-center group">
+                      <span className="material-symbols-outlined absolute left-4 text-xl text-on-surface-variant/40 group-focus-within:text-primary transition-colors">
+                        search
+                      </span>
+                      <input
+                        type="search"
+                        value={actionSearchQuery}
+                        onChange={(event) => setActionSearchQuery(event.target.value)}
+                        placeholder={t('agentBuilder.searchActionsPlaceholder')}
+                        className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container-low py-4 pl-12 pr-6 text-sm font-bold text-on-surface shadow-inner outline-none transition-all placeholder:text-on-surface-variant/30 focus:border-primary/30 focus:bg-surface-container-lowest focus:ring-4 focus:ring-primary/5"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                {actionStatus === 'loading' || actionStatus === 'idle' ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-4 text-on-surface-variant">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+                    <p className="text-xs font-black uppercase tracking-widest animate-pulse">{t('agentBuilder.loadingActions')}</p>
+                  </div>
+                ) : actionStatus === 'error' ? (
+                  <div className="flex flex-col items-center gap-4 rounded-3xl border border-error/20 bg-error/5 p-8 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-error/10 text-error">
+                      <span className="material-symbols-outlined text-2xl">error</span>
+                    </div>
+                    <p className="text-sm font-bold text-error">{t('agentBuilder.loadActionsError')}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 pb-8">
+                    {filteredActions.length > 0 ? (
+                      filteredActions.map((action) => {
+                        const isEnabled = enabledSet.has(action.name);
+                        return (
+                          <button
+                            key={action.name}
+                            onClick={() => toggleAction(action.name, !isEnabled)}
+                            className={`group relative flex w-full flex-col items-start gap-3 rounded-[1.75rem] border p-5 text-left transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] ${
+                              isEnabled
+                                ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-lg shadow-primary/5'
+                                : 'border-outline-variant/10 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low hover:shadow-xl hover:shadow-black/5'
+                            }`}
+                          >
+                            <div className="flex w-full items-start justify-between gap-4">
+                              <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+                                  <div className={`h-6 w-6 rounded-lg border-2 transition-all duration-300 ${
+                                    isEnabled 
+                                      ? 'border-primary bg-primary scale-110' 
+                                      : 'border-outline-variant/20 bg-background group-hover:border-primary/50'
+                                  }`} />
+                                  <span className={`material-symbols-outlined absolute text-white text-[16px] transition-all duration-300 ${
+                                    isEnabled ? 'scale-100 opacity-100 rotate-0' : 'scale-50 opacity-0 rotate-12'
+                                  }`}>check</span>
+                                </div>
+                                <span className={`text-sm font-bold tracking-tight truncate transition-colors duration-300 ${
+                                  isEnabled ? 'text-primary' : 'text-on-surface'
+                                }`}>
+                                  {formatToolActionName(action.name)}
+                                </span>
+                              </div>
+                              {action.recommended && (
+                                <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-primary border border-primary/10">
+                                  {t('agentBuilder.recommendedActions')}
+                                </span>
+                              )}
+                            </div>
+                            
+                            {(action.description || action.name) && (
+                              <p className={`pl-10 text-xs leading-relaxed transition-colors duration-300 line-clamp-2 font-medium ${
+                                isEnabled ? 'text-primary/60' : 'text-on-surface-variant/60'
+                              }`}>
+                                {action.description || action.name}
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="flex flex-col items-center justify-center rounded-[2.5rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-8 py-20 text-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/5 text-primary/20 mb-4">
+                          <span className="material-symbols-outlined text-4xl">search_off</span>
+                        </div>
+                        <p className="text-sm font-bold text-on-surface-variant/60">
+                          {t('agentBuilder.noMatchingActions')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {actionStatus === 'ready' && (
+                <div className="shrink-0 border-t border-outline-variant/10 bg-surface-container-lowest/80 p-6 backdrop-blur-xl">
+                  <button
+                    onClick={closeActionEditor}
+                    className="w-full rounded-[1.25rem] bg-primary px-8 py-4 text-xs font-black uppercase tracking-[0.2em] text-on-primary shadow-xl shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-2xl hover:shadow-primary/30 active:scale-[0.98]"
+                  >
+                    {t('common.done')}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })() : null}
 
       {isHistoryOpen ? (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/60 px-4 backdrop-blur-sm">

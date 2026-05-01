@@ -35,8 +35,10 @@ test("app security headers can omit CSP when a request nonce is required", () =>
 
 test("content security policy protects framing while allowing current widget preview assets", () => {
   const previousNodeEnv = process.env.NODE_ENV;
+  // @ts-expect-error - testing process.env mutation
   process.env.NODE_ENV = "production";
   const csp = buildAppContentSecurityPolicy({ nonce: "test-nonce" });
+  // @ts-expect-error - testing process.env mutation
   process.env.NODE_ENV = previousNodeEnv;
 
   assert.match(csp, /frame-ancestors 'none'/);
@@ -54,8 +56,10 @@ test("content security policy protects framing while allowing current widget pre
 
 test("development CSP allows Next.js inline bootstrap and eval-based debugging", () => {
   const previousNodeEnv = process.env.NODE_ENV;
+  // @ts-expect-error - testing process.env mutation
   process.env.NODE_ENV = "development";
   const csp = buildAppContentSecurityPolicy();
+  // @ts-expect-error - testing process.env mutation
   process.env.NODE_ENV = previousNodeEnv;
 
   const scriptSrc = getCspDirective(csp, "script-src");

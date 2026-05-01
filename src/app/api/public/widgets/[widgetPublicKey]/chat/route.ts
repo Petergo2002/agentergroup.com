@@ -7,6 +7,7 @@ import {
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
+import { extractCalSelectionFromDefinition } from "@/lib/cal";
 import {
   buildPublicWidgetRateLimitContext,
   buildRateLimitErrorPayload,
@@ -16,6 +17,7 @@ import {
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
 import {
   validateBody,
   validateWidgetChatBody,
@@ -451,6 +453,10 @@ export async function POST(
       ? previewRuntimeAgent?.googleCalendarSelection ??
         extractGoogleCalendarSelectionFromDefinition(publishedVersion?.definition)
       : extractGoogleCalendarSelectionFromDefinition(publishedVersion?.definition);
+    const calSelection = extractCalSelectionFromDefinition(publishedVersion?.definition);
+    const enabledToolsByToolkit = extractEnabledToolsFromDefinition(
+      publishedVersion?.definition,
+    );
 
     const calendarTimezone = googleCalendarSelection.timezone;
     const streamAbortController = new AbortController();
@@ -495,8 +501,10 @@ export async function POST(
             widgetSessionId: sessionId,
             calendarTimezone,
             googleCalendarSelection,
+            calSelection,
             endChatPolicy,
             gmailRecipientPolicy,
+            enabledToolsByToolkit,
             abortSignal: streamAbortController.signal,
             onToken: (token) => {
               const encoder = new TextEncoder();

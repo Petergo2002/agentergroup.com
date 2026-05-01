@@ -53,6 +53,7 @@ export const common = {
   never: "Never",
   justNow: "Just now",
   all: "All",
+  selected: "Selected",
   active: "Active",
   inactive: "Inactive",
   draft: "Draft",
@@ -89,4 +90,7 @@ export const common = {
   declined: "Invite declined.",
   declineConfirm: "Are you sure you want to decline this invitation?",
   done: "Done",
+  complete: "Complete",
+  locked: "Locked",
+  seconds: "sec",
 };
