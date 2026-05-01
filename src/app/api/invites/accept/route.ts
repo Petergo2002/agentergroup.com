@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
+import {
+  buildTeamMemberLimitError,
+  getTeamMemberLimitForPlan,
+} from "@/lib/plan-limits";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { PlanTier } from "@/lib/types/subscription";
 
 /** POST /api/invites/accept — Accept a workspace invite using a token. */
 export async function POST(request: Request) {
@@ -85,6 +90,39 @@ export async function POST(request: Request) {
     });
 
     return response;
+  }
+
+  const { data: subscription, error: subscriptionError } = await adminClient
+    .from("workspace_subscriptions")
+    .select("plan_tier")
+    .eq("workspace_id", invite.workspace_id)
+    .maybeSingle();
+
+  if (subscriptionError) {
+    return NextResponse.json({ error: subscriptionError.message }, { status: 500 });
+  }
+
+  const planTier = (subscription?.plan_tier ?? "free") as PlanTier;
+  const teamMemberLimit = getTeamMemberLimitForPlan(planTier);
+
+  const { data: existingWorkspaceMembers, error: workspaceMembersError } = await adminClient
+    .from("workspace_members")
+    .select("id, role")
+    .eq("workspace_id", invite.workspace_id);
+
+  if (workspaceMembersError) {
+    return NextResponse.json({ error: workspaceMembersError.message }, { status: 500 });
+  }
+
+  const nonOwnerMemberCount = (existingWorkspaceMembers ?? []).filter(
+    (member) => member.role !== "owner",
+  ).length;
+
+  if (nonOwnerMemberCount >= teamMemberLimit) {
+    return NextResponse.json(
+      { error: buildTeamMemberLimitError(planTier) },
+      { status: 403 },
+    );
   }
 
   // Insert workspace membership using service role (bypasses RLS)

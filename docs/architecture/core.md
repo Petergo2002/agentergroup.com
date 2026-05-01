@@ -368,6 +368,7 @@ Each plan defines limits for:
 - monthly message allowance (`messages_limit`)
 - active agent count (`agents_limit`)
 - integration access (`integrations_enabled`)
+- team member capacity (enforced in the team invite flow)
 - website crawling limits (hardcoded per tier)
 
 ### Data model
@@ -436,15 +437,16 @@ Accepts `{ plan_tier: "free" | "starter" | "premium" }`. Protected by `isAdminUs
 
 **Plan tier → limits mapping:**
 
-| Plan | `messages_limit` | `agents_limit` | `integrations_enabled` | `crawl_limit` | `sitemap_mapping` |
-| --- | --- | --- | --- | --- | --- |
-| `free` | 50 | 1 | false | 1 page | No |
-| `starter` | 500 | 3 | true | 1 page | No |
-| `premium` | 4000 | 9999 (unlimited) | true | 30 pages | Yes |
+| Plan | `messages_limit` | `agents_limit` | `integrations_enabled` | `team_member_limit` | `crawl_limit` | `sitemap_mapping` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `free` | 50 | 1 | false | 0 | 1 page | No |
+| `starter` | 500 | 3 | true | 2 | 1 page | No |
+| `premium` | 4000 | 9999 (unlimited) | true | 10 | 30 pages | Yes |
 
 **Important behavioral notes:**
 
 - `crawl_limit` and `sitemap_mapping` are functional limits enforced at the API and UI layers based on the `plan_tier`, rather than stored as columns in `workspace_subscriptions` yet.
+- `team_member_limit` is also enforced in application logic rather than stored as a database column. Pending invites count toward the same capacity as accepted non-owner members.
 - Stripe is **not involved** — this is a direct database override for internal ops use (trials, billing corrections, etc.)
 - `messages_used` is **not reset** when the plan changes — usage history is preserved
 - The workspace user's billing UI will reflect the new plan tier immediately after their next page load (the `AppWorkspaceContext` is reloaded on each authenticated request via bootstrap)
@@ -508,6 +510,7 @@ It provides:
 - invite creation by email
 - pending invite list with revoke action
 - incoming invite notifications for the current user
+- plan-based team capacity feedback (`free = 0`, `starter = 2`, `premium = 10`)
 
 ### Invite flow
 

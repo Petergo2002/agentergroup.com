@@ -9,9 +9,9 @@ import { useSearchParams, useRouter } from 'next/navigation';
 // ─── Static plan data ─────────────────────────────────────────────────────────
 
 const PLAN_FEATURES = {
-  free:    ['1 workspace', '1 widget', '50 messages per month', '1 active agent', '10 MB Knowledge Base storage', 'Community support'],
-  starter: ['1 workspace', 'Up to 3 widgets', '500 messages per month', 'Up to 3 agents', '25 MB Knowledge Base storage', 'Full integrations', 'Priority support'],
-  premium: ['Up to 5 workspaces', 'Up to 6 widgets', '4000 messages per month', 'Unlimited agents', '50 MB Knowledge Base storage', 'Full integrations', 'Remove widget branding', 'Dedicated support'],
+  free:    ['1 workspace', '1 widget', '50 messages per month', '1 active agent', '0 team members', '10 MB Knowledge Base storage', 'Community support'],
+  starter: ['1 workspace', 'Up to 3 widgets', '500 messages per month', 'Up to 3 agents', 'Up to 2 team members', '25 MB Knowledge Base storage', 'Full integrations', 'Priority support'],
+  premium: ['Up to 5 workspaces', 'Up to 6 widgets', '4000 messages per month', 'Unlimited agents', 'Up to 10 team members', '50 MB Knowledge Base storage', 'Full integrations', 'Remove widget branding', 'Dedicated support'],
 };
 
 const PLAN_PRICES = { free: '$0', starter: '$30', premium: '$110' };

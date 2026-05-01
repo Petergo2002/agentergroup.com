@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminUser } from "@/lib/admin/auth";
+import { PLAN_LIMITS } from "@/lib/plan-limits";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { PlanTier } from "@/lib/types/subscription";
-
-/**
- * Plan tier → subscription limits mapping.
- * This is the single source of truth for what each plan provides.
- * Keep in sync with the billing page display values and architecture.md.
- */
-const PLAN_LIMITS: Record<
-  PlanTier,
-  { messages_limit: number; agents_limit: number; integrations_enabled: boolean; storage_limit_bytes: number }
-> = {
-  free: { messages_limit: 50, agents_limit: 1, integrations_enabled: false, storage_limit_bytes: 10485760 },
-  starter: { messages_limit: 500, agents_limit: 3, integrations_enabled: true, storage_limit_bytes: 26214400 },
-  // agents_limit of 9999 represents "unlimited" since the column is an integer.
-  premium: { messages_limit: 4000, agents_limit: 9999, integrations_enabled: true, storage_limit_bytes: 52428800 },
-};
 
 const VALID_PLANS = new Set<PlanTier>(["free", "starter", "premium"]);
 

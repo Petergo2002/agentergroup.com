@@ -3,7 +3,12 @@ import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 import { sendInviteEmail } from "@/lib/email";
 import { getAppUrl } from "@/lib/env";
+import {
+  buildTeamMemberLimitError,
+  getTeamMemberLimitForPlan,
+} from "@/lib/plan-limits";
 import type { WorkspaceInviteRecord } from "@/lib/types";
+import type { PlanTier } from "@/lib/types/subscription";
 
 /** Validates an email address format. */
 function isValidEmail(email: string): boolean {
@@ -43,6 +48,18 @@ export async function POST(
     );
   }
 
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("workspace_subscriptions")
+    .select("plan_tier")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (subscriptionError) {
+    return NextResponse.json({ error: subscriptionError.message }, { status: 500 });
+  }
+
+  const planTier = (subscription?.plan_tier ?? "free") as PlanTier;
+
   const body = await request.json().catch(() => ({}));
   const email = String(body.email ?? "").trim().toLowerCase();
 
@@ -58,7 +75,7 @@ export async function POST(
   // Check if already a member
   const { data: existingMembers } = await supabase
     .from("workspace_members")
-    .select("id, user_id, profile:profiles(email)")
+    .select("id, user_id, role, profile:profiles(email)")
     .eq("workspace_id", workspaceId);
 
   const alreadyMember = (existingMembers ?? []).some((member: Record<string, unknown>) => {
@@ -70,17 +87,35 @@ export async function POST(
     return NextResponse.json({ error: "This person is already a member of this workspace." }, { status: 409 });
   }
 
-  // Check for existing pending invite
-  const { data: existingInvite } = await supabase
+  const { data: pendingInvites, error: pendingInvitesError } = await supabase
     .from("workspace_invites")
-    .select("id")
+    .select("id, email")
     .eq("workspace_id", workspaceId)
-    .eq("email", email)
-    .eq("status", "pending")
-    .maybeSingle();
+    .eq("status", "pending");
+
+  if (pendingInvitesError) {
+    return NextResponse.json({ error: pendingInvitesError.message }, { status: 500 });
+  }
+
+  const existingInvite = (pendingInvites ?? []).find(
+    (invite) => invite.email?.toLowerCase() === email,
+  );
 
   if (existingInvite) {
     return NextResponse.json({ error: "An invite for this email is already pending." }, { status: 409 });
+  }
+
+  const nonOwnerMemberCount = (existingMembers ?? []).filter(
+    (member: Record<string, unknown>) => member.role !== "owner",
+  ).length;
+  const occupiedSeats = nonOwnerMemberCount + (pendingInvites?.length ?? 0);
+  const teamMemberLimit = getTeamMemberLimitForPlan(planTier);
+
+  if (occupiedSeats >= teamMemberLimit) {
+    return NextResponse.json(
+      { error: buildTeamMemberLimitError(planTier) },
+      { status: 403 },
+    );
   }
 
   // Create the invite

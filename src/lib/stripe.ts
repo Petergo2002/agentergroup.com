@@ -6,6 +6,8 @@
  */
 
 import Stripe from 'stripe';
+import { PLAN_LIMITS } from '@/lib/plan-limits';
+import type { PlanTier } from '@/lib/types/subscription';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required environment variable: STRIPE_SECRET_KEY');
@@ -29,17 +31,9 @@ export const STRIPE_PRICE_IDS: Record<string, string> = {
  * Map Stripe Price IDs back to plan tiers.
  * Used by the webhook to determine which plan to activate.
  */
-export const STRIPE_PRICE_TO_PLAN: Record<string, string> = {
+export const STRIPE_PRICE_TO_PLAN: Record<string, PlanTier> = {
   [process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || 'price_1TP1pxEqNgWOqUOe64tSR342']: 'starter',
   [process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID || 'price_1TP1ptEqNgWOqUOePAREbCk0']: 'premium',
 };
 
-/**
- * Plan tier limits — mirrors the DB defaults.
- * Used by the webhook to update workspace_subscriptions correctly.
- */
-export const PLAN_LIMITS: Record<string, { messages_limit: number; agents_limit: number; integrations_enabled: boolean; storage_limit_bytes: number }> = {
-  free:    { messages_limit: 50,   agents_limit: 1,    integrations_enabled: false, storage_limit_bytes: 10485760 },
-  starter: { messages_limit: 500,  agents_limit: 3,    integrations_enabled: true,  storage_limit_bytes: 26214400 },
-  premium: { messages_limit: 4000, agents_limit: 9999, integrations_enabled: true,  storage_limit_bytes: 52428800 },
-};
+export { PLAN_LIMITS };

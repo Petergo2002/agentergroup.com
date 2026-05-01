@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { stripe, STRIPE_PRICE_TO_PLAN, PLAN_LIMITS } from '@/lib/stripe';
+import type { PlanTier } from '@/lib/types/subscription';
 
 
 /**
@@ -33,7 +34,7 @@ function createAdminClient() {
  */
 async function updateWorkspaceSubscription(
   workspaceId: string,
-  planTier: string,
+  planTier: PlanTier,
   stripeCustomerId: string,
   stripeSubscriptionId: string,
 ) {

@@ -9,12 +9,14 @@ const PLAN_FEATURES = {
   free: [
     "50 messages per month",
     "1 active agent",
+    "0 team members",
     "10 MB Knowledge storage",
     "Community support",
   ],
   starter: [
     "500 messages per month",
     "Up to 3 agents",
+    "Up to 2 team members",
     "25 MB Knowledge storage",
     "Full integrations",
     "Priority support",
@@ -22,6 +24,7 @@ const PLAN_FEATURES = {
   premium: [
     "4000 messages per month",
     "Unlimited agents",
+    "Up to 10 team members",
     "50 MB Knowledge storage",
     "Full integrations",
     "Dedicated support",

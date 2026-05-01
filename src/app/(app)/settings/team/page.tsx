@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import { getTeamMemberLimitForPlan } from '@/lib/plan-limits';
 import type { WorkspaceMemberWithProfile, WorkspaceInviteRecord, ExpandedWorkspaceInviteRecord } from '@/lib/types';
 import { Mail, Copy, X, Info } from 'lucide-react';
 
 export default function TeamSettingsPage() {
-  const { workspace, membership, user } = useAppContext();
+  const { workspace, membership, subscription, user } = useAppContext();
   const { t } = useLanguage();
   const { showToast } = useToast();
 
@@ -30,6 +31,19 @@ export default function TeamSettingsPage() {
   const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
 
   const canManageTeam = membership.role === 'owner' || membership.role === 'admin';
+  const teamMemberLimit = getTeamMemberLimitForPlan(subscription?.plan_tier);
+  const nonOwnerMemberCount = members.filter((member) => member.role !== 'owner').length;
+  const occupiedTeamSeats = nonOwnerMemberCount + invites.length;
+  const inviteCapacityReached = occupiedTeamSeats >= teamMemberLimit;
+  const canCreateInvites = canManageTeam && teamMemberLimit > 0 && !inviteCapacityReached;
+  const inviteDisabledReason =
+    teamMemberLimit === 0
+      ? (t('settings.team.inviteLockedFree') ||
+        'Team invites are not available on the Free plan.')
+      : inviteCapacityReached
+        ? (t('settings.team.inviteLimitReached', { limit: teamMemberLimit }) ||
+          `You have reached the ${teamMemberLimit}-member team limit for this plan.`)
+        : null;
 
   const loadMembers = useCallback(async () => {
     setIsLoadingMembers(true);
@@ -83,6 +97,16 @@ export default function TeamSettingsPage() {
   }, [loadMembers, loadInvites, loadIncomingInvites]);
 
   const handleSendInvite = async () => {
+    if (!canCreateInvites) {
+      showToast(
+        inviteDisabledReason ||
+          (t('settings.team.inviteLimitReached', { limit: teamMemberLimit }) ||
+            'You cannot send more invites on this plan.'),
+        'error',
+      );
+      return;
+    }
+
     if (!inviteEmail.trim()) return;
     setIsInviting(true);
     setLastInviteLink(null);
@@ -230,15 +254,48 @@ export default function TeamSettingsPage() {
         {canManageTeam && (
           <button
             onClick={() => {
+              if (!canCreateInvites) {
+                return;
+              }
               setIsInviteModalOpen(true);
               setLastInviteLink(null);
             }}
-            className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90"
+            disabled={!canCreateInvites}
+            title={inviteDisabledReason ?? undefined}
+            className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t('settings.team.invite') || 'Invite member'}
           </button>
         )}
       </div>
+
+      {canManageTeam && (
+        <div className="mb-8 rounded-[1.4rem] border border-outline-variant/20 bg-surface-container-lowest px-6 py-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-on-surface">
+                {t('settings.team.capacityTitle') || 'Team capacity'}
+              </h2>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                {teamMemberLimit === 0
+                  ? (t('settings.team.capacityFree') ||
+                    'The Free plan does not include team invites.')
+                  : (t('settings.team.capacityUsage', {
+                      used: occupiedTeamSeats,
+                      limit: teamMemberLimit,
+                    }) || `${occupiedTeamSeats} of ${teamMemberLimit} team seats used.`)}
+              </p>
+            </div>
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+              {(subscription?.plan_tier ?? 'free').toUpperCase()}
+            </span>
+          </div>
+          <p className="mt-3 text-xs text-on-surface-variant/80">
+            {t('settings.team.capacityHint') ||
+              'Pending invites count toward the limit.'}
+          </p>
+        </div>
+      )}
 
       {/* Guest Context Banner */}
       {membership.role !== 'owner' && (
@@ -456,6 +513,12 @@ export default function TeamSettingsPage() {
                 'They will receive full admin access to this workspace.'}
             </p>
 
+            {inviteDisabledReason && (
+              <div className="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                {inviteDisabledReason}
+              </div>
+            )}
+
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                 {t('common.email') || 'Email'}
@@ -507,7 +570,7 @@ export default function TeamSettingsPage() {
               </button>
               <button
                 onClick={handleSendInvite}
-                disabled={!inviteEmail.trim() || isInviting}
+                disabled={!inviteEmail.trim() || isInviting || !canCreateInvites}
                 className="flex-1 rounded-full bg-on-surface px-4 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {isInviting
