@@ -143,6 +143,8 @@ export const agentBuilder = {
   noRecommendedActions: "Det finns inga rekommenderade åtgärder för det här verktyget än.",
   selectMoreAction: "Välj en åtgärd att aktivera",
   noMoreActions: "Alla tillgängliga åtgärder är aktiverade.",
+  tapToAddAction: "Klicka för att lägga till åtgärden",
+  browseMoreActionsHint: "Öppna detta bara när du behöver fler åtgärder.",
   sendEmailAction: "Skicka e-post",
   createEventAction: "Skapa händelse",
   quickAddAction: "Snabblägg till",

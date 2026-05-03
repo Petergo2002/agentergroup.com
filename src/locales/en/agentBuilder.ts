@@ -142,6 +142,8 @@ export const agentBuilder = {
   noRecommendedActions: "No recommended actions for this toolkit yet.",
   selectMoreAction: "Select an action to enable",
   noMoreActions: "All available actions are enabled.",
+  tapToAddAction: "Click to add this action",
+  browseMoreActionsHint: "Open this only when you need extra actions.",
   sendEmailAction: "Send Email",
   createEventAction: "Create Event",
   quickAddAction: "Quick Add",

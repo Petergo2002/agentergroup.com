@@ -388,6 +388,14 @@ function formatBuilderStatusNote(
   }
 }
 
+function ActionDescriptionButton() {
+  return (
+    <span className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/10 bg-surface text-on-surface-variant/60 transition-all hover:border-primary/20 hover:text-primary focus-visible:border-primary/30 focus-visible:text-primary focus-visible:outline-none">
+      <span className="material-symbols-outlined text-base">info</span>
+    </span>
+  );
+}
+
 const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
   const { t } = useLanguage();
   const nodeText = getBuilderNodeText(data.kind, t);
@@ -1294,6 +1302,8 @@ export default function AgentBuilderPage() {
   const [isToolPickerOpen, setIsToolPickerOpen] = useState(false);
   const [actionEditorNodeId, setActionEditorNodeId] = useState<string | null>(null);
   const [actionSearchQuery, setActionSearchQuery] = useState('');
+  const [activeActionDescription, setActiveActionDescription] = useState<string | null>(null);
+  const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false);
   const [toolkitActionsBySlug, setToolkitActionsBySlug] = useState<
     Record<string, ToolkitActionOption[]>
   >({});
@@ -1998,6 +2008,8 @@ export default function AgentBuilderPage() {
 
   useEffect(() => {
     setActionSearchQuery('');
+    setActiveActionDescription(null);
+    setIsMoreActionsOpen(false);
   }, [actionEditorNodeId]);
 
   useEffect(() => {
@@ -3523,14 +3535,14 @@ export default function AgentBuilderPage() {
       <div
         className={`relative grid min-h-0 flex-1 overflow-hidden ${
           selectedNode
-            ? 'xl:grid-cols-[minmax(0,1fr)_24rem]'
+            ? 'xl:grid-cols-[minmax(0,1fr)_28rem]'
             : 'xl:grid-cols-[minmax(0,1fr)]'
         }`}
       >
-        <div className="group absolute bottom-0 left-0 top-0 z-30 w-85 -translate-x-[calc(100%-1.5rem)] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] hover:translate-x-0">
-          <aside className="relative flex h-full flex-col border-r border-outline-variant/10 bg-surface/90 p-8 shadow-[20px_0_80px_rgba(0,0,0,0.15)] backdrop-blur-3xl">
+        <div className="group absolute bottom-0 left-0 top-0 z-30 w-[22rem] -translate-x-[calc(100%-3.25rem)] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] hover:translate-x-0">
+          <aside className="relative flex h-full flex-col border-r border-outline-variant/10 bg-surface/90 px-7 py-8 shadow-[20px_0_80px_rgba(0,0,0,0.15)] backdrop-blur-3xl">
             {/* The Handle */}
-            <div className="absolute bottom-0 right-0 top-0 flex w-6 items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
+            <div className="absolute bottom-0 right-0 top-0 flex w-11 items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
               <div className="flex h-32 w-full flex-col items-center justify-center gap-4">
                 <div className="h-full w-[2px] rounded-full bg-primary/20" />
                 <span className="[writing-mode:vertical-lr] text-[10px] font-bold uppercase tracking-[0.3em] text-primary/40 rotate-180">
@@ -3769,12 +3781,29 @@ export default function AgentBuilderPage() {
         const filteredActions = actions.filter((action) =>
           matchesToolActionQuery(action, deferredActionSearchQuery),
         );
+        const recommendedActions = filteredActions.filter((action) => action.recommended);
+        const allRecommendedActionNames = actions
+          .filter((action) => action.recommended)
+          .map((action) => action.name);
+        const hasDisabledRecommendedActions = allRecommendedActionNames.some(
+          (toolName) => !enabledSet.has(toolName),
+        );
+        const moreActions = filteredActions.filter((action) => !action.recommended);
+        const availableMoreActions = moreActions.filter((action) => !enabledSet.has(action.name));
+        const enabledMoreActions = moreActions.filter((action) => enabledSet.has(action.name));
+        const shouldShowMoreActions = isMoreActionsOpen || Boolean(deferredActionSearchQuery);
         const toggleAction = (toolName: string, checked: boolean) => {
           updateToolActions(
             actionEditorNode.id,
             checked
               ? Array.from(new Set([...enabledTools, toolName]))
               : enabledTools.filter((item) => item !== toolName),
+          );
+        };
+        const enableRecommendedActions = () => {
+          updateToolActions(
+            actionEditorNode.id,
+            Array.from(new Set([...enabledTools, ...allRecommendedActionNames])),
           );
         };
 
@@ -3833,7 +3862,7 @@ export default function AgentBuilderPage() {
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-3">
+              <div className="flex-1 overflow-x-visible overflow-y-auto p-6 space-y-3">
                 {actionStatus === 'loading' || actionStatus === 'idle' ? (
                   <div className="flex h-full flex-col items-center justify-center gap-4 text-on-surface-variant">
                     <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
@@ -3847,55 +3876,223 @@ export default function AgentBuilderPage() {
                     <p className="text-sm font-bold text-error">{t('agentBuilder.loadActionsError')}</p>
                   </div>
                 ) : (
-                  <div className="space-y-3 pb-8">
+                  <div className="space-y-6 pb-8">
                     {filteredActions.length > 0 ? (
-                      filteredActions.map((action) => {
-                        const isEnabled = enabledSet.has(action.name);
-                        return (
-                          <button
-                            key={action.name}
-                            onClick={() => toggleAction(action.name, !isEnabled)}
-                            className={`group relative flex w-full flex-col items-start gap-3 rounded-[1.75rem] border p-5 text-left transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] ${
-                              isEnabled
-                                ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-lg shadow-primary/5'
-                                : 'border-outline-variant/10 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low hover:shadow-xl hover:shadow-black/5'
-                            }`}
-                          >
-                            <div className="flex w-full items-start justify-between gap-4">
-                              <div className="flex items-center gap-4 flex-1 min-w-0">
-                                <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
-                                  <div className={`h-6 w-6 rounded-lg border-2 transition-all duration-300 ${
-                                    isEnabled 
-                                      ? 'border-primary bg-primary scale-110' 
-                                      : 'border-outline-variant/20 bg-background group-hover:border-primary/50'
-                                  }`} />
-                                  <span className={`material-symbols-outlined absolute text-white text-[16px] transition-all duration-300 ${
-                                    isEnabled ? 'scale-100 opacity-100 rotate-0' : 'scale-50 opacity-0 rotate-12'
-                                  }`}>check</span>
-                                </div>
-                                <span className={`text-sm font-bold tracking-tight truncate transition-colors duration-300 ${
-                                  isEnabled ? 'text-primary' : 'text-on-surface'
-                                }`}>
-                                  {formatToolActionName(action.name)}
-                                </span>
-                              </div>
-                              {action.recommended && (
-                                <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-primary border border-primary/10">
+                      <>
+                        {recommendedActions.length > 0 || !deferredActionSearchQuery ? (
+                          <section className="space-y-3">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">
                                   {t('agentBuilder.recommendedActions')}
-                                </span>
+                                </p>
+                                <p className="mt-1 text-xs leading-relaxed text-on-surface-variant/60">
+                                  {t('agentBuilder.recommendedActionsHelp')}
+                                </p>
+                              </div>
+                              {recommendedActions.length > 0 && hasDisabledRecommendedActions ? (
+                                <button
+                                  type="button"
+                                  onClick={enableRecommendedActions}
+                                  className="shrink-0 rounded-full border border-primary/15 bg-primary/5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-all hover:bg-primary/10 active:scale-95"
+                                >
+                                  {t('agentBuilder.enableRecommended')}
+                                </button>
+                              ) : null}
+                            </div>
+
+                            {recommendedActions.length > 0 ? (
+                              recommendedActions.map((action) => {
+                                const isEnabled = enabledSet.has(action.name);
+                                return (
+                                  <div
+                                    key={action.name}
+                                    onMouseLeave={() =>
+                                      setActiveActionDescription((current) =>
+                                        current === action.name ? null : current,
+                                      )
+                                    }
+                                    className={`group relative flex w-full flex-col items-start gap-3 rounded-[1.75rem] border p-5 text-left transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] ${
+                                      isEnabled
+                                        ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-lg shadow-primary/5'
+                                        : 'border-outline-variant/10 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low hover:shadow-xl hover:shadow-black/5'
+                                    }`}
+                                  >
+                                    <div className="flex w-full items-start justify-between gap-4">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleAction(action.name, !isEnabled)}
+                                        className="flex min-w-0 flex-1 items-center gap-4 text-left"
+                                      >
+                                        <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+                                          <div className={`h-6 w-6 rounded-lg border-2 transition-all duration-300 ${
+                                            isEnabled
+                                              ? 'border-primary bg-primary scale-110'
+                                              : 'border-outline-variant/20 bg-background group-hover:border-primary/50'
+                                          }`} />
+                                          <span className={`material-symbols-outlined absolute text-white text-[16px] transition-all duration-300 ${
+                                            isEnabled ? 'scale-100 opacity-100 rotate-0' : 'scale-50 opacity-0 rotate-12'
+                                          }`}>check</span>
+                                        </div>
+                                        <span className={`truncate text-sm font-bold tracking-tight transition-colors duration-300 ${
+                                          isEnabled ? 'text-primary' : 'text-on-surface'
+                                        }`}>
+                                          {formatToolActionName(action.name)}
+                                        </span>
+                                      </button>
+                                      <div className="flex items-center gap-2">
+                                        {action.description ? (
+                                          <button
+                                            type="button"
+                                            onClick={(event) => event.stopPropagation()}
+                                            onMouseEnter={() => setActiveActionDescription(action.name)}
+                                            onFocus={() => setActiveActionDescription(action.name)}
+                                            onBlur={() =>
+                                              setActiveActionDescription((current) =>
+                                                current === action.name ? null : current,
+                                              )
+                                            }
+                                            className="shrink-0"
+                                            aria-label="Show action description"
+                                          >
+                                            <ActionDescriptionButton />
+                                          </button>
+                                        ) : null}
+                                        <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-primary border border-primary/10">
+                                          {t('agentBuilder.recommendedActions')}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {action.description && activeActionDescription === action.name ? (
+                                      <div className="w-full rounded-[1.25rem] border border-outline-variant/10 bg-surface/80 px-4 py-3">
+                                        <p className="text-xs leading-relaxed text-on-surface-variant">
+                                          {action.description}
+                                        </p>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="rounded-[1.5rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-5 py-4 text-sm text-on-surface-variant/60">
+                                {t('agentBuilder.noRecommendedActions')}
+                              </div>
+                            )}
+                          </section>
+                        ) : null}
+
+                        <section className="rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60">
+                                {t('agentBuilder.moreActions')}
+                              </p>
+                              <p className="mt-1 text-xs leading-relaxed text-on-surface-variant/60">
+                                {t('agentBuilder.selectMoreAction')}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setIsMoreActionsOpen((current) => !current)}
+                              disabled={moreActions.length === 0 && enabledMoreActions.length === 0}
+                              className="inline-flex items-center gap-2 rounded-full border border-outline-variant/10 bg-surface px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-on-surface transition-all hover:border-outline-variant/20 hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <span>{enabledMoreActions.length}</span>
+                              <span className="material-symbols-outlined text-sm">
+                                {shouldShowMoreActions ? 'expand_less' : 'expand_more'}
+                              </span>
+                            </button>
+                          </div>
+
+                          {enabledMoreActions.length > 0 ? (
+                            <div className="mt-4 flex flex-wrap gap-2.5">
+                              {enabledMoreActions.map((action) => (
+                                <button
+                                  key={action.name}
+                                  type="button"
+                                  onClick={() => toggleAction(action.name, false)}
+                                  className="inline-flex items-center gap-2 rounded-full border border-outline-variant/10 bg-surface-container px-4 py-2 text-[11px] font-bold text-on-surface transition-all hover:border-error/20 hover:bg-error/5 hover:text-error active:scale-95"
+                                >
+                                  <span>{formatToolActionName(action.name)}</span>
+                                  <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {shouldShowMoreActions ? (
+                            <div className="mt-4 space-y-3 border-t border-outline-variant/10 pt-4">
+                              {availableMoreActions.length > 0 ? (
+                                availableMoreActions.map((action) => (
+                                  <div
+                                    key={action.name}
+                                    onMouseLeave={() =>
+                                      setActiveActionDescription((current) =>
+                                        current === action.name ? null : current,
+                                      )
+                                    }
+                                    className="flex w-full flex-col gap-3 rounded-[1.25rem] border border-outline-variant/10 bg-surface px-4 py-3 text-left transition-all hover:border-primary/25 hover:bg-surface-container"
+                                  >
+                                    <div className="flex w-full items-center justify-between gap-4">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleAction(action.name, true)}
+                                        className="min-w-0 flex-1 text-left"
+                                      >
+                                        <p className="truncate text-sm font-bold tracking-tight text-on-surface">
+                                          {formatToolActionName(action.name)}
+                                        </p>
+                                        <p className="mt-1 text-[11px] font-medium text-on-surface-variant/60">
+                                          {t('agentBuilder.tapToAddAction')}
+                                        </p>
+                                      </button>
+                                      <div className="flex shrink-0 items-center gap-2">
+                                        {action.description ? (
+                                          <button
+                                            type="button"
+                                            onClick={(event) => event.stopPropagation()}
+                                            onMouseEnter={() => setActiveActionDescription(action.name)}
+                                            onFocus={() => setActiveActionDescription(action.name)}
+                                            onBlur={() =>
+                                              setActiveActionDescription((current) =>
+                                                current === action.name ? null : current,
+                                              )
+                                            }
+                                            className="shrink-0"
+                                            aria-label="Show action description"
+                                          >
+                                            <ActionDescriptionButton />
+                                          </button>
+                                        ) : null}
+                                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                          <span className="material-symbols-outlined text-lg">add</span>
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {action.description && activeActionDescription === action.name ? (
+                                      <div className="w-full rounded-[1.25rem] border border-outline-variant/10 bg-surface/80 px-4 py-3">
+                                        <p className="text-xs leading-relaxed text-on-surface-variant">
+                                          {action.description}
+                                        </p>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-xs leading-relaxed text-on-surface-variant/60">
+                                  {moreActions.length === 0 && deferredActionSearchQuery
+                                    ? t('agentBuilder.noMatchingActions')
+                                    : t('agentBuilder.noMoreActions')}
+                                </p>
                               )}
                             </div>
-                            
-                            {(action.description || action.name) && (
-                              <p className={`pl-10 text-xs leading-relaxed transition-colors duration-300 line-clamp-2 font-medium ${
-                                isEnabled ? 'text-primary/60' : 'text-on-surface-variant/60'
-                              }`}>
-                                {action.description || action.name}
-                              </p>
-                            )}
-                          </button>
-                        );
-                      })
+                          ) : (
+                            <p className="mt-4 text-xs leading-relaxed text-on-surface-variant/60">
+                              {t('agentBuilder.browseMoreActionsHint')}
+                            </p>
+                          )}
+                        </section>
+                      </>
                     ) : (
                       <div className="flex flex-col items-center justify-center rounded-[2.5rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-8 py-20 text-center">
                         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/5 text-primary/20 mb-4">
