@@ -120,6 +120,27 @@ export function hasComposioEnv(): boolean {
 }
 
 /**
+ * Checks whether Composio trigger webhooks can be verified.
+ *
+ * @returns `true` when the Composio webhook signing secret exists.
+ */
+export function hasComposioWebhookSecret(): boolean {
+  return Boolean(process.env.COMPOSIO_WEBHOOK_SECRET);
+}
+
+/**
+ * Returns the Composio webhook signing secret.
+ *
+ * @returns The configured webhook secret.
+ */
+export function getComposioWebhookSecret(): string {
+  return requireEnv(
+    process.env.COMPOSIO_WEBHOOK_SECRET,
+    "COMPOSIO_WEBHOOK_SECRET",
+  );
+}
+
+/**
  * Returns the public dashboard base URL.
  *
  * @returns The configured dashboard origin.

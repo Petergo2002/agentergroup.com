@@ -6,8 +6,10 @@ import {
 } from "@/lib/assistants/feature-flags";
 import { canEditAgentRecord, getMembershipRoleForWorkspace } from "@/lib/agents/access";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { disableComposioTrigger } from "@/lib/composio";
 import { createClient } from "@/lib/supabase/server";
 import { createAuditLog } from "@/lib/runtime/observability";
+import type { AgentAutomationRecord } from "@/lib/types";
 
 export async function POST(
   request: NextRequest,
@@ -60,11 +62,52 @@ export async function POST(
     );
   }
 
+  if (archived && agent.surface === "automation") {
+    const { data: automation, error: automationError } = await supabase
+      .from("agent_automations")
+      .select("*")
+      .eq("agent_id", agentId)
+      .maybeSingle();
+
+    if (automationError) {
+      return NextResponse.json({ error: automationError.message }, { status: 500 });
+    }
+
+    const automationRecord = automation as AgentAutomationRecord | null;
+
+    if (automationRecord?.composio_trigger_id) {
+      try {
+        await disableComposioTrigger(automationRecord.composio_trigger_id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to disable provider trigger.";
+
+        await supabase
+          .from("agent_automations")
+          .update({ status: "error", last_error: message })
+          .eq("id", automationRecord.id);
+
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
+    }
+
+    if (automationRecord) {
+      const automationPause = await supabase
+        .from("agent_automations")
+        .update({ status: "paused", last_error: null })
+        .eq("id", automationRecord.id);
+
+      if (automationPause.error) {
+        return NextResponse.json({ error: automationPause.error.message }, { status: 500 });
+      }
+    }
+  }
+
   const { error: updateError } = await supabase
     .from("agents")
     .update({
       archived_at: archived ? new Date().toISOString() : null,
       archived_by: archived ? user.id : null,
+      ...(archived && agent.surface === "automation" ? { status: "paused" } : {}),
     })
     .eq("id", agentId);
 

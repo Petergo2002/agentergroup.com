@@ -1,6 +1,6 @@
 # Agentergroup Architecture
 
-Last updated: 2026-04-22
+Last updated: 2026-05-04
 
 ## Purpose
 
@@ -28,12 +28,13 @@ The current product is a conversational AI agent platform with four core capabil
 The current MVP is intentionally narrow:
 
 - chat-first agent runtime
+- Automation agents with Composio external trigger ingestion, starting with Gmail
 - workspace-scoped knowledge base with semantic retrieval
 - limited live tools for Gmail, Microsoft Outlook, Google Calendar, and Cal.com
 - Google Drive only as a knowledge import source
 - internal assistant toolkit for Text to PDF generation
 
-This is not currently a workflow automation platform. There is no active Trigger.dev orchestration, no scheduled jobs, and no post-conversation workflow engine.
+This is not a general workflow automation platform. There is no active Trigger.dev orchestration and no separate multi-step workflow engine. Automation v1 is intentionally limited to external Composio triggers on automation agents, starting with Gmail. Those trigger events run through the shared agent runtime, so the automation can use the saved instructions, selected knowledge sources, and selected Composio tool nodes when the payload and instructions clearly require action.
 
 ## High-Level System
 
@@ -45,6 +46,7 @@ Browser (Next.js App Router UI)
     -> Supabase Edge Functions (knowledge processing + semantic search)
     -> OpenRouter (LLM chat completions)
     -> Composio (tool auth, connected accounts, tool execution)
+    -> Composio Webhooks (automation trigger events)
 ```
 
 ### Main responsibility split
@@ -98,9 +100,10 @@ Browser (Next.js App Router UI)
 
 Important implementation docs:
 
-- `docs/agent-builder.md`
-- `docs/architecture.md`
-- `docs/composio-integrations.md` — **read this before writing any Composio tool integration**
+- `docs/guides/agent-builder.md`
+- `docs/guides/automation-agents.md`
+- `docs/architecture/core.md`
+- `docs/guides/composio-integrations.md` — **read this before writing any Composio tool integration**
 
 ### Core app routes
 
@@ -151,10 +154,13 @@ Important implementation docs:
 - `src/app/api/agents/[id]/route.ts`
 - `src/app/api/agents/[id]/chat/route.ts`
 - `src/app/api/agents/[id]/knowledge/route.ts`
+- `src/app/api/agents/[id]/automation/route.ts`
+- `src/app/api/agents/[id]/automation/status/route.ts`
 - `src/app/api/agents/[id]/archive/route.ts`
 - `src/app/api/agents/[id]/rollback/route.ts`
 - `src/app/api/agents/[id]/status/route.ts`
 - `src/app/api/agents/[id]/widget/route.ts`
+- `src/app/api/composio/webhook/route.ts`
 - `src/app/api/assistants/route.ts`
 - `src/app/api/assistants/[id]/route.ts`
 - `src/app/api/assistants/[id]/threads/route.ts`
@@ -584,7 +590,7 @@ The system is easier to reason about if each layer has a clear ownership boundar
 
 > ⚠️ **Important:** Composio tool responses have non-obvious envelope shapes that vary between
 > integrations. IDs are sometimes integers, arrays are sometimes nested multiple levels deep,
-> and `data` fields are sometimes JSON strings. Always read `docs/composio-integrations.md`
+> and `data` fields are sometimes JSON strings. Always read `docs/guides/composio-integrations.md`
 > before writing a new tool extractor.
 
 ## Database Architecture
@@ -616,7 +622,7 @@ Purpose:
 
 Purpose:
 
-- `agents`: current editable/live agent metadata, including the primary `surface` (`assistant` or `widget`)
+- `agents`: current editable/live agent metadata, including the primary `surface` (`assistant`, `widget`, or `automation`)
 - `agent_drafts`: builder draft definition and current graph/config
 - `agent_versions`: published snapshots for version history and rollback
 
@@ -626,6 +632,7 @@ Important current behavior:
 - preview and internal assistant runtime both read from the current agent plus the last saved draft state
 - publish creates versioned snapshots, but runtime is not exclusively version-bound
 - publish is only required for widget agents; internal assistants become usable after the first normal save and move from `draft` to `active`
+- automation agents do not use widget publish; they are activated or paused through the automation trigger lifecycle route
 
 ### 3. Connections and runtime conversations
 
@@ -637,6 +644,8 @@ Important current behavior:
 - `run_steps`
 - `run_approvals`
 - `audit_logs`
+- `agent_automations`
+- `automation_events`
 
 Purpose:
 
@@ -648,6 +657,8 @@ Purpose:
 - `run_steps`: detailed runtime trace
 - `run_approvals`: approval records retained from the phase 3 schema
 - `audit_logs`: coarse event logs
+- `agent_automations`: one trigger binding row for an automation agent
+- `automation_events`: received external trigger events and their processing state
 
 Important current behavior:
 
@@ -655,6 +666,7 @@ Important current behavior:
 - approval schema still exists for future internal/governed flows
 - internal assistant threads are shared across the workspace and use per-thread active-turn locks
 - preview threads remain creator-scoped and are kept separate from assistant threads through `chat_threads.source`
+- automation runs do not create chat threads; they store trigger input and execution output directly on `runs` and link provider events through `automation_events.run_id`
 
 ### 4. Knowledge base
 
@@ -749,7 +761,12 @@ Current builder node kinds:
 - `outlook`
 - `googlecalendar`
 - `cal`
-- `output`
+
+Current agent surfaces:
+
+- `widget`: website chat agent, edited in Builder and tested in Preview
+- `automation`: external trigger agent, edited in Builder and inspected in Activity
+- `assistant`: internal workspace assistant, edited in Builder and used in the Assistants surface
 
 ### Builder constraints
 
@@ -757,7 +774,6 @@ Current canvas rules:
 
 - fixed `Trigger`
 - fixed core `Agent`
-- fixed `Output`
 - optional singleton `Knowledge`
 - optional singleton `End Chat`
 - optional singleton `Gmail`
@@ -789,8 +805,11 @@ The main ideas are:
 
 #### Trigger
 
-- read-only
-- represents the user message entry point
+- fixed entry point
+- represents a chat message for website chat agents
+- represents an external trigger event for automation agents
+- stores generic trigger config in `definition.config.trigger`
+- v1 automation trigger support is Composio Gmail new message (`GMAIL_NEW_GMAIL_MESSAGE`)
 
 #### Agent
 
@@ -899,17 +918,12 @@ Event type fetch path:
 - extracts from `result.data.eventTypeGroups[n].eventTypes` (Cal.com v2 shape)
 - event type IDs are integers — coerced to strings before use
 
-For the full response shape and extractor implementation details, see `docs/composio-integrations.md`.
+For the full response shape and extractor implementation details, see `docs/guides/composio-integrations.md`.
 
 Live tool capability is locked to:
 
 - `CAL_GET_AVAILABLE_SLOTS`
 - `CAL_CREATE_BOOKING`
-
-#### Output
-
-- read-only
-- represents the final assistant response
 
 ### Builder persistence model
 
@@ -953,6 +967,111 @@ It combines:
 - if the client provides an existing preview `threadId`, the backend now requires that thread to belong to the same agent, workspace, and authenticated creator before it will append messages or runs
 
 This separation is important because the product goal is a frontdesk-style assistant, not a debug console exposed to end users.
+
+## Automation Architecture
+
+For the deeper operational guide, see `docs/guides/automation-agents.md`.
+
+Automation UI lives at:
+
+- `src/app/(app)/agents/[id]/builder/page.tsx`
+- `src/app/(app)/agents/[id]/activity/page.tsx`
+- `src/components/agents/AgentViewTabs.tsx`
+- `src/components/modals/CreateAgentModal.tsx`
+
+Automation backend lives at:
+
+- `src/app/api/agents/[id]/automation/route.ts`
+- `src/app/api/agents/[id]/automation/status/route.ts`
+- `src/app/api/composio/webhook/route.ts`
+- `src/lib/automation/executor.ts`
+
+### Product model
+
+Automation is an agent surface, not a separate workflow product.
+
+The v1 builder shape is:
+
+```text
+External Trigger -> Agent Core
+                   -> Knowledge (optional)
+                   -> Connected Tools (optional)
+```
+
+Top-level product language should stay provider-neutral:
+
+- `Automation`
+- `External Trigger`
+- `Trigger`
+
+Provider-specific language such as Gmail belongs inside the selected trigger option and account selector.
+
+### Lifecycle
+
+Automation agents use:
+
+- `Save`
+- `Activate Trigger`
+- `Pause Trigger`
+- `Activity`
+
+They do not use website deploy/publish controls.
+
+Activation and pause are only allowed through:
+
+- `POST /api/agents/[id]/automation/status`
+
+Normal agent status toggles reject `surface = 'automation'`.
+
+### Event processing
+
+The runtime flow is:
+
+```text
+Composio trigger webhook
+  -> verify webhook signature
+  -> insert automation_events
+  -> after(() => processAutomationEvent(eventId))
+  -> claim event
+  -> create runs row
+  -> run shared agent runtime with audience = "automation"
+  -> persist assistant output, tool messages, knowledge matches, and connected toolkits
+  -> mark event processed/failed/ignored
+```
+
+The current worker uses `after()` processing. Durable retries, queue leases, and long-running workflow orchestration are intentionally deferred.
+
+### Tool execution
+
+Automation runs use the shared `runAgentChat(...)` runtime. The executor reads the saved builder definition and passes:
+
+- enabled tool actions from `extractEnabledToolsFromDefinition`
+- Gmail/Outlook recipient policy
+- Google Calendar selected calendar/timezone
+- Cal.com selected event type/timezone
+- selected knowledge sources through the normal attachment table
+
+This means an automation can use configured Gmail, Outlook, Google Calendar, and Cal.com tool nodes when the trigger payload and agent instructions clearly require action.
+
+Safety remains enforced by runtime policy:
+
+- only selected/attached tool nodes are loaded
+- provider-specific argument patchers enforce fixed email recipients and calendar/event-type selections
+- automation mode tells the model not to guess missing details and not to claim an external action happened unless a tool call succeeded
+
+### Activity
+
+Automation agents show Builder and Activity tabs.
+
+Activity reads the automation endpoint and presents:
+
+- trigger/account/readiness status
+- recent `runs`
+- recent `automation_events`
+- status and error messages
+- output summaries
+
+`/agents/[id]/preview` redirects automation agents to `/agents/[id]/activity`.
 
 ## Assistants Architecture
 
@@ -1090,6 +1209,8 @@ Each run creates step-level observability via:
 - `runs`
 - `run_steps`
 - `audit_logs`
+- `automation_events`
+- `agent_automations`
 
 The preview screen uses this data for inspection and debugging.
 
@@ -1313,6 +1434,15 @@ The product-owned integration catalog currently allows only:
 This is intentionally narrow. Unsupported marketplace-style integrations are not part of the current product surface.
 
 ### Current tool policy
+
+#### Automation trigger integration
+
+- Gmail
+  - `GMAIL_NEW_GMAIL_MESSAGE`
+  - consumed through `/api/composio/webhook`
+  - activates `surface = 'automation'` agents through `agent_automations`
+  - stores incoming events in `automation_events`
+  - runs the shared agent runtime with configured tools and knowledge
 
 #### Chat-capable integrations
 
@@ -1684,10 +1814,21 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/agents/[id]/chat` | Main conversational runtime |
 | `GET /api/agents/[id]/knowledge` | Load agent knowledge attachments |
 | `POST /api/agents/[id]/knowledge` | Replace knowledge attachments |
+| `GET /api/agents/[id]/automation` | Load automation definition, trigger binding, readiness, events, runs, and available trigger accounts |
+| `PUT /api/agents/[id]/automation` | Save or update the automation trigger binding while keeping activation separate |
+| `DELETE /api/agents/[id]/automation` | Delete the automation trigger binding and upstream provider trigger if present |
+| `POST /api/agents/[id]/automation/status` | Activate or pause an automation trigger; the only route allowed to turn automation triggers on or off |
 | `POST /api/agents/[id]/archive` | Archive an agent |
 | `POST /api/agents/[id]/rollback` | Roll back to a prior version |
+| `POST /api/agents/[id]/status` | Activate/pause normal agents; rejects automation agents |
 | `GET /api/agents/[id]/widget` | Legacy moved response pointing callers to `/widgets?agent=...` |
 | `POST /api/agents/[id]/widget` | Legacy moved response pointing callers to `/widgets?agent=...` |
+
+### Composio webhook APIs
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/composio/webhook` | Verify Composio trigger webhooks, store automation events, and schedule automation processing |
 
 ### Connection APIs
 
@@ -1695,7 +1836,7 @@ After import, the source behaves like any other workspace knowledge source.
 | --- | --- |
 | `GET /api/connections/toolkits` | Return supported integrations and merged connection status |
 | `POST /api/connections/authorize` | Start Composio authorization for one allowed integration |
-| `POST /api/connections/disconnect` | Remove a local connection row and best-effort delete the upstream Composio connected account |
+| `POST /api/connections/disconnect` | Remove a local connection row, best-effort delete the upstream Composio connected account, and pause/error active automations using that connection |
 | `GET /api/connections/googlecalendar/calendars` | List selectable calendars for one connected Google Calendar account in the builder |
 
 ### Workspace APIs
@@ -1777,9 +1918,12 @@ The core environment contract is:
 - `OPENROUTER_DATA_COLLECTION`
 - `OPENROUTER_REQUIRE_ZDR`
 - `COMPOSIO_API_KEY`
+- `COMPOSIO_WEBHOOK_SECRET`
 - `COMPOSIO_TOOLKIT_VERSION_GMAIL`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
+- `COMPOSIO_TOOLKIT_VERSION_CAL`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
+- `COMPOSIO_TOOLKIT_VERSION_OUTLOOK`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `WIDGET_APP_URL`
 - `WIDGET_ACCESS_SECRET`
@@ -1807,6 +1951,8 @@ Expected inside Supabase function runtime:
 - `runs`: high-level execution record
 - `run_steps`: fine-grained runtime trace
 - `audit_logs`: event log useful for operator context
+- `automation_events`: provider event ingestion and processing status
+- `agent_automations`: current automation trigger binding, status, provider trigger id, and last error
 
 ### Preview as operator surface
 
@@ -1824,13 +1970,26 @@ This is why it shows:
 
 while still keeping the end-user transcript clean.
 
+### Activity as automation operator surface
+
+The Activity UI is the automation debugger.
+
+It shows:
+
+- recent automation runs
+- recent trigger events
+- run/event statuses
+- output summaries
+- provider trigger/account readiness
+- last automation error
+
 ## Current Constraints and Intentional Simplifications
 
 These are not bugs. They are current architectural decisions.
 
 ### 1. Builder is a configuration editor, not a workflow engine
 
-The graph is intentionally limited. There are no condition nodes, loops, schedules, approvals, or background jobs in the active product flow.
+The graph is intentionally limited. There are no condition nodes, loops, schedules, or approval branches in the active product flow. Automation v1 has external trigger execution, but the builder graph is still configuration for one agent run, not a general workflow canvas.
 
 ### 2. Google Drive is knowledge-only
 
@@ -1856,9 +2015,9 @@ So runtime is not one single immutable model yet, but widgets are already more v
 
 The database still contains approval-related tables from the phase 3 runtime controls work, but the live customer chat flow does not currently stop on approval.
 
-### 6. No async orchestration layer
+### 6. No durable async orchestration layer
 
-There is no queue or scheduler for knowledge processing or conversational actions. Knowledge ingestion is triggered directly.
+There is no Trigger.dev worker, queue, or scheduler for conversational or automation actions. Knowledge ingestion is triggered directly. Automation events are processed through Next.js `after()` and should be moved to durable retry/queue infrastructure before high-volume or strict-SLA usage.
 
 ## How to Extend the System Safely
 
@@ -1871,7 +2030,10 @@ Update these layers together:
 3. connections page + authorize endpoint
 4. builder node/picker if it should be agent-attachable
 5. preview display
-6. runtime allowlist logic
+6. `src/lib/tool-actions.ts` action extraction
+7. runtime guidance/filter logic
+8. automation executor wiring if the tool should be available to automation runs
+9. docs in `docs/guides/adding-integrations.md` and `docs/guides/automation-agents.md`
 
 Do not expose an integration directly to runtime without first deciding:
 

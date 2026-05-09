@@ -89,7 +89,8 @@ export async function GET() {
 
     const agents = ((agentsResult.data ?? []) as AgentRecord[]).filter(
       (agent) =>
-        context.workspace.internal_assistants_enabled || agent.surface !== "assistant",
+        (context.workspace.internal_assistants_enabled || agent.surface !== "assistant") &&
+        (context.workspace.automations_enabled || agent.surface !== "automation"),
     );
     const widgetIds = ((widgetIdsResult.data ?? []) as Array<{ id: string }>).map(
       (widget) => widget.id,

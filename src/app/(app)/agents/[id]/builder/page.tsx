@@ -33,14 +33,14 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAppContext } from '@/components/app/AppContext';
 import { SimpleIcon } from '@/components/icons/SimpleIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
-import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
+import { hasInternalAssistantsEnabled, hasAutomationsEnabled } from '@/lib/assistants/feature-flags';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/ToastProvider';
 import { Modal } from '@/components/ui/Modal';
 import { AgentModelPicker } from '@/components/agents/AgentModelPicker';
 import { canEditAgentRecord } from '@/lib/agents/access';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
-import { buildInitialDefinition } from '@/lib/agents/defaults';
+import { AUTOMATION_GMAIL_TRIGGER_SLUG, buildInitialDefinition } from '@/lib/agents/defaults';
 import { getEffectiveConnectionStatus } from '@/lib/connections';
 import { DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS } from '@/lib/end-chat';
 import { normalizeGmailRecipientEmail } from '@/lib/gmail';
@@ -64,10 +64,13 @@ import {
 import { formatRelativeDate } from '@/lib/utils';
 import type {
   AgentRecord,
+  AgentAutomationRecord,
   AgentVersionRecord,
+  AutomationEventRecord,
   BuilderDefinition,
   BuilderNodeData,
   BuilderNodeKind,
+  BuilderTriggerSource,
   CalBuilderNodeData,
   ConnectionRecord,
   EndChatBuilderNodeData,
@@ -76,13 +79,15 @@ import type {
   GoogleCalendarBuilderNodeData,
   KnowledgeBuilderNodeData,
   KnowledgeSourceRecord,
+  RunRecord,
+  TriggerBuilderNodeData,
 } from '@/lib/types';
 
 type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
 type ToolNodeKind = 'gmail' | 'outlook' | 'googlecalendar' | 'cal';
 type ToolNodeData = GmailBuilderNodeData | OutlookBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
-type LibraryItemKey = 'knowledge' | 'tools' | 'endchat' | 'agent';
+type LibraryItemKey = 'trigger' | 'knowledge' | 'tools' | 'endchat' | 'agent';
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 type BuilderStatusNote =
   | { kind: 'draftInitial' }
@@ -116,6 +121,18 @@ interface OpenRouterModelsApiResponse {
   source?: 'openrouter' | 'fallback';
 }
 
+interface AutomationEnvironmentStatus {
+  hasComposio: boolean;
+  hasWebhookSecret: boolean;
+}
+
+interface AutomationApiResponse {
+  automation: AgentAutomationRecord | null;
+  events?: AutomationEventRecord[];
+  runs?: RunRecord[];
+  environment?: AutomationEnvironmentStatus;
+}
+
 const FIXED_NODE_IDS = {
   trigger: 'trigger',
   agent: 'agent',
@@ -146,11 +163,16 @@ const DEFAULT_POSITIONS: Record<BuilderNodeKind, { x: number; y: number }> = {
 
 const NODE_LIBRARY: NodeLibraryItem[] = [
   {
+    key: 'trigger',
+    label: 'Trigger',
+    icon: 'input',
+    description: 'Choose what starts this agent.',
+  },
+  {
     key: 'agent',
     label: 'Agent Core',
     icon: 'smart_toy',
-    description: 'The AI brain that processes and responds to users. Already on canvas.',
-    fixed: true,
+    description: 'The AI brain that processes and responds to users.',
   },
   {
     key: 'knowledge',
@@ -211,12 +233,22 @@ const TIMEZONE_OPTIONS = [
 
 const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'outlook', 'googlecalendar', 'cal'];
 
+const TRIGGER_SOURCE_ORDER: BuilderTriggerSource[] = [
+  'user_message',
+  'gmail_new_message',
+];
+
 function getStarterPromptFields(prompts: string[]) {
   return Array.from({ length: 3 }, (_, index) => prompts[index] ?? '');
 }
 
 function getNodeLibraryText(key: LibraryItemKey, t: Translate) {
   switch (key) {
+    case 'trigger':
+      return {
+        label: t('agentBuilder.nodeLibrary.trigger'),
+        description: t('agentBuilder.nodeLibrary.triggerDescription'),
+      };
     case 'agent':
       return {
         label: t('agentBuilder.nodeLibrary.agent'),
@@ -289,6 +321,23 @@ function getBuilderNodeText(kind: BuilderNodeKind, t: Translate) {
         label: t('agentBuilder.endChatLabel'),
         type: t('agentBuilder.controlType'),
         description: t('agentBuilder.endChatNodeDescription'),
+      };
+  }
+}
+
+function getTriggerSourceText(source: BuilderTriggerSource, t: Translate) {
+  switch (source) {
+    case 'user_message':
+      return {
+        label: t('agentBuilder.triggerSources.chatMessage'),
+        description: t('agentBuilder.triggerSources.chatMessageDescription'),
+        icon: 'chat',
+      };
+    case 'gmail_new_message':
+      return {
+        label: t('agentBuilder.triggerSources.gmailNewMessage'),
+        description: t('agentBuilder.triggerSources.gmailNewMessageDescription'),
+        icon: 'mail',
       };
   }
 }
@@ -519,6 +568,10 @@ function isEndChatNodeData(data: BuilderNodeData): data is EndChatBuilderNodeDat
   return data.kind === 'endchat';
 }
 
+function isTriggerNodeData(data: BuilderNodeData): data is TriggerBuilderNodeData {
+  return data.kind === 'trigger';
+}
+
 function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
   return (
     value === 'trigger' ||
@@ -533,6 +586,8 @@ function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
 }
 
 function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
+  const hasTrigger = nodes.some((node) => node.data.kind === 'trigger');
+  const hasAgent = nodes.some((node) => node.data.kind === 'agent');
   const hasKnowledge = nodes.some((node) => node.data.kind === 'knowledge');
   const hasGmail = nodes.some((node) => node.data.kind === 'gmail');
   const hasOutlook = nodes.some((node) => node.data.kind === 'outlook');
@@ -540,17 +595,19 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
   const hasCal = nodes.some((node) => node.data.kind === 'cal');
   const hasEndChat = nodes.some((node) => node.data.kind === 'endchat');
 
-  const edges: BuilderFlowEdge[] = [
-    {
+  const edges: BuilderFlowEdge[] = [];
+
+  if (hasTrigger && hasAgent) {
+    edges.push({
       id: 'e-trigger-agent',
       source: FIXED_NODE_IDS.trigger,
       target: FIXED_NODE_IDS.agent,
       animated: true,
       style: PRIMARY_EDGE_STYLE,
-    },
-  ];
+    });
+  }
 
-  if (hasKnowledge) {
+  if (hasAgent && hasKnowledge) {
     edges.push({
       id: 'e-agent-knowledge',
       source: FIXED_NODE_IDS.agent,
@@ -559,7 +616,7 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
     });
   }
 
-  if (hasGmail) {
+  if (hasAgent && hasGmail) {
     edges.push({
       id: 'e-agent-gmail',
       source: FIXED_NODE_IDS.agent,
@@ -568,7 +625,7 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
     });
   }
 
-  if (hasOutlook) {
+  if (hasAgent && hasOutlook) {
     edges.push({
       id: 'e-agent-outlook',
       source: FIXED_NODE_IDS.agent,
@@ -577,7 +634,7 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
     });
   }
 
-  if (hasCalendar) {
+  if (hasAgent && hasCalendar) {
     edges.push({
       id: 'e-agent-googlecalendar',
       source: FIXED_NODE_IDS.agent,
@@ -586,7 +643,7 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
     });
   }
 
-  if (hasCal) {
+  if (hasAgent && hasCal) {
     edges.push({
       id: 'e-agent-cal',
       source: FIXED_NODE_IDS.agent,
@@ -595,7 +652,7 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
     });
   }
 
-  if (hasEndChat) {
+  if (hasAgent && hasEndChat) {
     edges.push({
       id: 'e-agent-endchat',
       source: FIXED_NODE_IDS.agent,
@@ -623,6 +680,12 @@ function createTriggerNode(
       description: 'Entry point for the current conversation.',
       status: 'idle',
       locked: true,
+      triggerSource: 'user_message',
+      provider: 'internal',
+      toolkitSlug: null,
+      triggerSlug: null,
+      connectionId: null,
+      triggerConfig: {},
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -953,11 +1016,61 @@ function normalizeDefinition(
     'cal',
     calNode && isToolNodeData(calNode.data) ? calNode.data.connectionId : null,
   );
+  const persistedTrigger = definition.config?.trigger;
+  const legacyAutomationTrigger = definition.config?.automation;
+  const triggerDataFromConfig: Partial<TriggerBuilderNodeData> | undefined = persistedTrigger
+    ? {
+        triggerSource: persistedTrigger.source,
+        provider: persistedTrigger.provider,
+        toolkitSlug: persistedTrigger.toolkitSlug ?? null,
+        triggerSlug: persistedTrigger.triggerSlug ?? null,
+        connectionId: persistedTrigger.connectionId ?? null,
+        triggerConfig: persistedTrigger.triggerConfig ?? {},
+      }
+    : legacyAutomationTrigger
+      ? {
+          triggerSource: 'gmail_new_message',
+          provider: 'composio',
+          toolkitSlug: 'gmail',
+          triggerSlug: legacyAutomationTrigger.triggerSlug,
+          connectionId: legacyAutomationTrigger.connectionId,
+          triggerConfig: legacyAutomationTrigger.triggerConfig,
+        }
+      : undefined;
 
-  const normalizedNodes: BuilderFlowNode[] = [
-    createTriggerNode(nodesByKind.get('trigger')?.position ?? DEFAULT_POSITIONS.trigger),
-    createAgentCoreNode(nodesByKind.get('agent')?.position ?? DEFAULT_POSITIONS.agent),
-  ];
+  const normalizedNodes: BuilderFlowNode[] = [];
+  const triggerNode = nodesByKind.get('trigger');
+  const agentNode = nodesByKind.get('agent');
+  const hasAnyFlowNode =
+    Boolean(triggerNode) ||
+    Boolean(agentNode) ||
+    Boolean(knowledgeNode) ||
+    Boolean(gmailNode) ||
+    Boolean(outlookNode) ||
+    Boolean(calendarNode) ||
+    Boolean(calNode) ||
+    Boolean(endChatNode) ||
+    knowledgeSourceIds.length > 0 ||
+    Boolean(gmailConnectionId) ||
+    Boolean(outlookConnectionId) ||
+    Boolean(googleCalendarConnectionId) ||
+    Boolean(calConnectionId);
+
+  if (triggerNode || triggerDataFromConfig) {
+    normalizedNodes.push(
+      createTriggerNode(
+        triggerNode?.position ?? DEFAULT_POSITIONS.trigger,
+        {
+          ...(triggerDataFromConfig ?? {}),
+          ...((triggerNode?.data as Partial<TriggerBuilderNodeData> | undefined) ?? {}),
+        },
+      ),
+    );
+  }
+
+  if (agentNode || (hasAnyFlowNode && !triggerDataFromConfig && !triggerNode)) {
+    normalizedNodes.push(createAgentCoreNode(agentNode?.position ?? DEFAULT_POSITIONS.agent));
+  }
 
   if (knowledgeNode || knowledgeSourceIds.length > 0) {
     normalizedNodes.push(
@@ -1115,6 +1228,28 @@ function enrichNodeForDisplay(
 ): BuilderFlowNode {
   const localizedText = getBuilderNodeText(node.data.kind, t);
 
+  if (isTriggerNodeData(node.data)) {
+    const sourceText = getTriggerSourceText(node.data.triggerSource ?? 'user_message', t);
+    const providerLabel =
+      node.data.provider === 'composio'
+        ? t('agentBuilder.triggerProviderComposio')
+        : t('agentBuilder.triggerProviderInternal');
+
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        ...localizedText,
+        label: sourceText.label,
+        description: sourceText.description,
+        icon: sourceText.icon,
+        confidenceLabel: t('agentBuilder.confidence'),
+        badgeText: providerLabel,
+        badgeTone: node.data.provider === 'composio' ? 'warning' : 'success',
+      },
+    };
+  }
+
   if (node.data.kind === 'knowledge') {
     const sourceCount = node.data.sourceIds.length;
 
@@ -1214,31 +1349,102 @@ function getSelectedConnectionIdsFromNodes(nodes: BuilderFlowNode[]) {
   );
 }
 
-function getSelectableConnections(
+/**
+ * Returns the single best connection for a given tool kind.
+ * Priority: connected > pending > any.
+ * We enforce one connection per toolkit per workspace, so this is
+ * always the authoritative account.
+ */
+function getSingleConnection(
   connections: ConnectionRecord[],
   kind: ToolNodeKind,
-  currentConnectionId: string | null,
-) {
-  const matchingConnections = getToolConnectionsByKind(connections, kind);
-  const connectedConnections = matchingConnections.filter(
-    (connection) => connection.status === 'connected',
-  );
+): ConnectionRecord | null {
+  const matches = getToolConnectionsByKind(connections, kind);
+  if (matches.length === 0) return null;
+  const connected = matches.find((c) => c.status === 'connected');
+  return connected ?? matches[0];
+}
 
-  if (!currentConnectionId) {
-    return connectedConnections;
+/**
+ * Read-only "Connected Account" display card used inside tool node panels.
+ * Shows the account label / email with a colour-coded status indicator.
+ * Replaces the old <select> dropdown — there is now exactly one account per
+ * toolkit per workspace.
+ */
+function ConnectedAccountDisplay({
+  connection,
+  toolkitLabel,
+  onFix,
+}: {
+  connection: ConnectionRecord | null;
+  toolkitLabel: string;
+  onFix?: () => void;
+}) {
+  if (!connection) {
+    return (
+      <div className="rounded-[2rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-6 py-8 text-center">
+        <span className="material-symbols-outlined text-3xl text-on-surface-variant/30 mb-3 block">account_circle</span>
+        <p className="text-xs font-medium text-on-surface-variant/60 mb-5">
+          No {toolkitLabel} account connected yet.
+        </p>
+        <Link
+          href="/connections"
+          className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-primary transition-all hover:bg-primary/20 active:scale-95"
+        >
+          <span className="material-symbols-outlined text-lg">link</span>
+          Connect {toolkitLabel}
+        </Link>
+      </div>
+    );
   }
 
-  const currentConnection = matchingConnections.find(
-    (connection) => connection.id === currentConnectionId,
+  const isConnected = connection.status === 'connected';
+  const isPending = connection.status === 'pending';
+
+  const dotClass = isConnected
+    ? 'bg-success'
+    : isPending
+      ? 'bg-amber-400'
+      : 'bg-error';
+
+  const cardClass = isConnected
+    ? 'border-outline-variant/10 bg-surface-container-lowest'
+    : isPending
+      ? 'border-amber-500/20 bg-amber-500/5'
+      : 'border-error/20 bg-error/5';
+
+  const label =
+    connection.account_label && connection.account_label !== 'default'
+      ? connection.account_label
+      : connection.display_name;
+
+  return (
+    <div className={`rounded-[1.5rem] border px-5 py-4 ${cardClass}`}>
+      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
+        Connected Account
+      </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
+          <span className="text-sm font-bold text-on-surface truncate">{label}</span>
+        </div>
+        {!isConnected && (
+          <Link
+            href="/connections"
+            onClick={onFix}
+            className="shrink-0 text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
+          >
+            Fix →
+          </Link>
+        )}
+      </div>
+      {!isConnected && (
+        <p className="mt-1 ml-[22px] text-[11px] text-on-surface-variant/60">
+          {isPending ? 'Awaiting authorisation' : 'Connection error — reconnect in Connections'}
+        </p>
+      )}
+    </div>
   );
-
-  if (!currentConnection) {
-    return connectedConnections;
-  }
-
-  return connectedConnections.some((connection) => connection.id === currentConnection.id)
-    ? connectedConnections
-    : [currentConnection, ...connectedConnections];
 }
 
 export default function AgentBuilderPage() {
@@ -1261,6 +1467,11 @@ export default function AgentBuilderPage() {
   const [connections, setConnections] = useState<ConnectionRecord[]>([]);
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceRecord[]>([]);
   const [versions, setVersions] = useState<AgentVersionRecord[]>([]);
+  const [automationRecord, setAutomationRecord] = useState<AgentAutomationRecord | null>(null);
+  const [automationEvents, setAutomationEvents] = useState<AutomationEventRecord[]>([]);
+  const [automationRuns, setAutomationRuns] = useState<RunRecord[]>([]);
+  const [automationEnvironment, setAutomationEnvironment] =
+    useState<AutomationEnvironmentStatus | null>(null);
   const [calendarOptionsByConnectionId, setCalendarOptionsByConnectionId] = useState<
     Record<string, GoogleCalendarListItem[]>
   >({});
@@ -1297,9 +1508,12 @@ export default function AgentBuilderPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [automationStatusAction, setAutomationStatusAction] =
+    useState<'activate' | 'pause' | null>(null);
   const [isRollingBackVersionId, setIsRollingBackVersionId] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<BuilderStatusNote>({ kind: 'draftInitial' });
   const [isToolPickerOpen, setIsToolPickerOpen] = useState(false);
+  const [shouldClearExternalTrigger, setShouldClearExternalTrigger] = useState(false);
   const [actionEditorNodeId, setActionEditorNodeId] = useState<string | null>(null);
   const [actionSearchQuery, setActionSearchQuery] = useState('');
   const [activeActionDescription, setActiveActionDescription] = useState<string | null>(null);
@@ -1440,6 +1654,14 @@ export default function AgentBuilderPage() {
     () => nodes.some((node) => node.data.kind === 'knowledge'),
     [nodes],
   );
+  const hasTriggerNode = useMemo(
+    () => nodes.some((node) => node.data.kind === 'trigger'),
+    [nodes],
+  );
+  const hasAgentNode = useMemo(
+    () => nodes.some((node) => node.data.kind === 'agent'),
+    [nodes],
+  );
   const hasEndChatNode = useMemo(
     () => nodes.some((node) => node.data.kind === 'endchat'),
     [nodes],
@@ -1509,6 +1731,26 @@ export default function AgentBuilderPage() {
   const selectedNode = useMemo(
     () => displayNodes.find((node) => node.id === selectedNodeId) ?? null,
     [displayNodes, selectedNodeId],
+  );
+  const automationTriggerNode = useMemo(
+    () =>
+      nodes.find(
+        (node): node is BuilderFlowNode & { data: TriggerBuilderNodeData } =>
+          node.data.kind === 'trigger' &&
+          isTriggerNodeData(node.data) &&
+          node.data.provider === 'composio',
+      ) ?? null,
+    [nodes],
+  );
+  const automationConnectionId =
+    automationTriggerNode?.data.connectionId ?? automationRecord?.connection_id ?? null;
+  const automationSelectedConnection = automationConnectionId
+    ? connections.find((connection) => connection.id === automationConnectionId) ?? null
+    : null;
+  const automationCanActivate = Boolean(
+    automationConnectionId &&
+      automationEnvironment?.hasComposio &&
+      automationEnvironment?.hasWebhookSecret,
   );
   const canEditCurrentAgent = agent
     ? canEditAgentRecord(agent, user.id, membership.role)
@@ -1616,7 +1858,7 @@ export default function AgentBuilderPage() {
     ).map((item) => item.id);
 
     const loadedAgent = agentResult.data as AgentRecord;
-    const fallbackDefinition = buildInitialDefinition('custom');
+    const fallbackDefinition = buildInitialDefinition('custom', loadedAgent.surface);
     const definition = (draftResult.data?.definition ?? fallbackDefinition) as BuilderDefinition;
     const normalized = normalizeDefinition(
       definition,
@@ -1625,6 +1867,29 @@ export default function AgentBuilderPage() {
       attachedConnectionIds,
       attachedKnowledgeSourceIds,
     );
+    const hasExternalTrigger = normalized.nodes.some(
+      (node) =>
+        node.data.kind === 'trigger' &&
+        isTriggerNodeData(node.data) &&
+        node.data.provider === 'composio',
+    );
+
+    let automationPayload: AutomationApiResponse | null = null;
+
+    if (loadedAgent.surface === 'automation' || hasExternalTrigger) {
+      const automationResponse = await fetch(`/api/agents/${agentId}/automation`, {
+        cache: 'no-store',
+      });
+
+      if (automationResponse.ok) {
+        automationPayload = (await automationResponse.json()) as AutomationApiResponse;
+      } else if (loadedAgent.surface === 'automation') {
+        const payload = await automationResponse.json().catch(() => ({}));
+        throw new Error(
+          typeof payload.error === 'string' ? payload.error : t('agentBuilder.loadError'),
+        );
+      }
+    }
 
     setAgent(loadedAgent);
     setName(loadedAgent.name);
@@ -1642,7 +1907,40 @@ export default function AgentBuilderPage() {
     setEdges(normalized.edges);
     setVersions((versionsResult.data ?? []) as AgentVersionRecord[]);
     setConnections(chatConnections);
+
+    // Auto-wire: assign the single connected account to any tool node
+    // whose connectionId is null (zero-config for new nodes).
+    setNodes((prev) =>
+      prev.map((node) => {
+        if (!isToolNodeData(node.data) || node.data.connectionId !== null) {
+          return node;
+        }
+        const kind = node.data.kind as ToolNodeKind;
+        const match = chatConnections.find(
+          (c) => c.toolkit_slug === kind && c.status === 'connected',
+        );
+        if (!match) return node;
+        // For googlecalendar and cal, reset dependent fields when auto-assigning.
+        if (kind === 'googlecalendar') {
+          return {
+            ...node,
+            data: { ...node.data, connectionId: match.id, timezone: null, calendarId: null, calendarLabel: null },
+          };
+        }
+        if (kind === 'cal') {
+          return {
+            ...node,
+            data: { ...node.data, connectionId: match.id, timezone: null, eventTypeId: null, eventTypeLabel: null },
+          };
+        }
+        return { ...node, data: { ...node.data, connectionId: match.id } };
+      }),
+    );
     setKnowledgeSources((knowledgeSourcesResult.data ?? []) as KnowledgeSourceRecord[]);
+    setAutomationRecord(automationPayload?.automation ?? null);
+    setAutomationEvents(automationPayload?.events ?? []);
+    setAutomationRuns(automationPayload?.runs ?? []);
+    setAutomationEnvironment(automationPayload?.environment ?? null);
     setCurrentUserId(authResult.data.user?.id ?? null);
     setSelectedNodeId(null);
     setStatusNote(
@@ -1740,6 +2038,15 @@ export default function AgentBuilderPage() {
     }
 
     showToast(t('agentBuilder.internalAssistantsDisabled'), 'error');
+    router.replace('/dashboard');
+  }, [agent, router, showToast, t, workspace]);
+
+  useEffect(() => {
+    if (!agent || agent.surface !== 'automation' || hasAutomationsEnabled(workspace)) {
+      return;
+    }
+
+    showToast('Automations are not enabled for this workspace.', 'error');
     router.replace('/dashboard');
   }, [agent, router, showToast, t, workspace]);
 
@@ -2072,6 +2379,30 @@ export default function AgentBuilderPage() {
     setActionSearchQuery('');
   };
 
+  const handleAddTriggerNode = () => {
+    if (nodes.some((node) => node.data.kind === 'trigger')) {
+      showToast(t('agentBuilder.triggerAlreadyOnCanvas'), 'error');
+      return;
+    }
+
+    saveToHistory();
+    const node = createTriggerNode();
+    setNodes((currentNodes) => [...currentNodes, node]);
+    setSelectedNodeId(node.id);
+  };
+
+  const handleAddAgentNode = () => {
+    if (nodes.some((node) => node.data.kind === 'agent')) {
+      showToast(t('agentBuilder.agentAlreadyOnCanvas'), 'error');
+      return;
+    }
+
+    saveToHistory();
+    const node = createAgentCoreNode();
+    setNodes((currentNodes) => [...currentNodes, node]);
+    setSelectedNodeId(node.id);
+  };
+
   const handleAddKnowledgeNode = () => {
     if (nodes.some((node) => node.data.kind === 'knowledge')) {
       showToast(t('agentBuilder.knowledgeAlreadyOnCanvas'), 'error');
@@ -2224,19 +2555,85 @@ export default function AgentBuilderPage() {
     setSelectedNodeId(null);
   };
 
-  const buildDefinition = (): BuilderDefinition => ({
-    nodes,
-    edges: buildEdges(nodes),
-    viewport: flowInstance?.getViewport(),
-    config: {
-      model,
-      instructions,
-      starterPrompts: starterPromptFields
-        .map((item) => item.trim())
-        .filter(Boolean),
-      timezone,
-    },
-  });
+  const buildDefinition = (): BuilderDefinition => {
+    const triggerNode = nodes.find((node) => node.data.kind === 'trigger');
+    const triggerData =
+      triggerNode && isTriggerNodeData(triggerNode.data) ? triggerNode.data : null;
+
+    return {
+      nodes,
+      edges: buildEdges(nodes),
+      viewport: flowInstance?.getViewport(),
+      config: {
+        model,
+        instructions,
+        starterPrompts: starterPromptFields
+          .map((item) => item.trim())
+          .filter(Boolean),
+        timezone,
+        trigger: {
+          source: triggerData?.triggerSource ?? 'user_message',
+          provider: triggerData?.provider ?? 'internal',
+          toolkitSlug: triggerData?.toolkitSlug ?? null,
+          triggerSlug: triggerData?.triggerSlug ?? null,
+          triggerConfig: triggerData?.triggerConfig ?? {},
+          connectionId: triggerData?.connectionId ?? null,
+        },
+      },
+    };
+  };
+
+  const syncExternalTriggerBinding = async (definition: BuilderDefinition) => {
+    if (!agent || (agent.surface !== 'widget' && agent.surface !== 'automation')) {
+      return;
+    }
+
+    const trigger = definition.config.trigger;
+    const endpoint = `/api/agents/${agentId}/automation`;
+
+    if (trigger?.provider === 'composio' && trigger.triggerSlug) {
+      const response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          description,
+          model,
+          instructions,
+          timezone,
+          connectionId: trigger.connectionId ?? null,
+          triggerSlug: trigger.triggerSlug,
+          triggerConfig: trigger.triggerConfig ?? {},
+          definition,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof payload.error === 'string' ? payload.error : t('agentBuilder.saveError'),
+        );
+      }
+
+      setShouldClearExternalTrigger(false);
+      return;
+    }
+
+    if (!shouldClearExternalTrigger) {
+      return;
+    }
+
+    const response = await fetch(endpoint, { method: 'DELETE' });
+
+    if (!response.ok && response.status !== 404) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof payload.error === 'string' ? payload.error : t('agentBuilder.saveError'),
+      );
+    }
+
+    setShouldClearExternalTrigger(false);
+  };
 
   const saveDraft = async () => {
     if (!agent) {
@@ -2247,6 +2644,12 @@ export default function AgentBuilderPage() {
 
     try {
       const definition = buildDefinition();
+      const nextSurface =
+        agent.surface === 'assistant'
+          ? 'assistant'
+          : definition.config.trigger?.provider === 'composio'
+            ? 'automation'
+            : 'widget';
 
       const [agentResult, draftResult] = await Promise.all([
         supabase
@@ -2256,6 +2659,7 @@ export default function AgentBuilderPage() {
             description,
             instructions,
             model,
+            surface: nextSurface,
             starter_prompts: definition.config.starterPrompts,
             timezone,
             ...(agent.surface === 'assistant' && agent.status === 'draft'
@@ -2287,6 +2691,7 @@ export default function AgentBuilderPage() {
 
       await syncSelectedConnections(nodes);
       await syncSelectedKnowledgeSources(nodes);
+      await syncExternalTriggerBinding(definition);
       setAgent((current) =>
         current
           ? {
@@ -2295,6 +2700,7 @@ export default function AgentBuilderPage() {
               description,
               instructions,
               model,
+              surface: nextSurface,
               starter_prompts: definition.config.starterPrompts,
               timezone,
               status:
@@ -2382,6 +2788,47 @@ export default function AgentBuilderPage() {
       showToast(message, 'error');
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const updateAutomationStatus = async (action: 'activate' | 'pause') => {
+    if (!agent || agent.surface !== 'automation') {
+      return;
+    }
+
+    setAutomationStatusAction(action);
+
+    try {
+      if (action === 'activate') {
+        await saveDraft();
+      }
+
+      const response = await fetch(`/api/agents/${agentId}/automation/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          typeof payload.error === 'string' ? payload.error : t('agentBuilder.saveError'),
+        );
+      }
+
+      await loadBuilder();
+      router.refresh();
+      showToast(
+        action === 'activate'
+          ? t('agentBuilder.triggerActivated')
+          : t('agentBuilder.triggerPaused'),
+        'success',
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('agentBuilder.saveError');
+      showToast(message, 'error');
+    } finally {
+      setAutomationStatusAction(null);
     }
   };
 
@@ -2500,11 +2947,211 @@ export default function AgentBuilderPage() {
     }
 
     if (selectedNode.data.kind === 'trigger') {
+      const triggerNode = selectedNode as BuilderFlowNode & { data: TriggerBuilderNodeData };
+      const selectedSource = triggerNode.data.triggerSource ?? 'user_message';
+
       return (
-        <div className="space-y-4">
-          <p className="text-sm leading-6 text-on-surface-variant">
-            {t('agentBuilder.triggerDescription')}
-          </p>
+        <div className="space-y-7">
+          <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">
+              {t('agentBuilder.triggerSetupTitle')}
+            </p>
+            <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+              {t('agentBuilder.triggerSetupDescription')}
+            </p>
+            <div className="mt-4 rounded-[1rem] bg-surface-container-low px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant/50">
+                {t('agentBuilder.agentSurface')}
+              </p>
+              <p className="mt-1 text-sm font-black text-on-surface">
+                {selectedSource === 'user_message'
+                  ? t('agentBuilder.surfaceWidget')
+                  : t('agents.automation')}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {TRIGGER_SOURCE_ORDER.map((source) => {
+              const sourceText = getTriggerSourceText(source, t);
+              const isSelected = selectedSource === source;
+              const isExternal = source === 'gmail_new_message';
+              const isLocked = isExternal && !hasAutomationsEnabled(workspace);
+
+              return (
+                <button
+                  key={source}
+                  type="button"
+                  disabled={isLocked}
+                  onClick={() => {
+                    if (isLocked) return;
+                    if (selectedSource === 'gmail_new_message' && source !== 'gmail_new_message') {
+                      setShouldClearExternalTrigger(true);
+                    }
+
+                    setAgent((current) =>
+                      current && current.surface !== 'assistant'
+                        ? { ...current, surface: isExternal ? 'automation' : 'widget' }
+                        : current,
+                    );
+                    updateNode(triggerNode.id, (node) => ({
+                      ...node,
+                      data: {
+                        ...node.data,
+                        label: sourceText.label,
+                        description: sourceText.description,
+                        icon: sourceText.icon,
+                        triggerSource: source,
+                        provider: isExternal ? 'composio' : 'internal',
+                        toolkitSlug: isExternal ? 'gmail' : null,
+                        triggerSlug: isExternal ? AUTOMATION_GMAIL_TRIGGER_SLUG : null,
+                        connectionId:
+                          isExternal && isTriggerNodeData(node.data)
+                            ? node.data.connectionId ?? getSingleConnection(connections, 'gmail')?.id ?? null
+                            : null,
+                        triggerConfig: {},
+                      } as TriggerBuilderNodeData,
+                    }));
+                  }}
+                  className={`group flex w-full items-start gap-4 rounded-[1.5rem] border p-4 text-left transition-all ${
+                    isSelected
+                      ? 'border-primary/35 bg-primary/5 shadow-sm'
+                      : isLocked
+                        ? 'cursor-not-allowed border-outline-variant/10 bg-surface-container-lowest opacity-50'
+                        : 'border-outline-variant/10 bg-surface-container-lowest hover:border-primary/25 hover:bg-surface-container-low'
+                  }`}
+                >
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                      isSelected
+                        ? 'bg-primary text-on-primary'
+                        : isLocked
+                          ? 'bg-surface-container-high text-on-surface-variant/40'
+                          : 'bg-surface-container-high text-on-surface-variant'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-xl">
+                      {isLocked ? 'lock' : sourceText.icon}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-black text-on-surface">{sourceText.label}</p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] ${
+                          isExternal
+                            ? 'bg-warning/10 text-warning'
+                            : 'bg-success/10 text-success'
+                        }`}
+                      >
+                        {isExternal
+                          ? t('agentBuilder.triggerProviderComposio')
+                          : t('agentBuilder.triggerProviderInternal')}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-xs leading-relaxed text-on-surface-variant/65">
+                      {sourceText.description}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedSource === 'gmail_new_message' ? (
+            <div className="space-y-3 rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5">
+              <ConnectedAccountDisplay
+                connection={getSingleConnection(connections, 'gmail')}
+                toolkitLabel="Gmail"
+              />
+              <p className="text-[11px] leading-relaxed text-on-surface-variant/60">
+                {t('agentBuilder.composioTriggerHelp')}
+              </p>
+            </div>
+          ) : null}
+
+          {selectedSource === 'gmail_new_message' ? (
+            <div className="space-y-4 rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">
+                    {t('agentBuilder.automationReadiness')}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-on-surface-variant/60">
+                    {automationCanActivate
+                      ? t('agentBuilder.activationReady')
+                      : t('agentBuilder.activationBlocked')}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.15em] ${
+                    automationRecord?.status === 'active'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-warning/10 text-warning'
+                  }`}
+                >
+                  {automationRecord?.status ?? 'draft'}
+                </span>
+              </div>
+
+              <div className="space-y-3 rounded-[1rem] bg-surface-container-low p-4">
+                {[
+                  {
+                    label: t('agentBuilder.selectedTrigger'),
+                    value: getTriggerSourceText('gmail_new_message', t).label,
+                  },
+                  {
+                    label: t('agentBuilder.selectedAccount'),
+                    value:
+                      automationSelectedConnection?.account_label ??
+                      automationSelectedConnection?.external_id ??
+                      t('agentBuilder.noTriggerAccount'),
+                  },
+                  {
+                    label: t('agentBuilder.triggerProviderComposio'),
+                    value: automationEnvironment?.hasComposio
+                      ? 'Configured'
+                      : 'COMPOSIO_API_KEY missing',
+                  },
+                  {
+                    label: t('agentBuilder.webhookConfigured'),
+                    value: automationEnvironment?.hasWebhookSecret
+                      ? t('agentBuilder.webhookConfigured')
+                      : t('agentBuilder.webhookMissing'),
+                  },
+                  {
+                    label: t('agentBuilder.providerTrigger'),
+                    value: automationRecord?.composio_trigger_id ?? t('agentBuilder.noProviderTrigger'),
+                  },
+                  {
+                    label: t('agentBuilder.lastAutomationEvent'),
+                    value: automationEvents[0]?.created_at
+                      ? formatLocaleDateTime(automationEvents[0].created_at, language)
+                      : 'Never',
+                  },
+                  {
+                    label: t('agentBuilder.lastAutomationError'),
+                    value: automationRecord?.last_error ?? 'None',
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-start justify-between gap-4">
+                    <span className="text-[10px] font-black uppercase tracking-[0.16em] text-on-surface-variant/45">
+                      {item.label}
+                    </span>
+                    <span className="max-w-[12rem] truncate text-right text-xs font-bold text-on-surface">
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {automationRuns[0] ? (
+                <p className="text-[11px] font-medium text-on-surface-variant/60">
+                  Latest run: {automationRuns[0].status}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       );
     }
@@ -2836,17 +3483,12 @@ export default function AgentBuilderPage() {
     }
 
     if (toolNode && isToolNodeData(toolNode.data)) {
-      const selectableConnections = getSelectableConnections(
-        connections,
-        toolNode.data.kind,
-        toolNode.data.connectionId,
-      );
-      const selectedConnection = toolNode.data.connectionId
-        ? connections.find((connection) => connection.id === toolNode.data.connectionId) ?? null
-        : null;
-      const hasConnectedOptions = selectableConnections.some(
-        (connection) => connection.status === 'connected',
-      );
+      // Single-account model: one connection per toolkit per workspace.
+      const singleConnection =
+        toolNode.data.connectionId
+          ? (connections.find((c) => c.id === toolNode.data.connectionId) ?? getSingleConnection(connections, toolNode.data.kind))
+          : getSingleConnection(connections, toolNode.data.kind);
+      const selectedConnection = singleConnection;
       const emailRecipientEmail =
         toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook' ? toolNode.data.recipientEmail ?? '' : '';
       const selectedCalendarConnectionId =
@@ -2902,59 +3544,12 @@ export default function AgentBuilderPage() {
             </div>
           </div>
 
-          {selectedConnection && selectedConnection.status !== 'connected' ? (
-            <div className="rounded-[1.5rem] border border-error/20 bg-error/5 px-5 py-4 flex items-center gap-3">
-              <span className="material-symbols-outlined text-error text-xl">error</span>
-              <p className="text-sm font-bold text-error">
-                {t('agentBuilder.currentAccountStatus', {
-                  status: translateConnectionStatus(selectedConnection.status, t),
-                })}
-              </p>
-            </div>
-          ) : null}
-
+          {/* ── Connected account display card (read-only, no dropdown) ── */}
           <div className="space-y-6">
-            {(hasConnectedOptions || selectedConnection) ? (
-              <div>
-                <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
-                  {t('agentBuilder.connectedAccount')}
-                </label>
-                <div className="relative">
-                  <select
-                    value={toolNode.data.connectionId ?? ''}
-                    onChange={(event) => updateToolConnection(toolNode.id, event.target.value || null)}
-                    className="w-full appearance-none rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5 cursor-pointer"
-                  >
-                    <option value="">{t('agentBuilder.selectAccount')}</option>
-                    {selectableConnections.map((connection) => (
-                      <option key={connection.id} value={connection.id}>
-                        {connection.account_label || connection.display_name}
-                        {connection.status === 'connected'
-                          ? ''
-                          : ` (${translateConnectionStatus(connection.status, t)})`}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60">
-                    expand_more
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-[2rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-6 py-8 text-center">
-                <span className="material-symbols-outlined text-3xl text-on-surface-variant/30 mb-3">account_circle</span>
-                <p className="text-xs font-medium text-on-surface-variant/60 mb-5">
-                  {t('agentBuilder.noConnectedAccount', { label: toolNode.data.label })}
-                </p>
-                <Link
-                  href="/connections"
-                  className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-primary transition-all hover:bg-primary/20 active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-lg">link</span>
-                  {t('agentBuilder.connectLabel', { label: toolNode.data.label })}
-                </Link>
-              </div>
-            )}
+            <ConnectedAccountDisplay
+              connection={selectedConnection}
+              toolkitLabel={toolNode.data.label}
+            />
 
             {(toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook') && (
               <div className="space-y-4 pt-2">
@@ -3460,7 +4055,7 @@ export default function AgentBuilderPage() {
 
             <div className="h-4 w-[1px] bg-outline-variant/20" />
 
-            <AgentViewTabs agentId={agentId} current="builder" />
+            <AgentViewTabs agentId={agentId} current="builder" surface={agent?.surface} />
           </div>
         </div>
 
@@ -3528,6 +4123,40 @@ export default function AgentBuilderPage() {
                 {isPublishing ? t('agentBuilder.publishing') : t('agentBuilder.deployBlueprint')}
               </button>
             ) : null}
+
+            {agent?.surface === 'automation' ? (
+              automationRecord?.status === 'active' ? (
+                <button
+                  onClick={() => void updateAutomationStatus('pause')}
+                  disabled={automationStatusAction !== null || !canEditCurrentAgent}
+                  className="h-10 rounded-full border border-outline-variant/15 bg-surface-container-low px-6 text-xs font-bold text-on-surface-variant shadow-sm transition-all hover:bg-surface-container hover:text-on-surface active:scale-95 disabled:opacity-50"
+                >
+                  {automationStatusAction === 'pause'
+                    ? t('agentBuilder.pausingTrigger')
+                    : t('agentBuilder.pauseTrigger')}
+                </button>
+              ) : (
+                <button
+                  onClick={() => void updateAutomationStatus('activate')}
+                  disabled={
+                    automationStatusAction !== null ||
+                    isSaving ||
+                    !canEditCurrentAgent ||
+                    !automationCanActivate
+                  }
+                  className="signature-gradient h-10 rounded-full px-6 text-xs font-bold shadow-xl shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:shadow-2xl active:scale-95 disabled:opacity-50"
+                  title={
+                    automationCanActivate
+                      ? t('agentBuilder.activationReady')
+                      : t('agentBuilder.activationBlocked')
+                  }
+                >
+                  {automationStatusAction === 'activate'
+                    ? t('agentBuilder.activatingTrigger')
+                    : t('agentBuilder.activateTrigger')}
+                </button>
+              )
+            ) : null}
           </div>
         </div>
       </header>
@@ -3568,10 +4197,13 @@ export default function AgentBuilderPage() {
 
               <div className="mt-8 space-y-4">
                 {nodeLibraryItems.map((item) => {
+                  const isTriggerAdded = item.key === 'trigger' && hasTriggerNode;
+                  const isAgentAdded = item.key === 'agent' && hasAgentNode;
                   const isKnowledgeAdded = item.key === 'knowledge' && hasKnowledgeNode;
                   const isEndChatAdded = item.key === 'endchat' && hasEndChatNode;
                   const isFixed = item.fixed;
-                  const isDisabled = isKnowledgeAdded || isEndChatAdded || isFixed || item.disabled;
+                  const isDisabled =
+                    isTriggerAdded || isAgentAdded || isKnowledgeAdded || isEndChatAdded || item.disabled;
 
                   return (
                     <button
@@ -3579,6 +4211,10 @@ export default function AgentBuilderPage() {
                       onClick={() =>
                         item.disabled
                           ? showToast(t('settings.billing.featureLocked') || 'Please upgrade your plan to unlock this feature.', 'error')
+                          : item.key === 'trigger'
+                          ? handleAddTriggerNode()
+                          : item.key === 'agent'
+                          ? handleAddAgentNode()
                           : item.key === 'knowledge'
                           ? handleAddKnowledgeNode()
                           : item.key === 'endchat'
@@ -3592,7 +4228,7 @@ export default function AgentBuilderPage() {
                         item.disabled
                           ? 'border-outline-variant/5 bg-surface-container-low/40 opacity-50 grayscale cursor-not-allowed'
                           : isFixed
-                          ? 'border-dashed border-outline-variant/20 bg-surface-container-lowest/30 cursor-default opacity-80'
+                          ? 'border-dashed border-outline-variant/20 bg-surface-container-lowest/30 hover:border-primary/25 hover:bg-surface-container-low/50'
                           : isDisabled
                           ? 'border-outline-variant/10 bg-surface-container-low/50 opacity-60 cursor-not-allowed'
                           : 'border-outline-variant/10 bg-surface-container-lowest hover:border-primary/40 hover:bg-surface-container-low hover:shadow-xl hover:shadow-primary/5 active:scale-[0.98]'
@@ -3623,7 +4259,7 @@ export default function AgentBuilderPage() {
                             <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60">
                               {t('common.fixed')}
                             </span>
-                          ) : isKnowledgeAdded || isEndChatAdded ? (
+                          ) : isTriggerAdded || isAgentAdded || isKnowledgeAdded || isEndChatAdded ? (
                             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-primary">
                               {t('common.added')}
                             </span>
@@ -3661,6 +4297,21 @@ export default function AgentBuilderPage() {
               proOptions={{ hideAttribution: true }}
               className="bg-background"
             >
+              {displayNodes.length === 0 ? (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6">
+                  <div className="max-w-md rounded-[2rem] border border-outline-variant/10 bg-surface/85 p-8 text-center shadow-premium backdrop-blur-xl">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <span className="material-symbols-outlined text-2xl">add_circle</span>
+                    </div>
+                    <h2 className="mt-5 text-lg font-black tracking-tight text-on-surface">
+                      {t('agentBuilder.emptyCanvasTitle')}
+                    </h2>
+                    <p className="mt-3 text-sm leading-6 text-on-surface-variant/70">
+                      {t('agentBuilder.emptyCanvasDescription')}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
               <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
               <Controls className="!bottom-4 !left-4 !top-auto !right-auto" />
             </ReactFlow>

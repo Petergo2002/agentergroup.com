@@ -4,7 +4,7 @@ import {
   buildWorkspaceComposioUserId,
   getConnectionComposioUserId,
 } from "@/lib/connections";
-import { hasComposioEnv } from "@/lib/env";
+import { getComposioWebhookSecret, hasComposioEnv } from "@/lib/env";
 import { normalizeGmailRecipientEmail } from "@/lib/gmail";
 import { extractGoogleCalendarListItems } from "@/lib/google-calendar";
 import type {
@@ -77,11 +77,23 @@ export interface ToolkitActionOption {
   recommended: boolean;
 }
 
+export interface ComposioTriggerConnectionRef {
+  external_id: string | null;
+  toolkit_data: Record<string, unknown> | null;
+}
+
+export interface CreateComposioTriggerInput {
+  workspaceId: string;
+  connection: ComposioTriggerConnectionRef;
+  triggerSlug: string;
+  triggerConfig: Record<string, unknown>;
+}
+
 interface ConnectionSyncRow {
   id: string;
   external_id: string | null;
-  status: SyncedConnectedAccount["status"];
-  toolkit_data: Record<string, unknown> | null;
+  status: string;
+  toolkit_data: Record<string, unknown>;
   last_synced_at: string | null;
 }
 
@@ -91,6 +103,22 @@ interface ConnectionSyncSupabaseTable {
       eq: (
         column: string,
         value: string,
+      ) => {
+        maybeSingle: () => Promise<{
+          data: ConnectionSyncRow | null;
+          error: { message: string } | null;
+        }>;
+        in: (
+          column: string,
+          values: string[],
+        ) => Promise<{
+          data: ConnectionSyncRow[] | null;
+          error: { message: string } | null;
+        }>;
+      };
+      in: (
+        column: string,
+        values: string[],
       ) => Promise<{
         data: ConnectionSyncRow[] | null;
         error: { message: string } | null;
@@ -103,8 +131,15 @@ interface ConnectionSyncSupabaseTable {
         column: string,
         values: string[],
       ) => Promise<{ error: { message: string } | null }>;
+      eq: (
+        column: string,
+        value: string,
+      ) => Promise<{ error: { message: string } | null }>;
     };
   };
+  insert: (
+    values: Record<string, unknown>,
+  ) => Promise<{ error: { message: string } | null }>;
   upsert: (
     values: unknown,
     options?: Record<string, unknown>,
@@ -168,6 +203,16 @@ function normalizeConnectionStatus(value?: string | null) {
 
 function pickString(value: unknown) {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+export function getComposioConnectedAccountId(
+  connection: ComposioTriggerConnectionRef,
+) {
+  return (
+    connection.external_id ??
+    pickString(connection.toolkit_data?.id) ??
+    pickString(connection.toolkit_data?.connectedAccountId)
+  );
 }
 
 function normalizeAccountLabel(label: string | null | undefined) {
@@ -539,7 +584,8 @@ export async function syncConnectedAccountsToDatabase(
       .filter((externalId): externalId is string => Boolean(externalId)),
   );
 
-  const connectionsTable = supabase.from("connections") as ConnectionSyncSupabaseTable;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const connectionsTable = supabase.from("connections") as any;
   const { data: existingConnections, error: existingConnectionsError } = await connectionsTable
     .select("id, external_id, status, toolkit_data, last_synced_at")
     .eq("workspace_id", workspaceId)
@@ -578,8 +624,11 @@ export async function syncConnectedAccountsToDatabase(
     return [];
   }
 
-  const { error } = await connectionsTable.upsert(
-    connectedAccounts.map((account) => ({
+  // Upsert each connected account individually using external_id as the
+  // conflict key. This is the Composio connection ID — always unique — and
+  // does not depend on any multi-column unique constraint on the table.
+  for (const account of connectedAccounts) {
+    const row = {
       workspace_id: workspaceId,
       provider: "composio",
       toolkit_slug: account.toolkitSlug,
@@ -590,14 +639,40 @@ export async function syncConnectedAccountsToDatabase(
       toolkit_data: account.toolkitData,
       created_by: userId,
       last_synced_at: syncTimestamp,
-    })),
-    {
-      onConflict: "workspace_id,toolkit_slug,account_label",
-    },
-  );
+    };
 
-  if (error) {
-    throw new Error(error.message);
+    if (account.externalId) {
+      // Try to update the existing row by external_id first.
+      const { data: existing } = await connectionsTable
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .eq("external_id", account.externalId)
+        .maybeSingle();
+
+      if (existing) {
+        const { error: updateError } = await connectionsTable
+          .update({
+            display_name: row.display_name,
+            status: row.status,
+            account_label: row.account_label,
+            toolkit_data: row.toolkit_data,
+            last_synced_at: row.last_synced_at,
+          })
+          .eq("id", (existing as { id: string }).id);
+
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+        continue;
+      }
+    }
+
+    // No existing row — insert fresh.
+    const { error: insertError } = await connectionsTable.insert(row);
+
+    if (insertError) {
+      throw new Error(insertError.message);
+    }
   }
 
   return connectedAccounts;
@@ -654,6 +729,101 @@ export async function deleteConnectedAccount(connectedAccountId: string) {
   }
 
   return composio.connectedAccounts.delete(connectedAccountId);
+}
+
+export async function getComposioTriggerType(slug: string) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  return composio.triggers.getType(slug);
+}
+
+export async function createComposioTrigger({
+  workspaceId,
+  connection,
+  triggerSlug,
+  triggerConfig,
+}: CreateComposioTriggerInput) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  const connectedAccountId = getComposioConnectedAccountId(connection);
+
+  if (!connectedAccountId) {
+    throw new Error("The selected connection is missing a Composio connected account id.");
+  }
+
+  return composio.triggers.create(
+    buildWorkspaceComposioUserId(workspaceId),
+    triggerSlug,
+    {
+      connectedAccountId,
+      triggerConfig,
+    },
+  );
+}
+
+export async function enableComposioTrigger(triggerId: string) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  return composio.triggers.enable(triggerId);
+}
+
+export async function disableComposioTrigger(triggerId: string) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  return composio.triggers.disable(triggerId);
+}
+
+export async function deleteComposioTrigger(triggerId: string) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  return composio.triggers.delete(triggerId);
+}
+
+export async function verifyComposioWebhook(
+  rawBody: string,
+  headers: Headers,
+) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  const signature = headers.get("webhook-signature");
+  const webhookId = headers.get("webhook-id");
+  const webhookTimestamp = headers.get("webhook-timestamp");
+
+  if (!signature || !webhookId || !webhookTimestamp) {
+    throw new Error("Missing Composio webhook verification headers.");
+  }
+
+  return composio.triggers.verifyWebhook({
+    payload: rawBody,
+    signature,
+    id: webhookId,
+    timestamp: webhookTimestamp,
+    secret: getComposioWebhookSecret(),
+  });
 }
 
 function getSelectedChatToolsForToolkits(

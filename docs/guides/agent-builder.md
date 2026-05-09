@@ -1,6 +1,6 @@
 # Agent Builder
 
-Last updated: 2026-04-19
+Last updated: 2026-05-04
 
 ## Purpose
 
@@ -28,7 +28,8 @@ The builder is the editing surface for configuring an agent's:
 - timezone
 - end-of-chat policy
 - attached knowledge sources
-- attached live chat tools
+- attached live action tools
+- external automation trigger setup
 - published version history
 
 The current builder is intentionally narrow. It is not a general workflow engine.
@@ -44,12 +45,17 @@ Related files:
 - `src/components/modals/CreateAgentModal.tsx`
 - `src/components/agents/AgentViewTabs.tsx`
 - `src/lib/agents/defaults.ts`
+- `src/lib/automation/executor.ts`
 - `src/lib/integrations.ts`
 - `src/lib/types.ts`
+- `src/app/api/agents/[id]/automation/route.ts`
+- `src/app/api/agents/[id]/automation/status/route.ts`
+- `src/app/api/composio/webhook/route.ts`
 - `src/app/api/agents/[id]/knowledge/route.ts`
 - `src/app/api/agents/[id]/rollback/route.ts`
 - `src/app/api/agents/[id]/chat/route.ts`
 - `src/app/(app)/agents/[id]/preview/page.tsx`
+- `src/app/(app)/agents/[id]/activity/page.tsx`
 - `src/lib/runtime/agent-chat.ts`
 
 ## Current Builder Model
@@ -60,13 +66,11 @@ These nodes always exist and cannot be removed:
 
 - `trigger`
 - `agent`
-- `output`
 
 They are created by:
 
 - `createTriggerNode(...)`
 - `createAgentCoreNode(...)`
-- `createOutputNode(...)`
 
 ### Optional nodes
 
@@ -92,14 +96,27 @@ Current limits:
 
 Edges are rebuilt automatically from the node list by `buildEdges(...)`.
 
-The current flow shape is always:
+The website chat flow shape is:
 
 ```text
-User Message -> Agent -> Assistant Response
-                 -> Knowledge (optional)
-                 -> Gmail (optional)
-                 -> Google Calendar (optional)
-Assistant Response -> End Chat (optional)
+Chat Message Trigger -> Agent Core
+                         -> Knowledge (optional)
+                         -> Gmail (optional)
+                         -> Outlook (optional)
+                         -> Google Calendar (optional)
+                         -> Cal.com (optional)
+                         -> End Chat (optional)
+```
+
+The automation flow shape is:
+
+```text
+External Trigger -> Agent Core
+                    -> Knowledge (optional)
+                    -> Gmail (optional)
+                    -> Outlook (optional)
+                    -> Google Calendar (optional)
+                    -> Cal.com (optional)
 ```
 
 ## What the Builder UI Exposes
@@ -162,6 +179,36 @@ Important current behavior:
 - the builder loads selectable Google Calendars or Cal.com event types from the connected Composio account
 - if the connection no longer exists in Composio, the app marks the row disconnected and asks the operator to reconnect
 
+### Trigger inspector
+
+When the `trigger` node is selected, the builder lets the user choose what starts the agent.
+
+Current trigger sources:
+
+- `user_message`: internal chat trigger used by Website Chat agents
+- `gmail_new_message`: external Composio trigger used by Automation agents
+
+Important current behavior:
+
+- choosing the external trigger changes the agent surface to `automation`
+- choosing the chat trigger changes a non-assistant agent surface back to `widget`
+- the trigger config is stored in `definition.config.trigger`
+- Automation v1 stores `provider = 'composio'`, `toolkitSlug = 'gmail'`, and `triggerSlug = 'GMAIL_NEW_GMAIL_MESSAGE'`
+- the trigger account is selected on the trigger node as `connectionId`
+- the automation can be saved without a selected account
+- activation is blocked until a connected Gmail account is selected
+
+The inspector also shows automation readiness:
+
+- saved automation status
+- selected trigger
+- selected account
+- Composio provider env status
+- webhook secret status
+- provider trigger id when provisioned
+- last event
+- last error
+
 ### End Chat inspector
 
 When `endchat` is selected, the builder edits:
@@ -199,10 +246,10 @@ The left drawer is a node library.
 
 Current behavior:
 
-- `Agent Core` and `Response` are fixed and non-addable
+- `Agent Core` is fixed and non-addable
 - `Knowledge` can only be added once
 - `End Chat` can only be added once
-- `Connected Tools` opens a picker for Gmail and Google Calendar
+- `Connected Tools` opens a picker for Gmail, Microsoft Outlook, Google Calendar, and Cal.com
 - a tool can only be added if there is at least one connected account for that tool
 
 ## Create, Load, Normalize
@@ -216,7 +263,15 @@ Creation currently does two writes:
 1. insert a row into `agents`
 2. insert a starter draft into `agent_drafts`
 
-The initial definition comes from `buildInitialDefinition('custom')` in `src/lib/agents/defaults.ts`.
+The initial definition comes from `buildInitialDefinition('custom', surface)` in `src/lib/agents/defaults.ts`.
+
+Initial node defaults:
+
+- Website Chat: `Chat Message Trigger + Agent Core`
+- Automation: `External Trigger + Agent Core`
+- Internal Assistant: chat-style trigger and agent core, with assistant surface behavior
+
+Automation creation does not require a connected Gmail account. The account is selected later in the trigger inspector before activation.
 
 ### Builder loading
 
@@ -230,6 +285,7 @@ The initial definition comes from `buildInitialDefinition('custom')` in `src/lib
 - current auth user
 - `knowledge_sources`
 - attached knowledge sources through `/api/agents/[id]/knowledge`
+- automation state through `/api/agents/[id]/automation` when the loaded agent is an automation or the saved trigger is external
 
 ### Definition normalization
 
@@ -269,15 +325,44 @@ Saving does all of the following:
 2. upserts `agent_drafts` with the current `definition`
 3. replaces the rows in `agent_connections`
 4. replaces the rows in `agent_knowledge_sources` through `/api/agents/[id]/knowledge`
+5. upserts `agent_automations` through `/api/agents/[id]/automation` when the trigger provider is Composio
 
 Important implication:
 
 - unsaved UI edits are local browser state only
 - preview and downstream systems only reflect the last saved draft, not the current unsaved canvas
+- automation activation uses the last saved draft and trigger binding
+
+### Automation Activation and Pause
+
+Automation agents do not use Publish/Deploy.
+
+The builder header shows:
+
+- `Save`
+- `Activate Trigger`
+- `Pause Trigger`
+
+Activation and pause call:
+
+- `POST /api/agents/[id]/automation/status`
+
+with `action = 'activate'` or `action = 'pause'`.
+
+Important current behavior:
+
+- activation calls `saveDraft()` first
+- activation requires `COMPOSIO_API_KEY`
+- activation requires `COMPOSIO_WEBHOOK_SECRET`
+- activation requires a selected connected Gmail account
+- activation creates or enables the upstream Composio trigger
+- pause disables the upstream Composio trigger
+- normal `/api/agents/[id]/status` rejects automation agents
+- archive/delete/disconnect lifecycle paths disable or delete provider triggers when needed
 
 ### Publish
 
-`Publish` always calls `saveDraft()` first.
+`Publish` always calls `saveDraft()` first and only applies to website chat agents.
 
 After that it:
 
@@ -289,6 +374,8 @@ After that it:
    - current core config fields
 
 Publishing is what creates the version snapshot used for deployments.
+
+Automation agents are not version-published for trigger activation in v1. Their active runtime reads the current saved draft plus durable connection and knowledge attachments.
 
 ### Rollback
 
@@ -310,16 +397,25 @@ Important limitation:
 
 ## Preview and Runtime Impact
 
-### Preview tab
+### Agent tabs
 
-The builder and preview are the two agent views today:
+Website chat and internal assistant agents use:
 
 - `Builder`
 - `Preview`
 
+Automation agents use:
+
+- `Builder`
+- `Activity`
+
 Preview lives at:
 
 - `src/app/(app)/agents/[id]/preview/page.tsx`
+
+Activity lives at:
+
+- `src/app/(app)/agents/[id]/activity/page.tsx`
 
 Preview chat uses:
 
@@ -331,10 +427,12 @@ Important implication:
 - preview does not auto-save on tab navigation
 - preview reflects the last saved draft and current durable attachments
 - unsaved builder edits stay local until the user explicitly saves or publishes
+- automation preview redirects to Activity
+- Activity shows recent `runs`, `automation_events`, statuses, output summaries, event times, and errors
 
 ### What builder choices affect at runtime
 
-The runtime reads tool and knowledge availability from durable attachment tables:
+The shared runtime reads tool and knowledge availability from durable attachment tables:
 
 - tools from `agent_connections`
 - knowledge from `agent_knowledge_sources`
@@ -345,12 +443,15 @@ The runtime reads core agent settings from the `agents` table:
 - instructions
 - timezone
 
-The preview chat route also inspects the saved draft definition to extract:
+The preview chat route and automation executor also inspect the saved draft definition to extract:
 
 - the Google Calendar node resolved booking timezone
 - the Google Calendar selected booking calendar
 - the Gmail recipient policy
 - the `endchat` policy
+- selected enabled actions from tool nodes
+
+Automation does not use `endchat`, but it does use selected tool actions, selected knowledge sources, email recipient policy, Google Calendar selection, and Cal.com selection.
 
 ### Widgets and published agents
 
@@ -375,7 +476,7 @@ So the builder affects widgets in two stages:
 ### Supported interactions
 
 - select nodes
-- edit the selected node in the inspector (Trigger node inspector is currently hidden for a cleaner UI)
+- edit the selected node in the inspector, including Trigger setup for chat versus external automation triggers
 - draw manual edges/connections between nodes
 - add knowledge
 - add Gmail
@@ -427,6 +528,16 @@ So the builder affects widgets in two stages:
 - `instructions`
 - `starterPrompts`
 - `timezone`
+- `trigger`
+
+`config.trigger` stores:
+
+- `source`
+- `provider`
+- `toolkitSlug`
+- `triggerSlug`
+- `triggerConfig`
+- `connectionId`
 
 ### Node data types
 
@@ -440,7 +551,6 @@ Current supported node data types in `src/lib/types.ts`:
 - `OutlookBuilderNodeData`
 - `GoogleCalendarBuilderNodeData`
 - `CalBuilderNodeData`
-- `OutputBuilderNodeData`
 
 Important current tool-node fields:
 
@@ -460,6 +570,17 @@ Important current tool-node fields:
   - `eventTypeMode`
   - `eventTypeId`
   - `eventTypeLabel`
+  - `enabledTools`
+
+Important current trigger-node fields:
+
+- `TriggerBuilderNodeData`
+  - `triggerSource`
+  - `provider`
+  - `toolkitSlug`
+  - `triggerSlug`
+  - `connectionId`
+  - `triggerConfig`
 
 ### Composio toolkit versions
 
@@ -479,11 +600,13 @@ Important operational detail:
   - Google Calendar
   - Cal.com
   - Google Drive
+  - Microsoft Outlook
 - these can be overridden via environment variables:
   - `COMPOSIO_TOOLKIT_VERSION_GMAIL`
   - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
   - `COMPOSIO_TOOLKIT_VERSION_CAL`
   - `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
+  - `COMPOSIO_TOOLKIT_VERSION_OUTLOOK`
 
 This is why Google Calendar's booking-calendar selector and Google Drive import utilities do not pass per-request versions manually.
 
@@ -512,16 +635,19 @@ If you add or change a builder feature, review this list:
 - Update `src/app/(app)/agents/[id]/builder/page.tsx`
 - Update `src/lib/agents/defaults.ts` if the default canvas or config changed
 - Update `src/lib/integrations.ts` if a new live tool was added
+- Update `src/app/api/agents/[id]/automation/route.ts` and `src/app/api/agents/[id]/automation/status/route.ts` if automation trigger persistence or lifecycle changed
+- Update `src/app/api/composio/webhook/route.ts` and `src/lib/automation/executor.ts` if automation event processing changed
 - Update `src/app/api/agents/[id]/knowledge/route.ts` if knowledge attachment behavior changed
 - Update `src/app/api/agents/[id]/rollback/route.ts` if rollback semantics changed
 - Update `src/app/api/agents/[id]/chat/route.ts` and `src/lib/runtime/agent-chat.ts` if runtime behavior changed
 - Update widget deployment behavior if publish/version semantics changed
+- Update `docs/guides/automation-agents.md` if the automation trigger flow, lifecycle, data model, or execution behavior changed
 - Update this document in the same PR
 
 ## Recommended Next Documentation Rule
 
 For builder-related PRs, require this check:
 
-- if the PR changes builder behavior, node types, persistence, publish semantics, or runtime interpretation, `docs/agent-builder.md` must be updated too
+- if the PR changes builder behavior, node types, persistence, publish semantics, or runtime interpretation, `docs/guides/agent-builder.md` must be updated too
 
 That keeps this file as the living source of truth instead of a one-time writeup.

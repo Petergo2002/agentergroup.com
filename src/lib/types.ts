@@ -117,6 +117,13 @@ export type {
 export type { AuditLogRecord } from "./types/audit";
 
 export type {
+  AgentAutomationRecord,
+  AgentAutomationStatus,
+  AutomationEventRecord,
+  AutomationEventStatus,
+} from "./types/automation";
+
+export type {
   ConversationEndReason,
   EndChatPolicy,
   GmailRecipientMode,
@@ -128,6 +135,8 @@ export type {
 
 export type {
   BaseBuilderNodeData,
+  BuilderTriggerProvider,
+  BuilderTriggerSource,
   TriggerBuilderNodeData,
   AgentBuilderNodeData,
   KnowledgeBuilderNodeData,

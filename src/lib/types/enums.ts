@@ -1,5 +1,5 @@
 export type AgentStatus = "draft" | "active" | "paused";
-export type AgentSurface = "assistant" | "widget";
+export type AgentSurface = "assistant" | "widget" | "automation";
 export type ConnectionStatus =
   | "pending"
   | "connected"

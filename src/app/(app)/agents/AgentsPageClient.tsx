@@ -213,11 +213,11 @@ export default function AgentsPageClient({
         </div>
       </div>
 
-      {/* ─── Grid ─────────────────────────────────────────────── */}
+      {/* ─── List ─────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-[240px] animate-pulse rounded-[2rem] bg-surface-container-low/40" />
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-[68px] animate-pulse rounded-2xl bg-surface-container-low/40" />
           ))}
         </div>
       ) : filteredAgents.length === 0 ? (
@@ -231,7 +231,7 @@ export default function AgentsPageClient({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="flex flex-col gap-2.5">
           {pagedAgents.map((agent) => (
             <AgentCard
               key={agent.id}

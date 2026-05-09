@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         created_by: user.id,
       },
       {
-        onConflict: "workspace_id,toolkit_slug,account_label",
+        onConflict: "workspace_id,toolkit_slug",
       },
     );
 

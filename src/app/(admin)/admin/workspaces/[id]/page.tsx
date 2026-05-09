@@ -9,6 +9,7 @@ import { AdminWorkspaceAnalytics } from "@/components/admin/AdminWorkspaceAnalyt
 import { AdminWorkspaceSummaryPanel } from "@/components/admin/AdminWorkspaceSummaryPanel";
 import { AdminExtraCreditsGrant } from "@/components/admin/AdminExtraCreditsGrant";
 import { AdminInternalAssistantsToggle } from "@/components/admin/AdminInternalAssistantsToggle";
+import { AdminAutomationsToggle } from "@/components/admin/AdminAutomationsToggle";
 import { AdminPlanSelector } from "@/components/admin/AdminPlanSelector";
 import { requireAdminUser } from "@/lib/admin/auth";
 import {
@@ -107,6 +108,10 @@ export default async function AdminWorkspaceDetailPage({
               <AdminInternalAssistantsToggle
                 workspaceId={workspace.id}
                 enabled={workspace.internalAssistantsEnabled}
+              />
+              <AdminAutomationsToggle
+                workspaceId={workspace.id}
+                enabled={workspace.automationsEnabled}
               />
             </div>
           </div>

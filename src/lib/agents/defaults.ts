@@ -11,6 +11,8 @@ export const SUPPORTED_TOOLKITS = SUPPORTED_INTEGRATIONS.map((integration) => ({
   category: integration.category,
 }));
 
+export const AUTOMATION_GMAIL_TRIGGER_SLUG = "GMAIL_NEW_GMAIL_MESSAGE";
+
 const TEMPLATE_PRESETS = {
   support: {
     name: "Customer Support Agent",
@@ -62,8 +64,12 @@ export function getTemplatePreset(templateId: string) {
   return TEMPLATE_PRESETS[templateId as keyof typeof TEMPLATE_PRESETS] ?? TEMPLATE_PRESETS.custom;
 }
 
-export function buildInitialDefinition(templateId: string): BuilderDefinition {
+export function buildInitialDefinition(
+  templateId: string,
+  surface: AgentSurface = "widget",
+): BuilderDefinition {
   const preset = getTemplatePreset(templateId);
+  const isAutomation = surface === "automation";
 
   return {
     nodes: [
@@ -73,12 +79,20 @@ export function buildInitialDefinition(templateId: string): BuilderDefinition {
         position: { x: 40, y: 150 },
         data: {
           kind: "trigger",
-          label: "User Message",
+          label: isAutomation ? "External Trigger" : "Chat Message",
           type: "Trigger",
-          icon: "input",
-          description: "Starting point for the current conversation.",
+          icon: isAutomation ? "mail" : "chat",
+          description: isAutomation
+            ? "Starts from a connected external app event."
+            : "Runs when a visitor sends a chat message.",
           status: "idle",
           locked: true,
+          triggerSource: isAutomation ? "gmail_new_message" : "user_message",
+          provider: isAutomation ? "composio" : "internal",
+          toolkitSlug: isAutomation ? "gmail" : null,
+          triggerSlug: isAutomation ? AUTOMATION_GMAIL_TRIGGER_SLUG : null,
+          connectionId: null,
+          triggerConfig: {},
         },
       },
       {
@@ -90,49 +104,39 @@ export function buildInitialDefinition(templateId: string): BuilderDefinition {
           label: "Agent",
           type: "Core",
           icon: "smart_toy",
-          description: "Uses the selected model, instructions, and conversation context.",
+          description: "Uses the selected model, instructions, and context.",
           status: "active",
           showConfidence: true,
           confidenceValue: 82,
           locked: true,
         },
       },
-      {
-        id: "response",
-        type: "agentNode",
-        position: { x: 920, y: 150 },
-        data: {
-          kind: "output",
-          label: "Assistant Response",
-          type: "Output",
-          icon: "send",
-          description: "Returns the final response to the user.",
-          status: "idle",
-          locked: true,
-        },
-      },
     ],
     edges: [
       {
-        id: "e-trigger-model",
+        id: "e-trigger-agent",
         source: "trigger",
         target: "agent",
         animated: true,
         style: { stroke: "var(--color-primary)", strokeWidth: 2 },
       },
-      {
-        id: "e-agent-response",
-        source: "agent",
-        target: "response",
-        style: { stroke: "var(--color-outline-variant)", strokeWidth: 2, opacity: 0.45 },
-      },
     ],
     viewport: { x: 0, y: 0, zoom: 0.95 },
     config: {
       model: OPENROUTER_DEFAULT_AGENT_MODEL,
-      instructions: preset.instructions,
+      instructions: isAutomation
+        ? "You process incoming automation trigger events for this workspace. Summarize the event, identify useful context, and only take actions that are explicitly configured for this agent."
+        : preset.instructions,
       starterPrompts: [...preset.starterPrompts],
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      trigger: {
+        source: isAutomation ? "gmail_new_message" : "user_message",
+        provider: isAutomation ? "composio" : "internal",
+        toolkitSlug: isAutomation ? "gmail" : null,
+        triggerSlug: isAutomation ? AUTOMATION_GMAIL_TRIGGER_SLUG : null,
+        triggerConfig: {},
+        connectionId: null,
+      },
     },
   };
 }
@@ -144,15 +148,20 @@ export function buildAgentPayload(
 ) {
   const preset = getTemplatePreset(templateId);
   const name = customName.trim() || preset.name;
+  const isAutomation = surface === "automation";
 
   return {
     name,
     slug: `${slugify(name)}-${Date.now().toString().slice(-6)}`,
-    description: preset.description,
+    description: isAutomation
+      ? "Runs from a connected external trigger and processes incoming events."
+      : preset.description,
     status: "draft" as const,
     surface,
     model: OPENROUTER_DEFAULT_AGENT_MODEL,
-    instructions: preset.instructions,
+    instructions: isAutomation
+      ? "You process incoming automation trigger events for this workspace. Summarize the event, identify useful context, and only take actions that are explicitly configured for this agent."
+      : preset.instructions,
     starter_prompts: [...preset.starterPrompts],
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };

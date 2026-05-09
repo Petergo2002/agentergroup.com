@@ -13,6 +13,7 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 - Use internal assistants in authenticated workspace chat surfaces.
 - Attach knowledge sources and use them during agent conversations.
 - Connect external tools such as Gmail, Google Calendar, and Google Drive through Composio.
+- Create automation agents that start from external Composio triggers, beginning with Gmail new-message events, and then run the configured agent with selected tools and knowledge.
 - Deploy widgets for hosted usage or third-party site embedding.
 - Track widget sessions, transcripts, leads, and analytics inside each workspace.
 - Run owner-only privacy workflows for lookup, export, deletion, and retention cleanup.
@@ -53,9 +54,12 @@ Root app variables:
 | `OPENROUTER_DATA_COLLECTION` | No | Provider privacy mode, defaults to `deny` |
 | `OPENROUTER_REQUIRE_ZDR` | No | Enables OpenRouter ZDR preference when truthy |
 | `COMPOSIO_API_KEY` | Yes for tool integrations | Composio API key |
+| `COMPOSIO_WEBHOOK_SECRET` | Yes for automations | Secret used to verify Composio trigger webhooks |
 | `COMPOSIO_TOOLKIT_VERSION_GMAIL` | No | Gmail toolkit version override |
 | `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR` | No | Google Calendar toolkit version override |
+| `COMPOSIO_TOOLKIT_VERSION_CAL` | No | Cal.com toolkit version override |
 | `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE` | No | Google Drive toolkit version override |
+| `COMPOSIO_TOOLKIT_VERSION_OUTLOOK` | No | Microsoft Outlook toolkit version override |
 | `NEXT_PUBLIC_APP_URL` | No | Dashboard origin, defaults to `http://localhost:3000` |
 | `NEXT_PUBLIC_WIDGET_APP_URL` | No | Hosted widget origin, defaults to `http://localhost:5173` |
 | `WIDGET_APP_URL` | No | Legacy fallback alias for the hosted widget origin |

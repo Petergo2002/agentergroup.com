@@ -1,6 +1,6 @@
 # Composio Integrations — Implementation Guide
 
-Last updated: 2026-04-15
+Last updated: 2026-05-04
 
 This document is the mandatory reference for building and debugging Composio tool integrations
 in this codebase. Read this before writing any new integration. All lessons here were earned
@@ -10,7 +10,14 @@ through production debugging.
 
 ## Architecture Overview
 
-All Composio interactions go through a single execution path:
+Composio is used in two product paths:
+
+1. connected action tools used by chat and automation runtimes
+2. external trigger webhooks used by Automation agents
+
+### Action tool execution
+
+Most manual Composio utility calls go through:
 
 ```
 API Route (Next.js)
@@ -24,6 +31,49 @@ API Route (Next.js)
 - Throws if `result.successful === false`
 - Returns `result.data` — **not** `result` itself
 - So every extractor receives `result.data`, not the full Composio result envelope
+
+Runtime tool calls use Composio tool-router sessions:
+
+```text
+runAgentChat(...)
+  -> getWrappedTools(userId, enabledToolkits, enabledToolsByToolkit)
+  -> OpenRouter model proposes tool calls
+  -> handleChatToolCalls(userId, completion, policies)
+  -> Composio provider executes the selected tool calls
+  -> tool messages are fed back into the bounded model loop
+```
+
+This path is shared by:
+
+- preview chat
+- internal assistants
+- public widget runtime
+- automation runs
+
+Automation runs are still limited by the selected builder tool nodes. They do not get every Composio action by default.
+
+### External trigger webhooks
+
+Automation triggers use a different path:
+
+```text
+Composio trigger
+  -> POST /api/composio/webhook
+  -> verifyWebhook(...) with COMPOSIO_WEBHOOK_SECRET
+  -> lookup agent_automations by composio_trigger_id
+  -> insert automation_events
+  -> processAutomationEvent(...)
+```
+
+Current v1 trigger support:
+
+- `GMAIL_NEW_GMAIL_MESSAGE`
+
+Trigger creation/enabling/disabling/deletion is owned by:
+
+- `src/app/api/agents/[id]/automation/status/route.ts`
+- `src/app/api/agents/[id]/automation/route.ts`
+- `src/lib/composio.ts`
 
 ---
 
@@ -236,6 +286,10 @@ Before shipping any new integration, verify each item:
 | `src/app/api/connections/cal/event-types/route.ts` | Cal.com event types API route |
 | `src/app/api/connections/googlecalendar/calendars/route.ts` | Google Calendar API route |
 | `src/app/(app)/agents/[id]/builder/page.tsx` | Builder UI — event type dropdown state and fetch effect |
+| `src/app/api/agents/[id]/automation/route.ts` | Automation trigger binding save/delete endpoint |
+| `src/app/api/agents/[id]/automation/status/route.ts` | Automation trigger activate/pause endpoint |
+| `src/app/api/composio/webhook/route.ts` | Composio trigger webhook verification and event ingestion |
+| `src/lib/automation/executor.ts` | Automation event processor that runs the shared agent runtime |
 
 ---
 

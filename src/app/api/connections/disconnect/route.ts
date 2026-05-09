@@ -4,10 +4,11 @@ import { getEffectiveConnectionStatus } from "@/lib/connections";
 import { isConnectedAccountMissingError } from "@/lib/composio-errors";
 import {
   deleteConnectedAccount,
+  disableComposioTrigger,
   syncConnectedAccountsToDatabase,
 } from "@/lib/composio";
 import { createClient } from "@/lib/supabase/server";
-import type { ConnectionStatus } from "@/lib/types";
+import type { AgentAutomationRecord, ConnectionStatus } from "@/lib/types";
 
 interface DisconnectConnectionRow {
   id: string;
@@ -59,6 +60,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Connection not found." }, { status: 404 });
   }
 
+  const { data: automations, error: automationsError } = await supabase
+    .from("agent_automations")
+    .select("*")
+    .eq("workspace_id", context.workspace.id)
+    .eq("connection_id", connection.id)
+    .in("status", ["active", "provisioning"]);
+
+  if (automationsError) {
+    return NextResponse.json({ error: automationsError.message }, { status: 500 });
+  }
+
+  const automationRows = (automations ?? []) as AgentAutomationRecord[];
+
+  for (const automation of automationRows) {
+    if (automation.composio_trigger_id) {
+      try {
+        await disableComposioTrigger(automation.composio_trigger_id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to disable provider trigger.";
+
+        await supabase
+          .from("agent_automations")
+          .update({ status: "error", last_error: message })
+          .eq("id", automation.id);
+
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
+    }
+  }
+
   try {
     if (
       getEffectiveConnectionStatus(connection) === "connected" &&
@@ -96,6 +127,28 @@ export async function POST(request: NextRequest) {
 
   if (deleteError) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  }
+
+  if (automationRows.length > 0) {
+    const automationIds = automationRows.map((automation) => automation.id);
+    const agentIds = automationRows.map((automation) => automation.agent_id);
+    const message = "Connected account was disconnected.";
+
+    const [automationUpdate, agentUpdate] = await Promise.all([
+      supabase
+        .from("agent_automations")
+        .update({ status: "error", last_error: message, connection_id: null })
+        .in("id", automationIds),
+      supabase.from("agents").update({ status: "paused" }).in("id", agentIds),
+    ]);
+
+    if (automationUpdate.error) {
+      return NextResponse.json({ error: automationUpdate.error.message }, { status: 500 });
+    }
+
+    if (agentUpdate.error) {
+      return NextResponse.json({ error: agentUpdate.error.message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ ok: true });

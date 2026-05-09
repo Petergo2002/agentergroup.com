@@ -26,7 +26,8 @@ async function loadAgentsPageData() {
 
   return ((data ?? []) as AgentRecord[]).filter(
     (agent) =>
-      context.workspace.internal_assistants_enabled || agent.surface !== "assistant",
+      (context.workspace.internal_assistants_enabled || agent.surface !== "assistant") &&
+      (context.workspace.automations_enabled || agent.surface !== "automation"),
   );
 }
 

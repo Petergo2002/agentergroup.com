@@ -14,6 +14,7 @@ export interface WorkspaceRecord {
   description: string | null;
   owner_id: string;
   internal_assistants_enabled: boolean;
+  automations_enabled: boolean;
   onboarding_completed: boolean;
 }
 

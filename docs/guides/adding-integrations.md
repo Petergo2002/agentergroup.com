@@ -1,8 +1,10 @@
 # End-to-End Integration Guide — Adding New Toolkits
 
-Last updated: 2026-04-30
+Last updated: 2026-05-04
 
 This document defines the complete workflow for adding a new Composio toolkit (integration) to the Agenter platform. Follow these steps in order to ensure the integration is registered, secured, and properly exposed in the Agent Builder and Runtime.
+
+This guide covers live action toolkits. For external event triggers, also read `docs/guides/automation-agents.md`.
 
 ---
 
@@ -131,6 +133,46 @@ Update the `renderInspectorBody()` function in the `AgentBuilderPage` component.
 - **Action:** Runtime action selection is extracted from the saved builder definition. The stored `enabledTools` are validated against the toolkit prefix before `getWrappedTools()` loads them from Composio.
 - **File:** `src/lib/composio.ts`
 - **Action:** `getWrappedTools()` receives `enabledToolsByToolkit`. If a node has no stored `enabledTools`, it falls back to `recommendedChatTools` for backward compatibility.
+
+### Automation Runtime
+
+Automation agents use the same `runAgentChat(...)` runtime as chat agents.
+
+If the new toolkit should be usable inside automations:
+
+- make sure the node syncs its selected `connectionId` into `agent_connections`
+- make sure `extractEnabledToolsFromDefinition()` can recognize the node and validate its `enabledTools`
+- make sure any policy extractor used by chat also works from the saved draft definition
+- update `src/lib/automation/executor.ts` if the toolkit has additional per-node runtime settings that must be passed into `runAgentChat(...)`
+- update `docs/guides/automation-agents.md`
+
+Automation does not automatically grant all tools for a toolkit. Only attached/selected tool nodes are loaded.
+
+---
+
+## 5B. Adding External Trigger Types
+
+External trigger support is separate from live action tools.
+
+Automation v1 currently supports only:
+
+- provider: `composio`
+- toolkit: `gmail`
+- trigger slug: `GMAIL_NEW_GMAIL_MESSAGE`
+
+To add a new external trigger such as Slack message or calendar event:
+
+1. Loosen the database constraints on `agent_automations.toolkit_slug` and `agent_automations.trigger_slug`.
+2. Add a typed trigger source in `src/lib/types/builder.ts`.
+3. Add default trigger config in `src/lib/agents/defaults.ts` if it should be selectable on creation.
+4. Add trigger option UI in `src/app/(app)/agents/[id]/builder/page.tsx`.
+5. Update `PUT /api/agents/[id]/automation` validation to accept the new trigger.
+6. Update `POST /api/agents/[id]/automation/status` to validate the right connected account/toolkit.
+7. Update `POST /api/composio/webhook` if event matching or payload normalization differs from Gmail.
+8. Update Activity/readiness copy where provider-specific labels are shown.
+9. Update `docs/guides/automation-agents.md`.
+
+Keep product language generic. The top-level feature remains `Automation`; only the trigger option should say `Gmail`, `Slack`, `Calendar`, or another provider name.
 
 ---
 

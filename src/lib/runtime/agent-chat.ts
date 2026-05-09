@@ -131,7 +131,7 @@ export interface AgentRuntimeInput {
   input: string;
   history: RuntimeMessage[];
   toolUserId: string;
-  audience: "preview" | "assistant" | "widget";
+  audience: "preview" | "assistant" | "widget" | "automation";
   knowledgeAccessToken?: string | null;
   widgetPublicKey?: string | null;
   widgetSessionId?: string | null;
@@ -165,6 +165,8 @@ const OMITTED_ASSISTANT_HISTORY_MESSAGES = new Set([
 const INTERNAL_END_CHAT_TOOL_NAME = "suggest_end_chat";
 const INTERNAL_ASSISTANT_TOOLKIT_PROMPT =
   "If the user asks for a downloadable PDF, a printable version, or wants content exported as a PDF, use the available PDF tool to generate it. After the tool finishes, briefly tell the user the PDF is ready to download.";
+const AUTOMATION_EXECUTION_PROMPT =
+  "AUTOMATION MODE: The user message is an incoming external trigger event, not a live chat message. Use configured tools only when the agent instructions and trigger payload clearly require an action. If required details are missing, do not guess; summarize what is missing instead. Never claim an external action happened unless a tool call succeeded. After any tool work, return a concise operational summary of what happened, what you did, and any remaining issue.";
 const INTERNAL_CREATE_PDF_TOOL_NAME = "create_pdf_from_text";
 const INTERNAL_END_CHAT_TOOL_DEFINITION = {
   type: "function",
@@ -643,6 +645,10 @@ export async function runAgentChat({
 
   if (audience === "assistant" && agent.surface === "assistant") {
     systemInstructionBlocks.push(INTERNAL_ASSISTANT_TOOLKIT_PROMPT);
+  }
+
+  if (audience === "automation") {
+    systemInstructionBlocks.push(AUTOMATION_EXECUTION_PROMPT);
   }
 
   const toolGuidance = buildToolGuidance(

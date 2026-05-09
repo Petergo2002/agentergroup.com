@@ -13,7 +13,7 @@ export function canEditAgentRecord(
   actorUserId: string | null | undefined,
   membershipRole: WorkspaceMemberRecord["role"] | null | undefined,
 ) {
-  if (agent.surface === "widget") {
+  if (agent.surface === "widget" || agent.surface === "automation") {
     return Boolean(membershipRole);
   }
 

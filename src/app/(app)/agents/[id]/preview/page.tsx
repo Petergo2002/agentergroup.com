@@ -268,6 +268,11 @@ export default function AgentPreviewPage() {
         }
 
         const loadedAgent = agentResult.data as AgentRecord;
+        if (loadedAgent.surface === 'automation') {
+          router.replace(`/agents/${agentId}/activity`);
+          return;
+        }
+
         let threadRows = (threadResult.data ?? []) as ThreadRecord[];
         const runRows = (runResult.data ?? []) as RunRecord[];
 
@@ -329,7 +334,7 @@ export default function AgentPreviewPage() {
     return () => {
       isMounted = false;
     };
-  }, [agentId, createThreadRecord, loadMessages, loadRunDetails, showToast, supabase, t, user.id]);
+  }, [agentId, createThreadRecord, loadMessages, loadRunDetails, router, showToast, supabase, t, user.id]);
 
   useEffect(() => {
     return () => {
@@ -548,7 +553,7 @@ export default function AgentPreviewPage() {
 
             <div className="h-4 w-[1px] bg-outline-variant/20" />
 
-            <AgentViewTabs agentId={agentId} current="preview" />
+            <AgentViewTabs agentId={agentId} current="preview" surface={agent?.surface} />
           </div>
         </div>
 

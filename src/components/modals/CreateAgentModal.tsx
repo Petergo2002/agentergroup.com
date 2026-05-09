@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, Layout, Check } from 'lucide-react';
+import { Bot, MessageSquare, Workflow } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/ToastProvider';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { buildAgentPayload, buildInitialDefinition } from '@/lib/agents/defaults';
 import type { AgentSurface } from '@/lib/types';
-import { hasInternalAssistantsEnabled } from '@/lib/assistants/feature-flags';
+import { hasInternalAssistantsEnabled, hasAutomationsEnabled } from '@/lib/assistants/feature-flags';
 
 interface CreateAgentModalProps {
   isOpen: boolean;
@@ -29,6 +29,7 @@ export const CreateAgentModal = ({
   const { t } = useLanguage();
   const { showToast } = useToast();
   const internalAssistantsEnabled = hasInternalAssistantsEnabled(workspace);
+  const automationsEnabled = hasAutomationsEnabled(workspace);
   const [name, setName] = useState('');
   const [surface, setSurface] = useState<AgentSurface>(initialSurface);
   const [isSaving, setIsSaving] = useState(false);
@@ -43,6 +44,59 @@ export const CreateAgentModal = ({
     }
   }, [initialSurface, internalAssistantsEnabled, isOpen]);
 
+  const surfaceOptions: Array<{
+    surface: AgentSurface;
+    title: string;
+    description: string;
+    icon: React.ReactNode;
+  }> = [
+    {
+      surface: 'widget',
+      title: t('agents.createModal.widgetTitle'),
+      description: t('agents.createModal.widgetDescription'),
+      icon: <MessageSquare className="h-5 w-5" />,
+    },
+    ...(automationsEnabled
+      ? [
+          {
+            surface: 'automation' as AgentSurface,
+            title: t('agents.createModal.automationTitle'),
+            description: t('agents.createModal.automationDescription'),
+            icon: <Workflow className="h-5 w-5" />,
+          },
+        ]
+      : []),
+    ...(internalAssistantsEnabled
+      ? [
+          {
+            surface: 'assistant' as AgentSurface,
+            title: t('agents.createModal.assistantTitle'),
+            description: t('agents.createModal.assistantDescription'),
+            icon: <Bot className="h-5 w-5" />,
+          },
+        ]
+      : []),
+  ];
+
+  const nameLabel =
+    surface === 'assistant'
+      ? t('agents.createModal.assistantName')
+      : surface === 'automation'
+        ? t('agents.createModal.automationName')
+        : t('agents.createModal.agentName');
+  const namePlaceholder =
+    surface === 'assistant'
+      ? t('agents.createModal.assistantNamePlaceholder')
+      : surface === 'automation'
+        ? t('agents.createModal.automationNamePlaceholder')
+        : t('agents.createModal.agentNamePlaceholder');
+  const createLabel =
+    surface === 'assistant'
+      ? t('agents.createModal.createAssistant')
+      : surface === 'automation'
+        ? t('agents.createModal.createAutomation')
+        : t('agents.createAgent');
+
   const handleCreate = async () => {
     if (!name.trim()) {
       showToast(t('agents.createModal.enterName'), 'info');
@@ -51,6 +105,11 @@ export const CreateAgentModal = ({
 
     if (surface === 'assistant' && !internalAssistantsEnabled) {
       showToast(t('agentBuilder.internalAssistantsDisabled'), 'error');
+      return;
+    }
+
+    if (surface === 'automation' && !automationsEnabled) {
+      showToast('Automations are not enabled for this workspace.', 'error');
       return;
     }
 
@@ -76,7 +135,7 @@ export const CreateAgentModal = ({
       }
 
       const agentPayload = buildAgentPayload('custom', name, surface);
-      const definition = buildInitialDefinition('custom');
+      const definition = buildInitialDefinition('custom', surface);
 
       const { data: agent, error: agentError } = await supabase
         .from('agents')
@@ -121,101 +180,56 @@ export const CreateAgentModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('agents.createModal.title')}>
       <div className="space-y-10 py-4">
-        {/* Surface Selection */}
-        <div className="space-y-5">
+        <div className="space-y-4">
           <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.25em] block">
-            {t('agents.createModal.surface')}
+            {t('agents.createModal.trigger')}
           </label>
-          
-          <div className="flex flex-col gap-3">
-            {internalAssistantsEnabled && (
-              <button
-                type="button"
-                onClick={() => setSurface('assistant')}
-                className={`group relative flex items-center gap-5 p-5 rounded-[2rem] border transition-all duration-300 text-left ${
-                  surface === 'assistant'
-                    ? 'border-primary/30 bg-surface shadow-premium scale-[1.01]'
-                    : 'border-outline-variant/10 bg-surface-container-low/40 hover:bg-surface-container-low/80'
-                }`}
-              >
-                <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 ${
-                  surface === 'assistant' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-surface-container-high text-on-surface-variant/40'
-                }`}>
-                  <Bot className="h-7 w-7" />
-                  {surface === 'assistant' && (
-                    <div className="absolute inset-0 bg-primary blur-xl opacity-20" />
-                  )}
-                </div>
-                
-                <div className="min-w-0 flex-1">
-                  <p className="text-[16px] font-bold text-on-surface tracking-tight">
-                    {t('agents.createModal.assistantTitle')}
-                  </p>
-                  <p className="mt-0.5 text-xs text-on-surface-variant leading-relaxed truncate">
-                    {t('agents.createModal.assistantDescription')}
-                  </p>
-                </div>
+          <div className="grid gap-3">
+            {surfaceOptions.map((option) => {
+              const isSelected = surface === option.surface;
 
-                <div className={`mr-2 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-500 ${
-                  surface === 'assistant' ? 'border-primary bg-primary scale-110' : 'border-outline-variant/20 scale-100'
-                }`}>
-                  {surface === 'assistant' && <Check className="h-3.5 w-3.5 text-white" />}
-                </div>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setSurface('widget')}
-              className={`group relative flex items-center gap-5 p-5 rounded-[2rem] border transition-all duration-300 text-left ${
-                surface === 'widget'
-                  ? 'border-primary/30 bg-surface shadow-premium scale-[1.01]'
-                  : 'border-outline-variant/10 bg-surface-container-low/40 hover:bg-surface-container-low/80'
-              }`}
-            >
-              <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 ${
-                surface === 'widget' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-surface-container-high text-on-surface-variant/40'
-              }`}>
-                <Layout className="h-7 w-7" />
-                {surface === 'widget' && (
-                  <div className="absolute inset-0 bg-primary blur-xl opacity-20" />
-                )}
-              </div>
-              
-              <div className="min-w-0 flex-1">
-                <p className="text-[16px] font-bold text-on-surface tracking-tight">
-                  {t('agents.createModal.widgetTitle')}
-                </p>
-                <p className="mt-0.5 text-xs text-on-surface-variant leading-relaxed truncate">
-                  {t('agents.createModal.widgetDescription')}
-                </p>
-              </div>
-
-              <div className={`mr-2 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-500 ${
-                surface === 'widget' ? 'border-primary bg-primary scale-110' : 'border-outline-variant/20 scale-100'
-              }`}>
-                {surface === 'widget' && <Check className="h-3.5 w-3.5 text-white" />}
-              </div>
-            </button>
+              return (
+                <button
+                  key={option.surface}
+                  type="button"
+                  onClick={() => setSurface(option.surface)}
+                  className={`flex items-start gap-4 rounded-[1.5rem] border p-4 text-left transition-all ${
+                    isSelected
+                      ? 'border-primary/35 bg-primary/5 shadow-sm'
+                      : 'border-outline-variant/10 bg-surface-container-low/40 hover:border-primary/25 hover:bg-surface-container-low'
+                  }`}
+                >
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                      isSelected
+                        ? 'bg-primary text-on-primary'
+                        : 'bg-surface-container-high text-on-surface-variant'
+                    }`}
+                  >
+                    {option.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-on-surface">{option.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-on-surface-variant/65">
+                      {option.description}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Input Section */}
         <div className="space-y-5">
           <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.25em] block">
-            {surface === 'assistant'
-              ? t('agents.createModal.assistantName')
-              : t('agents.createModal.agentName')}
+            {nameLabel}
           </label>
           
           <div className="group relative">
             <input 
               type="text" 
-              placeholder={
-                surface === 'assistant'
-                  ? t('agents.createModal.assistantNamePlaceholder')
-                  : t('agents.createModal.agentNamePlaceholder')
-              }
+              placeholder={namePlaceholder}
               value={name}
               onChange={(event) => setName(event.target.value)}
               className="w-full bg-surface-container-low/40 border border-outline-variant/15 rounded-[1.5rem] px-7 py-5 text-[15px] text-on-surface transition-all outline-none focus:bg-surface focus:ring-4 focus:ring-primary/5 focus:border-primary/30 shadow-sm placeholder:text-on-surface-variant/60"
@@ -243,9 +257,7 @@ export const CreateAgentModal = ({
                   {t('agents.createModal.creating')}
                 </>
               ) : (
-                surface === 'assistant'
-                  ? t('agents.createModal.createAssistant')
-                  : t('agents.createAgent')
+                createLabel
               )}
             </span>
           </button>

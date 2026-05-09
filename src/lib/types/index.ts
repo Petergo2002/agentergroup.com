@@ -99,6 +99,13 @@ export type {
 export type { AuditLogRecord } from "./audit";
 
 export type {
+  AgentAutomationRecord,
+  AgentAutomationStatus,
+  AutomationEventRecord,
+  AutomationEventStatus,
+} from "./automation";
+
+export type {
   ConversationEndReason,
   EndChatPolicy,
   GmailRecipientMode,
@@ -115,6 +122,8 @@ export type {
 } from "./enums";
 
 export type {
+  BuilderTriggerProvider,
+  BuilderTriggerSource,
   TriggerBuilderNodeData,
   AgentBuilderNodeData,
   KnowledgeBuilderNodeData,

@@ -1,13 +1,16 @@
 export const agentBuilder = {
   nodeLibrary: {
+    trigger: "Trigger",
     agent: "Agentkärna",
     knowledge: "Kunskap",
     tools: "Anslutna verktyg",
     leads: "Internal Leads",
     endChat: "Avsluta chatt",
     output: "Svar",
+    triggerDescription:
+      "Välj vad som startar agenten.",
     agentDescription:
-      "AI-hjärnan som bearbetar och svarar användare. Finns redan på canvasen.",
+      "AI-hjärnan som bearbetar och svarar användare.",
     knowledgeDescription:
       "Koppla på workspace-källor som agenten kan hämta från.",
     toolsDescription:
@@ -37,6 +40,8 @@ export const agentBuilder = {
   multipleOldConnections:
     "Flera gamla verktygsanslutningar hittades. Granska noderna för Gmail och Calendar.",
   knowledgeAlreadyOnCanvas: "Kunskap finns redan på canvasen.",
+  triggerAlreadyOnCanvas: "Trigger finns redan på canvasen.",
+  agentAlreadyOnCanvas: "Agentkärna finns redan på canvasen.",
   leadsAlreadyOnCanvas: "Internal Leads finns redan på canvasen.",
   leadsWidgetOnly: "Internal Leads är bara tillgänglig för webbplatswidgets.",
   endChatAlreadyOnCanvas: "Avsluta chatt finns redan på canvasen.",
@@ -77,7 +82,44 @@ export const agentBuilder = {
   nodeLibraryDescription:
     "Håll flödet enkelt. Noder kopplas ihop automatiskt när du lägger till dem.",
   chooseToolNode: "Välj en verktygsnod",
+  emptyCanvasTitle: "Börja med en trigger",
+  emptyCanvasDescription:
+    "Lägg till en Trigger-nod från biblioteket. Chattmeddelande skapar en webbplatswidget; externa händelser skapar en automation.",
   triggerDescription: "Ingångspunkten för den aktuella konversationen.",
+  triggerSetupTitle: "Triggerinställning",
+  triggerSetupDescription:
+    "En trigger är händelsen som startar flödet. Använd interna triggers för widgetens händelser och Composio-triggers för externa apphändelser.",
+  triggerProviderInternal: "Intern",
+  triggerProviderComposio: "Composio",
+  agentSurface: "Agenttyp",
+  automationReadiness: "Automationsstatus",
+  activationReady: "Redo att aktiveras",
+  activationBlocked: "Behöver konfigureras",
+  webhookConfigured: "Webhook konfigurerad",
+  webhookMissing: "Webhook-secret saknas",
+  providerTrigger: "Provider-trigger",
+  noProviderTrigger: "Ingen provider-trigger än",
+  selectedTrigger: "Vald trigger",
+  selectedAccount: "Valt konto",
+  noTriggerAccount: "Inget konto valt",
+  lastAutomationEvent: "Senaste händelse",
+  lastAutomationError: "Senaste fel",
+  activateTrigger: "Aktivera trigger",
+  activatingTrigger: "Aktiverar...",
+  pauseTrigger: "Pausa trigger",
+  pausingTrigger: "Pausar...",
+  triggerActivated: "Trigger aktiverad.",
+  triggerPaused: "Trigger pausad.",
+  composioTriggerHelp:
+    "Composio-triggers används för externa apphändelser. Gmail är den första automations-triggern; Slack, kalender och andra triggers kan passa in i samma upplägg senare.",
+  triggerSources: {
+    chatMessage: "Chattmeddelande",
+    chatMessageDescription:
+      "Körs när en besökare skickar ett meddelande i webbplatsens chattwidget.",
+    gmailNewMessage: "Nytt Gmail-meddelande",
+    gmailNewMessageDescription:
+      "Körs från en Composio Gmail-trigger när en ansluten inkorg får ett nytt meddelande.",
+  },
   coreDescription:
     "Styr modell, instruktioner och livebeteende i svaren.",
   gmailDescription: "Skicka e-post under den aktuella konversationen.",

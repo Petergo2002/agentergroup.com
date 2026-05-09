@@ -1,0 +1,264 @@
+import { extractCalSelectionFromDefinition } from "@/lib/cal";
+import { buildWorkspaceComposioUserId } from "@/lib/connections";
+import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
+import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
+import { runAgentChat } from "@/lib/runtime/agent-chat";
+import { createRunStep, completeRunStep } from "@/lib/runtime/observability";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
+import type {
+  AgentAutomationRecord,
+  AgentRecord,
+  AutomationEventRecord,
+  BuilderDefinition,
+} from "@/lib/types";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+export function buildAutomationInput(triggerSlug: string, payload: Record<string, unknown>) {
+  return [
+    `Incoming automation event: ${triggerSlug}`,
+    "",
+    "Payload:",
+    JSON.stringify(payload, null, 2),
+  ].join("\n");
+}
+
+function readEventPayload(event: AutomationEventRecord) {
+  const payloadEnvelope = event.payload;
+  const nestedPayload = payloadEnvelope.payload;
+
+  return isRecord(nestedPayload) ? nestedPayload : payloadEnvelope;
+}
+
+async function markEventIgnored(
+  supabase: ReturnType<typeof createAdminClient>,
+  eventId: string,
+) {
+  await supabase
+    .from("automation_events")
+    .update({ status: "ignored" })
+    .eq("id", eventId);
+}
+
+export async function processAutomationEvent(eventId: string) {
+  const supabase = createAdminClient();
+
+  const claimResult = await supabase
+    .from("automation_events")
+    .update({ status: "processing" })
+    .eq("id", eventId)
+    .eq("status", "received")
+    .select("*")
+    .maybeSingle();
+
+  if (claimResult.error) {
+    throw claimResult.error;
+  }
+
+  if (!claimResult.data) {
+    return { ok: true, status: "skipped" as const };
+  }
+
+  const event = claimResult.data as AutomationEventRecord;
+  const automationResult = await supabase
+    .from("agent_automations")
+    .select("*")
+    .eq("id", event.automation_id)
+    .maybeSingle();
+
+  if (automationResult.error) {
+    throw automationResult.error;
+  }
+
+  const automation = automationResult.data as AgentAutomationRecord | null;
+
+  if (!automation || automation.status !== "active") {
+    await markEventIgnored(supabase, event.id);
+    return { ok: true, status: "ignored" as const };
+  }
+
+  const agentResult = await supabase
+    .from("agents")
+    .select("*")
+    .eq("id", automation.agent_id)
+    .eq("workspace_id", automation.workspace_id)
+    .maybeSingle();
+
+  if (agentResult.error) {
+    throw agentResult.error;
+  }
+
+  const agent = agentResult.data as AgentRecord | null;
+
+  if (
+    !agent ||
+    agent.archived_at ||
+    agent.status !== "active" ||
+    (agent.surface !== "widget" && agent.surface !== "automation")
+  ) {
+    await markEventIgnored(supabase, event.id);
+    return { ok: true, status: "ignored" as const };
+  }
+
+  const payload = readEventPayload(event);
+  const draftResult = await supabase
+    .from("agent_drafts")
+    .select("definition")
+    .eq("agent_id", agent.id)
+    .maybeSingle();
+
+  if (draftResult.error) {
+    throw draftResult.error;
+  }
+
+  const definition = (draftResult.data?.definition ?? null) as BuilderDefinition | null;
+  const gmailRecipientPolicy = extractGmailRecipientPolicyFromDefinition(definition);
+  const googleCalendarSelection = extractGoogleCalendarSelectionFromDefinition(definition);
+  const calSelection = extractCalSelectionFromDefinition(definition);
+  const enabledToolsByToolkit = extractEnabledToolsFromDefinition(definition);
+  let runId: string | null = null;
+  let runtimeStepId: string | null = null;
+
+  try {
+    const runInsert = await supabase
+      .from("runs")
+      .insert({
+        workspace_id: agent.workspace_id,
+        agent_id: agent.id,
+        status: "running",
+        model: agent.model,
+        input: {
+          source: "composio",
+          triggerSlug: event.trigger_slug,
+          eventId: event.id,
+          externalEventId: event.external_event_id,
+          payload,
+        },
+        output: {},
+        created_by: null,
+      })
+      .select()
+      .single();
+
+    if (runInsert.error) {
+      throw runInsert.error;
+    }
+
+    const createdRunId = runInsert.data.id;
+    runId = createdRunId;
+
+    await supabase
+      .from("automation_events")
+      .update({ run_id: createdRunId })
+      .eq("id", event.id);
+
+    const runtimeStep = await createRunStep(supabase, {
+      runId: createdRunId,
+      workspaceId: agent.workspace_id,
+      agentId: agent.id,
+      stepKey: "automation.execute",
+      stepType: "model",
+      title: "Execute automation event",
+      detail: "Running external trigger binding with configured agent tools.",
+      payload: {
+        triggerSlug: event.trigger_slug,
+        externalEventId: event.external_event_id,
+        enabledToolsByToolkit,
+      },
+    });
+    runtimeStepId = runtimeStep.id;
+
+    const result = await runAgentChat({
+      supabase: supabase as never,
+      agent,
+      input: buildAutomationInput(event.trigger_slug, payload),
+      history: [],
+      toolUserId: buildWorkspaceComposioUserId(agent.workspace_id),
+      audience: "automation",
+      calendarTimezone: googleCalendarSelection.timezone,
+      googleCalendarSelection,
+      calSelection,
+      gmailRecipientPolicy,
+      enabledToolsByToolkit,
+    });
+
+    await completeRunStep(
+      supabase,
+      runtimeStep.id,
+      "succeeded",
+      "Automation execution completed.",
+      {
+        contentLength: result.assistantContent.length,
+        toolMessageCount: result.toolMessages.length,
+        knowledgeMatchCount: result.knowledgeMatches.length,
+        connectedToolkits: result.connectedToolkits,
+      },
+    );
+
+    await supabase
+      .from("runs")
+      .update({
+        status: "succeeded",
+        output: {
+          assistantContent: result.assistantContent,
+          assistantMetadata: result.assistantMetadata,
+          finalCompletion: result.finalCompletion,
+          toolMessages: result.toolMessages,
+          knowledgeMatches: result.knowledgeMatches,
+          connectedToolkits: result.connectedToolkits,
+        },
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+
+    await Promise.all([
+      supabase
+        .from("automation_events")
+        .update({ status: "processed" })
+        .eq("id", event.id),
+      supabase
+        .from("agent_automations")
+        .update({ last_event_at: new Date().toISOString(), last_error: null })
+        .eq("id", automation.id),
+    ]);
+
+    return { ok: true, status: "processed" as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Automation run failed.";
+
+    if (runtimeStepId) {
+      await completeRunStep(
+        supabase,
+        runtimeStepId,
+        "failed",
+        message,
+      ).catch(() => undefined);
+    }
+
+    await Promise.all([
+      runId
+        ? supabase
+            .from("runs")
+            .update({
+              status: "failed",
+              error_message: message,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", runId)
+        : Promise.resolve({ error: null }),
+      supabase
+        .from("automation_events")
+        .update({ status: "failed" })
+        .eq("id", event.id),
+      supabase
+        .from("agent_automations")
+        .update({ last_error: message })
+        .eq("id", automation.id),
+    ]);
+
+    throw error;
+  }
+}

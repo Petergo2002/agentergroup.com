@@ -24,8 +24,10 @@ export const agents = {
   noInstructions: "Inga specifika instruktioner har lagts till för denna agent ännu.",
   builder: "Builder",
   preview: "Förhandsvisa",
+  activity: "Aktivitet",
   internalAssistant: "Intern assistent",
   websiteWidget: "Webbplatswidget",
+  automation: "Automation",
   filters: {
     all: "Alla",
     active: "Aktiva",
@@ -40,20 +42,33 @@ export const agents = {
   createModal: {
     title: "Skapa ny agent",
     surface: "Yta",
+    trigger: "Trigger",
     assistantTitle: "Intern assistent",
     assistantDescription:
       "Delas i workspacet och blir tillgänglig under Assistenter efter första sparningen.",
     widgetTitle: "Webbplatswidget",
     widgetDescription:
-      "Byggd för hostade och inbäddningsbara kundnära chattgränssnitt.",
+      "Startar när en besökare skickar ett chattmeddelande. Skapar en webbplatswidget-agent.",
+    automationTitle: "Automation",
+    automationDescription:
+      "Körs från externa triggerhändelser och kan använda konfigurerade verktyg och kunskap.",
+    gmailTriggerTitle: "Extern trigger",
+    gmailTriggerDescription:
+      "Startar från en ansluten apphändelse. Nytt Gmail-meddelande är den första triggern som stöds.",
     assistantName: "Assistentsnamn",
+    automationName: "Automationsnamn",
+    gmailTriggerName: "Automationsnamn",
     agentName: "Agentnamn",
     assistantNamePlaceholder: "t.ex. Säljassistent",
+    automationNamePlaceholder: "t.ex. Inbox-triage",
+    gmailTriggerNamePlaceholder: "t.ex. Inbox-triage",
     agentNamePlaceholder: "t.ex. Min anpassade agent",
     enterName: "Ange ett agentnamn.",
     createError: "Det gick inte att skapa agenten.",
     created: "Agent skapad.",
     creating: "Skapar...",
     createAssistant: "Skapa assistent",
+    createAutomation: "Skapa automation",
+    createGmailTriggerAgent: "Skapa automation",
   },
 };

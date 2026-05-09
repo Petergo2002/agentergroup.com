@@ -1,6 +1,10 @@
 import type { BuilderNodeKind, BuilderNodeStatus, BuilderNodeBadgeTone } from "./enums";
 import type { GmailRecipientMode } from "./policy";
 
+export type BuilderTriggerProvider = "internal" | "composio";
+
+export type BuilderTriggerSource = "user_message" | "gmail_new_message";
+
 export interface BaseBuilderNodeData extends Record<string, unknown> {
   kind: BuilderNodeKind;
   label: string;
@@ -17,6 +21,12 @@ export interface BaseBuilderNodeData extends Record<string, unknown> {
 export interface TriggerBuilderNodeData extends BaseBuilderNodeData {
   kind: "trigger";
   locked: true;
+  triggerSource: BuilderTriggerSource;
+  provider: BuilderTriggerProvider;
+  toolkitSlug?: string | null;
+  triggerSlug?: string | null;
+  connectionId?: string | null;
+  triggerConfig?: Record<string, unknown>;
 }
 
 export interface AgentBuilderNodeData extends BaseBuilderNodeData {
@@ -105,5 +115,18 @@ export interface BuilderDefinition {
     instructions: string;
     starterPrompts: string[];
     timezone: string;
+    trigger?: {
+      source: BuilderTriggerSource;
+      provider: BuilderTriggerProvider;
+      toolkitSlug?: string | null;
+      triggerSlug?: string | null;
+      triggerConfig?: Record<string, unknown>;
+      connectionId?: string | null;
+    };
+    automation?: {
+      triggerSlug: string;
+      triggerConfig: Record<string, unknown>;
+      connectionId: string | null;
+    };
   };
 }

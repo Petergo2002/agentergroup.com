@@ -1,6 +1,6 @@
 # Privacy Operations
 
-Last updated: 2026-04-19
+Last updated: 2026-05-04
 
 ## Purpose
 
@@ -15,6 +15,7 @@ Current scope:
 - public widget conversations
 - public widget leads
 - public widget session/activity data
+- automation run/activity records as workspace-owner operational data
 - public privacy policy:
   - `/privacy-policy`
 - signed-in customer compliance pages:
@@ -31,6 +32,7 @@ Out of scope in v1:
 - retention automation for imported knowledge
 - full privacy tooling for authenticated preview chat
 - full privacy tooling for authenticated internal assistant chat
+- full self-serve privacy tooling for automation trigger payloads
 
 ## Current Subprocessors
 
@@ -41,7 +43,7 @@ Current primary subprocessors:
 - OpenRouter
   - model routing and LLM access
 - Composio
-  - connected account authentication and tool execution
+  - connected account authentication, tool execution, and automation trigger webhooks
 
 Customer-facing compliance references are published inside the signed-in app on `/settings/subprocessors`.
 
@@ -57,6 +59,9 @@ Default v1 retention:
   - delete after 180 days based on `created_at`
 - widget session/activity metadata
   - retained through `widget_sessions`, since there is no separate widget events table
+- automation events and automation runs
+  - retained as operational workspace records until the owning workspace deletes the related agent/data manually
+  - not currently included in the public widget retention cron
 
 Manual retention:
 
@@ -176,11 +181,13 @@ Each delete action writes an audit log using `privacy.dsar.delete`.
 - the product does not currently verify identity automatically
 - imported knowledge is not automatically expired
 - this does not yet cover authenticated preview chat or internal assistant chat end-to-end
+- automation trigger payloads can contain third-party message data; current DSAR tooling does not yet provide a self-serve automation-specific export/delete flow
 
 ## Security Notes
 
 - Public widget DSAR tooling is owner-only.
 - Production chat persistence no longer stores raw tool arguments/results in assistant/widget `debugTrace` payloads.
+- Automation Activity stores run output, tool messages, and trigger payload references needed for operator debugging. Treat these records as workspace-confidential operational data.
 - Analytics conversation-detail debug traces are only visible to workspace owners and admins.
 - Remote file downloads used by assistant-generated downloads and Drive imports are SSRF-hardened:
   - only `http` and `https` are allowed

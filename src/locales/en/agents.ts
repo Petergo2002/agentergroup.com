@@ -23,8 +23,10 @@ export const agents = {
   noInstructions: "No specific instructions provided for this agent yet.",
   builder: "Builder",
   preview: "Preview",
+  activity: "Activity",
   internalAssistant: "Internal Assistant",
   websiteWidget: "Website Widget",
+  automation: "Automation",
   filters: {
     all: "All",
     active: "Active",
@@ -39,20 +41,33 @@ export const agents = {
   createModal: {
     title: "Create New Agent",
     surface: "Surface",
+    trigger: "Trigger",
     assistantTitle: "Internal Assistant",
     assistantDescription:
       "Shared inside the workspace and available in Assistants after the first save.",
     widgetTitle: "Website Widget",
     widgetDescription:
-      "Built for hosted and embeddable customer-facing chat surfaces.",
+      "Starts when a visitor sends a chat message. Creates a website chat widget agent.",
+    automationTitle: "Automation",
+    automationDescription:
+      "Runs from external trigger events and can use configured tools and knowledge.",
+    gmailTriggerTitle: "External Trigger",
+    gmailTriggerDescription:
+      "Starts from a connected app event. Gmail new message is the first supported trigger.",
     assistantName: "Assistant Name",
+    automationName: "Automation Name",
+    gmailTriggerName: "Automation Name",
     agentName: "Agent Name",
     assistantNamePlaceholder: "e.g. Sales Assistant",
+    automationNamePlaceholder: "e.g. Inbox Triage",
+    gmailTriggerNamePlaceholder: "e.g. Inbox Triage",
     agentNamePlaceholder: "e.g. My Custom Agent",
     enterName: "Please enter an agent name.",
     createError: "Failed to create the agent.",
     created: "Agent created.",
     creating: "Creating...",
     createAssistant: "Create Assistant",
+    createAutomation: "Create Automation",
+    createGmailTriggerAgent: "Create Automation",
   },
 };

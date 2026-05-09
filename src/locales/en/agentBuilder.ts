@@ -1,13 +1,16 @@
 export const agentBuilder = {
   nodeLibrary: {
+    trigger: "Trigger",
     agent: "Agent Core",
     knowledge: "Knowledge",
     tools: "Connected Tools",
     leads: "Internal Leads",
     endChat: "End Chat",
     output: "Response",
+    triggerDescription:
+      "Choose what starts this agent.",
     agentDescription:
-      "The AI brain that processes and responds to users. Already on canvas.",
+      "The AI brain that processes and responds to users.",
     knowledgeDescription:
       "Attach workspace sources the agent can retrieve from.",
     toolsDescription:
@@ -37,6 +40,8 @@ export const agentBuilder = {
   multipleOldConnections:
     "Multiple old tool connections were found. Review Gmail and Calendar nodes.",
   knowledgeAlreadyOnCanvas: "Knowledge is already on the canvas.",
+  triggerAlreadyOnCanvas: "Trigger is already on the canvas.",
+  agentAlreadyOnCanvas: "Agent Core is already on the canvas.",
   leadsAlreadyOnCanvas: "Internal Leads is already on the canvas.",
   leadsWidgetOnly: "Internal Leads is available only for website widget agents.",
   endChatAlreadyOnCanvas: "End Chat is already on the canvas.",
@@ -76,7 +81,44 @@ export const agentBuilder = {
   nodeLibraryDescription:
     "Keep the flow simple. Nodes connect automatically when you add them.",
   chooseToolNode: "Choose a tool node",
+  emptyCanvasTitle: "Start with a trigger",
+  emptyCanvasDescription:
+    "Add a Trigger node from the library. Chat message creates a website widget; external events create an automation.",
   triggerDescription: "Entry point for the current conversation.",
+  triggerSetupTitle: "Trigger setup",
+  triggerSetupDescription:
+    "A trigger is the event that starts the flow. Use internal triggers for widget lifecycle events and Composio triggers for external app events.",
+  triggerProviderInternal: "Internal",
+  triggerProviderComposio: "Composio",
+  agentSurface: "Agent type",
+  automationReadiness: "Automation readiness",
+  activationReady: "Ready to activate",
+  activationBlocked: "Needs setup",
+  webhookConfigured: "Webhook configured",
+  webhookMissing: "Webhook secret missing",
+  providerTrigger: "Provider trigger",
+  noProviderTrigger: "No provider trigger yet",
+  selectedTrigger: "Selected trigger",
+  selectedAccount: "Selected account",
+  noTriggerAccount: "No account selected",
+  lastAutomationEvent: "Last event",
+  lastAutomationError: "Last error",
+  activateTrigger: "Activate Trigger",
+  activatingTrigger: "Activating...",
+  pauseTrigger: "Pause Trigger",
+  pausingTrigger: "Pausing...",
+  triggerActivated: "Trigger activated.",
+  triggerPaused: "Trigger paused.",
+  composioTriggerHelp:
+    "Composio triggers are used for external app events. Gmail is the first supported automation trigger; Slack, calendar, and other triggers can fit this same setup later.",
+  triggerSources: {
+    chatMessage: "Chat message",
+    chatMessageDescription:
+      "Runs when a visitor sends a message in the website chat widget.",
+    gmailNewMessage: "New Gmail message",
+    gmailNewMessageDescription:
+      "Runs from a Composio Gmail trigger when a connected inbox receives a new message.",
+  },
   coreDescription:
     "Controls the model, instructions, and live response behavior.",
   gmailDescription: "Send emails during the current conversation.",

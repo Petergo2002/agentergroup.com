@@ -38,6 +38,7 @@ export interface AdminWorkspaceDetailSummary {
   ownerEmail: string | null;
   createdAt: string;
   internalAssistantsEnabled: boolean;
+  automationsEnabled: boolean;
   agentCount: number;
   widgetCount: number;
   conversationCount: number;

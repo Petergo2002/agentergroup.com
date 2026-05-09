@@ -71,6 +71,13 @@ export async function POST(
     );
   }
 
+  if (agent.surface === "automation") {
+    return NextResponse.json(
+      { error: "Use automation trigger controls to activate or pause this agent." },
+      { status: 400 },
+    );
+  }
+
   if (
     status === "active" &&
     agent.surface === "widget" &&

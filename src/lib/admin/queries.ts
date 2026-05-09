@@ -14,6 +14,7 @@ type WorkspaceRow = {
   owner_id: string;
   created_at: string;
   internal_assistants_enabled?: boolean;
+  automations_enabled?: boolean;
 };
 type ProfileRow = { id: string; email: string | null };
 type AgentRow = {
@@ -228,7 +229,7 @@ export async function getWorkspaceDetail(
   const admin = createAdminClient();
   const workspaceResult = await admin
     .from("workspaces")
-    .select("id, name, owner_id, created_at, internal_assistants_enabled")
+    .select("id, name, owner_id, created_at, internal_assistants_enabled, automations_enabled")
     .eq("id", workspaceId)
     .maybeSingle();
 
@@ -350,6 +351,7 @@ export async function getWorkspaceDetail(
       ownerEmail: (ownerResult.data as { email: string | null } | null)?.email ?? null,
       createdAt: workspace.created_at,
       internalAssistantsEnabled: workspace.internal_assistants_enabled === true,
+      automationsEnabled: workspace.automations_enabled === true,
       agentCount: agents.length,
       widgetCount: widgetIds.size,
       conversationCount: totalConversationCount,

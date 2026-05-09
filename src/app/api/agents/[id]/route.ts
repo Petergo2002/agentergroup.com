@@ -5,8 +5,10 @@ import {
   isInternalAssistantBlocked,
 } from "@/lib/assistants/feature-flags";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { deleteComposioTrigger } from "@/lib/composio";
 import { createAuditLog } from "@/lib/runtime/observability";
 import { createClient } from "@/lib/supabase/server";
+import type { AgentAutomationRecord } from "@/lib/types";
 import { WorkspaceAccessError, assertOwnedWorkspaceResource } from "@/lib/workspace-security";
 
 export async function DELETE(
@@ -95,6 +97,36 @@ export async function DELETE(
       { error: "Confirmation name did not match the agent name." },
       { status: 400 },
     );
+  }
+
+  if (agent.surface === "automation") {
+    const { data: automation, error: automationError } = await supabase
+      .from("agent_automations")
+      .select("*")
+      .eq("agent_id", agentId)
+      .maybeSingle();
+
+    if (automationError) {
+      return NextResponse.json({ error: automationError.message }, { status: 500 });
+    }
+
+    const automationRecord = automation as AgentAutomationRecord | null;
+
+    if (automationRecord?.composio_trigger_id) {
+      try {
+        await deleteComposioTrigger(automationRecord.composio_trigger_id);
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to delete provider trigger.",
+          },
+          { status: 500 },
+        );
+      }
+    }
   }
 
   const deleteResult = await supabase
