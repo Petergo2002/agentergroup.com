@@ -1,6 +1,6 @@
 # Agentergroup Architecture
 
-Last updated: 2026-05-04
+Last updated: 2026-05-12
 
 ## Purpose
 
@@ -30,7 +30,7 @@ The current MVP is intentionally narrow:
 - chat-first agent runtime
 - Automation agents with Composio external trigger ingestion, starting with Gmail
 - workspace-scoped knowledge base with semantic retrieval
-- limited live tools for Gmail, Microsoft Outlook, Google Calendar, and Cal.com
+- limited live tools for Gmail, Microsoft Outlook, Slack, HubSpot, Shopify, Google Calendar, and Cal.com
 - Google Drive only as a knowledge import source
 - internal assistant toolkit for Text to PDF generation
 
@@ -166,8 +166,18 @@ Important implementation docs:
 - `src/app/api/assistants/[id]/threads/route.ts`
 - `src/app/api/assistants/[id]/chat/route.ts`
 - `src/app/api/assistants/[id]/downloads/[messageId]/route.ts`
+- `src/app/api/billing/checkout/route.ts`
+- `src/app/api/billing/extra-credits/checkout/route.ts`
+- `src/app/api/billing/invoices/route.ts`
+- `src/app/api/billing/portal/route.ts`
+- `src/app/api/billing/webhook/route.ts`
 - `src/app/api/connections/toolkits/route.ts`
 - `src/app/api/connections/authorize/route.ts`
+- `src/app/api/connections/auth-links/route.ts`
+- `src/app/api/connections/auth-links/[id]/revoke/route.ts`
+- `src/app/api/public/connection-auth-links/[token]/start/route.ts`
+- `src/app/connect/[token]/page.tsx`
+- `src/app/connect/callback/page.tsx`
 - `src/app/api/connections/disconnect/route.ts`
 - `src/app/api/connections/googlecalendar/calendars/route.ts`
 - `src/app/api/connections/cal/event-types/route.ts`
@@ -411,8 +421,9 @@ Current billing UI surfaces:
 - message usage progress bar with percentage and reset date
 - current plan display with pricing
 - plan comparison grid (Free / Starter / Premium) with feature lists
-- payment method display (tied to Stripe)
-- billing history table with invoice downloads
+- self-serve 500-message extra credit checkout for paid workspaces
+- payment method display with Stripe billing portal handoff
+- billing history table populated from Stripe invoices, with PDF downloads when available
 
 Current plan pricing:
 
@@ -422,9 +433,8 @@ Current plan pricing:
 
 ### Current limitations
 
-- plan upgrade/downgrade actions are not yet connected to Stripe Checkout
-- payment method management is UI-only (not wired to Stripe portal)
-- billing history is currently static/placeholder
+- subscription upgrades use Stripe Checkout and downgrade/payment-method changes hand off to the Stripe billing portal rather than editing billing details inline
+- extra credit purchases are fixed to one 500-message pack and require `STRIPE_EXTRA_CREDITS_500_PRICE_ID`
 - message counting enforcement at runtime is planned but not yet gated at the API level
 
 ### Admin plan management
@@ -472,6 +482,25 @@ Important notes:
 - only `50`, `100`, and `500` are accepted; arbitrary client-provided amounts are rejected
 - extra credits increase `messages_limit`; `messages_used` is preserved
 - the RPC is revoked from `anon` and `authenticated`, and is granted only to `service_role`
+
+### Self-serve extra message credits
+
+Workspace owners and admins on paid plans can buy one self-serve credit pack from `/settings/billing`.
+
+**API route:**
+
+`POST /api/billing/extra-credits/checkout`
+
+Accepts `{ workspaceId: string }`. The route requires a workspace `owner` or `admin`, rejects `free` plan workspaces, and creates a Stripe Checkout Session in `payment` mode using `STRIPE_EXTRA_CREDITS_500_PRICE_ID`.
+
+**Credit pack:**
+
+- `500` extra message credits
+- applied to the current billing cycle by increasing `workspace_subscriptions.messages_limit`
+- `messages_used` is preserved
+- no separate credit-balance table exists
+
+Stripe confirms purchases through `checkout.session.completed`. The webhook calls `grant_workspace_purchased_messages()`, which is service-role only and idempotent by Stripe Checkout Session id so webhook retries do not double-grant credits.
 
 
 ## Team Management
@@ -731,6 +760,29 @@ Operational note:
 
 - the Edge Functions verify the caller through the forwarded `Authorization` header
 - then use the service role only for privileged internal writes such as chunk replacement
+
+### Security definer helper hardening
+
+Supabase security advisor flagged several `SECURITY DEFINER` functions in the exposed `public`
+schema as executable by `anon` and `authenticated`. The fix is captured in:
+
+- `supabase/migrations/20260512113836_secure_security_definer_functions.sql`
+- `supabase/migrations/20260512114059_tighten_private_helper_function_grants.sql`
+
+The migrations create a non-exposed `private` schema for RLS helper functions:
+
+- `private.is_workspace_member(uuid)`
+- `private.can_edit_agent(uuid)`
+- `private.workspace_internal_assistants_enabled(uuid)`
+
+RLS policies now call these private helpers instead of the public helper functions. Public
+`SECURITY DEFINER` RPCs such as turn-lock helpers, cleanup helpers, subscription bootstrap,
+usage incrementing, and the previous public helper copies have execute revoked from `public`,
+`anon`, and `authenticated`, with only `service_role` retained where server code still needs
+direct RPC access.
+
+After the MCP migration run, the only remaining Supabase security advisor warning was leaked
+password protection, which is an Auth dashboard setting and is intentionally not fixed in SQL.
 
 ## Agent Model
 
@@ -1497,17 +1549,25 @@ Current defaults are defined for:
 
 - `gmail`
 - `outlook`
+- `slack`
+- `hubspot`
+- `shopify`
 - `googlecalendar`
 - `cal`
 - `googledrive`
+- `text_to_pdf`
 
 These defaults can be overridden with environment variables:
 
 - `COMPOSIO_TOOLKIT_VERSION_GMAIL`
 - `COMPOSIO_TOOLKIT_VERSION_OUTLOOK`
+- `COMPOSIO_TOOLKIT_VERSION_SLACK`
+- `COMPOSIO_TOOLKIT_VERSION_HUBSPOT`
+- `COMPOSIO_TOOLKIT_VERSION_SHOPIFY`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
 - `COMPOSIO_TOOLKIT_VERSION_CAL`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
+- `COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF`
 
 The app does not pass toolkit versions ad hoc on each manual execution call.
 
@@ -1551,6 +1611,9 @@ It shows only:
 
 - Gmail
 - Microsoft Outlook
+- Slack
+- HubSpot
+- Shopify
 - Google Calendar
 - Cal.com
 - Google Drive
@@ -1568,7 +1631,7 @@ Current flow:
 1. user chooses one of the supported integrations
 2. backend validates the integration slug against the catalog
 3. backend asks Composio for an authorization session
-4. backend creates a Composio managed auth config, links the connected account flow, and upserts a `connections` row as pending
+4. backend creates or reuses the toolkit auth config, links the connected account flow, and upserts a `connections` row as pending
 5. user completes external provider auth
 6. app later syncs the connected account into `connections`
 
@@ -1577,6 +1640,33 @@ Important runtime rule:
 - connected accounts are keyed to the workspace-scoped Composio identity
 - stale legacy rows without the expected scoped identity are treated as disconnected until reconnected
 - previously synced Composio rows whose `external_id` no longer exists upstream are downgraded to `disconnected` on the next sync instead of being left as false-positive connected rows
+- most toolkits use Composio managed auth
+- Shopify does not have Composio managed auth; it requires either a real `COMPOSIO_SHOPIFY_AUTH_CONFIG_ID`/`COMPOSIO_AUTH_CONFIG_SHOPIFY` or Shopify OAuth credentials so `createConnectionRequest()` can create a `use_custom_auth` OAuth2 auth config
+- invalid placeholder auth config IDs such as `ac_...` are ignored, and auth config overrides are injected only when starting a connection request so `/connections` can still load even if optional Shopify setup is absent
+
+### External connection auth links
+
+Workspace owners and admins can create a one-integration auth link from the Connections page.
+The link is intended for agency/customer workflows where another person needs to authorize
+their own Gmail, Slack, HubSpot, Shopify, or other supported provider account without receiving
+Agentergroup workspace access.
+
+The `connection_auth_links` table stores only a SHA-256 `token_hash`; the raw bearer token is
+shown once in the generated `/connect/[token]` URL. Links default to a 7-day expiry and can be
+`pending`, `completed`, or `revoked`.
+
+Public flow:
+
+1. recipient opens `/connect/[token]`
+2. public API validates the hashed token, pending status, expiry, supported toolkit, and integration access
+3. backend creates a Composio connection request for `workspace:<workspaceId>` with a callback URL
+4. backend upserts the workspace `connections` row as `pending`, using the link creator as `created_by`
+5. recipient completes provider auth
+6. `/connect/callback` syncs Composio connected accounts into `connections`
+7. callback marks the auth link `completed` when a connected row for the toolkit exists
+
+Expired, revoked, and completed links cannot start a new provider auth flow. The resulting
+connection belongs to the workspace, not to the external recipient as an Agentergroup user.
 
 ### Google Calendar selector flow
 
@@ -1830,12 +1920,26 @@ After import, the source behaves like any other workspace knowledge source.
 | --- | --- |
 | `POST /api/composio/webhook` | Verify Composio trigger webhooks, store automation events, and schedule automation processing |
 
+### Billing APIs
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/billing/checkout` | Start Stripe subscription checkout for a workspace plan change |
+| `POST /api/billing/extra-credits/checkout` | Start one-time Stripe checkout for the 500-message extra credit pack |
+| `GET /api/billing/invoices` | List Stripe invoices for the active workspace billing customer |
+| `POST /api/billing/portal` | Create a Stripe billing portal session for payment method and subscription management |
+| `POST /api/billing/webhook` | Process Stripe subscription and extra credit checkout events |
+
 ### Connection APIs
 
 | Route | Purpose |
 | --- | --- |
 | `GET /api/connections/toolkits` | Return supported integrations and merged connection status |
 | `POST /api/connections/authorize` | Start Composio authorization for one allowed integration |
+| `GET /api/connections/auth-links` | List recent one-integration external auth links for the active workspace; owner/admin only |
+| `POST /api/connections/auth-links` | Create a hashed, 7-day external auth link for one supported integration; owner/admin and integrations-enabled workspaces only |
+| `POST /api/connections/auth-links/[id]/revoke` | Revoke a pending external auth link |
+| `POST /api/public/connection-auth-links/[token]/start` | Public no-login endpoint that validates a bearer link and starts provider auth |
 | `POST /api/connections/disconnect` | Remove a local connection row, best-effort delete the upstream Composio connected account, and pause/error active automations using that connection |
 | `GET /api/connections/googlecalendar/calendars` | List selectable calendars for one connected Google Calendar account in the builder |
 
@@ -1910,6 +2014,8 @@ The core environment contract is:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_APP_URL`
 - `NEXT_PUBLIC_WIDGET_APP_URL`
+- `NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID`
+- `NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID`
 
 ### Server-only
 
@@ -1924,10 +2030,24 @@ The core environment contract is:
 - `COMPOSIO_TOOLKIT_VERSION_CAL`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
 - `COMPOSIO_TOOLKIT_VERSION_OUTLOOK`
+- `COMPOSIO_TOOLKIT_VERSION_SLACK`
+- `COMPOSIO_TOOLKIT_VERSION_HUBSPOT`
+- `COMPOSIO_TOOLKIT_VERSION_SHOPIFY`
+- `COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF`
+- `COMPOSIO_SHOPIFY_AUTH_CONFIG_ID` (optional real Composio auth config id)
+- `COMPOSIO_AUTH_CONFIG_SHOPIFY` (optional alternate auth config id name)
+- `COMPOSIO_SHOPIFY_CLIENT_ID` (required if no auth config id is provided)
+- `COMPOSIO_SHOPIFY_CLIENT_SECRET` (required if no auth config id is provided)
+- `COMPOSIO_SHOPIFY_OAUTH_REDIRECT_URI`
+- `COMPOSIO_SHOPIFY_SCOPES` (optional)
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_EXTRA_CREDITS_500_PRICE_ID`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `WIDGET_APP_URL`
 - `WIDGET_ACCESS_SECRET`
 - `WIDGET_PREVIEW_SECRET`
+- `RATE_LIMIT_SECRET`
 - `GDPR_RETENTION_CRON_SECRET`
 
 ### Supabase Edge Functions

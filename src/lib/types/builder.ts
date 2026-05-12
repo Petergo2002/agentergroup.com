@@ -62,6 +62,30 @@ export interface OutlookBuilderNodeData extends BaseBuilderNodeData {
   simpleIconColor?: string;
 }
 
+export interface SlackBuilderNodeData extends BaseBuilderNodeData {
+  kind: "slack";
+  integrationSlug: "slack";
+  connectionId: string | null;
+  simpleIcon?: string;
+  simpleIconColor?: string;
+}
+
+export interface HubSpotBuilderNodeData extends BaseBuilderNodeData {
+  kind: "hubspot";
+  integrationSlug: "hubspot";
+  connectionId: string | null;
+  simpleIcon?: string;
+  simpleIconColor?: string;
+}
+
+export interface ShopifyBuilderNodeData extends BaseBuilderNodeData {
+  kind: "shopify";
+  integrationSlug: "shopify";
+  connectionId: string | null;
+  simpleIcon?: string;
+  simpleIconColor?: string;
+}
+
 export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
   kind: "googlecalendar";
   integrationSlug: "googlecalendar";
@@ -98,6 +122,9 @@ export type BuilderNodeData =
   | KnowledgeBuilderNodeData
   | GmailBuilderNodeData
   | OutlookBuilderNodeData
+  | SlackBuilderNodeData
+  | HubSpotBuilderNodeData
+  | ShopifyBuilderNodeData
   | GoogleCalendarBuilderNodeData
   | CalBuilderNodeData
   | EndChatBuilderNodeData;

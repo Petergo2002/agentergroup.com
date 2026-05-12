@@ -357,6 +357,9 @@ function buildToolGuidance(
     "Do not claim you lack the ability to do something if an attached tool can handle it.",
     "For meeting booking or calendar availability, use Google Calendar when it is attached.",
     "For email sending, use Gmail or Microsoft Outlook when they are attached.",
+    "For Slack, use the connected workspace to find channels or users, search relevant messages, read conversation history, and send messages only when the user's request or agent instructions clearly require it.",
+    "For HubSpot, use the connected CRM to search, create, and update contacts, companies, deals, tickets, notes, and tasks when the user's request or agent instructions clearly require CRM work.",
+    "For Shopify, use the connected store to read and manage products, customers, orders, draft orders, and inventory context when the user's request or agent instructions clearly require store operations.",
     "After using tools, answer the user in natural language with the outcome. Never return raw JSON, code, or tool payloads to the user.",
   ];
 
@@ -425,6 +428,18 @@ function buildToolGuidance(
 
     guidance.push(
       "When the user wants to book a meeting, first check available slots with CAL_GET_AVAILABLE_SLOTS_INFO, then use CAL_CREATE_BOOKING_VERSION_2 to create the booking with the selected time slot.",
+    );
+  }
+
+  if (toolkitSlugs.includes("hubspot")) {
+    guidance.push(
+      "For HubSpot CRM changes, search for an existing record first when identity is unclear, avoid creating duplicates, and ask a concise follow-up question when required CRM details are missing.",
+    );
+  }
+
+  if (toolkitSlugs.includes("shopify")) {
+    guidance.push(
+      "For Shopify store changes, inspect the relevant product, customer, order, or draft order first when identity is unclear. Do not cancel, refund, delete, or charge anything unless a specifically enabled tool and explicit user instruction allow it.",
     );
   }
 

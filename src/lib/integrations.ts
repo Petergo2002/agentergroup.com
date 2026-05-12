@@ -1,4 +1,4 @@
-export type SupportedIntegrationSlug = "gmail" | "googlecalendar" | "cal" | "googledrive" | "outlook";
+export type SupportedIntegrationSlug = "gmail" | "googlecalendar" | "cal" | "googledrive" | "outlook" | "slack" | "hubspot" | "shopify";
 export type InternalAssistantToolkitSlug = "text_to_pdf";
 export type IntegrationSurface = "chat" | "knowledge";
 
@@ -47,6 +47,79 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     connectionPurpose: "Used by agents to send emails during the current conversation.",
     surface: "chat",
     recommendedChatTools: ["OUTLOOK_SEND_EMAIL"],
+    allowedKnowledgeTools: [],
+  },
+  {
+    slug: "slack",
+    displayName: "Slack",
+    description: "Send messages and search workspace context in Slack.",
+    icon: "tag",
+    simpleIcon: "siSlack",
+    simpleIconColor: "#4A154B",
+    category: "Communication",
+    connectionPurpose: "Used by agents to send messages and search Slack workspace context.",
+    surface: "chat",
+    recommendedChatTools: [
+      "SLACK_SEND_MESSAGE",
+      "SLACK_SEARCH_MESSAGES",
+      "SLACK_FETCH_CONVERSATION_HISTORY",
+      "SLACK_FIND_CHANNELS",
+      "SLACK_FIND_USERS",
+    ],
+    allowedKnowledgeTools: [],
+  },
+  {
+    slug: "hubspot",
+    displayName: "HubSpot",
+    description: "Create, search, and update CRM records in HubSpot.",
+    icon: "hub",
+    simpleIcon: "siHubspot",
+    simpleIconColor: "#FF7A59",
+    category: "CRM",
+    connectionPurpose: "Used by agents to create, search, and update CRM records in HubSpot.",
+    surface: "chat",
+    recommendedChatTools: [
+      "HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA",
+      "HUBSPOT_LIST_CONTACTS",
+      "HUBSPOT_CREATE_CONTACT",
+      "HUBSPOT_UPDATE_CONTACT",
+      "HUBSPOT_SEARCH_COMPANIES",
+      "HUBSPOT_CREATE_COMPANY",
+      "HUBSPOT_UPDATE_COMPANY",
+      "HUBSPOT_SEARCH_DEALS",
+      "HUBSPOT_CREATE_DEAL",
+      "HUBSPOT_UPDATE_DEAL",
+      "HUBSPOT_CREATE_TICKET",
+      "HUBSPOT_CREATE_NOTE",
+      "HUBSPOT_CREATE_TASK",
+    ],
+    allowedKnowledgeTools: [],
+  },
+  {
+    slug: "shopify",
+    displayName: "Shopify",
+    description: "Read and manage store products, customers, orders, and draft orders in Shopify.",
+    icon: "shopping_bag",
+    simpleIcon: "siShopify",
+    simpleIconColor: "#7AB55C",
+    category: "Commerce",
+    connectionPurpose: "Used by agents to read and manage Shopify store products, customers, orders, and draft orders.",
+    surface: "chat",
+    recommendedChatTools: [
+      "SHOPIFY_GET_SHOP_DETAILS",
+      "SHOPIFY_GET_PRODUCTS_PAGINATED",
+      "SHOPIFY_COUNT_PRODUCTS",
+      "SHOPIFY_LIST_CUSTOMERS",
+      "SHOPIFY_CREATE_CUSTOMER",
+      "SHOPIFY_UPDATE_CUSTOMER",
+      "SHOPIFY_LIST_ORDERS",
+      "SHOPIFY_LIST_DRAFT_ORDERS",
+      "SHOPIFY_CREATE_DRAFT_ORDER",
+      "SHOPIFY_UPDATE_DRAFT_ORDER",
+      "SHOPIFY_LIST_INVENTORY_LEVELS",
+      "SHOPIFY_CREATES_A_NEW_PRODUCT",
+      "SHOPIFY_UPDATES_A_PRODUCT",
+    ],
     allowedKnowledgeTools: [],
   },
   {
@@ -162,6 +235,12 @@ export function getToolNamePrefixForToolkit(toolkitSlug: string) {
       return "GMAIL_";
     case "outlook":
       return "OUTLOOK_";
+    case "slack":
+      return "SLACK_";
+    case "hubspot":
+      return "HUBSPOT_";
+    case "shopify":
+      return "SHOPIFY_";
     case "googlecalendar":
       return "GOOGLECALENDAR_";
     case "cal":

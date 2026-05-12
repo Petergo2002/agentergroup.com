@@ -92,7 +92,7 @@ Activation validates:
 - `COMPOSIO_API_KEY` exists
 - `COMPOSIO_WEBHOOK_SECRET` exists
 - an `agent_automations` row exists
-- a connected Gmail account is selected
+- a selected Gmail account exists and is connected
 
 If there is no provider trigger yet, activation creates one through Composio and stores `composio_trigger_id`.
 
@@ -185,6 +185,9 @@ Current supported action toolkits:
 
 - Gmail
 - Microsoft Outlook
+- Slack
+- HubSpot
+- Shopify
 - Google Calendar
 - Cal.com
 
@@ -347,7 +350,7 @@ Use this checklist when changing automation behavior:
 - [ ] Create Website Chat agent: starts with chat trigger and agent core.
 - [ ] Create Automation agent: starts with external trigger and agent core.
 - [ ] Automation can save without selected account.
-- [ ] Activation blocks without a selected connected Gmail account.
+- [ ] Activation blocks unless the selected Gmail account exists and is connected.
 - [ ] Activation creates or enables the Composio trigger.
 - [ ] Pause disables the Composio trigger and updates local status.
 - [ ] Real Composio webhook verifies and stores `automation_events`.
@@ -361,4 +364,3 @@ Use this checklist when changing automation behavior:
 - [ ] `npm run lint`
 - [ ] `npm run build`
 - [ ] `npm test`
-

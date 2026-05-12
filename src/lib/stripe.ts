@@ -27,6 +27,9 @@ export const STRIPE_PRICE_IDS: Record<string, string> = {
   premium: process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID || 'price_1TP1ptEqNgWOqUOePAREbCk0',  // $110/mo
 };
 
+export const STRIPE_EXTRA_CREDITS_500_PRICE_ID =
+  process.env.STRIPE_EXTRA_CREDITS_500_PRICE_ID ?? "";
+
 /**
  * Map Stripe Price IDs back to plan tiers.
  * Used by the webhook to determine which plan to activate.

@@ -144,12 +144,7 @@ When the `agent` node is selected, the right panel edits:
   - Starter prompts presence (+10%)
   - Attached tools or knowledge (+20%)
 
-Current model options are hardcoded:
-
-- `openai/gpt-4o-mini`
-- `openai/gpt-4.1-mini`
-- `anthropic/claude-3.7-sonnet`
-- `google/gemini-2.5-flash`
+Current model options load from `/api/openrouter/models` and fall back to the curated local OpenRouter list when the live catalog is unavailable. If a saved agent uses a model outside the current featured sections, the builder shows it in a separate current-model section instead of silently replacing it.
 
 ### Knowledge inspector
 
@@ -163,17 +158,19 @@ Important current behavior:
 
 ### Tool inspector
 
-When `gmail`, `outlook`, `googlecalendar`, or `cal` is selected, the builder lets the user choose one connected account for that tool.
+When `gmail`, `outlook`, `slack`, `hubspot`, `shopify`, `googlecalendar`, or `cal` is selected, the builder shows the selected account for that tool.
 
 Important current behavior:
 
 - only chat-surface integrations are shown in the builder
-- the selectable connection is stored on the node as `connectionId`
+- the selected connection is stored on the node as `connectionId`
 - the actual durable mapping is synced to `agent_connections`
+- missing or disconnected selected accounts are shown as setup/error states and are not persisted as active runtime attachments
 - Gmail and Outlook both expose a per-node recipient policy:
   - `ai_decides`
   - `specific_email`
 - when Gmail or Outlook uses `specific_email`, the node stores the hidden fixed recipient on the draft definition and runtime enforces it server-side
+- Slack, HubSpot, and Shopify expose the shared connected-account display and action editor; they do not add per-node settings yet
 - Google Calendar exposes one selected booking calendar and resolves the booking timezone from that calendar
 - Cal.com exposes a scheduling mode: `ai_decides` or `specific_event_type`
 - the builder loads selectable Google Calendars or Cal.com event types from the connected Composio account
@@ -196,7 +193,7 @@ Important current behavior:
 - Automation v1 stores `provider = 'composio'`, `toolkitSlug = 'gmail'`, and `triggerSlug = 'GMAIL_NEW_GMAIL_MESSAGE'`
 - the trigger account is selected on the trigger node as `connectionId`
 - the automation can be saved without a selected account
-- activation is blocked until a connected Gmail account is selected
+- activation is blocked until the selected Gmail account exists and is connected
 
 The inspector also shows automation readiness:
 
@@ -224,12 +221,48 @@ Important current behavior:
 - preview inactivity timeout behavior is coordinated by the preview UI
 - preview and widget runtimes both use this node to expose session-completed behavior, but not through one identical enforcement path
 
-Allowed actions are currently informational and hardcoded:
+Tool nodes expose an action editor. Recommended actions are enabled by default, and additional actions can be enabled from the toolkit action list loaded through `/api/connections/toolkits/[toolkitSlug]/tools`.
+
+Default recommended actions:
 
 - Gmail:
   - `Send Email`
 - Microsoft Outlook:
   - `Send Email`
+- Slack:
+  - `Send Message`
+  - `Search Messages`
+  - `Fetch Conversation History`
+  - `Find Channels`
+  - `Find Users`
+- HubSpot:
+  - `Search Contacts By Criteria`
+  - `List Contacts`
+  - `Create Contact`
+  - `Update Contact`
+  - `Search Companies`
+  - `Create Company`
+  - `Update Company`
+  - `Search Deals`
+  - `Create Deal`
+  - `Update Deal`
+  - `Create Ticket`
+  - `Create Note`
+  - `Create Task`
+- Shopify:
+  - `Get Shop Details`
+  - `Get Products Paginated`
+  - `Count Products`
+  - `List Customers`
+  - `Create Customer`
+  - `Update Customer`
+  - `List Orders`
+  - `List Draft Orders`
+  - `Create Draft Order`
+  - `Update Draft Order`
+  - `List Inventory Levels`
+  - `Creates A New Product`
+  - `Updates A Product`
 - Google Calendar:
   - `Create Event`
   - `Quick Add`
@@ -246,11 +279,13 @@ The left drawer is a node library.
 
 Current behavior:
 
+- `Trigger` is fixed and non-addable
 - `Agent Core` is fixed and non-addable
 - `Knowledge` can only be added once
 - `End Chat` can only be added once
-- `Connected Tools` opens a picker for Gmail, Microsoft Outlook, Google Calendar, and Cal.com
+- `Connected Tools` opens a picker for Gmail, Microsoft Outlook, Slack, HubSpot, Shopify, Google Calendar, and Cal.com
 - a tool can only be added if there is at least one connected account for that tool
+- the drawer opens on hover and can also be pinned open by click/tap
 
 ## Create, Load, Normalize
 
@@ -354,7 +389,7 @@ Important current behavior:
 - activation calls `saveDraft()` first
 - activation requires `COMPOSIO_API_KEY`
 - activation requires `COMPOSIO_WEBHOOK_SECRET`
-- activation requires a selected connected Gmail account
+- activation requires the selected Gmail account to exist and be connected
 - activation creates or enables the upstream Composio trigger
 - pause disables the upstream Composio trigger
 - normal `/api/agents/[id]/status` rejects automation agents
@@ -362,7 +397,7 @@ Important current behavior:
 
 ### Publish
 
-`Publish` always calls `saveDraft()` first and only applies to website chat agents.
+`Publish Version` always calls `saveDraft()` first and only applies to website chat agents.
 
 After that it:
 
@@ -373,7 +408,7 @@ After that it:
    - `published_version_id = new version id`
    - current core config fields
 
-Publishing is what creates the version snapshot used for deployments.
+Publishing a version is what creates the version snapshot used for deployments.
 
 Automation agents are not version-published for trigger activation in v1. Their active runtime reads the current saved draft plus durable connection and knowledge attachments.
 
@@ -469,7 +504,7 @@ Current deployment behavior:
 So the builder affects widgets in two stages:
 
 1. `Save Draft` updates the editable current agent state
-2. `Publish` creates the version that widgets can deploy against
+2. `Publish Version` creates the version that widgets can deploy against
 
 ## Current UX and State Rules
 
@@ -477,13 +512,19 @@ So the builder affects widgets in two stages:
 
 - select nodes
 - edit the selected node in the inspector, including Trigger setup for chat versus external automation triggers
-- draw manual edges/connections between nodes
+- move nodes on the canvas
 - add knowledge
 - add Gmail
+- add Outlook
+- add Slack
+- add HubSpot
+- add Shopify
 - add Google Calendar
+- add Cal.com
+- add End Chat
 - remove optional nodes
 - save draft
-- publish
+- publish a version
 - open published version history
 - rollback to an older published version
 - undo/redo canvas changes in memory
@@ -495,7 +536,6 @@ So the builder affects widgets in two stages:
 - no custom node types
 - no multiple knowledge nodes
 - no multiple accounts per node
-- no per-tool custom action permissions in the UI
 - no node execution testing inside the builder
 - no diff view between versions
 - undo/redo is in-memory only and resets on reload
@@ -549,6 +589,9 @@ Current supported node data types in `src/lib/types.ts`:
 - `EndChatBuilderNodeData`
 - `GmailBuilderNodeData`
 - `OutlookBuilderNodeData`
+- `SlackBuilderNodeData`
+- `HubSpotBuilderNodeData`
+- `ShopifyBuilderNodeData`
 - `GoogleCalendarBuilderNodeData`
 - `CalBuilderNodeData`
 
@@ -564,6 +607,9 @@ Important current tool-node fields:
   - `calendarId`
   - `calendarLabel`
   - `includePrimaryCalendar`
+- `SlackBuilderNodeData` / `HubSpotBuilderNodeData` / `ShopifyBuilderNodeData`
+  - `connectionId`
+  - `enabledTools`
 - `CalBuilderNodeData`
   - `connectionId`
   - `timezone`
@@ -601,12 +647,18 @@ Important operational detail:
   - Cal.com
   - Google Drive
   - Microsoft Outlook
+  - Slack
+  - HubSpot
+  - Shopify
 - these can be overridden via environment variables:
   - `COMPOSIO_TOOLKIT_VERSION_GMAIL`
   - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
   - `COMPOSIO_TOOLKIT_VERSION_CAL`
   - `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
   - `COMPOSIO_TOOLKIT_VERSION_OUTLOOK`
+  - `COMPOSIO_TOOLKIT_VERSION_SLACK`
+  - `COMPOSIO_TOOLKIT_VERSION_HUBSPOT`
+  - `COMPOSIO_TOOLKIT_VERSION_SHOPIFY`
 
 This is why Google Calendar's booking-calendar selector and Google Drive import utilities do not pass per-request versions manually.
 

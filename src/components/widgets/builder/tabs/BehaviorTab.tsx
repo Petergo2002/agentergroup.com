@@ -16,6 +16,7 @@ export function BehaviorTab() {
   if (!form) return null;
 
   const canHideBranding = subscription?.plan_tier === 'premium';
+  const isBrandingVisible = canHideBranding ? form.showBranding : true;
 
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -56,7 +57,7 @@ export function BehaviorTab() {
               <button
                 type="button"
                 role="switch"
-                aria-checked={canHideBranding ? form.showBranding : true}
+                aria-checked={isBrandingVisible}
                 disabled={!canHideBranding}
                 onClick={() =>
                   setForm((current) =>
@@ -66,16 +67,12 @@ export function BehaviorTab() {
                   )
                 }
                 className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 ${
-                  (canHideBranding ? form.showBranding : true)
-                    ? 'bg-primary'
-                    : 'bg-outline-variant/30'
+                  isBrandingVisible ? 'bg-primary' : 'bg-outline-variant/30'
                 }`}
               >
                 <span
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-background shadow-sm transition-transform ${
-                    (canHideBranding ? form.showBranding : true)
-                      ? 'translate-x-6'
-                      : 'translate-x-1'
+                  className={`pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-background shadow-sm transition-transform ${
+                    isBrandingVisible ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>

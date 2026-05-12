@@ -1,6 +1,6 @@
 # End-to-End Integration Guide — Adding New Toolkits
 
-Last updated: 2026-05-04
+Last updated: 2026-05-12
 
 This document defines the complete workflow for adding a new Composio toolkit (integration) to the Agenter platform. Follow these steps in order to ensure the integration is registered, secured, and properly exposed in the Agent Builder and Runtime.
 
@@ -40,6 +40,18 @@ Do not add a platform-level chat allow list for new Composio toolkits. Chat inte
 Update the default version mapping.
 - **File:** `src/lib/composio.ts`
 - **Action:** Add the slug to `DEFAULT_COMPOSIO_TOOLKIT_VERSIONS` using the environment variable.
+
+### Auth Configuration
+Check whether the Composio toolkit has a managed auth config available.
+
+- **Managed auth available:** no extra env is needed; `createConnectionRequest()` can create `use_composio_managed_auth`.
+- **Managed auth not available:** add explicit env support for either a pre-created auth config id or provider credentials, then branch `createConnectionRequest()` to use `use_custom_auth`.
+
+Shopify is the reference implementation for custom auth:
+
+- `COMPOSIO_SHOPIFY_AUTH_CONFIG_ID` or `COMPOSIO_AUTH_CONFIG_SHOPIFY` can point at a real Composio auth config id.
+- Otherwise `COMPOSIO_SHOPIFY_CLIENT_ID`, `COMPOSIO_SHOPIFY_CLIENT_SECRET`, and `COMPOSIO_SHOPIFY_OAUTH_REDIRECT_URI` are used to create a Shopify `use_custom_auth` OAuth2 config.
+- Never document placeholders such as `ac_...` as usable values; they are examples only.
 
 ### Tool Constants
 Define constants for the tools you'll be intercepting or using.
@@ -145,6 +157,7 @@ If the new toolkit should be usable inside automations:
 - make sure any policy extractor used by chat also works from the saved draft definition
 - update `src/lib/automation/executor.ts` if the toolkit has additional per-node runtime settings that must be passed into `runAgentChat(...)`
 - update `docs/guides/automation-agents.md`
+- update `docs/guides/composio-integrations.md` with auth setup, default tools, and known response-shape notes
 
 Automation does not automatically grant all tools for a toolkit. Only attached/selected tool nodes are loaded.
 

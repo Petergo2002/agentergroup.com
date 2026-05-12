@@ -14,7 +14,7 @@ export const agentBuilder = {
     knowledgeDescription:
       "Koppla på workspace-källor som agenten kan hämta från.",
     toolsDescription:
-      "Lägg till verktyg för liveåtgärder i chatten.",
+      "Lägg till Gmail, Outlook, Slack, Google Calendar eller Cal.com för liveåtgärder i chatten.",
     leadsDescription:
       "Fånga strukturerade interna leads från widgetkonversationer.",
     endChatDescription:
@@ -60,7 +60,7 @@ export const agentBuilder = {
   surfaceAssistant: "Intern assistent",
   surfaceWidget: "Webbplatswidget",
   currentAccountStatus:
-    "Nuvarande konto är {status}. Välj ett anslutet konto innan publicering.",
+    "Nuvarande konto är {status}. Välj ett anslutet konto innan du sparar.",
   lastSaved: "Senast sparad {date}",
   publishedAt: "Publicerad v{version} {date}",
   rolledBackAt: "Tillbakarullad {date}",
@@ -75,7 +75,7 @@ export const agentBuilder = {
   lastUpdate: "Senaste uppdatering",
   saveDraft: "Spara",
   savingDraft: "Sparar...",
-  deployBlueprint: "Publicera blueprint",
+  deployBlueprint: "Publicera version",
   publishing: "Publicerar...",
   loadingBuilder: "Laddar builder...",
   nodeLibraryTitle: "Nodbibliotek",
@@ -124,6 +124,9 @@ export const agentBuilder = {
     "Styr modell, instruktioner och livebeteende i svaren.",
   gmailDescription: "Skicka e-post under den aktuella konversationen.",
   outlookDescription: "Skicka e-post under den aktuella konversationen via Outlook.",
+  slackDescription: "Skicka meddelanden och sök workspace-kontext i Slack.",
+  hubspotDescription: "Skapa, sök och uppdatera CRM-poster i HubSpot.",
+  shopifyDescription: "Läs och hantera butikens produkter, kunder, ordrar och orderutkast i Shopify.",
   googleCalendarDescription: "Kontrollera tillgänglighet och boka möten.",
   calDescription: "Kontrollera tillgänglighet och boka möten med Cal.com.",
   leadsDescription:
@@ -151,6 +154,9 @@ export const agentBuilder = {
   removeNode: "Ta bort nod",
   useGmail: "Använd Gmail i den aktuella konversationen.",
   useOutlook: "Använd Outlook i den aktuella konversationen.",
+  useSlack: "Använd Slack för att hitta kanaler, söka meddelanden, läsa kontext och skicka meddelanden när det efterfrågas.",
+  useHubSpot: "Använd HubSpot för att söka CRM-poster, skapa eller uppdatera kundposter och logga anteckningar eller uppgifter när det efterfrågas.",
+  useShopify: "Använd Shopify för att granska butiksdata, hantera kunder och produkter och arbeta med ordrar eller orderutkast när det efterfrågas.",
   useCalendar: "Kontrollera tillgänglighet och boka möten.",
   useCal: "Kontrollera tillgänglighet och boka möten med Cal.com.",
   noConnectedAccount: "Inget anslutet {label}-konto ännu.",

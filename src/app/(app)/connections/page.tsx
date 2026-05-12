@@ -1,9 +1,10 @@
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { syncConnectedAccountsToDatabase } from "@/lib/composio";
-import { getEffectiveConnectionStatus } from "@/lib/connections";
+import { getEffectiveConnectionStatus, sortConnectedItemsFirst } from "@/lib/connections";
 import { SUPPORTED_INTEGRATIONS } from "@/lib/integrations";
 import { createClient } from "@/lib/supabase/server";
-import type { ConnectionRecord } from "@/lib/types";
+import { isWorkspaceAdminRole } from "@/lib/workspace-security";
+import type { ConnectionAuthLinkRecord, ConnectionRecord } from "@/lib/types";
 import ConnectionsPageClient from "./ConnectionsPageClient";
 
 async function loadConnectionsPageData() {
@@ -46,7 +47,7 @@ async function loadConnectionsPageData() {
       status: getEffectiveConnectionStatus(connection),
     }));
 
-  const toolkits = SUPPORTED_INTEGRATIONS.map((toolkit) => {
+  const toolkits = sortConnectedItemsFirst(SUPPORTED_INTEGRATIONS.map((toolkit) => {
     const connection =
       connectionRows.find(
         (item) => item.toolkit_slug === toolkit.slug && item.status === "connected",
@@ -64,21 +65,50 @@ async function loadConnectionsPageData() {
       connection: connection ?? null,
       status: connection?.status ?? "disconnected",
     };
-  });
+  }));
+
+  let authLinks: Array<Omit<ConnectionAuthLinkRecord, "token_hash">> = [];
+  const canManageAuthLinks = isWorkspaceAdminRole(context.membership.role);
+
+  if (canManageAuthLinks) {
+    const { data: storedAuthLinks, error: authLinksError } = await supabase
+      .from("connection_auth_links")
+      .select(
+        "id, workspace_id, toolkit_slug, created_by, status, expires_at, completed_connection_id, created_at, updated_at",
+      )
+      .eq("workspace_id", context.workspace.id)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    if (authLinksError) {
+      throw authLinksError;
+    }
+
+    authLinks = (storedAuthLinks ?? []) as Array<Omit<ConnectionAuthLinkRecord, "token_hash">>;
+  }
 
   return {
     initialToolkits: toolkits,
     initialConnections: connectionRows,
+    initialAuthLinks: authLinks,
+    canManageAuthLinks,
   };
 }
 
 export default async function ConnectionsPage() {
-  const { initialToolkits, initialConnections } = await loadConnectionsPageData();
+  const {
+    initialToolkits,
+    initialConnections,
+    initialAuthLinks,
+    canManageAuthLinks,
+  } = await loadConnectionsPageData();
 
   return (
     <ConnectionsPageClient
       initialToolkits={initialToolkits}
       initialConnections={initialConnections}
+      initialAuthLinks={initialAuthLinks}
+      canManageAuthLinks={canManageAuthLinks}
     />
   );
 }

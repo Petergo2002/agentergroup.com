@@ -74,3 +74,9 @@ export function getEffectiveConnectionStatus(
     ? connection.status
     : "disconnected";
 }
+
+export function sortConnectedItemsFirst<T extends { status: string }>(items: T[]): T[] {
+  return [...items].sort(
+    (a, b) => Number(b.status === "connected") - Number(a.status === "connected"),
+  );
+}

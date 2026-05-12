@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
-import { CreditCard, Download, CheckCircle2, MessageSquare, ExternalLink, Loader2 } from 'lucide-react';
+import { Coins, CreditCard, Download, CheckCircle2, MessageSquare, ExternalLink, Loader2, LockKeyhole } from 'lucide-react';
 import { useAppContext } from '@/components/app/AppContext';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { EXTRA_MESSAGE_CREDIT_PACK_AMOUNT } from '@/lib/billing-credits';
 
 // ─── Static plan data ─────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ export default function BillingSettingsPage() {
   const router = useRouter();
 
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [creditsCheckoutLoading, setCreditsCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
@@ -43,20 +45,30 @@ export default function BillingSettingsPage() {
 
   const isAdmin = ['owner', 'admin'].includes(membership?.role ?? 'member');
   const currentPlan = subscription?.plan_tier || 'free';
+  const isFreePlan = currentPlan === 'free';
   const usagePercent = subscription
     ? Math.min(Math.round((subscription.messages_used / subscription.messages_limit) * 100), 100)
     : 0;
 
   // ─── Show toast from Stripe redirect params ──────────────────────────────
   useEffect(() => {
-    if (searchParams.get('success') === 'true') {
+    const creditsStatus = searchParams.get('credits');
+
+    if (creditsStatus === 'success') {
+      setToast({ type: 'success', message: t('settings.billing.extraCreditsSuccess') });
+      router.refresh();
+      router.replace('/settings/billing');
+    } else if (creditsStatus === 'canceled') {
+      setToast({ type: 'error', message: t('settings.billing.extraCreditsCanceled') });
+      router.replace('/settings/billing');
+    } else if (searchParams.get('success') === 'true') {
       setToast({ type: 'success', message: '🎉 Plan upgraded successfully! Welcome aboard.' });
       router.replace('/settings/billing');
     } else if (searchParams.get('canceled') === 'true') {
       setToast({ type: 'error', message: 'Checkout canceled. No changes were made.' });
       router.replace('/settings/billing');
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, t]);
 
   // Auto-dismiss toast after 5 seconds
   useEffect(() => {
@@ -140,6 +152,35 @@ export default function BillingSettingsPage() {
     }
   }
 
+  async function handleExtraCreditsCheckout() {
+    if (isFreePlan || !isAdmin || creditsCheckoutLoading) return;
+
+    setCreditsCheckoutLoading(true);
+    try {
+      const res = await fetch('/api/billing/extra-credits/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId: workspace.id }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setToast({
+          type: 'error',
+          message: data.error ?? t('settings.billing.extraCreditsCheckoutError'),
+        });
+        return;
+      }
+
+      window.location.href = data.url;
+    } catch {
+      setToast({ type: 'error', message: t('settings.billing.extraCreditsCheckoutError') });
+    } finally {
+      setCreditsCheckoutLoading(false);
+    }
+  }
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -208,6 +249,76 @@ export default function BillingSettingsPage() {
                 style={{ width: `${usagePercent}%` }}
               />
             </div>
+          </div>
+        </div>
+
+        {/* Extra Credits */}
+        <div className="rounded-[1.7rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-4">
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+                isFreePlan ? 'bg-surface-container text-on-surface-variant' : 'bg-primary/10 text-primary'
+              }`}>
+                {isFreePlan ? <LockKeyhole className="h-6 w-6" /> : <Coins className="h-6 w-6" />}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
+                  {t('settings.billing.extraCreditsTitle')}
+                </p>
+                <h2 className="mt-2 text-lg font-bold text-on-surface">
+                  {isFreePlan
+                    ? t('settings.billing.extraCreditsLockedTitle')
+                    : t('settings.billing.extraCreditsPackTitle', {
+                        amount: EXTRA_MESSAGE_CREDIT_PACK_AMOUNT,
+                      })}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
+                  {isFreePlan
+                    ? t('settings.billing.extraCreditsLockedDescription')
+                    : t('settings.billing.extraCreditsDescription', {
+                        amount: EXTRA_MESSAGE_CREDIT_PACK_AMOUNT,
+                      })}
+                </p>
+              </div>
+            </div>
+
+            {isFreePlan ? (
+              <button
+                type="button"
+                onClick={() => handleUpgrade('starter')}
+                disabled={!isAdmin || checkoutLoading === 'starter'}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                title={!isAdmin ? t('settings.billing.extraCreditsAdminOnly') : undefined}
+              >
+                {checkoutLoading === 'starter' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                {isAdmin
+                  ? t('settings.billing.extraCreditsUpgradeCta')
+                  : t('settings.billing.extraCreditsAdminOnly')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleExtraCreditsCheckout}
+                disabled={!isAdmin || creditsCheckoutLoading}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                title={!isAdmin ? t('settings.billing.extraCreditsAdminOnly') : undefined}
+              >
+                {creditsCheckoutLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Coins className="h-4 w-4" />
+                )}
+                {isAdmin
+                  ? creditsCheckoutLoading
+                    ? t('settings.billing.extraCreditsRedirecting')
+                    : t('settings.billing.extraCreditsButton', {
+                        amount: EXTRA_MESSAGE_CREDIT_PACK_AMOUNT,
+                      })
+                  : t('settings.billing.extraCreditsAdminOnly')}
+              </button>
+            )}
           </div>
         </div>
 

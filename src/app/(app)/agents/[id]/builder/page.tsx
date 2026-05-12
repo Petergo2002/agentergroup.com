@@ -75,7 +75,10 @@ import type {
   ConnectionRecord,
   EndChatBuilderNodeData,
   GmailBuilderNodeData,
+  HubSpotBuilderNodeData,
   OutlookBuilderNodeData,
+  ShopifyBuilderNodeData,
+  SlackBuilderNodeData,
   GoogleCalendarBuilderNodeData,
   KnowledgeBuilderNodeData,
   KnowledgeSourceRecord,
@@ -85,8 +88,8 @@ import type {
 
 type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
-type ToolNodeKind = 'gmail' | 'outlook' | 'googlecalendar' | 'cal';
-type ToolNodeData = GmailBuilderNodeData | OutlookBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
+type ToolNodeKind = 'gmail' | 'outlook' | 'slack' | 'hubspot' | 'shopify' | 'googlecalendar' | 'cal';
+type ToolNodeData = GmailBuilderNodeData | OutlookBuilderNodeData | SlackBuilderNodeData | HubSpotBuilderNodeData | ShopifyBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
 type LibraryItemKey = 'trigger' | 'knowledge' | 'tools' | 'endchat' | 'agent';
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 type BuilderStatusNote =
@@ -156,8 +159,11 @@ const DEFAULT_POSITIONS: Record<BuilderNodeKind, { x: number; y: number }> = {
   knowledge: { x: 610, y: 70 },
   gmail: { x: 610, y: 220 },
   outlook: { x: 610, y: 220 },
-  googlecalendar: { x: 610, y: 360 },
-  cal: { x: 610, y: 500 },
+  slack: { x: 610, y: 290 },
+  hubspot: { x: 610, y: 360 },
+  shopify: { x: 610, y: 430 },
+  googlecalendar: { x: 610, y: 500 },
+  cal: { x: 610, y: 640 },
   endchat: { x: 1210, y: 150 },
 };
 
@@ -167,12 +173,14 @@ const NODE_LIBRARY: NodeLibraryItem[] = [
     label: 'Trigger',
     icon: 'input',
     description: 'Choose what starts this agent.',
+    fixed: true,
   },
   {
     key: 'agent',
     label: 'Agent Core',
     icon: 'smart_toy',
     description: 'The AI brain that processes and responds to users.',
+    fixed: true,
   },
   {
     key: 'knowledge',
@@ -231,7 +239,7 @@ const TIMEZONE_OPTIONS = [
   { value: 'Pacific/Auckland', label: 'Auckland' },
 ];
 
-const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'outlook', 'googlecalendar', 'cal'];
+const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'outlook', 'slack', 'hubspot', 'shopify', 'googlecalendar', 'cal'];
 
 const TRIGGER_SOURCE_ORDER: BuilderTriggerSource[] = [
   'user_message',
@@ -303,6 +311,24 @@ function getBuilderNodeText(kind: BuilderNodeKind, t: Translate) {
         label: 'Microsoft Outlook',
         type: t('agentBuilder.toolType'),
         description: t('agentBuilder.outlookDescription'),
+      };
+    case 'slack':
+      return {
+        label: 'Slack',
+        type: t('agentBuilder.toolType'),
+        description: t('agentBuilder.slackDescription'),
+      };
+    case 'hubspot':
+      return {
+        label: 'HubSpot',
+        type: t('agentBuilder.toolType'),
+        description: t('agentBuilder.hubspotDescription'),
+      };
+    case 'shopify':
+      return {
+        label: 'Shopify',
+        type: t('agentBuilder.toolType'),
+        description: t('agentBuilder.shopifyDescription'),
       };
     case 'googlecalendar':
       return {
@@ -376,7 +402,7 @@ function translateKnowledgeStatus(status: string, t: Translate) {
 
 function formatToolActionName(toolName: string) {
   return toolName
-    .replace(/^(GMAIL|OUTLOOK|GOOGLECALENDAR|CAL)_/, '')
+    .replace(/^(GMAIL|OUTLOOK|SLACK|HUBSPOT|SHOPIFY|GOOGLECALENDAR|CAL)_/, '')
     .toLowerCase()
     .split('_')
     .filter(Boolean)
@@ -553,7 +579,7 @@ AgentNode.displayName = 'AgentNode';
 // nodeTypes is now memoized inside AgentBuilderPage to prevent Fast Refresh warnings
 
 function isToolNodeKind(kind: BuilderNodeKind): kind is ToolNodeKind {
-  return kind === 'gmail' || kind === 'outlook' || kind === 'googlecalendar' || kind === 'cal';
+  return kind === 'gmail' || kind === 'outlook' || kind === 'slack' || kind === 'hubspot' || kind === 'shopify' || kind === 'googlecalendar' || kind === 'cal';
 }
 
 function isToolNodeData(data: BuilderNodeData): data is ToolNodeData {
@@ -579,6 +605,9 @@ function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
     value === 'knowledge' ||
     value === 'gmail' ||
     value === 'outlook' ||
+    value === 'slack' ||
+    value === 'hubspot' ||
+    value === 'shopify' ||
     value === 'googlecalendar' ||
     value === 'cal' ||
     value === 'endchat'
@@ -591,6 +620,9 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
   const hasKnowledge = nodes.some((node) => node.data.kind === 'knowledge');
   const hasGmail = nodes.some((node) => node.data.kind === 'gmail');
   const hasOutlook = nodes.some((node) => node.data.kind === 'outlook');
+  const hasSlack = nodes.some((node) => node.data.kind === 'slack');
+  const hasHubSpot = nodes.some((node) => node.data.kind === 'hubspot');
+  const hasShopify = nodes.some((node) => node.data.kind === 'shopify');
   const hasCalendar = nodes.some((node) => node.data.kind === 'googlecalendar');
   const hasCal = nodes.some((node) => node.data.kind === 'cal');
   const hasEndChat = nodes.some((node) => node.data.kind === 'endchat');
@@ -630,6 +662,33 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
       id: 'e-agent-outlook',
       source: FIXED_NODE_IDS.agent,
       target: 'outlook',
+      style: DEFAULT_EDGE_STYLE,
+    });
+  }
+
+  if (hasAgent && hasSlack) {
+    edges.push({
+      id: 'e-agent-slack',
+      source: FIXED_NODE_IDS.agent,
+      target: 'slack',
+      style: DEFAULT_EDGE_STYLE,
+    });
+  }
+
+  if (hasAgent && hasHubSpot) {
+    edges.push({
+      id: 'e-agent-hubspot',
+      source: FIXED_NODE_IDS.agent,
+      target: 'hubspot',
+      style: DEFAULT_EDGE_STYLE,
+    });
+  }
+
+  if (hasAgent && hasShopify) {
+    edges.push({
+      id: 'e-agent-shopify',
+      source: FIXED_NODE_IDS.agent,
+      target: 'shopify',
       style: DEFAULT_EDGE_STYLE,
     });
   }
@@ -792,6 +851,84 @@ function createOutlookNode(
   };
 }
 
+function createSlackNode(
+  position = DEFAULT_POSITIONS.slack,
+  connectionId: string | null = null,
+  data?: Partial<SlackBuilderNodeData>,
+): BuilderFlowNode {
+  return {
+    id: 'slack',
+    type: 'agentNode',
+    position,
+    data: {
+      kind: 'slack',
+      label: 'Slack',
+      type: 'Tool',
+      icon: 'tag',
+      simpleIcon: 'siSlack',
+      simpleIconColor: '#4A154B',
+      description: 'Send messages and search workspace context in Slack.',
+      status: 'idle',
+      integrationSlug: 'slack',
+      connectionId,
+      enabledTools: getRecommendedChatToolsForToolkit('slack'),
+      ...(data ?? {}),
+    } as BuilderNodeData,
+  };
+}
+
+function createHubSpotNode(
+  position = DEFAULT_POSITIONS.hubspot,
+  connectionId: string | null = null,
+  data?: Partial<HubSpotBuilderNodeData>,
+): BuilderFlowNode {
+  return {
+    id: 'hubspot',
+    type: 'agentNode',
+    position,
+    data: {
+      kind: 'hubspot',
+      label: 'HubSpot',
+      type: 'Tool',
+      icon: 'hub',
+      simpleIcon: 'siHubspot',
+      simpleIconColor: '#FF7A59',
+      description: 'Create, search, and update CRM records in HubSpot.',
+      status: 'idle',
+      integrationSlug: 'hubspot',
+      connectionId,
+      enabledTools: getRecommendedChatToolsForToolkit('hubspot'),
+      ...(data ?? {}),
+    } as BuilderNodeData,
+  };
+}
+
+function createShopifyNode(
+  position = DEFAULT_POSITIONS.shopify,
+  connectionId: string | null = null,
+  data?: Partial<ShopifyBuilderNodeData>,
+): BuilderFlowNode {
+  return {
+    id: 'shopify',
+    type: 'agentNode',
+    position,
+    data: {
+      kind: 'shopify',
+      label: 'Shopify',
+      type: 'Tool',
+      icon: 'shopping_bag',
+      simpleIcon: 'siShopify',
+      simpleIconColor: '#7AB55C',
+      description: 'Read and manage store products, customers, orders, and draft orders in Shopify.',
+      status: 'idle',
+      integrationSlug: 'shopify',
+      connectionId,
+      enabledTools: getRecommendedChatToolsForToolkit('shopify'),
+      ...(data ?? {}),
+    } as BuilderNodeData,
+  };
+}
+
 function createGoogleCalendarNode(
   position = DEFAULT_POSITIONS.googlecalendar,
   connectionId: string | null = null,
@@ -907,6 +1044,18 @@ function inferNodeKind(node: BuilderFlowNode) {
     return 'outlook';
   }
 
+  if (label === 'slack') {
+    return 'slack';
+  }
+
+  if (label === 'hubspot') {
+    return 'hubspot';
+  }
+
+  if (label === 'shopify') {
+    return 'shopify';
+  }
+
   if (label === 'google calendar') {
     return 'googlecalendar';
   }
@@ -955,6 +1104,16 @@ function pickEnabledToolsFromNode(kind: ToolNodeKind, node: BuilderFlowNode | un
     : getRecommendedChatToolsForToolkit(kind);
 }
 
+function getDefaultNodeForSurface(
+  surface: AgentRecord['surface'],
+  kind: 'trigger' | 'agent',
+) {
+  const definition = buildInitialDefinition('custom', surface);
+  return ((Array.isArray(definition.nodes) ? definition.nodes : []) as BuilderFlowNode[]).find(
+    (node) => node.data.kind === kind,
+  );
+}
+
 function normalizeDefinition(
   definition: BuilderDefinition,
   surface: AgentRecord['surface'],
@@ -989,6 +1148,9 @@ function normalizeDefinition(
 
   const gmailNode = nodesByKind.get('gmail');
   const outlookNode = nodesByKind.get('outlook');
+  const slackNode = nodesByKind.get('slack');
+  const hubspotNode = nodesByKind.get('hubspot');
+  const shopifyNode = nodesByKind.get('shopify');
   const calendarNode = nodesByKind.get('googlecalendar');
   const calNode = nodesByKind.get('cal');
   const endChatNode = nodesByKind.get('endchat');
@@ -1003,6 +1165,24 @@ function normalizeDefinition(
     attachedConnectionIds,
     'outlook',
     outlookNode && isToolNodeData(outlookNode.data) ? outlookNode.data.connectionId : null,
+  );
+  const slackConnectionId = pickPreferredConnectionId(
+    connections,
+    attachedConnectionIds,
+    'slack',
+    slackNode && isToolNodeData(slackNode.data) ? slackNode.data.connectionId : null,
+  );
+  const hubspotConnectionId = pickPreferredConnectionId(
+    connections,
+    attachedConnectionIds,
+    'hubspot',
+    hubspotNode && isToolNodeData(hubspotNode.data) ? hubspotNode.data.connectionId : null,
+  );
+  const shopifyConnectionId = pickPreferredConnectionId(
+    connections,
+    attachedConnectionIds,
+    'shopify',
+    shopifyNode && isToolNodeData(shopifyNode.data) ? shopifyNode.data.connectionId : null,
   );
   const googleCalendarConnectionId = pickPreferredConnectionId(
     connections,
@@ -1041,36 +1221,31 @@ function normalizeDefinition(
   const normalizedNodes: BuilderFlowNode[] = [];
   const triggerNode = nodesByKind.get('trigger');
   const agentNode = nodesByKind.get('agent');
-  const hasAnyFlowNode =
-    Boolean(triggerNode) ||
-    Boolean(agentNode) ||
-    Boolean(knowledgeNode) ||
-    Boolean(gmailNode) ||
-    Boolean(outlookNode) ||
-    Boolean(calendarNode) ||
-    Boolean(calNode) ||
-    Boolean(endChatNode) ||
-    knowledgeSourceIds.length > 0 ||
-    Boolean(gmailConnectionId) ||
-    Boolean(outlookConnectionId) ||
-    Boolean(googleCalendarConnectionId) ||
-    Boolean(calConnectionId);
+  const defaultTriggerNode = getDefaultNodeForSurface(surface, 'trigger');
+  const defaultAgentNode = getDefaultNodeForSurface(surface, 'agent');
 
-  if (triggerNode || triggerDataFromConfig) {
-    normalizedNodes.push(
-      createTriggerNode(
-        triggerNode?.position ?? DEFAULT_POSITIONS.trigger,
-        {
-          ...(triggerDataFromConfig ?? {}),
-          ...((triggerNode?.data as Partial<TriggerBuilderNodeData> | undefined) ?? {}),
-        },
-      ),
-    );
-  }
+  normalizedNodes.push(
+    createTriggerNode(
+      triggerNode?.position ?? defaultTriggerNode?.position ?? DEFAULT_POSITIONS.trigger,
+      {
+        ...((defaultTriggerNode?.data as Partial<TriggerBuilderNodeData> | undefined) ?? {}),
+        ...(triggerDataFromConfig ?? {}),
+        ...((triggerNode?.data as Partial<TriggerBuilderNodeData> | undefined) ?? {}),
+        locked: true,
+      } as Partial<BuilderNodeData>,
+    ),
+  );
 
-  if (agentNode || (hasAnyFlowNode && !triggerDataFromConfig && !triggerNode)) {
-    normalizedNodes.push(createAgentCoreNode(agentNode?.position ?? DEFAULT_POSITIONS.agent));
-  }
+  normalizedNodes.push(
+    createAgentCoreNode(
+      agentNode?.position ?? defaultAgentNode?.position ?? DEFAULT_POSITIONS.agent,
+      {
+        ...((defaultAgentNode?.data as Partial<BuilderNodeData> | undefined) ?? {}),
+        ...((agentNode?.data as Partial<BuilderNodeData> | undefined) ?? {}),
+        locked: true,
+      } as Partial<BuilderNodeData>,
+    ),
+  );
 
   if (knowledgeNode || knowledgeSourceIds.length > 0) {
     normalizedNodes.push(
@@ -1119,6 +1294,48 @@ function normalizeDefinition(
                   ? outlookNode.data.recipientEmail
                   : null,
               enabledTools: pickEnabledToolsFromNode('outlook', outlookNode),
+            }
+          : undefined,
+      ),
+    );
+  }
+
+  if (slackNode || slackConnectionId) {
+    normalizedNodes.push(
+      createSlackNode(
+        slackNode?.position ?? DEFAULT_POSITIONS.slack,
+        slackConnectionId,
+        slackNode && slackNode.data.kind === 'slack'
+          ? {
+              enabledTools: pickEnabledToolsFromNode('slack', slackNode),
+            }
+          : undefined,
+      ),
+    );
+  }
+
+  if (hubspotNode || hubspotConnectionId) {
+    normalizedNodes.push(
+      createHubSpotNode(
+        hubspotNode?.position ?? DEFAULT_POSITIONS.hubspot,
+        hubspotConnectionId,
+        hubspotNode && hubspotNode.data.kind === 'hubspot'
+          ? {
+              enabledTools: pickEnabledToolsFromNode('hubspot', hubspotNode),
+            }
+          : undefined,
+      ),
+    );
+  }
+
+  if (shopifyNode || shopifyConnectionId) {
+    normalizedNodes.push(
+      createShopifyNode(
+        shopifyNode?.position ?? DEFAULT_POSITIONS.shopify,
+        shopifyConnectionId,
+        shopifyNode && shopifyNode.data.kind === 'shopify'
+          ? {
+              enabledTools: pickEnabledToolsFromNode('shopify', shopifyNode),
             }
           : undefined,
       ),
@@ -1339,11 +1556,24 @@ function getKnowledgeSourceIdsFromNodes(nodes: BuilderFlowNode[]) {
   return knowledgeNode.data.sourceIds.filter(Boolean);
 }
 
-function getSelectedConnectionIdsFromNodes(nodes: BuilderFlowNode[]) {
+function getSelectedConnectionIdsFromNodes(
+  nodes: BuilderFlowNode[],
+  connections: ConnectionRecord[],
+) {
+  const connectedConnectionIds = new Set(
+    connections
+      .filter((connection) => connection.status === 'connected')
+      .map((connection) => connection.id),
+  );
+
   return Array.from(
     new Set(
       nodes.flatMap((node) =>
-        isToolNodeData(node.data) && node.data.connectionId ? [node.data.connectionId] : [],
+        isToolNodeData(node.data) &&
+        node.data.connectionId &&
+        connectedConnectionIds.has(node.data.connectionId)
+          ? [node.data.connectionId]
+          : [],
       ),
     ),
   );
@@ -1513,6 +1743,7 @@ export default function AgentBuilderPage() {
   const [isRollingBackVersionId, setIsRollingBackVersionId] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<BuilderStatusNote>({ kind: 'draftInitial' });
   const [isToolPickerOpen, setIsToolPickerOpen] = useState(false);
+  const [isNodeLibraryOpen, setIsNodeLibraryOpen] = useState(false);
   const [shouldClearExternalTrigger, setShouldClearExternalTrigger] = useState(false);
   const [actionEditorNodeId, setActionEditorNodeId] = useState<string | null>(null);
   const [actionSearchQuery, setActionSearchQuery] = useState('');
@@ -1676,8 +1907,20 @@ export default function AgentBuilderPage() {
     [nodes],
   );
   const hasConfiguredTools = useMemo(
-    () => nodes.some((node) => isToolNodeData(node.data) && Boolean(node.data.connectionId)),
-    [nodes],
+    () =>
+      nodes.some(
+        (node) =>
+          isToolNodeData(node.data) &&
+          Boolean(
+            node.data.connectionId &&
+              connections.some(
+                (connection) =>
+                  connection.id === node.data.connectionId &&
+                  connection.status === 'connected',
+              ),
+          ),
+      ),
+    [connections, nodes],
   );
   const displayNodes = useMemo(() => {
     const agentTitleFallback = t('agentBuilder.agentTitleFallback');
@@ -1743,12 +1986,13 @@ export default function AgentBuilderPage() {
     [nodes],
   );
   const automationConnectionId =
-    automationTriggerNode?.data.connectionId ?? automationRecord?.connection_id ?? null;
+    automationTriggerNode?.data.connectionId ?? null;
   const automationSelectedConnection = automationConnectionId
     ? connections.find((connection) => connection.id === automationConnectionId) ?? null
     : null;
   const automationCanActivate = Boolean(
     automationConnectionId &&
+      automationSelectedConnection?.status === 'connected' &&
       automationEnvironment?.hasComposio &&
       automationEnvironment?.hasWebhookSecret,
   );
@@ -1757,7 +2001,7 @@ export default function AgentBuilderPage() {
     : true;
 
   const syncSelectedConnections = async (nextNodes: BuilderFlowNode[]) => {
-    const selectedConnectionIds = getSelectedConnectionIdsFromNodes(nextNodes);
+    const selectedConnectionIds = getSelectedConnectionIdsFromNodes(nextNodes, connections);
 
     await supabase.from('agent_connections').delete().eq('agent_id', agentId);
 
@@ -1867,7 +2111,8 @@ export default function AgentBuilderPage() {
       attachedConnectionIds,
       attachedKnowledgeSourceIds,
     );
-    const hasExternalTrigger = normalized.nodes.some(
+    let normalizedNodes = normalized.nodes;
+    const hasExternalTrigger = normalizedNodes.some(
       (node) =>
         node.data.kind === 'trigger' &&
         isTriggerNodeData(node.data) &&
@@ -1891,6 +2136,70 @@ export default function AgentBuilderPage() {
       }
     }
 
+    if (automationPayload?.automation?.connection_id) {
+      normalizedNodes = normalizedNodes.map((node) => {
+        if (
+          node.data.kind !== 'trigger' ||
+          !isTriggerNodeData(node.data) ||
+          node.data.provider !== 'composio' ||
+          node.data.connectionId
+        ) {
+          return node;
+        }
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            connectionId: automationPayload.automation?.connection_id ?? null,
+          },
+        };
+      });
+    }
+
+    const hydratedNodes = normalizedNodes.map((node) => {
+      if (!isToolNodeData(node.data) || node.data.connectionId !== null) {
+        return node;
+      }
+
+      const kind = node.data.kind as ToolNodeKind;
+      const match = chatConnections.find(
+        (connection) => connection.toolkit_slug === kind && connection.status === 'connected',
+      );
+
+      if (!match) {
+        return node;
+      }
+
+      if (kind === 'googlecalendar') {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            connectionId: match.id,
+            timezone: null,
+            calendarId: null,
+            calendarLabel: null,
+          },
+        };
+      }
+
+      if (kind === 'cal') {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            connectionId: match.id,
+            timezone: null,
+            eventTypeId: null,
+            eventTypeLabel: null,
+          },
+        };
+      }
+
+      return { ...node, data: { ...node.data, connectionId: match.id } };
+    });
+
     setAgent(loadedAgent);
     setName(loadedAgent.name);
     setDescription(loadedAgent.description);
@@ -1903,39 +2212,10 @@ export default function AgentBuilderPage() {
       ),
     );
     setDraftVersion(draftResult.data?.version ?? 1);
-    setNodes(normalized.nodes);
-    setEdges(normalized.edges);
+    setNodes(hydratedNodes);
+    setEdges(buildEdges(hydratedNodes));
     setVersions((versionsResult.data ?? []) as AgentVersionRecord[]);
     setConnections(chatConnections);
-
-    // Auto-wire: assign the single connected account to any tool node
-    // whose connectionId is null (zero-config for new nodes).
-    setNodes((prev) =>
-      prev.map((node) => {
-        if (!isToolNodeData(node.data) || node.data.connectionId !== null) {
-          return node;
-        }
-        const kind = node.data.kind as ToolNodeKind;
-        const match = chatConnections.find(
-          (c) => c.toolkit_slug === kind && c.status === 'connected',
-        );
-        if (!match) return node;
-        // For googlecalendar and cal, reset dependent fields when auto-assigning.
-        if (kind === 'googlecalendar') {
-          return {
-            ...node,
-            data: { ...node.data, connectionId: match.id, timezone: null, calendarId: null, calendarLabel: null },
-          };
-        }
-        if (kind === 'cal') {
-          return {
-            ...node,
-            data: { ...node.data, connectionId: match.id, timezone: null, eventTypeId: null, eventTypeLabel: null },
-          };
-        }
-        return { ...node, data: { ...node.data, connectionId: match.id } };
-      }),
-    );
     setKnowledgeSources((knowledgeSourcesResult.data ?? []) as KnowledgeSourceRecord[]);
     setAutomationRecord(automationPayload?.automation ?? null);
     setAutomationEvents(automationPayload?.events ?? []);
@@ -2439,11 +2719,16 @@ export default function AgentBuilderPage() {
     }
 
     saveToHistory();
+    const defaultConnection = getSingleConnection(connections, kind);
+    const connectionId = defaultConnection?.status === 'connected' ? defaultConnection.id : null;
     const nextNode =
-      kind === 'gmail' ? createGmailNode() :
-      kind === 'outlook' ? createOutlookNode() :
-      kind === 'cal' ? createCalNode() :
-      createGoogleCalendarNode();
+      kind === 'gmail' ? createGmailNode(DEFAULT_POSITIONS.gmail, connectionId) :
+      kind === 'outlook' ? createOutlookNode(DEFAULT_POSITIONS.outlook, connectionId) :
+      kind === 'slack' ? createSlackNode(DEFAULT_POSITIONS.slack, connectionId) :
+      kind === 'hubspot' ? createHubSpotNode(DEFAULT_POSITIONS.hubspot, connectionId) :
+      kind === 'shopify' ? createShopifyNode(DEFAULT_POSITIONS.shopify, connectionId) :
+      kind === 'cal' ? createCalNode(DEFAULT_POSITIONS.cal, connectionId) :
+      createGoogleCalendarNode(DEFAULT_POSITIONS.googlecalendar, connectionId);
     setNodes((currentNodes) => [...currentNodes, nextNode]);
     setSelectedNodeId(nextNode.id);
     setIsToolPickerOpen(false);
@@ -2465,48 +2750,6 @@ export default function AgentBuilderPage() {
           sourceIds: checked
             ? Array.from(new Set([...currentSourceIds, sourceId]))
             : currentSourceIds.filter((id) => id !== sourceId),
-        },
-      };
-    });
-  };
-
-  const updateToolConnection = (nodeId: string, connectionId: string | null) => {
-    updateNode(nodeId, (node) => {
-      if (!isToolNodeData(node.data)) {
-        return node;
-      }
-
-      if (node.data.kind === 'googlecalendar') {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            connectionId,
-            timezone: null,
-            calendarId: null,
-            calendarLabel: null,
-          },
-        };
-      }
-
-      if (node.data.kind === 'cal') {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            connectionId,
-            timezone: null,
-            eventTypeId: null,
-            eventTypeLabel: null,
-          },
-        };
-      }
-
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          connectionId,
         },
       };
     });
@@ -2925,9 +3168,15 @@ export default function AgentBuilderPage() {
           ? t('agentBuilder.gmailDescription')
           : kind === 'outlook'
             ? t('agentBuilder.outlookDescription')
-            : kind === 'cal'
-              ? t('agentBuilder.calDescription')
-              : t('agentBuilder.googleCalendarDescription'),
+            : kind === 'slack'
+              ? t('agentBuilder.slackDescription')
+              : kind === 'hubspot'
+                ? t('agentBuilder.hubspotDescription')
+                : kind === 'shopify'
+                  ? t('agentBuilder.shopifyDescription')
+                  : kind === 'cal'
+                    ? t('agentBuilder.calDescription')
+                    : t('agentBuilder.googleCalendarDescription'),
       icon: integration?.icon ?? 'extension',
       simpleIcon: integration?.simpleIcon,
       simpleIconColor: integration?.simpleIconColor,
@@ -3061,7 +3310,7 @@ export default function AgentBuilderPage() {
           {selectedSource === 'gmail_new_message' ? (
             <div className="space-y-3 rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5">
               <ConnectedAccountDisplay
-                connection={getSingleConnection(connections, 'gmail')}
+                connection={automationSelectedConnection}
                 toolkitLabel="Gmail"
               />
               <p className="text-[11px] leading-relaxed text-on-surface-variant/60">
@@ -3483,12 +3732,9 @@ export default function AgentBuilderPage() {
     }
 
     if (toolNode && isToolNodeData(toolNode.data)) {
-      // Single-account model: one connection per toolkit per workspace.
-      const singleConnection =
-        toolNode.data.connectionId
-          ? (connections.find((c) => c.id === toolNode.data.connectionId) ?? getSingleConnection(connections, toolNode.data.kind))
-          : getSingleConnection(connections, toolNode.data.kind);
-      const selectedConnection = singleConnection;
+      const selectedConnection = toolNode.data.connectionId
+        ? connections.find((connection) => connection.id === toolNode.data.connectionId) ?? null
+        : null;
       const emailRecipientEmail =
         toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook' ? toolNode.data.recipientEmail ?? '' : '';
       const selectedCalendarConnectionId =
@@ -3537,9 +3783,15 @@ export default function AgentBuilderPage() {
                   ? t('agentBuilder.useGmail')
                   : toolNode.data.kind === 'outlook'
                     ? t('agentBuilder.useOutlook')
-                    : toolNode.data.kind === 'cal'
-                      ? t('agentBuilder.useCal')
-                      : t('agentBuilder.useCalendar')}
+                    : toolNode.data.kind === 'slack'
+                      ? t('agentBuilder.useSlack')
+                      : toolNode.data.kind === 'hubspot'
+                        ? t('agentBuilder.useHubSpot')
+                        : toolNode.data.kind === 'shopify'
+                          ? t('agentBuilder.useShopify')
+                          : toolNode.data.kind === 'cal'
+                            ? t('agentBuilder.useCal')
+                            : t('agentBuilder.useCalendar')}
               </p>
             </div>
           </div>
@@ -4168,27 +4420,58 @@ export default function AgentBuilderPage() {
             : 'xl:grid-cols-[minmax(0,1fr)]'
         }`}
       >
-        <div className="group absolute bottom-0 left-0 top-0 z-30 w-[22rem] -translate-x-[calc(100%-3.25rem)] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] hover:translate-x-0">
+        <div
+          className={`group absolute bottom-0 left-0 top-0 z-30 w-[22rem] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] ${
+            isNodeLibraryOpen ? 'translate-x-0' : '-translate-x-[calc(100%-3.25rem)] hover:translate-x-0'
+          }`}
+        >
           <aside className="relative flex h-full flex-col border-r border-outline-variant/10 bg-surface/90 px-7 py-8 shadow-[20px_0_80px_rgba(0,0,0,0.15)] backdrop-blur-3xl">
             {/* The Handle */}
-            <div className="absolute bottom-0 right-0 top-0 flex w-11 items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
-              <div className="flex h-32 w-full flex-col items-center justify-center gap-4">
+            <button
+              type="button"
+              onClick={() => setIsNodeLibraryOpen(true)}
+              className={`absolute bottom-0 right-0 top-0 flex w-11 items-center justify-center transition-opacity duration-300 ${
+                isNodeLibraryOpen ? 'pointer-events-none opacity-0' : 'group-hover:opacity-0'
+              }`}
+              aria-label={t('agentBuilder.nodeLibraryTitle')}
+              aria-expanded={isNodeLibraryOpen}
+            >
+              <span className="flex h-32 w-full flex-col items-center justify-center gap-4">
                 <div className="h-full w-[2px] rounded-full bg-primary/20" />
                 <span className="[writing-mode:vertical-lr] text-[10px] font-bold uppercase tracking-[0.3em] text-primary/40 rotate-180">
                   {t('agentBuilder.nodeLibraryTitle')}
                 </span>
                 <div className="h-full w-[2px] rounded-full bg-primary/20" />
-              </div>
-            </div>
+              </span>
+            </button>
 
-            <div className="flex-1 overflow-y-auto opacity-0 transition-all duration-500 delay-100 group-hover:opacity-100 translate-x-[-10px] group-hover:translate-x-0">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <span className="material-symbols-outlined text-lg">grid_view</span>
+            <div
+              className={`flex-1 overflow-y-auto transition-all duration-500 delay-100 ${
+                isNodeLibraryOpen
+                  ? 'translate-x-0 opacity-100'
+                  : 'translate-x-[-10px] opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
+              }`}
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <span className="material-symbols-outlined text-lg">grid_view</span>
+                  </div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">
+                    {t('agentBuilder.nodeLibraryTitle')}
+                  </p>
                 </div>
-                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">
-                  {t('agentBuilder.nodeLibraryTitle')}
-                </p>
+                {isNodeLibraryOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsNodeLibraryOpen(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-90"
+                    aria-label={t('common.close')}
+                    title={t('common.close')}
+                  >
+                    <span className="material-symbols-outlined text-base">close</span>
+                  </button>
+                ) : null}
               </div>
               
               <p className="mt-4 text-xs leading-6 text-on-surface-variant/70 font-medium">
@@ -4203,7 +4486,12 @@ export default function AgentBuilderPage() {
                   const isEndChatAdded = item.key === 'endchat' && hasEndChatNode;
                   const isFixed = item.fixed;
                   const isDisabled =
-                    isTriggerAdded || isAgentAdded || isKnowledgeAdded || isEndChatAdded || item.disabled;
+                    isFixed ||
+                    isTriggerAdded ||
+                    isAgentAdded ||
+                    isKnowledgeAdded ||
+                    isEndChatAdded ||
+                    item.disabled;
 
                   return (
                     <button
@@ -4211,6 +4499,8 @@ export default function AgentBuilderPage() {
                       onClick={() =>
                         item.disabled
                           ? showToast(t('settings.billing.featureLocked') || 'Please upgrade your plan to unlock this feature.', 'error')
+                          : item.fixed
+                          ? undefined
                           : item.key === 'trigger'
                           ? handleAddTriggerNode()
                           : item.key === 'agent'

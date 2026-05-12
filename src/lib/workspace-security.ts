@@ -8,6 +8,10 @@ export class WorkspaceAccessError extends Error {
   }
 }
 
+export function isWorkspaceAdminRole(role: unknown) {
+  return role === "owner" || role === "admin";
+}
+
 export function assertOwnedWorkspaceResource<T extends { workspace_id: string }>(
   resource: T | null,
   activeWorkspaceId: string,

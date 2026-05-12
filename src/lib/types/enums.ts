@@ -31,6 +31,9 @@ export type BuilderNodeKind =
   | "knowledge"
   | "gmail"
   | "outlook"
+  | "slack"
+  | "hubspot"
+  | "shopify"
   | "googlecalendar"
   | "cal"
   | "endchat";

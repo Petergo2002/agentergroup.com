@@ -48,6 +48,21 @@ export const settings = {
     messages: "Meddelanden",
     messagesUsed: "{used} av {limit} meddelanden använda",
     messagesReset: "Återställs den {date}",
+    extraCreditsTitle: "Extra credits",
+    extraCreditsPackTitle: "+{amount} meddelandekrediter",
+    extraCreditsDescription:
+      "Lägg till {amount} extra meddelandekrediter i denna faktureringsperiod. Credits rullar inte över, och din månatliga planpott återställs som vanligt varje cykel.",
+    extraCreditsLockedTitle: "Uppgradera för att köpa credits",
+    extraCreditsLockedDescription:
+      "Extra credits är tillgängliga på Starter- och Premium-planerna.",
+    extraCreditsUpgradeCta: "Uppgradera till Starter",
+    extraCreditsButton: "Lägg till {amount} credits",
+    extraCreditsAdminOnly: "Endast admin",
+    extraCreditsRedirecting: "Omdirigerar...",
+    extraCreditsCheckoutError: "Det gick inte att starta checkout för extra credits.",
+    extraCreditsSuccess:
+      "Betalningen är mottagen. Dina extra credits visas när Stripe har bekräftat köpet.",
+    extraCreditsCanceled: "Checkout för extra credits avbröts. Inga ändringar gjordes.",
     agentLimitReached: "Du har nått din gräns för antal agenter. Uppgradera din plan för att skapa fler.",
     featureLocked: "Uppgradera din plan för att låsa upp denna funktion.",
     plans: {

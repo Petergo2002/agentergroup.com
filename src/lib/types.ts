@@ -40,7 +40,11 @@ export type {
 
 export type { AgentRecord, AgentVersionRecord } from "./types/agent";
 
-export type { ConnectionRecord } from "./types/connection";
+export type {
+  ConnectionAuthLinkRecord,
+  ConnectionAuthLinkStatus,
+  ConnectionRecord,
+} from "./types/connection";
 
 export type {
   KnowledgeSourceRecord,
@@ -142,6 +146,9 @@ export type {
   KnowledgeBuilderNodeData,
   GmailBuilderNodeData,
   OutlookBuilderNodeData,
+  SlackBuilderNodeData,
+  HubSpotBuilderNodeData,
+  ShopifyBuilderNodeData,
   GoogleCalendarBuilderNodeData,
   CalBuilderNodeData,
   EndChatBuilderNodeData,

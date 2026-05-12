@@ -48,6 +48,21 @@ export const settings = {
     messages: "Messages",
     messagesUsed: "{used} of {limit} messages used",
     messagesReset: "Resets on {date}",
+    extraCreditsTitle: "Extra credits",
+    extraCreditsPackTitle: "+{amount} message credits",
+    extraCreditsDescription:
+      "Add {amount} extra message credits to this billing cycle. Credits do not roll over, and your monthly plan allowance resets normally each cycle.",
+    extraCreditsLockedTitle: "Upgrade to buy credits",
+    extraCreditsLockedDescription:
+      "Extra credits are available on Starter and Premium plans.",
+    extraCreditsUpgradeCta: "Upgrade to Starter",
+    extraCreditsButton: "Add {amount} credits",
+    extraCreditsAdminOnly: "Admin only",
+    extraCreditsRedirecting: "Redirecting...",
+    extraCreditsCheckoutError: "Failed to start extra credits checkout.",
+    extraCreditsSuccess:
+      "Payment received. Your extra credits will appear once Stripe confirms the purchase.",
+    extraCreditsCanceled: "Extra credits checkout canceled. No changes were made.",
     agentLimitReached: "You have reached your agent limit. Please upgrade your plan.",
     featureLocked: "Please upgrade your plan to unlock this feature.",
     plans: {

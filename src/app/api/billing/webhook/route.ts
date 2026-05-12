@@ -14,9 +14,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import {
+  EXTRA_MESSAGE_CREDIT_PACK_AMOUNT,
+  EXTRA_MESSAGE_CREDIT_PURCHASE_TYPE,
+} from '@/lib/billing-credits';
 import { stripe, STRIPE_PRICE_TO_PLAN, PLAN_LIMITS } from '@/lib/stripe';
 import type { PlanTier } from '@/lib/types/subscription';
 
+interface PurchasedCreditsRpcRow {
+  workspace_id: string;
+  messages_limit: number;
+  messages_used: number;
+  granted_amount: number;
+  already_granted: boolean;
+}
 
 /**
  * Creates a privileged Supabase client using the service role key.
@@ -108,6 +119,53 @@ async function downgradeToFree(workspaceId: string) {
   console.log(`[webhook] Downgraded workspace ${workspaceId} → free plan`);
 }
 
+async function grantPurchasedMessageCredits(session: Stripe.Checkout.Session) {
+  const metadata = session.metadata ?? {};
+  const workspaceId = metadata.workspace_id;
+  const actorUserId = metadata.actor_user_id;
+  const amount = metadata.amount;
+  const metadataSessionId = metadata.stripe_session_id;
+
+  if (
+    !workspaceId ||
+    !actorUserId ||
+    amount !== String(EXTRA_MESSAGE_CREDIT_PACK_AMOUNT) ||
+    metadataSessionId !== session.id
+  ) {
+    throw new Error(
+      `[webhook] extra credits checkout session ${session.id} has invalid metadata`,
+    );
+  }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("grant_workspace_purchased_messages", {
+    p_workspace_id: workspaceId,
+    p_actor_id: actorUserId,
+    p_stripe_session_id: session.id,
+  });
+
+  if (error) {
+    console.error("[webhook] Failed to grant purchased message credits:", error);
+    throw error;
+  }
+
+  const grant = Array.isArray(data)
+    ? (data[0] as PurchasedCreditsRpcRow | undefined)
+    : undefined;
+
+  if (!grant) {
+    throw new Error(
+      `[webhook] extra credits checkout session ${session.id} did not return a grant row`,
+    );
+  }
+
+  console.log(
+    `[webhook] ${
+      grant.already_granted ? "Confirmed existing" : "Granted"
+    } ${grant.granted_amount} extra message credits for workspace ${workspaceId}`,
+  );
+}
+
 export async function POST(req: Request) {
   const body = await req.text();
   const signature = req.headers.get('stripe-signature');
@@ -137,6 +195,14 @@ export async function POST(req: Request) {
       // ─── Checkout completed — user just paid for the first time ──────────────
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        if (
+          session.mode === 'payment' &&
+          session.metadata?.purchase_type === EXTRA_MESSAGE_CREDIT_PURCHASE_TYPE
+        ) {
+          await grantPurchasedMessageCredits(session);
+          break;
+        }
 
         if (session.mode !== 'subscription') break;
 

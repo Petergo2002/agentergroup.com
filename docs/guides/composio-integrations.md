@@ -1,6 +1,6 @@
 # Composio Integrations — Implementation Guide
 
-Last updated: 2026-05-04
+Last updated: 2026-05-12
 
 This document is the mandatory reference for building and debugging Composio tool integrations
 in this codebase. Read this before writing any new integration. All lessons here were earned
@@ -14,6 +14,7 @@ Composio is used in two product paths:
 
 1. connected action tools used by chat and automation runtimes
 2. external trigger webhooks used by Automation agents
+3. external no-login auth links used to let another person authorize a provider account into a workspace
 
 ### Action tool execution
 
@@ -52,6 +53,19 @@ This path is shared by:
 
 Automation runs are still limited by the selected builder tool nodes. They do not get every Composio action by default.
 
+### Auth config strategy
+
+Connection starts are owned by `createConnectionRequest()` in `src/lib/composio.ts`.
+
+Default behavior:
+
+- most supported toolkits create a `use_composio_managed_auth` auth config on demand
+- a real configured auth config id can be supplied through `COMPOSIO_AUTH_CONFIG_<TOOLKIT>` or `COMPOSIO_<TOOLKIT>_AUTH_CONFIG_ID`
+- auth config ids are injected into a Composio tool-router session only for the explicit connection-start request, not for every `/connections` page load
+- placeholder values such as `*_replace_me` and `ac_...` are ignored
+
+Shopify is the current exception: Composio Managed App is not available for Shopify, so the app either uses a real pre-created Shopify auth config id or creates a `use_custom_auth` OAuth2 config from Shopify app credentials.
+
 ### External trigger webhooks
 
 Automation triggers use a different path:
@@ -74,6 +88,31 @@ Trigger creation/enabling/disabling/deletion is owned by:
 - `src/app/api/agents/[id]/automation/status/route.ts`
 - `src/app/api/agents/[id]/automation/route.ts`
 - `src/lib/composio.ts`
+
+### External connection auth links
+
+Workspace owners/admins can create a one-integration link from `/connections`.
+The public recipient does not need an Agentergroup login. The flow still uses the same
+workspace-scoped Composio identity, so the account is connected to `workspace:<workspaceId>`.
+
+Key files:
+
+- `src/app/api/connections/auth-links/route.ts`
+- `src/app/api/connections/auth-links/[id]/revoke/route.ts`
+- `src/app/api/public/connection-auth-links/[token]/start/route.ts`
+- `src/app/connect/[token]/page.tsx`
+- `src/app/connect/callback/page.tsx`
+- `supabase/migrations/20260512105825_connection_auth_links.sql`
+
+Rules:
+
+- store only the SHA-256 token hash in `connection_auth_links`
+- links are bearer secrets and must be treated like passwords
+- links are scoped to one supported toolkit
+- default expiry is 7 days
+- expired, revoked, and completed links cannot start a new Composio auth request
+- public routes use the service role because the recipient is intentionally unauthenticated
+- callback syncs Composio accounts and marks the link completed only after a connected row exists
 
 ---
 
@@ -238,6 +277,93 @@ Implementation: `extractCalEventTypes()` in `src/lib/composio.ts`
 
 ---
 
+### Slack — action tools
+
+Slack is currently a chat action toolkit in the product. Recommended defaults include:
+
+- `SLACK_SEND_MESSAGE`
+- `SLACK_SEARCH_MESSAGES`
+- `SLACK_FETCH_CONVERSATION_HISTORY`
+- `SLACK_FIND_CHANNELS`
+- `SLACK_FIND_USERS`
+
+*Note: Slack does not have a product-specific listing extractor yet. The builder uses the shared dynamic action list from `/api/connections/toolkits/[toolkitSlug]/tools`.*
+
+---
+
+### HubSpot — action tools
+
+HubSpot is currently a chat action toolkit in the product. The Composio toolkit slug is `hubspot`, and the current default version is `20260501_00`.
+
+Recommended defaults include:
+
+- `HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA`
+- `HUBSPOT_LIST_CONTACTS`
+- `HUBSPOT_CREATE_CONTACT`
+- `HUBSPOT_UPDATE_CONTACT`
+- `HUBSPOT_SEARCH_COMPANIES`
+- `HUBSPOT_CREATE_COMPANY`
+- `HUBSPOT_UPDATE_COMPANY`
+- `HUBSPOT_SEARCH_DEALS`
+- `HUBSPOT_CREATE_DEAL`
+- `HUBSPOT_UPDATE_DEAL`
+- `HUBSPOT_CREATE_TICKET`
+- `HUBSPOT_CREATE_NOTE`
+- `HUBSPOT_CREATE_TASK`
+
+Do not enable archive/delete/GDPR-permanent-delete tools by default. Operators can opt into additional HubSpot actions through the shared dynamic action list.
+
+*Note: HubSpot does not have a product-specific listing extractor yet. The builder uses the shared dynamic action list from `/api/connections/toolkits/[toolkitSlug]/tools`.*
+
+---
+
+### Shopify — action tools
+
+Shopify is currently a chat action toolkit in the product. The Composio toolkit slug is `shopify`, and the current default version is `20260506_00`.
+
+Composio Managed App is not available for Shopify. The connection flow requires custom Shopify OAuth credentials.
+
+Supported setup modes:
+
+1. Provide a real pre-created Composio auth config id:
+   - `COMPOSIO_SHOPIFY_AUTH_CONFIG_ID`
+   - or `COMPOSIO_AUTH_CONFIG_SHOPIFY`
+2. Or let the app create a custom OAuth2 auth config at connection time:
+   - `COMPOSIO_SHOPIFY_CLIENT_ID`
+   - `COMPOSIO_SHOPIFY_CLIENT_SECRET`
+   - `COMPOSIO_SHOPIFY_OAUTH_REDIRECT_URI`
+   - `COMPOSIO_SHOPIFY_SCOPES` (optional; use when scopes should be passed to Composio instead of relying only on the Shopify app version)
+
+The Shopify app redirect URL should match the Composio callback used in env:
+
+```text
+https://backend.composio.dev/api/v3/toolkits/auth/callback
+```
+
+Do not set `COMPOSIO_SHOPIFY_AUTH_CONFIG_ID=ac_...`; that is only a placeholder and is ignored by the app. A real auth config id must belong to the same Composio project and the Shopify toolkit.
+
+Recommended defaults include:
+
+- `SHOPIFY_GET_SHOP_DETAILS`
+- `SHOPIFY_GET_PRODUCTS_PAGINATED`
+- `SHOPIFY_COUNT_PRODUCTS`
+- `SHOPIFY_LIST_CUSTOMERS`
+- `SHOPIFY_CREATE_CUSTOMER`
+- `SHOPIFY_UPDATE_CUSTOMER`
+- `SHOPIFY_LIST_ORDERS`
+- `SHOPIFY_LIST_DRAFT_ORDERS`
+- `SHOPIFY_CREATE_DRAFT_ORDER`
+- `SHOPIFY_UPDATE_DRAFT_ORDER`
+- `SHOPIFY_LIST_INVENTORY_LEVELS`
+- `SHOPIFY_CREATES_A_NEW_PRODUCT`
+- `SHOPIFY_UPDATES_A_PRODUCT`
+
+Do not enable cancel/refund/delete/charge tools by default. Operators can opt into additional Shopify actions through the shared dynamic action list.
+
+*Note: Shopify does not have a product-specific listing extractor yet. The builder uses the shared dynamic action list from `/api/connections/toolkits/[toolkitSlug]/tools`.*
+
+---
+
 ### Google Calendar — `GOOGLECALENDAR_LIST_CALENDARS`
 
 | Field | Path | Notes |
@@ -283,8 +409,14 @@ Before shipping any new integration, verify each item:
 | `src/lib/composio.ts` | All `executeToolCall`, `listXxx` functions, and their extractors |
 | `src/lib/cal.ts` | Cal.com frontend types and `extractCalEventTypeListItems` (mirrors composio.ts logic) |
 | `src/lib/google-calendar.ts` | Google Calendar frontend types and extractor |
+| `src/app/api/connections/toolkits/[toolkitSlug]/tools/route.ts` | Dynamic action list route for chat-surface toolkits |
 | `src/app/api/connections/cal/event-types/route.ts` | Cal.com event types API route |
 | `src/app/api/connections/googlecalendar/calendars/route.ts` | Google Calendar API route |
+| `src/app/api/connections/auth-links/route.ts` | Admin API for creating and listing external auth links |
+| `src/app/api/connections/auth-links/[id]/revoke/route.ts` | Admin API for closing pending external auth links |
+| `src/app/api/public/connection-auth-links/[token]/start/route.ts` | Public no-login endpoint that starts a Composio auth request from a bearer link |
+| `src/app/connect/[token]/page.tsx` | Public recipient page for one integration auth request |
+| `src/app/connect/callback/page.tsx` | Public callback page that syncs and completes auth links |
 | `src/app/(app)/agents/[id]/builder/page.tsx` | Builder UI — event type dropdown state and fetch effect |
 | `src/app/api/agents/[id]/automation/route.ts` | Automation trigger binding save/delete endpoint |
 | `src/app/api/agents/[id]/automation/status/route.ts` | Automation trigger activate/pause endpoint |

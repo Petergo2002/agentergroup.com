@@ -15,3 +15,18 @@ export interface ConnectionRecord {
   created_at: string;
   updated_at: string;
 }
+
+export type ConnectionAuthLinkStatus = "pending" | "completed" | "revoked";
+
+export interface ConnectionAuthLinkRecord {
+  id: string;
+  workspace_id: string;
+  toolkit_slug: string;
+  created_by: string;
+  token_hash: string;
+  status: ConnectionAuthLinkStatus;
+  expires_at: string;
+  completed_connection_id: string | null;
+  created_at: string;
+  updated_at: string;
+}

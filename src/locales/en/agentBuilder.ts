@@ -14,7 +14,7 @@ export const agentBuilder = {
     knowledgeDescription:
       "Attach workspace sources the agent can retrieve from.",
     toolsDescription:
-      "Add tools for live in-chat actions.",
+      "Add Gmail, Outlook, Slack, Google Calendar, or Cal.com for live in-chat actions.",
     leadsDescription:
       "Capture structured internal leads from widget conversations.",
     endChatDescription:
@@ -59,7 +59,7 @@ export const agentBuilder = {
   surfaceAssistant: "Internal Assistant",
   surfaceWidget: "Website Widget",
   currentAccountStatus:
-    "Current account is {status}. Pick a connected account before publishing.",
+    "Current account is {status}. Pick a connected account before saving.",
   lastSaved: "Last saved {date}",
   publishedAt: "Published v{version} at {date}",
   rolledBackAt: "Rolled back at {date}",
@@ -74,7 +74,7 @@ export const agentBuilder = {
   lastUpdate: "Last Update",
   saveDraft: "Save",
   savingDraft: "Saving...",
-  deployBlueprint: "Deploy Blueprint",
+  deployBlueprint: "Publish Version",
   publishing: "Publishing...",
   loadingBuilder: "Loading builder...",
   nodeLibraryTitle: "Node Library",
@@ -123,6 +123,9 @@ export const agentBuilder = {
     "Controls the model, instructions, and live response behavior.",
   gmailDescription: "Send emails during the current conversation.",
   outlookDescription: "Send emails during the current conversation via Outlook.",
+  slackDescription: "Send messages and search workspace context in Slack.",
+  hubspotDescription: "Create, search, and update CRM records in HubSpot.",
+  shopifyDescription: "Read and manage store products, customers, orders, and draft orders in Shopify.",
   googleCalendarDescription: "Check availability and book meetings.",
   calDescription: "Check availability and book meetings with Cal.com.",
   leadsDescription:
@@ -150,6 +153,9 @@ export const agentBuilder = {
   removeNode: "Remove Node",
   useGmail: "Use Gmail during the current conversation.",
   useOutlook: "Use Outlook during the current conversation.",
+  useSlack: "Use Slack to find channels, search messages, read context, and send messages when requested.",
+  useHubSpot: "Use HubSpot to search CRM records, create or update customer records, and log notes or tasks when requested.",
+  useShopify: "Use Shopify to inspect store data, manage customers and products, and work with orders or draft orders when requested.",
   useCalendar: "Check availability and book meetings.",
   useCal: "Check availability and book meetings with Cal.com.",
   noConnectedAccount: "No connected {label} account yet.",

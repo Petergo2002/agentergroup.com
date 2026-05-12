@@ -161,6 +161,9 @@ const DEFAULT_COMPOSIO_TOOLKIT_VERSIONS = {
   cal: process.env.COMPOSIO_TOOLKIT_VERSION_CAL ?? "latest",
   googledrive: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE ?? "20260309_00",
   outlook: process.env.COMPOSIO_TOOLKIT_VERSION_OUTLOOK ?? "latest",
+  slack: process.env.COMPOSIO_TOOLKIT_VERSION_SLACK ?? "20260511_01",
+  hubspot: process.env.COMPOSIO_TOOLKIT_VERSION_HUBSPOT ?? "20260501_00",
+  shopify: process.env.COMPOSIO_TOOLKIT_VERSION_SHOPIFY ?? "20260506_00",
   text_to_pdf: process.env.COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF ?? "latest",
 } as const;
 
@@ -168,6 +171,8 @@ const SESSION_TTL_MS = 1000 * 60 * 30;
 const toolRouterSessionCache = new Map<string, ToolRouterSessionRef>();
 const composioSessionCache = new Map<string, Awaited<ReturnType<Composio["create"]>>>();
 const MCP_SESSION_CACHE = new Map<string, MCPSessionInfo>();
+const DEFAULT_COMPOSIO_OAUTH_REDIRECT_URI =
+  "https://backend.composio.dev/api/v3/toolkits/auth/callback";
 const COMPOSIO_SESSION_TOOLKITS = [
   ...SUPPORTED_INTEGRATIONS.map((integration) => integration.slug),
   ...getInternalAssistantToolkitSlugs(),
@@ -203,6 +208,60 @@ function normalizeConnectionStatus(value?: string | null) {
 
 function pickString(value: unknown) {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function getEnvValue(name: string) {
+  const value = process.env[name]?.trim();
+
+  if (!value || value.endsWith("_replace_me") || value === "ac_...") {
+    return null;
+  }
+
+  return value;
+}
+
+function getComposioEnvSlug(toolkitSlug: string) {
+  return toolkitSlug.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+}
+
+function getConfiguredAuthConfigId(toolkitSlug: string) {
+  const envSlug = getComposioEnvSlug(toolkitSlug);
+
+  return (
+    getEnvValue(`COMPOSIO_AUTH_CONFIG_${envSlug}`) ??
+    getEnvValue(`COMPOSIO_${envSlug}_AUTH_CONFIG_ID`)
+  );
+}
+
+function getShopifyAuthConfigOptions(integrationName: string) {
+  const clientId = getEnvValue("COMPOSIO_SHOPIFY_CLIENT_ID");
+  const clientSecret = getEnvValue("COMPOSIO_SHOPIFY_CLIENT_SECRET");
+
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Shopify connections require COMPOSIO_SHOPIFY_CLIENT_ID and COMPOSIO_SHOPIFY_CLIENT_SECRET, or a pre-created COMPOSIO_SHOPIFY_AUTH_CONFIG_ID.",
+    );
+  }
+
+  const credentials: Record<string, string> = {
+    client_id: clientId,
+    client_secret: clientSecret,
+    oauth_redirect_uri:
+      getEnvValue("COMPOSIO_SHOPIFY_OAUTH_REDIRECT_URI") ??
+      DEFAULT_COMPOSIO_OAUTH_REDIRECT_URI,
+  };
+  const scopes = getEnvValue("COMPOSIO_SHOPIFY_SCOPES");
+
+  if (scopes) {
+    credentials.scopes = scopes;
+  }
+
+  return {
+    name: `${integrationName} Custom Auth`,
+    type: "use_custom_auth" as const,
+    authScheme: "OAUTH2" as const,
+    credentials,
+  };
 }
 
 export function getComposioConnectedAccountId(
@@ -296,9 +355,19 @@ function prepareAccountsForSync(accounts: SyncedConnectedAccount[]) {
     }
   }
 
+  const dedupedByToolkit = new Map<SupportedIntegrationSlug, SyncedConnectedAccount>();
+
+  for (const account of dedupedByIdentity.values()) {
+    const existing = dedupedByToolkit.get(account.toolkitSlug);
+
+    if (!existing || preferConnectedAccount(existing, account)) {
+      dedupedByToolkit.set(account.toolkitSlug, account);
+    }
+  }
+
   const usedLabels = new Set<string>();
 
-  return Array.from(dedupedByIdentity.values())
+  return Array.from(dedupedByToolkit.values())
     .sort((left, right) => {
       if (left.toolkitSlug !== right.toolkitSlug) {
         return left.toolkitSlug.localeCompare(right.toolkitSlug);
@@ -490,10 +559,13 @@ export async function getOrCreateToolRouterSession(userId: string) {
   }
 }
 
-export async function getComposioSession(userId: string) {
+export async function getComposioSession(
+  userId: string,
+  authConfigOverrides?: Record<string, string>,
+) {
   const cached = composioSessionCache.get(userId);
 
-  if (cached) {
+  if (cached && !authConfigOverrides) {
     return cached;
   }
 
@@ -505,6 +577,9 @@ export async function getComposioSession(userId: string) {
 
   const session = await composio.create(userId, {
     toolkits: COMPOSIO_SESSION_TOOLKITS,
+    ...(authConfigOverrides && Object.keys(authConfigOverrides).length > 0
+      ? { authConfigs: authConfigOverrides }
+      : {}),
   });
 
   composioSessionCache.set(userId, session);
@@ -624,9 +699,9 @@ export async function syncConnectedAccountsToDatabase(
     return [];
   }
 
-  // Upsert each connected account individually using external_id as the
-  // conflict key. This is the Composio connection ID — always unique — and
-  // does not depend on any multi-column unique constraint on the table.
+  // The database enforces one connection per toolkit in each workspace.
+  // Composio can return a new external id during reconnects, so conflict on
+  // the stable workspace/toolkit pair rather than external_id.
   for (const account of connectedAccounts) {
     const row = {
       workspace_id: workspaceId,
@@ -641,37 +716,12 @@ export async function syncConnectedAccountsToDatabase(
       last_synced_at: syncTimestamp,
     };
 
-    if (account.externalId) {
-      // Try to update the existing row by external_id first.
-      const { data: existing } = await connectionsTable
-        .select("id")
-        .eq("workspace_id", workspaceId)
-        .eq("external_id", account.externalId)
-        .maybeSingle();
+    const { error: upsertError } = await connectionsTable.upsert(row, {
+      onConflict: "workspace_id,toolkit_slug",
+    });
 
-      if (existing) {
-        const { error: updateError } = await connectionsTable
-          .update({
-            display_name: row.display_name,
-            status: row.status,
-            account_label: row.account_label,
-            toolkit_data: row.toolkit_data,
-            last_synced_at: row.last_synced_at,
-          })
-          .eq("id", (existing as { id: string }).id);
-
-        if (updateError) {
-          throw new Error(updateError.message);
-        }
-        continue;
-      }
-    }
-
-    // No existing row — insert fresh.
-    const { error: insertError } = await connectionsTable.insert(row);
-
-    if (insertError) {
-      throw new Error(insertError.message);
+    if (upsertError) {
+      throw new Error(upsertError.message);
     }
   }
 
@@ -682,6 +732,9 @@ export async function createConnectionRequest(
   workspaceId: string,
   userId: string,
   toolkitSlug: string,
+  options?: {
+    callbackUrl?: string;
+  },
 ) {
   const composio = createComposioClient();
 
@@ -696,21 +749,37 @@ export async function createConnectionRequest(
   }
 
   const composioUserId = buildWorkspaceComposioUserId(workspaceId);
-  const session = await getComposioSession(composioUserId);
-  const authConfig = await composio.authConfigs.create(toolkitSlug, {
-    name: `${integration.displayName} Managed Auth`,
-    type: "use_composio_managed_auth",
-  });
-  const authConfigId =
-    authConfig && typeof authConfig === "object" && "id" in authConfig
-      ? String(authConfig.id)
-      : null;
+  let authConfigId = getConfiguredAuthConfigId(toolkitSlug);
+
+  if (!authConfigId) {
+    const authConfig = await composio.authConfigs.create(
+      toolkitSlug,
+      toolkitSlug === "shopify"
+        ? getShopifyAuthConfigOptions(integration.displayName)
+        : {
+            name: `${integration.displayName} Managed Auth`,
+            type: "use_composio_managed_auth",
+          },
+    );
+
+    authConfigId =
+      authConfig && typeof authConfig === "object" && "id" in authConfig
+        ? String(authConfig.id)
+        : null;
+  }
 
   if (!authConfigId) {
     throw new Error("Failed to create a Composio auth config.");
   }
 
-  const request = await composio.connectedAccounts.link(composioUserId, authConfigId);
+  const session = await getComposioSession(composioUserId, {
+    [toolkitSlug]: authConfigId,
+  });
+  const request = await composio.connectedAccounts.link(
+    composioUserId,
+    authConfigId,
+    options?.callbackUrl ? { callbackUrl: options.callbackUrl } : undefined,
+  );
 
   return {
     id: request.id,
