@@ -62,6 +62,8 @@ export function normalizeWidgetConfig(config: WidgetConfig): WidgetConfig {
         config.widget?.secondaryColor ||
         config.widget?.primaryColor ||
         "#ff5c00",
+      backgroundColor: config.widget?.backgroundColor,
+      textColor: config.widget?.textColor,
       showBranding: config.widget?.showBranding ?? true,
     },
     home: {

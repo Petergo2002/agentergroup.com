@@ -1743,7 +1743,7 @@ export default function AgentBuilderPage() {
   const [isRollingBackVersionId, setIsRollingBackVersionId] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<BuilderStatusNote>({ kind: 'draftInitial' });
   const [isToolPickerOpen, setIsToolPickerOpen] = useState(false);
-  const [isNodeLibraryOpen, setIsNodeLibraryOpen] = useState(false);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [shouldClearExternalTrigger, setShouldClearExternalTrigger] = useState(false);
   const [actionEditorNodeId, setActionEditorNodeId] = useState<string | null>(null);
   const [actionSearchQuery, setActionSearchQuery] = useState('');
@@ -4420,159 +4420,12 @@ export default function AgentBuilderPage() {
             : 'xl:grid-cols-[minmax(0,1fr)]'
         }`}
       >
-        <div
-          className={`group absolute bottom-0 left-0 top-0 z-30 w-[22rem] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] ${
-            isNodeLibraryOpen ? 'translate-x-0' : '-translate-x-[calc(100%-3.25rem)] hover:translate-x-0'
-          }`}
-        >
-          <aside className="relative flex h-full flex-col border-r border-outline-variant/10 bg-surface/90 px-7 py-8 shadow-[20px_0_80px_rgba(0,0,0,0.15)] backdrop-blur-3xl">
-            {/* The Handle */}
-            <button
-              type="button"
-              onClick={() => setIsNodeLibraryOpen(true)}
-              className={`absolute bottom-0 right-0 top-0 flex w-11 items-center justify-center transition-opacity duration-300 ${
-                isNodeLibraryOpen ? 'pointer-events-none opacity-0' : 'group-hover:opacity-0'
-              }`}
-              aria-label={t('agentBuilder.nodeLibraryTitle')}
-              aria-expanded={isNodeLibraryOpen}
-            >
-              <span className="flex h-32 w-full flex-col items-center justify-center gap-4">
-                <div className="h-full w-[2px] rounded-full bg-primary/20" />
-                <span className="[writing-mode:vertical-lr] text-[10px] font-bold uppercase tracking-[0.3em] text-primary/40 rotate-180">
-                  {t('agentBuilder.nodeLibraryTitle')}
-                </span>
-                <div className="h-full w-[2px] rounded-full bg-primary/20" />
-              </span>
-            </button>
-
-            <div
-              className={`flex-1 overflow-y-auto transition-all duration-500 delay-100 ${
-                isNodeLibraryOpen
-                  ? 'translate-x-0 opacity-100'
-                  : 'translate-x-[-10px] opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
-              }`}
-            >
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <span className="material-symbols-outlined text-lg">grid_view</span>
-                  </div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">
-                    {t('agentBuilder.nodeLibraryTitle')}
-                  </p>
-                </div>
-                {isNodeLibraryOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsNodeLibraryOpen(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-90"
-                    aria-label={t('common.close')}
-                    title={t('common.close')}
-                  >
-                    <span className="material-symbols-outlined text-base">close</span>
-                  </button>
-                ) : null}
-              </div>
-              
-              <p className="mt-4 text-xs leading-6 text-on-surface-variant/70 font-medium">
-                {t('agentBuilder.nodeLibraryDescription')}
-              </p>
-
-              <div className="mt-8 space-y-4">
-                {nodeLibraryItems.map((item) => {
-                  const isTriggerAdded = item.key === 'trigger' && hasTriggerNode;
-                  const isAgentAdded = item.key === 'agent' && hasAgentNode;
-                  const isKnowledgeAdded = item.key === 'knowledge' && hasKnowledgeNode;
-                  const isEndChatAdded = item.key === 'endchat' && hasEndChatNode;
-                  const isFixed = item.fixed;
-                  const isDisabled =
-                    isFixed ||
-                    isTriggerAdded ||
-                    isAgentAdded ||
-                    isKnowledgeAdded ||
-                    isEndChatAdded ||
-                    item.disabled;
-
-                  return (
-                    <button
-                      key={item.key}
-                      onClick={() =>
-                        item.disabled
-                          ? showToast(t('settings.billing.featureLocked') || 'Please upgrade your plan to unlock this feature.', 'error')
-                          : item.fixed
-                          ? undefined
-                          : item.key === 'trigger'
-                          ? handleAddTriggerNode()
-                          : item.key === 'agent'
-                          ? handleAddAgentNode()
-                          : item.key === 'knowledge'
-                          ? handleAddKnowledgeNode()
-                          : item.key === 'endchat'
-                          ? handleAddEndChatNode()
-                          : item.key === 'tools'
-                          ? setIsToolPickerOpen(true)
-                          : undefined
-                      }
-                      disabled={isDisabled && !item.disabled}
-                      className={`group/item relative flex w-full items-start gap-4 rounded-[2rem] border p-5 text-left transition-all duration-300 ${
-                        item.disabled
-                          ? 'border-outline-variant/5 bg-surface-container-low/40 opacity-50 grayscale cursor-not-allowed'
-                          : isFixed
-                          ? 'border-dashed border-outline-variant/20 bg-surface-container-lowest/30 hover:border-primary/25 hover:bg-surface-container-low/50'
-                          : isDisabled
-                          ? 'border-outline-variant/10 bg-surface-container-low/50 opacity-60 cursor-not-allowed'
-                          : 'border-outline-variant/10 bg-surface-container-lowest hover:border-primary/40 hover:bg-surface-container-low hover:shadow-xl hover:shadow-primary/5 active:scale-[0.98]'
-                      }`}
-                    >
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 ${
-                        item.disabled || isFixed || isDisabled 
-                        ? 'bg-surface-container-high text-on-surface-variant/40' 
-                        : 'bg-primary/10 text-primary group-hover/item:bg-primary group-hover/item:text-on-primary'
-                      }`}>
-                        <span className="material-symbols-outlined text-xl">
-                          {item.icon}
-                        </span>
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={`text-sm font-bold tracking-tight ${
-                            item.disabled || isFixed || isDisabled ? 'text-on-surface-variant' : 'text-on-surface'
-                          }`}>
-                            {item.label}
-                          </p>
-                          {item.disabled ? (
-                            <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60 border border-outline-variant/10">
-                              {t('common.locked')}
-                            </span>
-                          ) : isFixed ? (
-                            <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60">
-                              {t('common.fixed')}
-                            </span>
-                          ) : isTriggerAdded || isAgentAdded || isKnowledgeAdded || isEndChatAdded ? (
-                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-primary">
-                              {t('common.added')}
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-1.5 text-[11px] leading-relaxed text-on-surface-variant/60 line-clamp-2">
-                          {item.description}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </aside>
-        </div>
-
         <section
           className={`h-full min-h-0 border-b border-outline-variant/10 xl:border-b-0 ${
             selectedNode ? 'xl:border-r' : ''
           }`}
         >
-          <div className="h-full w-full">
+          <div className="relative h-full w-full">
             <ReactFlow
               nodes={displayNodes}
               edges={edges}
@@ -4581,7 +4434,7 @@ export default function AgentBuilderPage() {
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-              onPaneClick={() => setSelectedNodeId(null)}
+              onPaneClick={() => { setSelectedNodeId(null); setIsAddMenuOpen(false); }}
               onInit={setFlowInstance}
               fitView
               proOptions={{ hideAttribution: true }}
@@ -4604,8 +4457,116 @@ export default function AgentBuilderPage() {
               ) : null}
               <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
               <Controls className="!bottom-4 !left-4 !top-auto !right-auto" />
+            
             </ReactFlow>
+
+            {/* Bottom Floating Bar */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center">
+              {isAddMenuOpen && (
+                <div className="mb-4 w-72 overflow-hidden rounded-[2rem] border border-outline-variant/10 bg-surface/95 shadow-premium backdrop-blur-3xl p-3 origin-bottom animate-slide-up-fade">
+                  <div className="flex flex-col gap-1 max-h-[60vh] overflow-y-auto pr-1">
+                    {nodeLibraryItems.map((item, index) => {
+                      const isTriggerAdded = item.key === 'trigger' && hasTriggerNode;
+                      const isAgentAdded = item.key === 'agent' && hasAgentNode;
+                      const isKnowledgeAdded = item.key === 'knowledge' && hasKnowledgeNode;
+                      const isEndChatAdded = item.key === 'endchat' && hasEndChatNode;
+                      const isFixed = item.fixed;
+                      const isDisabled =
+                        isFixed ||
+                        isTriggerAdded ||
+                        isAgentAdded ||
+                        isKnowledgeAdded ||
+                        isEndChatAdded ||
+                        item.disabled;
+
+                      return (
+                        <button
+                          key={item.key}
+                          style={{ animationDelay: `${index * 50}ms` }}
+                          onClick={() => {
+                            if (item.disabled) {
+                              showToast(t('settings.billing.featureLocked') || 'Please upgrade your plan to unlock this feature.', 'error');
+                              return;
+                            }
+                            if (isFixed) return;
+                            
+                            if (item.key === 'trigger') handleAddTriggerNode();
+                            else if (item.key === 'agent') handleAddAgentNode();
+                            else if (item.key === 'knowledge') handleAddKnowledgeNode();
+                            else if (item.key === 'endchat') handleAddEndChatNode();
+                            else if (item.key === 'tools') setIsToolPickerOpen(true);
+                            
+                            setIsAddMenuOpen(false);
+                          }}
+                          disabled={isDisabled && !item.disabled}
+                          className={`group/item flex items-center gap-3 rounded-2xl p-2.5 text-left transition-colors duration-200 animate-stagger-item ${
+                            item.disabled
+                              ? 'opacity-50 grayscale cursor-not-allowed'
+                              : isFixed
+                              ? 'bg-surface-container-lowest/30'
+                              : isDisabled
+                              ? 'opacity-60 cursor-not-allowed'
+                              : 'hover:bg-surface-container-low hover:text-primary active:scale-[0.98]'
+                          }`}
+                        >
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all ${
+                            item.disabled || isFixed || isDisabled 
+                            ? 'bg-surface-container-high text-on-surface-variant/40' 
+                            : 'bg-primary/10 text-primary group-hover/item:bg-primary group-hover/item:text-on-primary'
+                          }`}>
+                            <span className="material-symbols-outlined text-lg">
+                              {item.icon}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className={`text-[13px] font-bold tracking-tight truncate ${
+                                item.disabled || isFixed || isDisabled ? 'text-on-surface-variant' : 'text-on-surface'
+                              }`}>
+                                {item.label}
+                              </p>
+                              {item.disabled && (
+                                <span className="rounded-full bg-surface-container-high px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60">
+                                  {t('common.locked')}
+                                </span>
+                              )}
+                              {isFixed && !item.disabled && (
+                                <span className="rounded-full bg-surface-container-high px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60">
+                                  {t('common.fixed')}
+                                </span>
+                              )}
+                              {(isTriggerAdded || isAgentAdded || isKnowledgeAdded || isEndChatAdded) && !isFixed && (
+                                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.15em] text-primary">
+                                  {t('common.added')}
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 text-[10px] text-on-surface-variant/60 line-clamp-1">
+                              {item.description}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                className={`flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-full shadow-premium transition-all duration-300 hover:scale-105 active:scale-95 ${
+                  isAddMenuOpen ? 'bg-surface text-primary border border-outline-variant/20' : 'bg-primary text-on-primary hover:shadow-primary/20'
+                }`}
+                aria-label={t('agentBuilder.nodeLibraryTitle')}
+              >
+                <span className={`material-symbols-outlined text-2xl transition-transform duration-500 ease-[cubic-bezier(0.2,0,0,1)] ${isAddMenuOpen ? 'rotate-45 scale-110' : ''}`}>
+                  add
+                </span>
+              </button>
+            </div>
           </div>
+
         </section>
 
         {selectedNode ? (

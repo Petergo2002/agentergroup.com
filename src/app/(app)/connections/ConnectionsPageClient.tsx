@@ -114,14 +114,21 @@ export default function ConnectionsPageClient({
     }
   }, [loadAuthLinks, showToast, t]);
 
-  const handleConnect = async (toolkitSlug: string) => {
+  const handleConnect = useCallback(async (toolkit: ConnectionToolkitCard) => {
     try {
+      if (toolkit.status === 'connected') {
+        showToast(
+          t('connections.replaceFlowWarning', { integration: toolkit.displayName }),
+          'info',
+        );
+      }
+
       const response = await fetch('/api/connections/authorize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ toolkitSlug }),
+        body: JSON.stringify({ toolkitSlug: toolkit.slug }),
       });
       const payload = await response.json();
 
@@ -138,7 +145,7 @@ export default function ConnectionsPageClient({
         error instanceof Error ? error.message : t('connections.startFlowError');
       showToast(message, 'error');
     }
-  };
+  }, [showToast, t]);
 
   const handleDisconnect = async (connectionId: string) => {
     setDisconnectingConnectionId(connectionId);
@@ -375,10 +382,10 @@ export default function ConnectionsPageClient({
                       </button>
                     ) : null}
                     <button
-                      onClick={() => handleConnect(toolkit.slug)}
+                      onClick={() => handleConnect(toolkit)}
                       className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface transition-colors hover:border-primary/35 hover:bg-primary hover:text-on-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
-                      {toolkit.status === 'connected' ? t('connections.reconnect') : t('connections.connect')}
+                      {toolkit.status === 'connected' ? t('connections.replaceAccount') : t('connections.connect')}
                     </button>
                   </div>
                 </div>

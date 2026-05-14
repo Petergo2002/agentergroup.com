@@ -87,9 +87,9 @@ export const agentBuilder = {
   triggerDescription: "Entry point for the current conversation.",
   triggerSetupTitle: "Trigger setup",
   triggerSetupDescription:
-    "A trigger is the event that starts the flow. Use internal triggers for widget lifecycle events and Composio triggers for external app events.",
+    "A trigger is the event that starts the flow. Use internal triggers for widget lifecycle events and external triggers for third-party app events.",
   triggerProviderInternal: "Internal",
-  triggerProviderComposio: "Composio",
+  triggerProviderComposio: "External",
   agentSurface: "Agent type",
   automationReadiness: "Automation readiness",
   activationReady: "Ready to activate",
@@ -110,14 +110,14 @@ export const agentBuilder = {
   triggerActivated: "Trigger activated.",
   triggerPaused: "Trigger paused.",
   composioTriggerHelp:
-    "Composio triggers are used for external app events. Gmail is the first supported automation trigger; Slack, calendar, and other triggers can fit this same setup later.",
+    "External triggers are used for third-party app events. Gmail is the first supported automation trigger; Slack, calendar, and other triggers can fit this same setup later.",
   triggerSources: {
     chatMessage: "Chat message",
     chatMessageDescription:
       "Runs when a visitor sends a message in the website chat widget.",
     gmailNewMessage: "New Gmail message",
     gmailNewMessageDescription:
-      "Runs from a Composio Gmail trigger when a connected inbox receives a new message.",
+      "Runs when a connected inbox receives a new message.",
   },
   coreDescription:
     "Controls the model, instructions, and live response behavior.",

@@ -88,9 +88,9 @@ export const agentBuilder = {
   triggerDescription: "Ingångspunkten för den aktuella konversationen.",
   triggerSetupTitle: "Triggerinställning",
   triggerSetupDescription:
-    "En trigger är händelsen som startar flödet. Använd interna triggers för widgetens händelser och Composio-triggers för externa apphändelser.",
+    "En trigger är händelsen som startar flödet. Använd interna triggers för widgetens händelser och externa triggers för apphändelser utanför systemet.",
   triggerProviderInternal: "Intern",
-  triggerProviderComposio: "Composio",
+  triggerProviderComposio: "Extern",
   agentSurface: "Agenttyp",
   automationReadiness: "Automationsstatus",
   activationReady: "Redo att aktiveras",
@@ -111,14 +111,14 @@ export const agentBuilder = {
   triggerActivated: "Trigger aktiverad.",
   triggerPaused: "Trigger pausad.",
   composioTriggerHelp:
-    "Composio-triggers används för externa apphändelser. Gmail är den första automations-triggern; Slack, kalender och andra triggers kan passa in i samma upplägg senare.",
+    "Externa triggers används för apphändelser utanför systemet. Gmail är den första automations-triggern; Slack, kalender och andra triggers kan passa in i samma upplägg senare.",
   triggerSources: {
     chatMessage: "Chattmeddelande",
     chatMessageDescription:
       "Körs när en besökare skickar ett meddelande i webbplatsens chattwidget.",
     gmailNewMessage: "Nytt Gmail-meddelande",
     gmailNewMessageDescription:
-      "Körs från en Composio Gmail-trigger när en ansluten inkorg får ett nytt meddelande.",
+      "Körs när en ansluten inkorg får ett nytt meddelande.",
   },
   coreDescription:
     "Styr modell, instruktioner och livebeteende i svaren.",

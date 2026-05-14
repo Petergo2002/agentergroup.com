@@ -1278,20 +1278,26 @@
 
     if (!bubble) return;
 
-    bubble.disabled = true;
-    bubble.setAttribute("aria-busy", "true");
+    if (bubble) {
+      bubble.disabled = true;
+      bubble.setAttribute("aria-busy", "true");
+    }
 
     try {
       await ensureRuntimeReady();
     } catch (error) {
       debugLogger.error("[AgenterGroup Widget] Bootstrap failed", error);
-      bubble.disabled = false;
-      bubble.removeAttribute("aria-busy");
+      if (bubble) {
+        bubble.disabled = false;
+        bubble.removeAttribute("aria-busy");
+      }
       return;
     }
 
-    bubble.disabled = false;
-    bubble.removeAttribute("aria-busy");
+    if (bubble) {
+      bubble.disabled = false;
+      bubble.removeAttribute("aria-busy");
+    }
 
     if (!iframeContainer) {
       return;
