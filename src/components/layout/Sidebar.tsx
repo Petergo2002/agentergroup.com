@@ -15,7 +15,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  type LucideIcon,
 } from "lucide-react";
 import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";

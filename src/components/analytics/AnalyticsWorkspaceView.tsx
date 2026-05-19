@@ -25,6 +25,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import Image from "next/image";
 
 interface AnalyticsIdentitySummary {
   name: string | null;
@@ -381,7 +382,6 @@ function ConversationDetail({
         detail.conversation.agentLabel || detail.conversation.agentName,
       )
     : null;
-  const contactEmail = detail?.lead?.email || detail?.identitySummary?.email || null;
   const contactName = detail?.lead?.name || detail?.identitySummary?.name || null;
   const contactPhone = detail?.lead?.phone || detail?.identitySummary?.phone || null;
   const capturedAt = detail?.lead?.createdAt ?? null;
@@ -527,7 +527,7 @@ function ConversationDetail({
                           {(message.metadata as { attachments?: { type?: string; url: string; name: string }[] }).attachments!.map((att, i: number) => (
                             att.type?.startsWith("image/") ? (
                               <a key={i} href={att.url} target="_blank" rel="noopener noreferrer">
-                                <img src={att.url} alt={att.name} className="w-24 h-24 object-cover rounded-lg border border-black/10 shadow-sm" />
+                                <Image src={att.url} alt={att.name} width={96} height={96} className="w-24 h-24 object-cover rounded-lg border border-black/10 shadow-sm" unoptimized />
                               </a>
                             ) : (
                               <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-black/10 hover:bg-black/20 transition-colors rounded-lg text-xs font-medium shadow-sm">

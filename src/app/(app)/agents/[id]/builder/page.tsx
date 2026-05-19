@@ -1510,7 +1510,7 @@ export default function AgentBuilderPage() {
     if (normalized.requiresToolReview) {
       showToast(t('agentBuilder.multipleOldConnections'), 'error');
     }
-  }, [agentId, setNodes, showToast, supabase, t]);
+  }, [agentId, setNodes, setEdges, showToast, supabase, t]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1564,7 +1564,7 @@ export default function AgentBuilderPage() {
     }
 
     setEdges(buildEdges(nodes));
-  }, [nodes]);
+  }, [nodes, setEdges]);
 
   useEffect(() => {
     calendarOptionsStatusRef.current = calendarOptionsStatusByConnectionId;

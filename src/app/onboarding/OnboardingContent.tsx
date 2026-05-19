@@ -47,9 +47,7 @@ export default function OnboardingContent({
   const canceled = searchParams.get("canceled") === "true";
 
   const [loading, setLoading] = useState<string | null>(success ? 'completing' : null);
-  const [status, setStatus] = useState<'idle' | 'success' | 'canceled'>(
-    success ? 'success' : canceled ? 'canceled' : 'idle'
-  );
+  const status = success ? 'success' : canceled ? 'canceled' : 'idle';
 
   useEffect(() => {
     if (success) {

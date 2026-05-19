@@ -285,7 +285,6 @@ export default function BillingSettingsPage() {
 
               {(() => {
                 const isDowngrade = TIER_LEVELS[plan] < TIER_LEVELS[currentPlan];
-                const isUpgrade = TIER_LEVELS[plan] > TIER_LEVELS[currentPlan];
                 const buttonDisabled = !isAdmin || currentPlan === plan || checkoutLoading === plan || (portalLoading && isDowngrade);
 
                 return (

@@ -24,11 +24,21 @@ export function AppShell({ children, context, user }: AppShellProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("agenter_sidebar_collapsed") === "true";
-    if (saved) {
-      setIsSidebarCollapsed(true);
-    }
-    setMounted(true);
+    let active = true;
+    const init = async () => {
+      // Defer synchronous setStates avoiding React hydration cascading renders
+      await Promise.resolve();
+      if (!active) return;
+      const saved = localStorage.getItem("agenter_sidebar_collapsed") === "true";
+      if (saved) {
+        setIsSidebarCollapsed(true);
+      }
+      setMounted(true);
+    };
+    init();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const toggleSidebarCollapse = () => {
