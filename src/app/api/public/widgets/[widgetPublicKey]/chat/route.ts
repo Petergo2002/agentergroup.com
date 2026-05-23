@@ -9,6 +9,10 @@ import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import { extractCalSelectionFromDefinition } from "@/lib/cal";
 import {
+  consumeWorkspaceMessageUsage,
+  MessageLimitExceededError,
+} from "@/lib/message-usage";
+import {
   buildPublicWidgetRateLimitContext,
   buildRateLimitErrorPayload,
   enforceRateLimits,
@@ -296,17 +300,21 @@ export async function POST(
       }
     }
 
-    const { data: allowed, error: rpcError } = await supabase.rpc(
-      "increment_workspace_message_usage",
-      { p_workspace_id: loaded.widget.workspace_id },
-    );
+    try {
+      await consumeWorkspaceMessageUsage(
+        supabase,
+        loaded.widget.workspace_id,
+      );
+    } catch (usageError) {
+      if (!(usageError instanceof MessageLimitExceededError)) {
+        throw usageError;
+      }
 
-    if (rpcError || !allowed) {
       return buildErrorResponse(
         request,
-        402,
-        "This workspace has reached its monthly message limit.",
-        "MESSAGE_LIMIT_REACHED",
+        usageError.status,
+        usageError.message,
+        usageError.code,
       );
     }
 

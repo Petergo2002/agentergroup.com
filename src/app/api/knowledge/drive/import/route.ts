@@ -32,6 +32,45 @@ function getNestedRecord(value: unknown) {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 }
 
+async function linkSourceToFolder(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  sourceId: string,
+  folderIdValue: unknown,
+) {
+  const folderId = typeof folderIdValue === "string" ? folderIdValue.trim() : "";
+
+  if (!folderId) {
+    return;
+  }
+
+  const { data: folder, error: folderError } = await supabase
+    .from("knowledge_folders")
+    .select("id")
+    .eq("id", folderId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (folderError) {
+    throw new Error(folderError.message);
+  }
+
+  if (!folder) {
+    throw new Error("Target folder was not found.");
+  }
+
+  const { error: linkError } = await supabase
+    .from("knowledge_folder_sources")
+    .insert({
+      folder_id: folder.id,
+      knowledge_source_id: sourceId,
+    });
+
+  if (linkError && linkError.code !== "23505") {
+    throw new Error(linkError.message);
+  }
+}
+
 async function getFilePayloadBytes(payload: Record<string, unknown>) {
   try {
     const nestedCandidates = [
@@ -97,6 +136,7 @@ export async function POST(request: NextRequest) {
   const fileId = String(body.fileId ?? "").trim();
   const overrideName = String(body.name ?? "").trim();
   const connectionId = String(body.connectionId ?? "").trim();
+  const folderId = String(body.folderId ?? "").trim();
 
   if (!fileId) {
     return NextResponse.json({ error: "fileId is required." }, { status: 400 });
@@ -239,6 +279,8 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
+
+    await linkSourceToFolder(supabase, context.workspace.id, source.id, folderId);
 
     const processResult = await supabase.functions.invoke("process-knowledge-source", {
       headers: session?.access_token

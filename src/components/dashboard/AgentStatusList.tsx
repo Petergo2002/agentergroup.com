@@ -60,7 +60,7 @@ export function AgentStatusList({ agents, isLoading }: AgentStatusListProps) {
               <Link
                 key={agent.id}
                 href={`/agents/${agent.id}/builder`}
-                className="group flex items-center justify-between gap-4 rounded-2xl bg-surface-container-lowest/65 p-4 transition-all hover:bg-surface-container hover:shadow-lg hover:shadow-black/20 hover:ring-1 hover:ring-primary/10"
+                className="group flex items-center justify-between gap-4 rounded-2xl bg-surface-container-lowest/65 p-4 transition-all duration-300 hover:bg-surface-container hover:-translate-y-0.5 hover:shadow-premium hover:ring-1 hover:ring-primary/10"
               >
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container group-hover:bg-primary/5 group-hover:text-primary transition-colors">

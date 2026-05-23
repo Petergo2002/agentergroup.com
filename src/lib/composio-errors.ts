@@ -58,3 +58,17 @@ export function isConnectedAccountMissingError(error: unknown) {
       normalized.includes("was not found or may have been deleted"))
   );
 }
+
+export function isComposioAuthenticationError(error: unknown) {
+  const normalized = getComposioErrorText(error).toLowerCase();
+
+  return (
+    normalized.includes("http_unauthorized") ||
+    normalized.includes("invalid api key") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("status\":401") ||
+    normalized.includes("status 401") ||
+    normalized.includes("code\":10401") ||
+    normalized.includes("code 10401")
+  );
+}

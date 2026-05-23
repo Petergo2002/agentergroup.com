@@ -62,7 +62,7 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
             <Link
               key={convo.widgetSessionId}
               href="/analytics"
-              className="group relative block rounded-2xl bg-surface-container-lowest/65 p-5 transition-all hover:bg-surface-container hover:shadow-lg hover:shadow-black/20 hover:ring-1 hover:ring-primary/10"
+              className="group relative block rounded-2xl bg-surface-container-lowest/65 p-5 transition-all duration-300 hover:bg-surface-container hover:-translate-y-0.5 hover:shadow-premium hover:ring-1 hover:ring-primary/10"
             >
               <div className="flex items-start justify-between gap-6">
                 <div className="flex gap-4 min-w-0">

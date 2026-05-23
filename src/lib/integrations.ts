@@ -1,4 +1,4 @@
-export type SupportedIntegrationSlug = "gmail" | "googlecalendar" | "cal" | "googledrive" | "outlook" | "slack" | "hubspot" | "shopify";
+export type SupportedIntegrationSlug = "gmail" | "googlecalendar" | "cal" | "googledrive" | "outlook" | "slack" | "hubspot" | "shopify" | "googleads";
 export type InternalAssistantToolkitSlug = "text_to_pdf";
 export type IntegrationSurface = "chat" | "knowledge";
 
@@ -123,6 +123,25 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     allowedKnowledgeTools: [],
   },
   {
+    slug: "googleads",
+    displayName: "Google Ads",
+    description: "Inspect Google Ads accounts, campaigns, customer lists, and GAQL reports.",
+    icon: "ads_click",
+    simpleIcon: "siGoogleads",
+    simpleIconColor: "#4285F4",
+    category: "Marketing",
+    connectionPurpose: "Used by agents to inspect Google Ads accounts, campaigns, customer lists, and GAQL reports.",
+    surface: "chat",
+    recommendedChatTools: [
+      "GOOGLEADS_LIST_ACCESSIBLE_CUSTOMERS",
+      "GOOGLEADS_GET_CAMPAIGN_BY_ID",
+      "GOOGLEADS_GET_CAMPAIGN_BY_NAME",
+      "GOOGLEADS_GET_CUSTOMER_LISTS",
+      "GOOGLEADS_SEARCH_STREAM_GAQL",
+    ],
+    allowedKnowledgeTools: [],
+  },
+  {
     slug: "googlecalendar",
     displayName: "Google Calendar",
     description: "Check availability and book meetings.",
@@ -241,6 +260,8 @@ export function getToolNamePrefixForToolkit(toolkitSlug: string) {
       return "HUBSPOT_";
     case "shopify":
       return "SHOPIFY_";
+    case "googleads":
+      return "GOOGLEADS_";
     case "googlecalendar":
       return "GOOGLECALENDAR_";
     case "cal":

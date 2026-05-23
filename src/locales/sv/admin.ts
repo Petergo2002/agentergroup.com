@@ -10,6 +10,7 @@ export const admin = {
   workspaces: "Workspaces",
   customerActivity: "Kundaktivitet",
   customersBadge: "Kunder",
+  verification: "Verifiering",
   workspaceDirectory: "Workspace-katalog",
   workspaceDirectoryDescription:
     "En tydlig workspace-vy över vem som använder plattformen och hur aktiva de är.",

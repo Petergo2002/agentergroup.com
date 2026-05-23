@@ -1,42 +1,89 @@
 /**
- * Stripe SDK singleton.
+ * Stripe SDK and billing configuration helpers.
  *
- * Import `stripe` from this file wherever you need server-side Stripe operations.
- * Never import Stripe directly in route handlers — always go through this file.
+ * Keep this module import-safe: billing routes should fail when invoked with
+ * missing billing env, not during unrelated module evaluation.
  */
 
-import Stripe from 'stripe';
-import { PLAN_LIMITS } from '@/lib/plan-limits';
-import type { PlanTier } from '@/lib/types/subscription';
+import Stripe from "stripe";
+import { PLAN_LIMITS } from "./plan-limits";
+import type { PlanTier } from "./types/subscription";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required environment variable: STRIPE_SECRET_KEY');
+export class BillingConfigurationError extends Error {
+  status = 503;
+
+  constructor(message = "Billing is not configured.") {
+    super(message);
+    this.name = "BillingConfigurationError";
+  }
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2026-03-25.dahlia',
-  typescript: true,
-});
+const STRIPE_BILLING_PLANS = ["starter", "premium"] as const;
+type StripeBillingPlan = (typeof STRIPE_BILLING_PLANS)[number];
 
-/**
- * Map plan tiers to Stripe Price IDs.
- * These are the recurring monthly prices created in Stripe.
- */
-export const STRIPE_PRICE_IDS: Record<string, string> = {
-  starter: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || 'price_1TP1pxEqNgWOqUOe64tSR342',  // $30/mo
-  premium: process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID || 'price_1TP1ptEqNgWOqUOePAREbCk0',  // $110/mo
-};
+let stripeClient: Stripe | null = null;
+let stripeClientSecret: string | null = null;
 
-export const STRIPE_EXTRA_CREDITS_500_PRICE_ID =
-  process.env.STRIPE_EXTRA_CREDITS_500_PRICE_ID ?? "";
+function requireBillingEnv(value: string | undefined, name: string) {
+  const normalized = value?.trim();
 
-/**
- * Map Stripe Price IDs back to plan tiers.
- * Used by the webhook to determine which plan to activate.
- */
-export const STRIPE_PRICE_TO_PLAN: Record<string, PlanTier> = {
-  [process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || 'price_1TP1pxEqNgWOqUOe64tSR342']: 'starter',
-  [process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID || 'price_1TP1ptEqNgWOqUOePAREbCk0']: 'premium',
-};
+  if (!normalized) {
+    throw new BillingConfigurationError(
+      `Missing required billing environment variable: ${name}`,
+    );
+  }
+
+  return normalized;
+}
+
+export function isStripeBillingPlan(plan: string): plan is StripeBillingPlan {
+  return STRIPE_BILLING_PLANS.includes(plan as StripeBillingPlan);
+}
+
+export function getStripe() {
+  const secretKey = requireBillingEnv(
+    process.env.STRIPE_SECRET_KEY,
+    "STRIPE_SECRET_KEY",
+  );
+
+  if (!stripeClient || stripeClientSecret !== secretKey) {
+    stripeClient = new Stripe(secretKey, {
+      apiVersion: "2026-03-25.dahlia",
+      typescript: true,
+    });
+    stripeClientSecret = secretKey;
+  }
+
+  return stripeClient;
+}
+
+export function getStripePriceIds(): Record<StripeBillingPlan, string> {
+  return {
+    starter: requireBillingEnv(
+      process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID,
+      "NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID",
+    ),
+    premium: requireBillingEnv(
+      process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID,
+      "NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID",
+    ),
+  };
+}
+
+export function getStripePriceToPlan(): Record<string, PlanTier> {
+  const priceIds = getStripePriceIds();
+
+  return {
+    [priceIds.starter]: "starter",
+    [priceIds.premium]: "premium",
+  };
+}
+
+export function getStripeExtraCredits500PriceId() {
+  return requireBillingEnv(
+    process.env.STRIPE_EXTRA_CREDITS_500_PRICE_ID,
+    "STRIPE_EXTRA_CREDITS_500_PRICE_ID",
+  );
+}
 
 export { PLAN_LIMITS };

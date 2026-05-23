@@ -40,4 +40,6 @@ export const login = {
   privacyPolicy: "Privacy Policy",
   termsOfService: "Terms of Service",
   logoAlt: "Agentergroup logo",
+  continueWithGoogle: "Continue with Google",
+  orContinueWith: "or continue with email",
 };

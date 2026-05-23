@@ -30,48 +30,46 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
   }
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-center p-8 bg-[#141414] font-body text-white overflow-hidden">
-      {/* Subtle Grid Background */}
-      <div className="absolute inset-0 z-0 opacity-[0.03]" 
-           style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+    <main className="relative min-h-screen flex flex-col items-center justify-center p-8 bg-[#050505] font-body text-[#f5f1eb] overflow-hidden">
 
-      <div className="relative z-10 w-full max-w-md space-y-10 bg-white/[0.02] p-12 rounded-[2.5rem] border border-white/5 shadow-2xl backdrop-blur-sm">
+      <div className="relative z-10 w-full max-w-md space-y-10 bg-[#0d0d0d] p-12 rounded-[2px] border border-[#161616] shadow-2xl">
         <div className="flex justify-center mb-8">
           <Image
             src="/dashboardlogo.svg"
             alt="Agentergroup"
-            width={180}
-            height={60}
-            className="h-10 w-auto opacity-90"
+            width={840}
+            height={279}
+            priority
+            className="h-10 w-auto opacity-90 object-contain"
           />
         </div>
 
         <div className="space-y-3 text-center">
-          <span className="inline-block text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-2">
+          <span className="inline-block text-[10px] font-bold uppercase tracking-[0.3em] text-[#ff5c00] mb-2">
             Final Step
           </span>
-          <h2 className="font-headline text-3xl font-bold tracking-tight text-white leading-tight">
+          <h2 className="font-headline text-3xl font-extrabold tracking-tight text-white leading-tight">
             {messages.login.completeSignupTitle}
           </h2>
-          <p className="text-[13px] text-white/50 font-medium">
+          <p className="text-[13px] text-[#9d948a]/80 font-medium">
             {messages.login.completeSignupSubtitle}
           </p>
         </div>
 
         {error ? (
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs text-red-400 font-bold tracking-tight text-center">
+          <div className="rounded-[2px] border border-error/20 bg-error-container/10 px-4 py-3 text-xs text-error font-semibold text-center animate-shake">
             {error}
           </div>
         ) : null}
 
-        <form action={updatePassword} className="space-y-8">
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-1">
+        <form action={updatePassword} className="space-y-6">
+          <div className="space-y-5">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
                 Full Name
               </label>
               <input
-                className="w-full rounded-2xl border border-white/5 bg-white/[0.03] px-5 py-4 text-sm text-white outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-white/20"
+                className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
                 name="fullName"
                 type="text"
                 placeholder="John Doe"
@@ -79,12 +77,12 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-1">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
                 Company Name
               </label>
               <input
-                className="w-full rounded-2xl border border-white/5 bg-white/[0.03] px-5 py-4 text-sm text-white outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-white/20"
+                className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
                 name="companyName"
                 type="text"
                 placeholder="Agentergroup AB"
@@ -92,14 +90,14 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
               />
             </div>
 
-            <div className="h-px w-full bg-white/5 my-4" />
+            <div className="h-px w-full bg-[#161616] my-4" />
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-1">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
                 {messages.login.setPassword}
               </label>
               <input
-                className="w-full rounded-2xl border border-white/5 bg-white/[0.03] px-5 py-4 text-sm text-white outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-white/20"
+                className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
                 name="password"
                 type="password"
                 placeholder="••••••••"
@@ -108,12 +106,12 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-1">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
                 {messages.login.confirmPassword}
               </label>
               <input
-                className="w-full rounded-2xl border border-white/5 bg-white/[0.03] px-5 py-4 text-sm text-white outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-white/20"
+                className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
                 name="confirmPassword"
                 type="password"
                 placeholder="••••••••"
@@ -125,14 +123,14 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
 
           <button
             type="submit"
-            className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-primary py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-xl shadow-primary/20 transition-all hover:shadow-primary/30 active:scale-[0.98]"
+            className="w-full flex h-11 items-center justify-center rounded-[2px] bg-[#ff5c00] hover:bg-[#e05100] text-white text-[11px] font-bold uppercase tracking-widest active:scale-[0.98] transition-all duration-200 cursor-pointer"
           >
             {messages.login.finishSignup}
           </button>
         </form>
       </div>
-      
-      <p className="relative z-10 mt-12 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">
+
+      <p className="relative z-10 mt-12 text-[10px] font-bold text-[#9d948a]/30 uppercase tracking-[0.2em]">
         Secure Account Setup
       </p>
     </main>

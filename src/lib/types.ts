@@ -39,6 +39,12 @@ export type {
 } from "./types/subscription";
 
 export type { AgentRecord, AgentVersionRecord } from "./types/agent";
+export type {
+  AgentLibraryTemplateRecord,
+  AgentLibraryTemplateSourceRecord,
+  AgentLibraryTemplateStatus,
+  AgentLibraryTemplateWithSources,
+} from "./types/agent-library";
 
 export type {
   ConnectionAuthLinkRecord,
@@ -50,6 +56,10 @@ export type {
   KnowledgeSourceRecord,
   KnowledgeChunkRecord,
   AgentKnowledgeSourceRecord,
+  KnowledgeFolderRecord,
+  KnowledgeFolderSourceRecord,
+  AgentKnowledgeFolderRecord,
+  KnowledgeFolderWithSources,
   DriveImportFileRecord,
   KnowledgeMatchRecord,
 } from "./types/knowledge";
@@ -149,6 +159,7 @@ export type {
   SlackBuilderNodeData,
   HubSpotBuilderNodeData,
   ShopifyBuilderNodeData,
+  GoogleAdsBuilderNodeData,
   GoogleCalendarBuilderNodeData,
   CalBuilderNodeData,
   EndChatBuilderNodeData,

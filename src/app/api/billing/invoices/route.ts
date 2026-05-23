@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { stripe } from '@/lib/stripe';
+import { BillingConfigurationError, getStripe } from '@/lib/stripe';
 import {
   BillingAuthorizationError,
   assertWorkspaceBillingAdmin,
@@ -50,6 +50,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ invoices: [] });
     }
 
+    const stripe = getStripe();
+
     // Fetch the last 10 invoices from Stripe
     const invoicesResponse = await stripe.invoices.list({
       customer: subscription.stripe_customer_id,
@@ -73,6 +75,10 @@ export async function GET(req: Request) {
 
   } catch (err) {
     if (err instanceof BillingAuthorizationError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+
+    if (err instanceof BillingConfigurationError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
 

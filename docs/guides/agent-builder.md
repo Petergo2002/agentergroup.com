@@ -1,6 +1,6 @@
 # Agent Builder
 
-Last updated: 2026-05-04
+Last updated: 2026-05-20
 
 ## Purpose
 
@@ -27,7 +27,7 @@ The builder is the editing surface for configuring an agent's:
 - starter prompts
 - timezone
 - end-of-chat policy
-- attached knowledge sources
+- attached knowledge sources and folders
 - attached live action tools
 - external automation trigger setup
 - published version history
@@ -57,6 +57,7 @@ Related files:
 - `src/app/(app)/agents/[id]/preview/page.tsx`
 - `src/app/(app)/agents/[id]/activity/page.tsx`
 - `src/lib/runtime/agent-chat.ts`
+- `src/lib/builder-connection-resolver.ts`
 
 ## Current Builder Model
 
@@ -79,6 +80,10 @@ The builder currently supports these optional node kinds:
 - `knowledge`
 - `gmail`
 - `outlook`
+- `slack`
+- `hubspot`
+- `shopify`
+- `googleads`
 - `googlecalendar`
 - `cal`
 - `endchat`
@@ -88,6 +93,10 @@ Current limits:
 - only one `knowledge` node
 - only one `gmail` node
 - only one `outlook` node
+- only one `slack` node
+- only one `hubspot` node
+- only one `shopify` node
+- only one `googleads` node
 - only one `googlecalendar` node
 - only one `cal` node
 - only one `endchat` node
@@ -103,6 +112,10 @@ Chat Message Trigger -> Agent Core
                          -> Knowledge (optional)
                          -> Gmail (optional)
                          -> Outlook (optional)
+                         -> Slack (optional)
+                         -> HubSpot (optional)
+                         -> Shopify (optional)
+                         -> Google Ads (optional)
                          -> Google Calendar (optional)
                          -> Cal.com (optional)
                          -> End Chat (optional)
@@ -115,6 +128,10 @@ External Trigger -> Agent Core
                     -> Knowledge (optional)
                     -> Gmail (optional)
                     -> Outlook (optional)
+                    -> Slack (optional)
+                    -> HubSpot (optional)
+                    -> Shopify (optional)
+                    -> Google Ads (optional)
                     -> Google Calendar (optional)
                     -> Cal.com (optional)
 ```
@@ -148,29 +165,34 @@ Current model options load from `/api/openrouter/models` and fall back to the cu
 
 ### Knowledge inspector
 
-When the `knowledge` node is selected, the builder shows workspace knowledge sources and allows attachment by checkbox.
+When the `knowledge` node is selected, the builder shows workspace knowledge folders and individual sources and allows attachment by checkbox.
 
 Important current behavior:
 
 - only sources in the current workspace can be attached
+- only folders in the current workspace can be attached
 - sources that are not ready cannot be selected
-- the builder stores selected source ids on the node and syncs them to `agent_knowledge_sources`
+- folder selections are live: adding a ready source to an attached folder makes it available to the agent without re-saving the agent
+- the builder stores selected source ids as `sourceIds` and selected folder ids as `folderIds` on the node
+- `POST /api/agents/[id]/knowledge` syncs direct sources to `agent_knowledge_sources` and folders to `agent_knowledge_folders`
 
 ### Tool inspector
 
-When `gmail`, `outlook`, `slack`, `hubspot`, `shopify`, `googlecalendar`, or `cal` is selected, the builder shows the selected account for that tool.
+When `gmail`, `outlook`, `slack`, `hubspot`, `shopify`, `googleads`, `googlecalendar`, or `cal` is selected, the builder shows the selected account for that tool.
 
 Important current behavior:
 
 - only chat-surface integrations are shown in the builder
 - the selected connection is stored on the node as `connectionId`
 - the actual durable mapping is synced to `agent_connections`
-- missing or disconnected selected accounts are shown as setup/error states and are not persisted as active runtime attachments
+- missing, disconnected, or wrong-toolkit selected accounts are rebound to the newest connected account for the same toolkit when possible
+- if a Google Calendar or Cal.com account is rebound, account-specific calendar/event-type fields are cleared so stale selections are not reused
+- if no connected account exists for the toolkit, the node remains in a setup/error state and is not persisted as an active runtime attachment
 - Gmail and Outlook both expose a per-node recipient policy:
   - `ai_decides`
   - `specific_email`
 - when Gmail or Outlook uses `specific_email`, the node stores the hidden fixed recipient on the draft definition and runtime enforces it server-side
-- Slack, HubSpot, and Shopify expose the shared connected-account display and action editor; they do not add per-node settings yet
+- Slack, HubSpot, Shopify, and Google Ads expose the shared connected-account display and action editor; they do not add per-node settings yet
 - Google Calendar exposes one selected booking calendar and resolves the booking timezone from that calendar
 - Cal.com exposes a scheduling mode: `ai_decides` or `specific_event_type`
 - the builder loads selectable Google Calendars or Cal.com event types from the connected Composio account
@@ -263,6 +285,12 @@ Default recommended actions:
   - `List Inventory Levels`
   - `Creates A New Product`
   - `Updates A Product`
+- Google Ads:
+  - `List Accessible Customers`
+  - `Get Campaign By Id`
+  - `Get Campaign By Name`
+  - `Get Customer Lists`
+  - `Search Stream GAQL`
 - Google Calendar:
   - `Create Event`
   - `Quick Add`
@@ -283,7 +311,7 @@ Current behavior:
 - `Agent Core` is fixed and non-addable
 - `Knowledge` can only be added once
 - `End Chat` can only be added once
-- `Connected Tools` opens a picker for Gmail, Microsoft Outlook, Slack, HubSpot, Shopify, Google Calendar, and Cal.com
+- `Connected Tools` opens a picker for Gmail, Microsoft Outlook, Slack, HubSpot, Shopify, Google Ads, Google Calendar, and Cal.com
 - a tool can only be added if there is at least one connected account for that tool
 - the drawer opens on hover and can also be pinned open by click/tap
 
@@ -470,7 +498,7 @@ Important implication:
 The shared runtime reads tool and knowledge availability from durable attachment tables:
 
 - tools from `agent_connections`
-- knowledge from `agent_knowledge_sources`
+- knowledge from `agent_knowledge_sources` and live folder attachments in `agent_knowledge_folders`
 
 The runtime reads core agent settings from the `agents` table:
 
@@ -519,6 +547,7 @@ So the builder affects widgets in two stages:
 - add Slack
 - add HubSpot
 - add Shopify
+- add Google Ads
 - add Google Calendar
 - add Cal.com
 - add End Chat
@@ -551,7 +580,52 @@ So the builder affects widgets in two stages:
 - `connections`
 - `agent_connections`
 - `knowledge_sources`
+- `knowledge_folders`
+- `knowledge_folder_sources`
 - `agent_knowledge_sources`
+- `agent_knowledge_folders`
+
+### Agent Library
+
+The Agent Library lets users submit saved agents as reusable templates, then import approved templates into another workspace.
+
+Main files:
+
+- `src/components/agents/AgentLibraryDialog.tsx`
+- `src/components/agents/TemplateVariableSetup.tsx`
+- `src/lib/agent-library.ts`
+- `src/lib/template-variables.ts`
+- `src/app/api/agent-library/route.ts`
+- `src/app/api/agent-library/submissions/route.ts`
+- `src/app/api/agent-library/submit/route.ts`
+- `src/app/api/agent-library/[id]/import/route.ts`
+- `src/app/api/admin/agent-library/route.ts`
+- `src/app/api/admin/agent-library/[id]/review/route.ts`
+- `src/app/(admin)/admin/verification/page.tsx`
+
+Database tables:
+
+- `agent_library_templates`
+- `agent_library_template_sources`
+
+Current behavior:
+
+- publishing to the library creates a `pending` template from the saved draft definition
+- template definitions are sanitized before storage:
+  - tool and trigger `connectionId` values are cleared
+  - knowledge node `sourceIds` and `folderIds` are cleared
+  - Google Calendar calendar/timezone selection is cleared
+  - Cal.com event-type/timezone selection is cleared
+  - Composio trigger config is cleared
+- attached direct knowledge sources and sources reachable through selected folders are snapshotted into `agent_library_template_sources`; file sources are rebuilt from `knowledge_chunks` in chunk order
+- required integrations are derived from tool nodes and Composio trigger config
+- admins approve or reject templates from `/admin/verification`
+- only approved templates appear in the public library tab
+- workspace submissions appear in the user's submissions tab with their review status
+- importing an approved template creates a draft agent, clones template knowledge as text knowledge sources, links those sources to the agent, and writes a starter `agent_drafts` row
+- import enforces workspace feature gates for `assistant` and `automation` surfaces, active agent limits, and knowledge storage limits
+
+Prompt templates may contain `{{variable_name}}` tokens. The library dialog detects those tokens from template instructions, asks the importing user for values, and the import route resolves them before saving the new agent instructions. Supported variable keys are letters, digits, and underscores, starting with a letter.
 
 ### Builder definition shape
 
@@ -592,6 +666,7 @@ Current supported node data types in `src/lib/types.ts`:
 - `SlackBuilderNodeData`
 - `HubSpotBuilderNodeData`
 - `ShopifyBuilderNodeData`
+- `GoogleAdsBuilderNodeData`
 - `GoogleCalendarBuilderNodeData`
 - `CalBuilderNodeData`
 
@@ -607,7 +682,7 @@ Important current tool-node fields:
   - `calendarId`
   - `calendarLabel`
   - `includePrimaryCalendar`
-- `SlackBuilderNodeData` / `HubSpotBuilderNodeData` / `ShopifyBuilderNodeData`
+- `SlackBuilderNodeData` / `HubSpotBuilderNodeData` / `ShopifyBuilderNodeData` / `GoogleAdsBuilderNodeData`
   - `connectionId`
   - `enabledTools`
 - `CalBuilderNodeData`
@@ -650,6 +725,7 @@ Important operational detail:
   - Slack
   - HubSpot
   - Shopify
+  - Google Ads
 - these can be overridden via environment variables:
   - `COMPOSIO_TOOLKIT_VERSION_GMAIL`
   - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
@@ -659,6 +735,7 @@ Important operational detail:
   - `COMPOSIO_TOOLKIT_VERSION_SLACK`
   - `COMPOSIO_TOOLKIT_VERSION_HUBSPOT`
   - `COMPOSIO_TOOLKIT_VERSION_SHOPIFY`
+  - `COMPOSIO_TOOLKIT_VERSION_GOOGLEADS`
 
 This is why Google Calendar's booking-calendar selector and Google Drive import utilities do not pass per-request versions manually.
 
@@ -676,6 +753,8 @@ When changing the builder, treat these as the source-of-truth layers:
    Define the durable persisted state.
 4. `src/lib/runtime/agent-chat.ts` and related routes
    Define what the saved builder state actually does at runtime.
+5. `src/lib/agent-library.ts` and `src/lib/template-variables.ts`
+   Define how reusable templates are sanitized, imported, and personalized.
 
 If these layers disagree, runtime behavior wins over UI assumptions.
 
@@ -685,9 +764,11 @@ If you add or change a builder feature, review this list:
 
 - Update `src/lib/types.ts`
 - Update `src/app/(app)/agents/[id]/builder/page.tsx`
+- Update `src/lib/builder-connection-resolver.ts` if connection selection or stale-account fallback changed
 - Update `src/lib/agents/defaults.ts` if the default canvas or config changed
 - Update `src/lib/integrations.ts` if a new live tool was added
 - Update `src/app/api/agents/[id]/automation/route.ts` and `src/app/api/agents/[id]/automation/status/route.ts` if automation trigger persistence or lifecycle changed
+- Update the Agent Library API/routes and `src/lib/agent-library.ts` if template submission/import behavior changed
 - Update `src/app/api/composio/webhook/route.ts` and `src/lib/automation/executor.ts` if automation event processing changed
 - Update `src/app/api/agents/[id]/knowledge/route.ts` if knowledge attachment behavior changed
 - Update `src/app/api/agents/[id]/rollback/route.ts` if rollback semantics changed

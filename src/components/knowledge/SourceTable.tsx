@@ -1,30 +1,77 @@
 "use client";
 
-import { FileText, CheckCircle2, Clock, AlertCircle, RefreshCw, Trash2, Eye, Globe } from "lucide-react";
+import { useEffect, useRef } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Eye,
+  FileText,
+  Folder,
+  Globe,
+  Pencil,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
-import type { KnowledgeSourceRecord } from "@/lib/types";
+import type { KnowledgeFolderWithSources, KnowledgeSourceRecord } from "@/lib/types";
 import { formatRelativeDate } from "@/lib/utils";
 
 interface SourceTableProps {
   sources: KnowledgeSourceRecord[];
+  folders?: KnowledgeFolderWithSources[];
+  allFolders?: KnowledgeFolderWithSources[];
   isLoading: boolean;
   onProcess: (id: string) => void;
   onDelete: (source: KnowledgeSourceRecord) => void;
   onView: (source: KnowledgeSourceRecord) => void;
+  onOpenFolder?: (folder: KnowledgeFolderWithSources) => void;
+  onEditFolder?: (folder: KnowledgeFolderWithSources) => void;
+  onDeleteFolder?: (folder: KnowledgeFolderWithSources) => void;
+  selectedSourceIds?: string[];
+  onToggleSource?: (sourceId: string, checked: boolean) => void;
+  onToggleAllSources?: (checked: boolean) => void;
   processingId?: string | null;
   deletingId?: string | null;
+  deletingFolderId?: string | null;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
 export function SourceTable({
   sources,
+  folders = [],
+  allFolders = folders,
   isLoading,
   onProcess,
   onDelete,
   onView,
+  onOpenFolder,
+  onEditFolder,
+  onDeleteFolder,
+  selectedSourceIds = [],
+  onToggleSource,
+  onToggleAllSources,
   processingId,
   deletingId,
+  deletingFolderId,
+  emptyTitle,
+  emptyDescription,
 }: SourceTableProps) {
   const { language, t } = useLanguage();
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const selectedSourceSet = new Set(selectedSourceIds);
+  const selectable = Boolean(onToggleSource);
+  const allVisibleSourcesSelected =
+    sources.length > 0 && sources.every((source) => selectedSourceSet.has(source.id));
+  const someVisibleSourcesSelected =
+    sources.some((source) => selectedSourceSet.has(source.id)) && !allVisibleSourcesSelected;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleSourcesSelected;
+    }
+  }, [someVisibleSourcesSelected]);
 
   if (isLoading) {
     return (
@@ -36,15 +83,17 @@ export function SourceTable({
     );
   }
 
-  if (sources.length === 0) {
+  if (sources.length === 0 && folders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl bg-surface-container-low/50 px-6 py-20 text-center ring-1 ring-inset ring-outline-variant/10">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-container text-on-surface-variant/40">
           <FileText className="h-8 w-8" />
         </div>
-        <h3 className="mt-6 text-lg font-bold text-on-surface">{t("knowledge.noSourcesFound")}</h3>
+        <h3 className="mt-6 text-lg font-bold text-on-surface">
+          {emptyTitle ?? t("knowledge.noSourcesFound")}
+        </h3>
         <p className="mt-2 max-w-sm text-sm text-on-surface-variant/70 text-balance">
-          {t("knowledge.connectDriveStatus")}
+          {emptyDescription ?? t("knowledge.connectDriveStatus")}
         </p>
       </div>
     );
@@ -56,6 +105,19 @@ export function SourceTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container/60 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
+              {selectable ? (
+                <th className="w-12 px-6 py-5">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allVisibleSourcesSelected}
+                    disabled={sources.length === 0}
+                    onChange={(event) => onToggleAllSources?.(event.target.checked)}
+                    className="h-4 w-4 rounded border-outline-variant/40 text-primary focus:ring-primary/30 disabled:opacity-40"
+                    aria-label={t("knowledge.selectAllSources")}
+                  />
+                </th>
+              ) : null}
               <th className="px-6 py-5">{t("knowledge.sourceName")}</th>
               <th className="px-6 py-5">{t("knowledge.type")}</th>
               <th className="px-6 py-5 text-center">{t("common.status")}</th>
@@ -64,16 +126,104 @@ export function SourceTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/5">
+            {folders.map((folder) => {
+              const isDeleting = deletingFolderId === folder.id;
+
+              return (
+                <tr
+                  key={`folder-${folder.id}`}
+                  className="group/row transition-all hover:bg-surface-container-lowest active:bg-surface-container-high/20"
+                >
+                  {selectable ? <td className="px-6 py-4" /> : null}
+                  <td className="px-6 py-4">
+                    <button
+                      type="button"
+                      onClick={() => onOpenFolder?.(folder)}
+                      className="flex w-full items-center gap-3 rounded-xl text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container-low"
+                      aria-label={t("knowledge.openFolder", { name: folder.name })}
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover/row:bg-primary/15">
+                        <Folder className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-on-surface tracking-tight">
+                          {folder.name}
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px] text-on-surface-variant/60">
+                          {folder.description || t("knowledge.noFolderDescription")}
+                        </p>
+                      </div>
+                    </button>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
+                      {t("knowledge.folderType")}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="inline-flex rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                      {t("knowledge.folderSourceCountShort", { count: folder.sourceIds.length })}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-on-surface-variant/80 font-medium">
+                    {formatRelativeDate(folder.updated_at, language)}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => onOpenFolder?.(folder)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors"
+                        title={t("common.view")}
+                        aria-label={t("knowledge.openFolder", { name: folder.name })}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => onEditFolder?.(folder)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors"
+                        title={t("common.edit")}
+                        aria-label={t("knowledge.editFolder")}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteFolder?.(folder)}
+                        disabled={isDeleting}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-error/10 hover:text-error disabled:opacity-50 transition-colors"
+                        title={t("common.delete")}
+                        aria-label={t("knowledge.deleteFolder")}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+
             {sources.map((source) => {
               const isProcessing = processingId === source.id;
               const isDeleting = deletingId === source.id;
               const status = source.status;
+              const sourceFolders = allFolders.filter((folder) => folder.sourceIds.includes(source.id));
+              const checked = selectedSourceSet.has(source.id);
 
               return (
                 <tr 
                   key={source.id} 
                   className="group/row transition-all hover:bg-surface-container-lowest active:bg-surface-container-high/20"
                 >
+                  {selectable ? (
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) => onToggleSource?.(source.id, event.target.checked)}
+                        className="h-4 w-4 rounded border-outline-variant/40 text-primary focus:ring-primary/30"
+                        aria-label={t("knowledge.selectSource", { name: source.name })}
+                      />
+                    </td>
+                  ) : null}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant group-hover/row:bg-primary/10 group-hover/row:text-primary transition-colors">
@@ -88,7 +238,9 @@ export function SourceTable({
                           {source.name}
                         </p>
                         <p className="mt-0.5 truncate text-[11px] text-on-surface-variant/60">
-                          {source.chunk_count} chunks • {source.source_type === "website" && typeof source.metadata?.sourceUrl === "string" ? source.metadata.sourceUrl : source.description || t("assistants.noDescription")}
+                          {sourceFolders.length > 0
+                            ? sourceFolders.map((folder) => folder.name).join(", ")
+                            : `${source.chunk_count} chunks • ${source.source_type === "website" && typeof source.metadata?.sourceUrl === "string" ? source.metadata.sourceUrl : source.description || t("assistants.noDescription")}`}
                         </p>
                       </div>
                     </div>
@@ -112,6 +264,12 @@ export function SourceTable({
                           <span className="text-primary uppercase tracking-wider">{t("statuses.knowledge.syncing")}</span>
                         </>
                       )}
+                      {status === "pending" && (
+                        <>
+                          <Clock className="h-3.5 w-3.5 text-on-surface-variant animate-pulse" />
+                          <span className="text-on-surface-variant uppercase tracking-wider">{t("statuses.knowledge.pending")}</span>
+                        </>
+                      )}
                       {status === "failed" && (
                         <>
                           <AlertCircle className="h-3.5 w-3.5 text-error" />
@@ -129,6 +287,7 @@ export function SourceTable({
                         onClick={() => onView(source)}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors"
                         title={t("common.view")}
+                        aria-label={t("knowledge.viewSource", { name: source.name })}
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -137,6 +296,7 @@ export function SourceTable({
                         disabled={isProcessing}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary disabled:opacity-50 transition-colors"
                         title={t("knowledge.queuedForProcessing")}
+                        aria-label={t("knowledge.retrySourceProcessing", { name: source.name })}
                       >
                         <RefreshCw className={`h-4 w-4 ${isProcessing ? "animate-spin" : ""}`} />
                       </button>
@@ -145,6 +305,7 @@ export function SourceTable({
                         disabled={isDeleting}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-error/10 hover:text-error disabled:opacity-50 transition-colors"
                         title={t("common.delete")}
+                        aria-label={t("knowledge.deleteSource", { name: source.name })}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

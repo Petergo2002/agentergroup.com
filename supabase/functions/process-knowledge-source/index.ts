@@ -98,7 +98,11 @@ Deno.serve(async (request) => {
       const metadata = source.metadata || {};
       const url = metadata.sourceUrl;
       const crawlLimit = metadata.crawlLimit || 1;
-      const selectedUrls = metadata.selectedUrls || [];
+      const selectedUrls = Array.isArray(metadata.selectedUrls)
+        ? (metadata.selectedUrls as unknown[]).filter((value: unknown): value is string =>
+            typeof value === "string" && value.trim().length > 0
+          )
+        : [];
       const isPremium = metadata.isPremium || false;
 
       if (!url) throw new Error("Missing sourceUrl in website metadata.");
@@ -111,26 +115,39 @@ Deno.serve(async (request) => {
       // Priority 1: User picked specific pages via the /map tool
       // (The /map endpoint is already premium-gated so selectedUrls are always trusted)
       if (selectedUrls.length > 0) {
-        console.log(`[Process] Scraping ${selectedUrls.length} selected URLs one by one...`);
-        const results: string[] = [];
-        for (const u of selectedUrls) {
-          let scrapeUrl = u;
-          if (!/^https?:\/\//i.test(scrapeUrl)) scrapeUrl = `https://${scrapeUrl}`;
-          
-          console.log(`[Process] Scraping individual URL: ${scrapeUrl}`);
-          try {
-            const res = await firecrawl.scrape(scrapeUrl, { formats: ["markdown"] });
-            if (res.markdown) {
-              results.push(res.markdown);
-              console.log(`[Process] Successfully scraped ${scrapeUrl} (${res.markdown.length} chars)`);
-            } else {
-              console.warn(`[Process] No markdown returned for ${scrapeUrl}`);
+        console.log(`[Process] Scraping ${selectedUrls.length} selected URLs in batches...`);
+        const validResults: string[] = [];
+        const batchSize = 4;
+
+        for (let index = 0; index < selectedUrls.length; index += batchSize) {
+          const batch = selectedUrls.slice(index, index + batchSize);
+          const scrapePromises: Array<Promise<string | null>> = batch.map(async (u: string) => {
+            let scrapeUrl = u;
+            if (!/^https?:\/\//i.test(scrapeUrl)) scrapeUrl = `https://${scrapeUrl}`;
+
+            console.log(`[Process] Scraping individual URL: ${scrapeUrl}`);
+            try {
+              const res = await firecrawl.scrape(scrapeUrl, { formats: ["markdown"] });
+              if (res.markdown) {
+                console.log(`[Process] Successfully scraped ${scrapeUrl} (${res.markdown.length} chars)`);
+                return res.markdown;
+              } else {
+                console.warn(`[Process] No markdown returned for ${scrapeUrl}`);
+                return null;
+              }
+            } catch (err) {
+              console.error(`[Process] Scrape error for ${scrapeUrl}:`, err);
+              return null;
             }
-          } catch (err) {
-            console.error(`[Process] Scrape error for ${scrapeUrl}:`, err);
-          }
+          });
+
+          const results = await Promise.all(scrapePromises);
+          validResults.push(...results.filter((result: string | null): result is string => result !== null));
+          console.log(`[Process] Finished selected URL batch ${Math.floor(index / batchSize) + 1}/${Math.ceil(selectedUrls.length / batchSize)}.`);
         }
-        scrapedText = results.join("\n\n---\n\n");
+
+        scrapedText = validResults.join("\n\n---\n\n");
+
       } else if (crawlLimit > 1 && isPremium) {
         console.log(`[Process] Crawling website: ${targetUrl} (Limit: ${crawlLimit})`);
         // firecrawl.crawl() polls until done and returns a CrawlJob ({ status, data[], total, completed })
@@ -242,34 +259,47 @@ Deno.serve(async (request) => {
 
     console.log(`[Process] Generating embeddings for ${chunks.length} chunks...`);
     const chunkRows: Array<Record<string, unknown>> = [];
+    const embeddingBatchSize = 8;
 
-    for (const chunk of chunks) {
-      try {
-        const embedding = await model.run(chunk.content, {
-          mean_pool: true,
-          normalize: true,
-        });
+    for (let index = 0; index < chunks.length; index += embeddingBatchSize) {
+      const batch = chunks.slice(index, index + embeddingBatchSize);
+      const rows = await Promise.all(
+        batch.map(async (chunk) => {
+          try {
+            const embedding = await model.run(chunk.content, {
+              mean_pool: true,
+              normalize: true,
+            });
 
-        chunkRows.push({
-          source_id: source.id,
-          workspace_id: source.workspace_id,
-          chunk_index: chunk.chunkIndex,
-          content: chunk.content,
-          content_length: chunk.contentLength,
-          embedding: JSON.stringify(embedding),
-          metadata: {
-            sourceType: source.source_type,
-            sourceName: source.name,
-            chunkIndex: chunk.chunkIndex,
-            contentLength: chunk.contentLength,
-            ingestionVersion: 1,
-          },
-        });
-      } catch (embErr) {
-        console.error(`[Process] Embedding error for chunk ${chunk.chunkIndex}:`, embErr);
-        throw embErr;
-      }
+            return {
+              source_id: source.id,
+              workspace_id: source.workspace_id,
+              chunk_index: chunk.chunkIndex,
+              content: chunk.content,
+              content_length: chunk.contentLength,
+              embedding: JSON.stringify(embedding),
+              metadata: {
+                sourceType: source.source_type,
+                sourceName: source.name,
+                chunkIndex: chunk.chunkIndex,
+                contentLength: chunk.contentLength,
+                ingestionVersion: 1,
+              },
+            };
+          } catch (embErr) {
+            console.error(`[Process] Embedding error for chunk ${chunk.chunkIndex}:`, embErr);
+            throw embErr;
+          }
+        }),
+      );
+
+      chunkRows.push(...rows);
+      console.log(
+        `[Process] Finished embedding batch ${Math.floor(index / embeddingBatchSize) + 1}/${Math.ceil(chunks.length / embeddingBatchSize)}.`,
+      );
     }
+
+    chunkRows.sort((a, b) => Number(a.chunk_index) - Number(b.chunk_index));
 
     console.log(`[Process] Deleting old chunks...`);
     await adminClient.from("knowledge_chunks").delete().eq("source_id", source.id);

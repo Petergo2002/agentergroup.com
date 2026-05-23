@@ -345,7 +345,16 @@ export function ChatView({
                       <div className="flex flex-col gap-1 items-end">
                         {msg.attachments.map((att, i) => (
                           att.type.startsWith("image/") ? (
-                            <img key={i} src={att.url} alt={att.name} className="max-w-[200px] rounded-lg shadow-sm object-cover" />
+                            // The widget app is built with Vite, so `next/image` is not available here.
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={i}
+                              src={att.url}
+                              alt={att.name}
+                              className="max-w-[200px] rounded-lg shadow-sm object-cover"
+                              loading="lazy"
+                              decoding="async"
+                            />
                           ) : (
                             <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-widget-card border border-widget-border rounded-lg px-3 py-2 text-xs text-widget-fg hover:bg-widget-border/30 transition-colors shadow-sm">
                               <Paperclip className="w-3.5 h-3.5 shrink-0" />
@@ -439,7 +448,15 @@ export function ChatView({
               {pendingAttachments.map((att, i) => (
                 <div key={i} className="flex items-center gap-2 bg-widget-card border border-widget-border rounded-lg px-2 py-1 shadow-sm">
                   {att.type.startsWith("image/") ? (
-                    <img src={att.url} alt={att.name} className="w-6 h-6 rounded object-cover" />
+                    // The widget app is built with Vite, so `next/image` is not available here.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={att.url}
+                      alt={att.name}
+                      className="w-6 h-6 rounded object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : (
                     <Paperclip className="w-4 h-4 text-widget-muted" />
                   )}

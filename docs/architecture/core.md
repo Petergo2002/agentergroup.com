@@ -1,6 +1,6 @@
 # Agentergroup Architecture
 
-Last updated: 2026-05-12
+Last updated: 2026-05-20
 
 ## Purpose
 
@@ -30,7 +30,7 @@ The current MVP is intentionally narrow:
 - chat-first agent runtime
 - Automation agents with Composio external trigger ingestion, starting with Gmail
 - workspace-scoped knowledge base with semantic retrieval
-- limited live tools for Gmail, Microsoft Outlook, Slack, HubSpot, Shopify, Google Calendar, and Cal.com
+- limited live tools for Gmail, Microsoft Outlook, Slack, HubSpot, Shopify, Google Ads, Google Calendar, and Cal.com
 - Google Drive only as a knowledge import source
 - internal assistant toolkit for Text to PDF generation
 
@@ -701,15 +701,40 @@ Important current behavior:
 
 - `knowledge_sources`
 - `knowledge_chunks`
+- `knowledge_folders`
+- `knowledge_folder_sources`
 - `agent_knowledge_sources`
+- `agent_knowledge_folders`
 - RPC: `match_agent_knowledge_chunks`
 
 Purpose:
 
 - `knowledge_sources`: workspace knowledge library
 - `knowledge_chunks`: embedded chunk storage
-- `agent_knowledge_sources`: which sources are attached to which agent
-- `match_agent_knowledge_chunks`: similarity search scoped to one agent and workspace
+- `knowledge_folders`: workspace-owned source groups
+- `knowledge_folder_sources`: many-to-many folder/source membership
+- `agent_knowledge_sources`: directly attached sources for an agent
+- `agent_knowledge_folders`: live folder attachments for an agent
+- `match_agent_knowledge_chunks`: similarity search scoped to one agent and workspace, including direct sources and ready sources in attached folders
+
+### 4B. Agent library templates
+
+- `agent_library_templates`
+- `agent_library_template_sources`
+
+Purpose:
+
+- `agent_library_templates`: submitted reusable agent templates with review status, sanitized builder definition, required integrations, template variables, and source metadata
+- `agent_library_template_sources`: snapshotted knowledge content bundled with a template
+
+Important current behavior:
+
+- templates are submitted from saved agent drafts and start in `pending`
+- admins review templates from `/admin/verification`
+- only `approved` templates are importable from the user-facing Agent Library
+- template submission removes workspace-specific connection ids, trigger config, knowledge ids, and account-specific calendar/event-type selections from the stored builder definition
+- imported templates create a new draft agent, clone bundled knowledge into the importing workspace, relink the knowledge node to the imported source ids, and resolve `{{variable_name}}` prompt variables before saving instructions
+- RLS lets authenticated users read approved templates, their own submissions, and templates from their workspace; privileged admin review uses service-role routes
 
 ### 5. Widget deployment and customer conversations
 
@@ -1479,6 +1504,10 @@ The product-owned integration catalog currently allows only:
 
 - `gmail`
 - `outlook`
+- `slack`
+- `hubspot`
+- `shopify`
+- `googleads`
 - `googlecalendar`
 - `cal`
 - `googledrive`
@@ -1502,6 +1531,22 @@ This is intentionally narrow. Unsupported marketplace-style integrations are not
   - `GMAIL_SEND_EMAIL`
 - Microsoft Outlook
   - `OUTLOOK_SEND_EMAIL`
+- Slack
+  - `SLACK_SEND_MESSAGE`
+  - `SLACK_SEARCH_MESSAGES`
+  - `SLACK_FETCH_CONVERSATION_HISTORY`
+  - `SLACK_FIND_CHANNELS`
+  - `SLACK_FIND_USERS`
+- HubSpot
+  - contact, company, deal, ticket, note, and task actions selected from the shared action picker
+- Shopify
+  - shop, product, customer, order, draft order, and inventory actions selected from the shared action picker
+- Google Ads
+  - `GOOGLEADS_LIST_ACCESSIBLE_CUSTOMERS`
+  - `GOOGLEADS_GET_CAMPAIGN_BY_ID`
+  - `GOOGLEADS_GET_CAMPAIGN_BY_NAME`
+  - `GOOGLEADS_GET_CUSTOMER_LISTS`
+  - `GOOGLEADS_SEARCH_STREAM_GAQL`
 - Google Calendar
   - `GOOGLECALENDAR_CREATE_EVENT`
   - `GOOGLECALENDAR_QUICK_ADD`
@@ -1552,6 +1597,7 @@ Current defaults are defined for:
 - `slack`
 - `hubspot`
 - `shopify`
+- `googleads`
 - `googlecalendar`
 - `cal`
 - `googledrive`
@@ -1564,6 +1610,7 @@ These defaults can be overridden with environment variables:
 - `COMPOSIO_TOOLKIT_VERSION_SLACK`
 - `COMPOSIO_TOOLKIT_VERSION_HUBSPOT`
 - `COMPOSIO_TOOLKIT_VERSION_SHOPIFY`
+- `COMPOSIO_TOOLKIT_VERSION_GOOGLEADS`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLECALENDAR`
 - `COMPOSIO_TOOLKIT_VERSION_CAL`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE`
@@ -1614,6 +1661,7 @@ It shows only:
 - Slack
 - HubSpot
 - Shopify
+- Google Ads
 - Google Calendar
 - Cal.com
 - Google Drive
@@ -1741,7 +1789,10 @@ Google Docs, Sheets, Slides, images, and general binaries are not part of the cu
 
 - `knowledge_sources`
 - `knowledge_chunks`
+- `knowledge_folders`
+- `knowledge_folder_sources`
 - `agent_knowledge_sources`
+- `agent_knowledge_folders`
 
 #### Storage
 
@@ -1836,6 +1887,8 @@ If processing fails:
 2. Embed the incoming user query with `gte-small`
 3. Call RPC `match_agent_knowledge_chunks`
 4. Return the top semantic matches
+
+The RPC resolves eligible sources from direct `agent_knowledge_sources` rows plus ready sources currently inside folders attached through `agent_knowledge_folders`. Duplicate source eligibility is deduped before chunk matching.
 
 ### Retrieval settings
 
@@ -1969,6 +2022,10 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/knowledge/sources` | Create a text source, scrape a website, or reserve file source upload |
 | `DELETE /api/knowledge/sources/[id]` | Delete a source and associated file/chunks |
 | `POST /api/knowledge/sources/[id]/process` | Reprocess an existing source |
+| `GET /api/knowledge/folders` | List workspace knowledge folders and source membership |
+| `POST /api/knowledge/folders` | Create a folder and optional source membership |
+| `PATCH /api/knowledge/folders/[id]` | Rename, describe, or replace source membership for a folder |
+| `DELETE /api/knowledge/folders/[id]` | Delete a folder and links without deleting sources |
 | `GET /api/knowledge/drive/files` | List importable Google Drive files for a selected connected account |
 | `POST /api/knowledge/drive/import` | Import a supported Drive file into the knowledge base from a selected connected account |
 
@@ -2033,7 +2090,10 @@ The core environment contract is:
 - `COMPOSIO_TOOLKIT_VERSION_SLACK`
 - `COMPOSIO_TOOLKIT_VERSION_HUBSPOT`
 - `COMPOSIO_TOOLKIT_VERSION_SHOPIFY`
+- `COMPOSIO_TOOLKIT_VERSION_GOOGLEADS`
 - `COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF`
+- `COMPOSIO_GOOGLEADS_AUTH_CONFIG_ID` (optional real Composio auth config id)
+- `COMPOSIO_AUTH_CONFIG_GOOGLEADS` (optional alternate auth config id name)
 - `COMPOSIO_SHOPIFY_AUTH_CONFIG_ID` (optional real Composio auth config id)
 - `COMPOSIO_AUTH_CONFIG_SHOPIFY` (optional alternate auth config id name)
 - `COMPOSIO_SHOPIFY_CLIENT_ID` (required if no auth config id is provided)

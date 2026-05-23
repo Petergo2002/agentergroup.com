@@ -115,6 +115,18 @@ interface AttachedKnowledgeRow {
   } | null;
 }
 
+interface AttachedKnowledgeFolderRow {
+  folder: {
+    sources?: Array<{
+      source: {
+        id: string;
+        name: string;
+        status: string;
+      } | null;
+    }>;
+  } | null;
+}
+
 export interface AgentRuntimeInput {
   supabase: RuntimeSupabaseLike;
   agent: Pick<
@@ -360,6 +372,7 @@ function buildToolGuidance(
     "For Slack, use the connected workspace to find channels or users, search relevant messages, read conversation history, and send messages only when the user's request or agent instructions clearly require it.",
     "For HubSpot, use the connected CRM to search, create, and update contacts, companies, deals, tickets, notes, and tasks when the user's request or agent instructions clearly require CRM work.",
     "For Shopify, use the connected store to read and manage products, customers, orders, draft orders, and inventory context when the user's request or agent instructions clearly require store operations.",
+    "For Google Ads, use the connected ad account to inspect accessible customers, campaigns, customer lists, and GAQL reporting data when the user's request or agent instructions clearly require advertising work.",
     "After using tools, answer the user in natural language with the outcome. Never return raw JSON, code, or tool payloads to the user.",
   ];
 
@@ -443,6 +456,12 @@ function buildToolGuidance(
     );
   }
 
+  if (toolkitSlugs.includes("googleads")) {
+    guidance.push(
+      "For Google Ads changes, inspect the relevant customer account, campaign, customer list, or GAQL result first when identity is unclear. Do not mutate campaigns, ad groups, or customer lists unless the specific mutation tool is enabled and the user explicitly asks for that change.",
+    );
+  }
+
   return guidance.join(" ");
 }
 
@@ -479,7 +498,11 @@ async function loadRuntimeContext(
   agentId: string,
   toolUserId: string,
 ) {
-  const [{ data: attachedConnections }, { data: attachedKnowledgeSources }] =
+  const [
+    { data: attachedConnections },
+    { data: attachedKnowledgeSources },
+    { data: attachedKnowledgeFolders },
+  ] =
     await Promise.all([
       supabase
         .from("agent_connections")
@@ -488,6 +511,10 @@ async function loadRuntimeContext(
       supabase
         .from("agent_knowledge_sources")
         .select("source:knowledge_sources(id, name, status)")
+        .eq("agent_id", agentId),
+      supabase
+        .from("agent_knowledge_folders")
+        .select("folder:knowledge_folders(sources:knowledge_folder_sources(source:knowledge_sources(id, name, status)))")
         .eq("agent_id", agentId),
     ]);
 
@@ -506,7 +533,7 @@ async function loadRuntimeContext(
     )
     .map((connection) => connection.toolkit_slug);
 
-  const readyKnowledgeSources = (
+  const directKnowledgeSources = (
     (attachedKnowledgeSources ?? []) as unknown as AttachedKnowledgeRow[]
   )
     .map((item) => item.source)
@@ -516,6 +543,26 @@ async function loadRuntimeContext(
       ): source is NonNullable<AttachedKnowledgeRow["source"]> =>
         Boolean(source?.status === "ready"),
     );
+  const folderKnowledgeSources = (
+    (attachedKnowledgeFolders ?? []) as unknown as AttachedKnowledgeFolderRow[]
+  ).flatMap((item) =>
+    (item.folder?.sources ?? [])
+      .map((sourceLink) => sourceLink.source)
+      .filter(
+        (
+          source,
+        ): source is NonNullable<AttachedKnowledgeRow["source"]> =>
+          Boolean(source?.status === "ready"),
+      ),
+  );
+  const readyKnowledgeSources = Array.from(
+    new Map(
+      [...directKnowledgeSources, ...folderKnowledgeSources].map((source) => [
+        source.id,
+        source,
+      ]),
+    ).values(),
+  );
 
   return {
     connectedToolkits,

@@ -4,6 +4,7 @@ export const agents = {
   description:
     "Bygg, hantera och skala specialiserade AI-agenter för interna processer och externa kundupplevelser.",
   createAgent: "Skapa agent",
+  library: "Bibliotek",
   searchPlaceholder: "Sök i biblioteket...",
   noAgentsFound: "Inga agenter hittades",
   noAgentsFoundDescription:

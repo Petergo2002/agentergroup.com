@@ -18,7 +18,12 @@ import {
   EXTRA_MESSAGE_CREDIT_PACK_AMOUNT,
   EXTRA_MESSAGE_CREDIT_PURCHASE_TYPE,
 } from '@/lib/billing-credits';
-import { stripe, STRIPE_PRICE_TO_PLAN, PLAN_LIMITS } from '@/lib/stripe';
+import {
+  BillingConfigurationError,
+  getStripe,
+  getStripePriceToPlan,
+  PLAN_LIMITS,
+} from '@/lib/stripe';
 import type { PlanTier } from '@/lib/types/subscription';
 
 interface PurchasedCreditsRpcRow {
@@ -181,11 +186,31 @@ export async function POST(req: Request) {
 
   // Verify the event came from Stripe (prevents spoofed events)
   let event: Stripe.Event;
+  let stripe: ReturnType<typeof getStripe>;
   try {
+    stripe = getStripe();
     event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
+    if (err instanceof BillingConfigurationError) {
+      console.error('[webhook] Stripe is not configured:', err.message);
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: err.status });
+    }
+
     console.error('[webhook] Signature verification failed:', err);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+  }
+
+  let stripePriceToPlan: Record<string, PlanTier>;
+
+  try {
+    stripePriceToPlan = getStripePriceToPlan();
+  } catch (err) {
+    if (err instanceof BillingConfigurationError) {
+      console.error('[webhook] Stripe price mapping is not configured:', err.message);
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: err.status });
+    }
+
+    throw err;
   }
 
   // Process the verified event
@@ -216,7 +241,7 @@ export async function POST(req: Request) {
         }
 
         const priceId = subscription.items.data[0]?.price?.id;
-        const planTier = STRIPE_PRICE_TO_PLAN[priceId] ?? 'free';
+        const planTier = priceId ? stripePriceToPlan[priceId] ?? 'free' : 'free';
 
         await updateWorkspaceSubscription(
           workspaceId,
@@ -238,7 +263,7 @@ export async function POST(req: Request) {
         }
 
         const priceId = subscription.items.data[0]?.price?.id;
-        const planTier = STRIPE_PRICE_TO_PLAN[priceId] ?? 'free';
+        const planTier = priceId ? stripePriceToPlan[priceId] ?? 'free' : 'free';
 
         if (subscription.status === 'active') {
           await updateWorkspaceSubscription(

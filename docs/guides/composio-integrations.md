@@ -1,6 +1,6 @@
 # Composio Integrations — Implementation Guide
 
-Last updated: 2026-05-12
+Last updated: 2026-05-20
 
 This document is the mandatory reference for building and debugging Composio tool integrations
 in this codebase. Read this before writing any new integration. All lessons here were earned
@@ -361,6 +361,36 @@ Recommended defaults include:
 Do not enable cancel/refund/delete/charge tools by default. Operators can opt into additional Shopify actions through the shared dynamic action list.
 
 *Note: Shopify does not have a product-specific listing extractor yet. The builder uses the shared dynamic action list from `/api/connections/toolkits/[toolkitSlug]/tools`.*
+
+---
+
+### Google Ads — action tools
+
+Google Ads is currently a chat action toolkit in the product. The Composio toolkit slug is `googleads`, and the current default version is `20260506_00`.
+
+Composio Managed App is available for Google Ads, so the default `use_composio_managed_auth` connection flow works. A real configured auth config id can still be supplied through:
+
+- `COMPOSIO_GOOGLEADS_AUTH_CONFIG_ID`
+- or `COMPOSIO_AUTH_CONFIG_GOOGLEADS`
+
+Recommended defaults are intentionally read/search focused:
+
+- `GOOGLEADS_LIST_ACCESSIBLE_CUSTOMERS`
+- `GOOGLEADS_GET_CAMPAIGN_BY_ID`
+- `GOOGLEADS_GET_CAMPAIGN_BY_NAME`
+- `GOOGLEADS_GET_CUSTOMER_LISTS`
+- `GOOGLEADS_SEARCH_STREAM_GAQL`
+
+Additional actions exposed by the Composio toolkit can be enabled by operators through the shared action picker:
+
+- `GOOGLEADS_ADD_OR_REMOVE_TO_CUSTOMER_LIST`
+- `GOOGLEADS_CREATE_CUSTOMER_LIST`
+- `GOOGLEADS_MUTATE_AD_GROUPS`
+- `GOOGLEADS_MUTATE_CAMPAIGNS`
+
+Do not enable mutate/customer-list write tools by default. Operators can opt into those actions through the shared dynamic action list when the agent is explicitly allowed to modify Google Ads data.
+
+*Note: Google Ads does not have a product-specific listing extractor yet. The builder uses the shared dynamic action list from `/api/connections/toolkits/[toolkitSlug]/tools`.*
 
 ---
 

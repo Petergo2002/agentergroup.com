@@ -40,6 +40,7 @@ export interface AgentBuilderNodeData extends BaseBuilderNodeData {
 export interface KnowledgeBuilderNodeData extends BaseBuilderNodeData {
   kind: "knowledge";
   sourceIds: string[];
+  folderIds?: string[];
 }
 
 export interface GmailBuilderNodeData extends BaseBuilderNodeData {
@@ -86,6 +87,14 @@ export interface ShopifyBuilderNodeData extends BaseBuilderNodeData {
   simpleIconColor?: string;
 }
 
+export interface GoogleAdsBuilderNodeData extends BaseBuilderNodeData {
+  kind: "googleads";
+  integrationSlug: "googleads";
+  connectionId: string | null;
+  simpleIcon?: string;
+  simpleIconColor?: string;
+}
+
 export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
   kind: "googlecalendar";
   integrationSlug: "googlecalendar";
@@ -125,6 +134,7 @@ export type BuilderNodeData =
   | SlackBuilderNodeData
   | HubSpotBuilderNodeData
   | ShopifyBuilderNodeData
+  | GoogleAdsBuilderNodeData
   | GoogleCalendarBuilderNodeData
   | CalBuilderNodeData
   | EndChatBuilderNodeData;

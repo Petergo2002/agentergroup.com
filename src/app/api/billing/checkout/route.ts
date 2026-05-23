@@ -10,7 +10,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAppUrl } from '@/lib/env';
-import { stripe, STRIPE_PRICE_IDS } from '@/lib/stripe';
+import {
+  BillingConfigurationError,
+  getStripe,
+  getStripePriceIds,
+  isStripeBillingPlan,
+} from '@/lib/stripe';
 import {
   BillingAuthorizationError,
   assertWorkspaceBillingAdmin,
@@ -31,7 +36,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { plan, workspaceId } = body as { plan: string; workspaceId: string };
 
-    if (!plan || !STRIPE_PRICE_IDS[plan]) {
+    if (!plan || !isStripeBillingPlan(plan)) {
       return NextResponse.json({ error: 'Invalid plan. Must be "starter" or "premium".' }, { status: 400 });
     }
     if (!workspaceId) {
@@ -59,6 +64,9 @@ export async function POST(req: Request) {
     if (subscription.plan_tier === plan) {
       return NextResponse.json({ error: 'You are already on this plan.' }, { status: 400 });
     }
+
+    const stripe = getStripe();
+    const stripePriceIds = getStripePriceIds();
 
     // Find or create a Stripe Customer for this workspace
     let stripeCustomerId = subscription.stripe_customer_id;
@@ -95,7 +103,7 @@ export async function POST(req: Request) {
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: 'subscription',
-      line_items: [{ price: STRIPE_PRICE_IDS[plan], quantity: 1 }],
+      line_items: [{ price: stripePriceIds[plan], quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
       // Pass workspace context through metadata so the webhook knows which workspace to update
@@ -109,6 +117,10 @@ export async function POST(req: Request) {
 
   } catch (err) {
     if (err instanceof BillingAuthorizationError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+
+    if (err instanceof BillingConfigurationError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
 

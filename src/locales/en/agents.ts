@@ -4,6 +4,7 @@ export const agents = {
   description:
     "Construct, manage, and scale specialized AI agents for your internal processes and external customer experiences.",
   createAgent: "Create Agent",
+  library: "Library",
   searchPlaceholder: "Search the library...",
   noAgentsFound: "No agents found",
   noAgentsFoundDescription:

@@ -2,16 +2,22 @@
 
 import { useCallback, useMemo, useState } from "react";
 import {
+  ArrowLeft,
   BookOpenText,
   CheckCircle2,
+  ChevronRight,
   Cloud,
   FileText,
   Filter,
   FolderOpen,
+  FolderPlus,
+  FolderInput,
+  FolderMinus,
   RefreshCw,
   Search,
   TriangleAlert,
   Upload,
+  X,
   Database,
   Loader2,
   type LucideIcon,
@@ -29,6 +35,7 @@ import {
 import type {
   ConnectionRecord,
   DriveImportFileRecord,
+  KnowledgeFolderWithSources,
   KnowledgeSourceRecord,
   WorkspaceSubscriptionRecord,
 } from "@/lib/types";
@@ -44,10 +51,12 @@ type InputTab = "text" | "file" | "drive" | "website" | null;
 
 export default function KnowledgePageClient({
   initialSources,
+  initialFolders,
   initialDriveConnections,
   subscription,
 }: {
   initialSources: KnowledgeSourceRecord[];
+  initialFolders: KnowledgeFolderWithSources[];
   initialDriveConnections: ConnectionRecord[];
   subscription: WorkspaceSubscriptionRecord;
 }) {
@@ -55,6 +64,17 @@ export default function KnowledgePageClient({
   const { language, t } = useLanguage();
   const { showToast } = useToast();
   const [sources, setSources] = useState<KnowledgeSourceRecord[]>(initialSources);
+  const [folders, setFolders] = useState<KnowledgeFolderWithSources[]>(initialFolders);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
+  const [folderName, setFolderName] = useState("");
+  const [folderDescription, setFolderDescription] = useState("");
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [isSavingFolder, setIsSavingFolder] = useState(false);
+  const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
+  const [isMovingSelectedSources, setIsMovingSelectedSources] = useState(false);
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+  const [targetFolderId, setTargetFolderId] = useState("");
   const [sourceSearch, setSourceSearch] = useState("");
   const [textName, setTextName] = useState("");
   const [textDescription, setTextDescription] = useState("");
@@ -94,16 +114,69 @@ export default function KnowledgePageClient({
   const [isDeleteDialogOpen, setIsDeleteOpen] = useState(false);
   const [sourceToDelete, setSourceToDelete] = useState<KnowledgeSourceRecord | null>(null);
 
+  const selectedFolder = useMemo(
+    () => folders.find((folder) => folder.id === selectedFolderId) ?? null,
+    [folders, selectedFolderId],
+  );
+
+  const selectedFolderSources = useMemo(() => {
+    if (!selectedFolder) return [];
+    const sourceIdSet = new Set(selectedFolder.sourceIds);
+    return sources.filter((source) => sourceIdSet.has(source.id));
+  }, [selectedFolder, sources]);
+
+  const rootSources = useMemo(() => {
+    const filedSourceIds = new Set(folders.flatMap((folder) => folder.sourceIds));
+    return sources.filter((source) => !filedSourceIds.has(source.id));
+  }, [folders, sources]);
+
+  const visibleSources = selectedFolder ? selectedFolderSources : rootSources;
+
   const filteredSources = useMemo(() => {
-    if (!sourceSearch.trim()) return sources;
+    if (!sourceSearch.trim()) return visibleSources;
     const search = sourceSearch.toLowerCase();
-    return sources.filter(
+    return visibleSources.filter(
       (s) =>
         s.name.toLowerCase().includes(search) ||
         s.description?.toLowerCase().includes(search) ||
         s.metadata?.sourceUrl != null && typeof s.metadata.sourceUrl === "string" && s.metadata.sourceUrl.toLowerCase().includes(search),
     );
-  }, [sources, sourceSearch]);
+  }, [visibleSources, sourceSearch]);
+
+  const filteredFolders = useMemo(() => {
+    if (selectedFolder) return [];
+    if (!sourceSearch.trim()) return folders;
+    const search = sourceSearch.toLowerCase();
+    return folders.filter(
+      (folder) =>
+        folder.name.toLowerCase().includes(search) ||
+        folder.description.toLowerCase().includes(search),
+    );
+  }, [folders, selectedFolder, sourceSearch]);
+
+  const startEditingFolder = (folder: KnowledgeFolderWithSources) => {
+    setEditingFolderId(folder.id);
+    setSelectedFolderId(folder.id);
+    setFolderName(folder.name);
+    setFolderDescription(folder.description);
+    setIsFolderDialogOpen(true);
+  };
+
+  const resetFolderForm = () => {
+    setEditingFolderId(null);
+    setFolderName("");
+    setFolderDescription("");
+  };
+
+  const openCreateFolderDialog = () => {
+    resetFolderForm();
+    setIsFolderDialogOpen(true);
+  };
+
+  const openSourceForm = (tab: Exclude<InputTab, null>) => {
+    setTargetFolderId(selectedFolderId ?? "");
+    setActiveTab(tab);
+  };
 
   const filteredDiscoveredUrls = useMemo(() => {
     if (!pageSearch.trim()) return discoveredUrls;
@@ -142,6 +215,204 @@ export default function KnowledgePageClient({
 
     setSources(payload.sources ?? []);
   }, [t]);
+
+  const loadFolders = useCallback(async () => {
+    const response = await fetch("/api/knowledge/folders", {
+      cache: "no-store",
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error ?? t("knowledge.loadFoldersError"));
+    }
+
+    const nextFolders = (payload.folders ?? []) as KnowledgeFolderWithSources[];
+    setFolders(nextFolders);
+    setSelectedFolderId((current) =>
+      current && nextFolders.some((folder) => folder.id === current)
+        ? current
+        : null,
+    );
+  }, [t]);
+
+  const handleSaveFolder = async () => {
+    const trimmedName = folderName.trim();
+
+    if (!trimmedName) {
+      showToast(t("knowledge.folderNameRequired"), "error");
+      return;
+    }
+
+    setIsSavingFolder(true);
+
+    try {
+      const response = await fetch(
+        editingFolderId
+          ? `/api/knowledge/folders/${editingFolderId}`
+          : "/api/knowledge/folders",
+        {
+          method: editingFolderId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: trimmedName,
+            description: folderDescription.trim(),
+          }),
+        },
+      );
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? t("knowledge.saveFolderError"));
+      }
+
+      await loadFolders();
+      setSelectedFolderId(payload.folder?.id ?? editingFolderId ?? null);
+      resetFolderForm();
+      setIsFolderDialogOpen(false);
+      showToast(
+        editingFolderId ? t("knowledge.folderUpdated") : t("knowledge.folderCreated"),
+        "success",
+      );
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : t("knowledge.saveFolderError"),
+        "error",
+      );
+    } finally {
+      setIsSavingFolder(false);
+    }
+  };
+
+  const patchFolderSourceIds = async (folderId: string, sourceIds: string[]) => {
+    const response = await fetch(`/api/knowledge/folders/${folderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourceIds }),
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error ?? t("knowledge.updateFolderSourcesError"));
+    }
+
+    return payload.folder as KnowledgeFolderWithSources;
+  };
+
+  const handleMoveSelectedSourcesToFolder = async (folderId: string) => {
+    const targetFolder = folders.find((item) => item.id === folderId);
+
+    if (!targetFolder || selectedSourceIds.length === 0) {
+      return;
+    }
+
+    setIsMovingSelectedSources(true);
+
+    try {
+      const changedFolders: KnowledgeFolderWithSources[] = [];
+      const selectedSet = new Set(selectedSourceIds);
+
+      // 1. Add selected sources to the target folder (deduped)
+      const nextTarget = await patchFolderSourceIds(
+        targetFolder.id,
+        Array.from(new Set([...targetFolder.sourceIds, ...selectedSourceIds])),
+      );
+      changedFolders.push(nextTarget);
+
+      // 2. Remove selected sources from EVERY other folder they currently belong to.
+      //    This is what makes it a true "move" — not just a copy.
+      const otherFoldersContainingSelected = folders.filter(
+        (folder) =>
+          folder.id !== targetFolder.id &&
+          folder.sourceIds.some((id) => selectedSet.has(id)),
+      );
+
+      await Promise.all(
+        otherFoldersContainingSelected.map(async (folder) => {
+          const updated = await patchFolderSourceIds(
+            folder.id,
+            folder.sourceIds.filter((id) => !selectedSet.has(id)),
+          );
+          changedFolders.push(updated);
+        }),
+      );
+
+      setFolders((current) =>
+        current.map((folder) =>
+          changedFolders.find((changed) => changed.id === folder.id) ?? folder,
+        ),
+      );
+      setSelectedSourceIds([]);
+      setSelectedFolderId(targetFolder.id);
+      setSourceSearch("");
+      showToast(t("knowledge.sourcesMovedToFolder", { count: selectedSourceIds.length }), "success");
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : t("knowledge.updateFolderSourcesError"),
+        "error",
+      );
+    } finally {
+      setIsMovingSelectedSources(false);
+    }
+  };
+
+  const handleRemoveSelectedFromFolder = async () => {
+    if (!selectedFolder || selectedSourceIds.length === 0) {
+      return;
+    }
+
+    setIsMovingSelectedSources(true);
+
+    try {
+      const selectedSet = new Set(selectedSourceIds);
+      const updatedFolder = await patchFolderSourceIds(
+        selectedFolder.id,
+        selectedFolder.sourceIds.filter((sourceId) => !selectedSet.has(sourceId)),
+      );
+
+      setFolders((current) =>
+        current.map((folder) => (folder.id === updatedFolder.id ? updatedFolder : folder)),
+      );
+      setSelectedSourceIds([]);
+      showToast(t("knowledge.sourcesRemovedFromFolder", { count: selectedSourceIds.length }), "success");
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : t("knowledge.updateFolderSourcesError"),
+        "error",
+      );
+    } finally {
+      setIsMovingSelectedSources(false);
+    }
+  };
+
+  const handleDeleteFolder = async (folder: KnowledgeFolderWithSources) => {
+    setDeletingFolderId(folder.id);
+
+    try {
+      const response = await fetch(`/api/knowledge/folders/${folder.id}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? t("knowledge.deleteFolderError"));
+      }
+
+      await loadFolders();
+      if (selectedFolderId === folder.id) {
+        setSelectedFolderId(null);
+        setSelectedSourceIds([]);
+      }
+      resetFolderForm();
+      showToast(t("knowledge.folderDeleted"), "success");
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : t("knowledge.deleteFolderError"),
+        "error",
+      );
+    } finally {
+      setDeletingFolderId(null);
+    }
+  };
 
   const loadDriveFiles = useCallback(
     async ({ reset, pageToken }: { reset: boolean; pageToken?: string }) => {
@@ -212,6 +483,7 @@ export default function KnowledgePageClient({
           description: textDescription.trim(),
           sourceType: "text",
           rawText: trimmedText,
+          folderId: targetFolderId || null,
         }),
       });
       const payload = await response.json();
@@ -223,7 +495,7 @@ export default function KnowledgePageClient({
       setTextName("");
       setTextDescription("");
       setRawText("");
-      await loadSources();
+      await Promise.all([loadSources(), loadFolders()]);
       showToast(t("knowledge.textCreated"), "success");
     } catch (error) {
       showToast(
@@ -265,6 +537,7 @@ export default function KnowledgePageClient({
           fileName: file.name,
           mimeType,
           fileSizeBytes: file.size,
+          folderId: targetFolderId || null,
         }),
       });
       const createPayload = await createResponse.json();
@@ -298,7 +571,7 @@ export default function KnowledgePageClient({
       setSelectedFile(null);
       setFileName("");
       setFileDescription("");
-      await loadSources();
+      await Promise.all([loadSources(), loadFolders()]);
       showToast(t("knowledge.fileUploaded"), "success");
     } catch (error) {
       showToast(
@@ -389,6 +662,7 @@ export default function KnowledgePageClient({
           sourceType: "website",
           url: targetUrl,
           urls: selectedUrls,
+          folderId: targetFolderId || null,
         }),
       });
       const payload = await response.json();
@@ -402,7 +676,7 @@ export default function KnowledgePageClient({
       setWebsiteDescription("");
       setDiscoveredUrls([]);
       setSelectedUrls([]);
-      await loadSources();
+      await Promise.all([loadSources(), loadFolders()]);
       showToast(t("knowledge.websiteScraped"), "success");
     } catch (error) {
       showToast(
@@ -427,6 +701,7 @@ export default function KnowledgePageClient({
           fileId: file.id,
           name: file.name,
           connectionId: selectedDriveConnectionId || null,
+          folderId: targetFolderId || null,
         }),
       });
       const payload = await response.json();
@@ -435,7 +710,7 @@ export default function KnowledgePageClient({
         throw new Error(payload.error ?? t("knowledge.importDriveError"));
       }
 
-      await loadSources();
+      await Promise.all([loadSources(), loadFolders()]);
       showToast(t("knowledge.driveImported"), "success");
     } catch (error) {
       showToast(
@@ -498,7 +773,7 @@ export default function KnowledgePageClient({
         throw new Error(payload.error ?? t("knowledge.deleteError"));
       }
 
-      await loadSources();
+      await Promise.all([loadSources(), loadFolders()]);
       showToast(t("knowledge.removed"), "success");
     } catch (error) {
       showToast(
@@ -525,6 +800,53 @@ export default function KnowledgePageClient({
       <span className="text-sm font-bold text-on-surface">{value}</span>
     </div>
   );
+
+  const renderFolderTargetSelect = () => {
+    if (folders.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+              {t("knowledge.targetFolder")}
+            </label>
+            <p className="mt-1 text-xs text-on-surface-variant/60">
+              {t("knowledge.targetFolderDescription")}
+            </p>
+          </div>
+          <select
+            value={targetFolderId}
+            onChange={(event) => setTargetFolderId(event.target.value)}
+            className="min-w-[220px] rounded-lg border border-outline-variant/20 bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+          >
+            <option value="">{t("knowledge.noTargetFolder")}</option>
+            {folders.map((folder) => (
+              <option key={folder.id} value={folder.id}>
+                {folder.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
+  };
+
+  const toggleSourceSelection = (sourceId: string, checked: boolean) => {
+    setSelectedSourceIds((current) =>
+      checked
+        ? Array.from(new Set([...current, sourceId]))
+        : current.filter((id) => id !== sourceId),
+    );
+  };
+
+  const toggleAllVisibleSources = (checked: boolean) => {
+    setSelectedSourceIds(checked ? filteredSources.map((source) => source.id) : []);
+  };
+
+  const moveTargetFolders = folders.filter((folder) => folder.id !== selectedFolder?.id);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-10 font-label">
@@ -589,6 +911,7 @@ export default function KnowledgePageClient({
                 <h3 className="font-headline text-lg font-bold text-on-surface">
                   {activeTab === "text" && t("knowledge.writeNewKnowledgeSource")}
                   {activeTab === "file" && t("knowledge.uploadDocument")}
+                  {activeTab === "website" && t("knowledge.scrapeWebsite")}
                   {activeTab === "drive" && t("knowledge.importFromCloud")}
                 </h3>
               </div>
@@ -616,6 +939,7 @@ export default function KnowledgePageClient({
                     />
                   </div>
                 </div>
+                {renderFolderTargetSelect()}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.content")}</label>
                   <textarea
@@ -660,6 +984,8 @@ export default function KnowledgePageClient({
                     />
                   </div>
                 </div>
+
+                {renderFolderTargetSelect()}
 
                 <div className="space-y-1.5 focus-within:text-primary transition-colors">
                   <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.websiteUrl")}</label>
@@ -824,6 +1150,7 @@ export default function KnowledgePageClient({
                     />
                   </div>
                 </div>
+                {renderFolderTargetSelect()}
                 <label className="flex h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest/50 transition-all hover:bg-surface-container hover:border-primary/20">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container shadow-sm mb-4">
                     <Upload className="h-5 w-5 text-on-surface-variant" />
@@ -859,6 +1186,7 @@ export default function KnowledgePageClient({
 
             {activeTab === "drive" && (
               <div className="space-y-6">
+                {renderFolderTargetSelect()}
                 <div className="flex items-center justify-between gap-4">
                   {driveConnections.length > 1 ? (
                     <select
@@ -954,47 +1282,282 @@ export default function KnowledgePageClient({
           </div>
         ) : (
           <SourceBentoGrid 
-            onAddText={() => setActiveTab("text")}
-            onUploadFile={() => setActiveTab("file")}
-            onCloudImport={() => setActiveTab("drive")}
-            onScrapeWebsite={() => setActiveTab("website")}
+            onAddText={() => openSourceForm("text")}
+            onUploadFile={() => openSourceForm("file")}
+            onCloudImport={() => openSourceForm("drive")}
+            onScrapeWebsite={() => openSourceForm("website")}
           />
         )}
       </section>
 
       {/* List Section */}
       <section className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">
-              {t("knowledge.activeKnowledgeSources")}
-            </h2>
-            <div className="flex items-center gap-2 rounded-full bg-surface-container-high px-2 py-0.5 text-[9px] font-bold text-on-surface-variant">
-              {t("knowledge.totalSuffix", { count: sources.length })}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            {/* Back arrow — only visible inside a folder */}
+            {selectedFolder ? (
+              <button
+                onClick={() => {
+                  setSelectedFolderId(null);
+                  setTargetFolderId("");
+                  setSelectedSourceIds([]);
+                  setSourceSearch("");
+                }}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                aria-label="Back to all sources"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            ) : null}
+
+            <div className="space-y-1">
+              {/* Breadcrumb trail */}
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/60">
+                {selectedFolder ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setSelectedFolderId(null);
+                        setTargetFolderId("");
+                        setSelectedSourceIds([]);
+                        setSourceSearch("");
+                      }}
+                      className="transition-colors hover:text-on-surface"
+                    >
+                      {t("knowledge.activeKnowledgeSources")}
+                    </button>
+                    <ChevronRight className="h-3 w-3 opacity-40" />
+                    <span className="text-on-surface">{selectedFolder.name}</span>
+                  </>
+                ) : (
+                  <span>{t("knowledge.activeKnowledgeSources")}</span>
+                )}
+              </div>
+              {/* Item count pill */}
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-2.5 py-0.5 text-[9px] font-bold text-on-surface-variant">
+                {t("knowledge.totalSuffix", {
+                  count: selectedFolder
+                    ? selectedFolderSources.length
+                    : rootSources.length + folders.length,
+                })}
+              </div>
             </div>
           </div>
           
-          <div className="relative">
-            <Filter className="absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-on-surface-variant/40" />
-            <input
-              value={sourceSearch}
-              onChange={(event) => setSourceSearch(event.target.value)}
-              placeholder={t("knowledge.filterPlaceholder")}
-              className="w-full rounded-md border border-outline-variant/30 bg-surface-container-low px-10 py-2 text-[12px] text-on-surface outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 sm:w-64"
-            />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative">
+              <Filter className="absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-on-surface-variant/40" />
+              <input
+                value={sourceSearch}
+                onChange={(event) => setSourceSearch(event.target.value)}
+                placeholder={t("knowledge.filterPlaceholder")}
+                className="w-full rounded-md border border-outline-variant/30 bg-surface-container-low py-2 pl-10 pr-9 text-[12px] text-on-surface outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 sm:w-64"
+              />
+              {sourceSearch ? (
+                <button
+                  type="button"
+                  onClick={() => setSourceSearch("")}
+                  className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-on-surface-variant/50 transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                  aria-label={t("knowledge.clearFilter")}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </div>
+            <button
+              onClick={openCreateFolderDialog}
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-on-surface px-4 text-[11px] font-bold uppercase tracking-[0.14em] text-background transition-opacity hover:opacity-90"
+            >
+              <FolderPlus className="h-4 w-4" />
+              {t("knowledge.createFolder")}
+            </button>
           </div>
         </div>
 
+        {/* Bulk-selection action bar — modern pill-style inline toolbar */}
+        {selectedSourceIds.length > 0 ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between admin-fade-in">
+            {/* Selection count badge */}
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2 text-[10px] font-bold text-on-primary">
+                {selectedSourceIds.length}
+              </span>
+              <span className="text-xs font-bold text-on-surface">
+                {t("knowledge.selectedSources", { count: selectedSourceIds.length })}
+              </span>
+            </div>
+
+            {/* Action pills */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Move-to folder chips */}
+              {moveTargetFolders.length > 0 && !isMovingSelectedSources && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">
+                    <FolderInput className="h-3 w-3" />
+                    {t("knowledge.moveSelectedTo")}
+                  </span>
+                  {moveTargetFolders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      onClick={() => void handleMoveSelectedSourcesToFolder(folder.id)}
+                      disabled={isMovingSelectedSources}
+                      className="inline-flex h-7 items-center gap-1.5 rounded-full border border-outline-variant/20 bg-surface-container-lowest px-3 text-[11px] font-bold text-on-surface transition-all hover:border-primary/30 hover:bg-primary/8 hover:text-primary disabled:opacity-50"
+                    >
+                      <FolderOpen className="h-3 w-3" />
+                      {folder.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {isMovingSelectedSources ? (
+                <span className="flex items-center gap-1.5 text-xs text-primary">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {t("common.saving")}
+                </span>
+              ) : null}
+
+              {/* Remove from current folder */}
+              {selectedFolder ? (
+                <button
+                  onClick={() => void handleRemoveSelectedFromFolder()}
+                  disabled={isMovingSelectedSources}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-error/20 bg-error/5 px-3 text-[11px] font-bold text-error transition-all hover:bg-error/10 disabled:opacity-50"
+                >
+                  <FolderMinus className="h-3.5 w-3.5" />
+                  {t("knowledge.removeFromFolder")}
+                </button>
+              ) : null}
+
+              {/* Divider */}
+              <div className="h-5 w-px bg-outline-variant/20" />
+
+              {/* Clear selection */}
+              <button
+                onClick={() => setSelectedSourceIds([])}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                aria-label={t("common.cancel")}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <SourceTable 
           sources={filteredSources}
+          folders={filteredFolders}
+          allFolders={folders}
           isLoading={isLoading}
           onProcess={handleProcess}
           onDelete={handleDeleteClick}
           onView={handleView}
+          onOpenFolder={(folder) => {
+            setSelectedFolderId(folder.id);
+            setTargetFolderId(folder.id);
+            setSelectedSourceIds([]);
+            setSourceSearch("");
+          }}
+          onEditFolder={startEditingFolder}
+          onDeleteFolder={(folder) => void handleDeleteFolder(folder)}
+          selectedSourceIds={selectedSourceIds}
+          onToggleSource={toggleSourceSelection}
+          onToggleAllSources={toggleAllVisibleSources}
           processingId={processingSourceId}
           deletingId={deletingSourceId}
+          deletingFolderId={deletingFolderId}
+          emptyTitle={
+            selectedFolder
+              ? t("knowledge.noFolderSourcesTitle")
+              : sourceSearch
+                ? t("knowledge.noSourcesFound")
+                : undefined
+          }
+          emptyDescription={
+            selectedFolder
+              ? t("knowledge.noFolderSourcesDescription")
+              : sourceSearch
+                ? t("knowledge.noSourcesForFilter")
+                : folders.length > 0
+                  ? t("knowledge.noRootSourcesDescription")
+                  : undefined
+          }
         />
       </section>
+
+      {isFolderDialogOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-outline-variant/15 bg-surface p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <FolderPlus className="h-5 w-5" />
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-on-surface">
+                  {editingFolderId ? t("knowledge.editFolder") : t("knowledge.createFolder")}
+                </h3>
+                <p className="mt-1 text-sm text-on-surface-variant/70">
+                  {t("knowledge.createFolderDialogDescription")}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsFolderDialogOpen(false);
+                  resetFolderForm();
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                aria-label={t("common.close")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+                  {t("knowledge.folderName")}
+                </label>
+                <input
+                  value={folderName}
+                  onChange={(event) => setFolderName(event.target.value)}
+                  placeholder={t("knowledge.folderNamePlaceholder")}
+                  className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 py-3 text-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+                  {t("knowledge.folderDescription")}
+                </label>
+                <input
+                  value={folderDescription}
+                  onChange={(event) => setFolderDescription(event.target.value)}
+                  placeholder={t("knowledge.folderDescriptionPlaceholder")}
+                  className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 py-3 text-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setIsFolderDialogOpen(false);
+                  resetFolderForm();
+                }}
+                className="h-10 rounded-xl border border-outline-variant/15 px-4 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={() => void handleSaveFolder()}
+                disabled={isSavingFolder || !folderName.trim()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-on-surface px-5 text-[11px] font-bold uppercase tracking-[0.14em] text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {isSavingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {editingFolderId ? t("common.save") : t("knowledge.createFolder")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ViewSourceModal
         isOpen={isViewerOpen}

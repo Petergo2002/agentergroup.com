@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 import { createOpenRouterChatCompletion } from "@/lib/openrouter";
+import {
+  consumeWorkspaceMessageUsage,
+  MessageLimitExceededError,
+} from "@/lib/message-usage";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { WorkspaceAccessError, assertOwnedWorkspaceResource } from "@/lib/workspace-security";
 
 export async function POST(
@@ -98,6 +103,8 @@ RULES:
   };
 
   try {
+    await consumeWorkspaceMessageUsage(createAdminClient(), agent.workspace_id);
+
     const response = await createOpenRouterChatCompletion({
       messages: [systemMessage, userMessage],
       stream: false,
@@ -111,6 +118,13 @@ RULES:
 
     return NextResponse.json({ optimizedInstructions });
   } catch (error) {
+    if (error instanceof MessageLimitExceededError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
+
     console.error("Prompt optimization failed:", error);
     const message = error instanceof Error ? error.message : "Failed to optimize prompt.";
     return NextResponse.json({ error: message }, { status: 500 });

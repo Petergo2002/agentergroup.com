@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { sanitizePostAuthRedirectTo } from "@/lib/auth-redirect";
 import { getSupabaseEnv } from "@/lib/env";
 import {
   buildAppContentSecurityPolicy,
@@ -12,44 +13,37 @@ import {
  * - /login
  * - /auth/*
  * - /api/health
+ * - /api/billing/webhook
+ * - /api/composio/webhook
+ * - /api/internal/privacy/retention
+ * - /connect/*
  * - /privacy-policy
+ * - /data-processing
+ * - /subprocessors
  * - /_next/*
  * - /favicon.ico
  * - static asset paths
  *
- * Protected paths that require authentication:
- * - /dashboard/*
- * - /agents/*
- * - /widgets/*
- * - /api/dashboard/*
- * - /api/agents/*
- * - /api/widgets/*
- * - /connections/*
- * - /settings/*
- *
- * Any route that is not explicitly protected is allowed through by default so
- * new public routes do not get redirected to /login by accident. Keep this
- * list aligned with proxy.ts.
+ * All other matched routes require authentication by default. Add routes to the
+ * explicit public lists only when they are intentionally unauthenticated and
+ * have their own verification where needed.
  */
+const PUBLIC_EXACT_PATHS = [
+  "/",
+  "/api/health",
+  "/privacy-policy",
+  "/data-processing",
+  "/subprocessors",
+] as const;
+
 const PUBLIC_PATH_PREFIXES = [
   "/api/public",
   "/login",
   "/auth",
-  "/api/health",
-  "/privacy-policy",
-] as const;
-
-const PROTECTED_PATH_PREFIXES = [
-  "/onboarding",
-  "/dashboard",
-  "/assistants",
-  "/agents",
-  "/widgets",
-  "/api/dashboard",
-  "/api/agents",
-  "/api/widgets",
-  "/connections",
-  "/settings",
+  "/api/billing/webhook",
+  "/api/composio/webhook",
+  "/api/internal/privacy/retention",
+  "/connect",
 ] as const;
 
 function createNonce() {
@@ -77,11 +71,10 @@ function matchesPathPrefix(pathname: string, prefix: string) {
 }
 
 function isExplicitPublicPath(pathname: string) {
-  return PUBLIC_PATH_PREFIXES.some((prefix) => matchesPathPrefix(pathname, prefix));
-}
-
-function isProtectedPath(pathname: string) {
-  return PROTECTED_PATH_PREFIXES.some((prefix) => matchesPathPrefix(pathname, prefix));
+  return (
+    PUBLIC_EXACT_PATHS.includes(pathname as (typeof PUBLIC_EXACT_PATHS)[number]) ||
+    PUBLIC_PATH_PREFIXES.some((prefix) => matchesPathPrefix(pathname, prefix))
+  );
 }
 
 export async function updateSession(request: NextRequest) {
@@ -96,7 +89,7 @@ export async function updateSession(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
 
-  if (isExplicitPublicPath(pathname) || !isProtectedPath(pathname)) {
+  if (isExplicitPublicPath(pathname)) {
     return withSecurityHeaders(
       NextResponse.next({
         request: {
@@ -146,7 +139,10 @@ export async function updateSession(request: NextRequest) {
   if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("redirectTo", request.nextUrl.pathname);
+    url.searchParams.set(
+      "redirectTo",
+      sanitizePostAuthRedirectTo(`${request.nextUrl.pathname}${request.nextUrl.search}`),
+    );
     return withSecurityHeaders(NextResponse.redirect(url), contentSecurityPolicy);
   }
 

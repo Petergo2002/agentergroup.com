@@ -2,6 +2,7 @@ import { extractCalSelectionFromDefinition } from "@/lib/cal";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
+import { consumeWorkspaceMessageUsage } from "@/lib/message-usage";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createRunStep, completeRunStep } from "@/lib/runtime/observability";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -170,6 +171,8 @@ export async function processAutomationEvent(eventId: string) {
       },
     });
     runtimeStepId = runtimeStep.id;
+
+    await consumeWorkspaceMessageUsage(supabase, agent.workspace_id);
 
     const result = await runAgentChat({
       supabase: supabase as never,

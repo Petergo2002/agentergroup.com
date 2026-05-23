@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import {
@@ -19,6 +19,93 @@ function buildStorageLimitError(storageLimitBytes: number) {
   return `Storage limit exceeded. Your current plan allows ${
     storageLimitBytes / 1024 / 1024
   }MB total knowledge base storage.`;
+}
+
+async function linkSourceToFolder(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  sourceId: string,
+  folderIdValue: unknown,
+) {
+  const folderId = typeof folderIdValue === "string" ? folderIdValue.trim() : "";
+
+  if (!folderId) {
+    return;
+  }
+
+  const { data: folder, error: folderError } = await supabase
+    .from("knowledge_folders")
+    .select("id")
+    .eq("id", folderId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (folderError) {
+    throw new Error(folderError.message);
+  }
+
+  if (!folder) {
+    throw new Error("Target folder was not found.");
+  }
+
+  const { error: linkError } = await supabase
+    .from("knowledge_folder_sources")
+    .insert({
+      folder_id: folder.id,
+      knowledge_source_id: sourceId,
+    });
+
+  if (linkError && linkError.code !== "23505") {
+    throw new Error(linkError.message);
+  }
+}
+
+function queueKnowledgeProcessing(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sourceId: string,
+  accessToken?: string | null,
+) {
+  after(async () => {
+    const processResponse = await supabase.functions.invoke(
+      "process-knowledge-source",
+      {
+        headers: accessToken
+          ? {
+              Authorization: `Bearer ${accessToken}`,
+            }
+          : undefined,
+        body: {
+          sourceId,
+        },
+      },
+    );
+
+    if (processResponse.error) {
+      const { data: failedSource } = await supabase
+        .from("knowledge_sources")
+        .select("error_message")
+        .eq("id", sourceId)
+        .maybeSingle();
+
+      const errorMessage =
+        failedSource?.error_message ??
+        processResponse.error.message ??
+        "Knowledge processing failed.";
+
+      console.error("[knowledge/sources] Background processing failed", {
+        sourceId,
+        message: errorMessage,
+      });
+
+      await supabase
+        .from("knowledge_sources")
+        .update({
+          status: "failed",
+          error_message: errorMessage,
+        })
+        .eq("id", sourceId);
+    }
+  });
 }
 
 export async function GET() {
@@ -129,6 +216,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    try {
+      await linkSourceToFolder(supabase, context.workspace.id, source.id, body.folderId);
+    } catch (folderError) {
+      return NextResponse.json(
+        {
+          error:
+            folderError instanceof Error
+              ? folderError.message
+              : "Failed to add source to folder.",
+        },
+        { status: 500 },
+      );
+    }
+
     const processResponse = await supabase.functions.invoke(
       "process-knowledge-source",
       {
@@ -216,34 +317,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Invoke the edge function which will now handle the scraping
-    const processResponse = await supabase.functions.invoke(
-      "process-knowledge-source",
-      {
-        headers: session?.access_token
-          ? {
-              Authorization: `Bearer ${session.access_token}`,
-            }
-          : undefined,
-        body: {
-          sourceId: source.id,
-        },
-      },
-    );
-
-    if (processResponse.error) {
+    try {
+      await linkSourceToFolder(supabase, context.workspace.id, source.id, body.folderId);
+    } catch (folderError) {
       return NextResponse.json(
         {
-          error: processResponse.error.message,
-          source,
+          error:
+            folderError instanceof Error
+              ? folderError.message
+              : "Failed to add source to folder.",
         },
         { status: 500 },
       );
     }
 
+    queueKnowledgeProcessing(supabase, source.id, session?.access_token);
+
     return NextResponse.json({
       source,
-      processStatus: "processing",
+      processStatus: "queued",
     });
   }
 
@@ -314,6 +406,20 @@ export async function POST(request: NextRequest) {
   if (updateError || !updatedSource) {
     return NextResponse.json(
       { error: updateError?.message ?? "Failed to reserve upload path." },
+      { status: 500 },
+    );
+  }
+
+  try {
+    await linkSourceToFolder(supabase, context.workspace.id, updatedSource.id, body.folderId);
+  } catch (folderError) {
+    return NextResponse.json(
+      {
+        error:
+          folderError instanceof Error
+            ? folderError.message
+            : "Failed to add source to folder.",
+      },
       { status: 500 },
     );
   }

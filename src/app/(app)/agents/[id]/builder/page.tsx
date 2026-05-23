@@ -12,6 +12,8 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
+import { parseVariableKeys } from '@/lib/template-variables';
 import {
   Background,
   BackgroundVariant,
@@ -36,11 +38,14 @@ import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { hasInternalAssistantsEnabled, hasAutomationsEnabled } from '@/lib/assistants/feature-flags';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/ToastProvider';
-import { Modal } from '@/components/ui/Modal';
 import { AgentModelPicker } from '@/components/agents/AgentModelPicker';
 import { canEditAgentRecord } from '@/lib/agents/access';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
 import { AUTOMATION_GMAIL_TRIGGER_SLUG, buildInitialDefinition } from '@/lib/agents/defaults';
+import {
+  getSingleToolConnection,
+  resolveToolNodeConnection,
+} from '@/lib/builder-connection-resolver';
 import { getEffectiveConnectionStatus } from '@/lib/connections';
 import { DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS } from '@/lib/end-chat';
 import { normalizeGmailRecipientEmail } from '@/lib/gmail';
@@ -75,12 +80,14 @@ import type {
   ConnectionRecord,
   EndChatBuilderNodeData,
   GmailBuilderNodeData,
+  GoogleAdsBuilderNodeData,
   HubSpotBuilderNodeData,
   OutlookBuilderNodeData,
   ShopifyBuilderNodeData,
   SlackBuilderNodeData,
   GoogleCalendarBuilderNodeData,
   KnowledgeBuilderNodeData,
+  KnowledgeFolderWithSources,
   KnowledgeSourceRecord,
   RunRecord,
   TriggerBuilderNodeData,
@@ -88,8 +95,8 @@ import type {
 
 type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
-type ToolNodeKind = 'gmail' | 'outlook' | 'slack' | 'hubspot' | 'shopify' | 'googlecalendar' | 'cal';
-type ToolNodeData = GmailBuilderNodeData | OutlookBuilderNodeData | SlackBuilderNodeData | HubSpotBuilderNodeData | ShopifyBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
+type ToolNodeKind = 'gmail' | 'outlook' | 'slack' | 'hubspot' | 'shopify' | 'googleads' | 'googlecalendar' | 'cal';
+type ToolNodeData = GmailBuilderNodeData | OutlookBuilderNodeData | SlackBuilderNodeData | HubSpotBuilderNodeData | ShopifyBuilderNodeData | GoogleAdsBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
 type LibraryItemKey = 'trigger' | 'knowledge' | 'tools' | 'endchat' | 'agent';
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 type BuilderStatusNote =
@@ -162,8 +169,9 @@ const DEFAULT_POSITIONS: Record<BuilderNodeKind, { x: number; y: number }> = {
   slack: { x: 610, y: 290 },
   hubspot: { x: 610, y: 360 },
   shopify: { x: 610, y: 430 },
-  googlecalendar: { x: 610, y: 500 },
-  cal: { x: 610, y: 640 },
+  googleads: { x: 610, y: 500 },
+  googlecalendar: { x: 610, y: 570 },
+  cal: { x: 610, y: 710 },
   endchat: { x: 1210, y: 150 },
 };
 
@@ -239,7 +247,7 @@ const TIMEZONE_OPTIONS = [
   { value: 'Pacific/Auckland', label: 'Auckland' },
 ];
 
-const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'outlook', 'slack', 'hubspot', 'shopify', 'googlecalendar', 'cal'];
+const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'outlook', 'slack', 'hubspot', 'shopify', 'googleads', 'googlecalendar', 'cal'];
 
 const TRIGGER_SOURCE_ORDER: BuilderTriggerSource[] = [
   'user_message',
@@ -329,6 +337,12 @@ function getBuilderNodeText(kind: BuilderNodeKind, t: Translate) {
         label: 'Shopify',
         type: t('agentBuilder.toolType'),
         description: t('agentBuilder.shopifyDescription'),
+      };
+    case 'googleads':
+      return {
+        label: 'Google Ads',
+        type: t('agentBuilder.toolType'),
+        description: t('agentBuilder.googleAdsDescription'),
       };
     case 'googlecalendar':
       return {
@@ -579,7 +593,7 @@ AgentNode.displayName = 'AgentNode';
 // nodeTypes is now memoized inside AgentBuilderPage to prevent Fast Refresh warnings
 
 function isToolNodeKind(kind: BuilderNodeKind): kind is ToolNodeKind {
-  return kind === 'gmail' || kind === 'outlook' || kind === 'slack' || kind === 'hubspot' || kind === 'shopify' || kind === 'googlecalendar' || kind === 'cal';
+  return kind === 'gmail' || kind === 'outlook' || kind === 'slack' || kind === 'hubspot' || kind === 'shopify' || kind === 'googleads' || kind === 'googlecalendar' || kind === 'cal';
 }
 
 function isToolNodeData(data: BuilderNodeData): data is ToolNodeData {
@@ -608,6 +622,7 @@ function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
     value === 'slack' ||
     value === 'hubspot' ||
     value === 'shopify' ||
+    value === 'googleads' ||
     value === 'googlecalendar' ||
     value === 'cal' ||
     value === 'endchat'
@@ -623,6 +638,7 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
   const hasSlack = nodes.some((node) => node.data.kind === 'slack');
   const hasHubSpot = nodes.some((node) => node.data.kind === 'hubspot');
   const hasShopify = nodes.some((node) => node.data.kind === 'shopify');
+  const hasGoogleAds = nodes.some((node) => node.data.kind === 'googleads');
   const hasCalendar = nodes.some((node) => node.data.kind === 'googlecalendar');
   const hasCal = nodes.some((node) => node.data.kind === 'cal');
   const hasEndChat = nodes.some((node) => node.data.kind === 'endchat');
@@ -689,6 +705,15 @@ function buildEdges(nodes: BuilderFlowNode[]): BuilderFlowEdge[] {
       id: 'e-agent-shopify',
       source: FIXED_NODE_IDS.agent,
       target: 'shopify',
+      style: DEFAULT_EDGE_STYLE,
+    });
+  }
+
+  if (hasAgent && hasGoogleAds) {
+    edges.push({
+      id: 'e-agent-googleads',
+      source: FIXED_NODE_IDS.agent,
+      target: 'googleads',
       style: DEFAULT_EDGE_STYLE,
     });
   }
@@ -776,6 +801,7 @@ function createAgentCoreNode(
 function createKnowledgeNode(
   position = DEFAULT_POSITIONS.knowledge,
   sourceIds: string[] = [],
+  folderIds: string[] = [],
   data?: Partial<BuilderNodeData>,
 ): BuilderFlowNode {
   return {
@@ -790,6 +816,7 @@ function createKnowledgeNode(
       description: 'Retrieves relevant context from attached sources.',
       status: 'idle',
       sourceIds,
+      folderIds,
       ...(data ?? {}),
     } as BuilderNodeData,
   };
@@ -929,6 +956,32 @@ function createShopifyNode(
   };
 }
 
+function createGoogleAdsNode(
+  position = DEFAULT_POSITIONS.googleads,
+  connectionId: string | null = null,
+  data?: Partial<GoogleAdsBuilderNodeData>,
+): BuilderFlowNode {
+  return {
+    id: 'googleads',
+    type: 'agentNode',
+    position,
+    data: {
+      kind: 'googleads',
+      label: 'Google Ads',
+      type: 'Tool',
+      icon: 'ads_click',
+      simpleIcon: 'siGoogleads',
+      simpleIconColor: '#4285F4',
+      description: 'Inspect Google Ads accounts, campaigns, customer lists, and GAQL reports.',
+      status: 'idle',
+      integrationSlug: 'googleads',
+      connectionId,
+      enabledTools: getRecommendedChatToolsForToolkit('googleads'),
+      ...(data ?? {}),
+    } as BuilderNodeData,
+  };
+}
+
 function createGoogleCalendarNode(
   position = DEFAULT_POSITIONS.googlecalendar,
   connectionId: string | null = null,
@@ -1056,6 +1109,10 @@ function inferNodeKind(node: BuilderFlowNode) {
     return 'shopify';
   }
 
+  if (label === 'google ads' || label === 'googleads') {
+    return 'googleads';
+  }
+
   if (label === 'google calendar') {
     return 'googlecalendar';
   }
@@ -1120,6 +1177,7 @@ function normalizeDefinition(
   connections: ConnectionRecord[],
   attachedConnectionIds: string[],
   attachedKnowledgeSourceIds: string[],
+  attachedKnowledgeFolderIds: string[],
 ): NormalizedBuilderDefinition {
   const rawNodes = (Array.isArray(definition.nodes) ? definition.nodes : []) as BuilderFlowNode[];
   const nodesByKind = new Map<BuilderNodeKind, BuilderFlowNode>();
@@ -1145,12 +1203,17 @@ function normalizeDefinition(
     knowledgeNode && isKnowledgeNodeData(knowledgeNode.data)
       ? knowledgeNode.data.sourceIds
       : attachedKnowledgeSourceIds;
+  const knowledgeFolderIds =
+    knowledgeNode && isKnowledgeNodeData(knowledgeNode.data)
+      ? knowledgeNode.data.folderIds ?? []
+      : attachedKnowledgeFolderIds;
 
   const gmailNode = nodesByKind.get('gmail');
   const outlookNode = nodesByKind.get('outlook');
   const slackNode = nodesByKind.get('slack');
   const hubspotNode = nodesByKind.get('hubspot');
   const shopifyNode = nodesByKind.get('shopify');
+  const googleAdsNode = nodesByKind.get('googleads');
   const calendarNode = nodesByKind.get('googlecalendar');
   const calNode = nodesByKind.get('cal');
   const endChatNode = nodesByKind.get('endchat');
@@ -1183,6 +1246,12 @@ function normalizeDefinition(
     attachedConnectionIds,
     'shopify',
     shopifyNode && isToolNodeData(shopifyNode.data) ? shopifyNode.data.connectionId : null,
+  );
+  const googleAdsConnectionId = pickPreferredConnectionId(
+    connections,
+    attachedConnectionIds,
+    'googleads',
+    googleAdsNode && isToolNodeData(googleAdsNode.data) ? googleAdsNode.data.connectionId : null,
   );
   const googleCalendarConnectionId = pickPreferredConnectionId(
     connections,
@@ -1247,11 +1316,12 @@ function normalizeDefinition(
     ),
   );
 
-  if (knowledgeNode || knowledgeSourceIds.length > 0) {
+  if (knowledgeNode || knowledgeSourceIds.length > 0 || knowledgeFolderIds.length > 0) {
     normalizedNodes.push(
       createKnowledgeNode(
         knowledgeNode?.position ?? DEFAULT_POSITIONS.knowledge,
         knowledgeSourceIds,
+        knowledgeFolderIds,
       ),
     );
   }
@@ -1336,6 +1406,20 @@ function normalizeDefinition(
         shopifyNode && shopifyNode.data.kind === 'shopify'
           ? {
               enabledTools: pickEnabledToolsFromNode('shopify', shopifyNode),
+            }
+          : undefined,
+      ),
+    );
+  }
+
+  if (googleAdsNode || googleAdsConnectionId) {
+    normalizedNodes.push(
+      createGoogleAdsNode(
+        googleAdsNode?.position ?? DEFAULT_POSITIONS.googleads,
+        googleAdsConnectionId,
+        googleAdsNode && googleAdsNode.data.kind === 'googleads'
+          ? {
+              enabledTools: pickEnabledToolsFromNode('googleads', googleAdsNode),
             }
           : undefined,
       ),
@@ -1556,6 +1640,16 @@ function getKnowledgeSourceIdsFromNodes(nodes: BuilderFlowNode[]) {
   return knowledgeNode.data.sourceIds.filter(Boolean);
 }
 
+function getKnowledgeFolderIdsFromNodes(nodes: BuilderFlowNode[]) {
+  const knowledgeNode = nodes.find((node) => node.data.kind === 'knowledge');
+
+  if (!knowledgeNode || !isKnowledgeNodeData(knowledgeNode.data)) {
+    return [];
+  }
+
+  return (knowledgeNode.data.folderIds ?? []).filter(Boolean);
+}
+
 function getSelectedConnectionIdsFromNodes(
   nodes: BuilderFlowNode[],
   connections: ConnectionRecord[],
@@ -1589,10 +1683,7 @@ function getSingleConnection(
   connections: ConnectionRecord[],
   kind: ToolNodeKind,
 ): ConnectionRecord | null {
-  const matches = getToolConnectionsByKind(connections, kind);
-  if (matches.length === 0) return null;
-  const connected = matches.find((c) => c.status === 'connected');
-  return connected ?? matches[0];
+  return getSingleToolConnection(connections, kind);
 }
 
 /**
@@ -1604,10 +1695,14 @@ function getSingleConnection(
 function ConnectedAccountDisplay({
   connection,
   toolkitLabel,
+  isConnecting = false,
+  onConnect,
   onFix,
 }: {
   connection: ConnectionRecord | null;
   toolkitLabel: string;
+  isConnecting?: boolean;
+  onConnect?: () => void;
   onFix?: () => void;
 }) {
   if (!connection) {
@@ -1617,13 +1712,27 @@ function ConnectedAccountDisplay({
         <p className="text-xs font-medium text-on-surface-variant/60 mb-5">
           No {toolkitLabel} account connected yet.
         </p>
-        <Link
-          href="/connections"
-          className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-primary transition-all hover:bg-primary/20 active:scale-95"
-        >
-          <span className="material-symbols-outlined text-lg">link</span>
-          Connect {toolkitLabel}
-        </Link>
+        {onConnect ? (
+          <button
+            type="button"
+            onClick={onConnect}
+            disabled={isConnecting}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-black uppercase tracking-widest text-on-primary transition-all hover:bg-primary/90 active:scale-95 disabled:cursor-wait disabled:opacity-70"
+          >
+            <span className={`material-symbols-outlined text-lg ${isConnecting ? 'animate-spin' : ''}`}>
+              {isConnecting ? 'sync' : 'link'}
+            </span>
+            {isConnecting ? 'Opening...' : `Connect ${toolkitLabel}`}
+          </button>
+        ) : (
+          <Link
+            href="/connections"
+            className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-primary transition-all hover:bg-primary/20 active:scale-95"
+          >
+            <span className="material-symbols-outlined text-lg">link</span>
+            Connect {toolkitLabel}
+          </Link>
+        )}
       </div>
     );
   }
@@ -1658,7 +1767,16 @@ function ConnectedAccountDisplay({
           <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
           <span className="text-sm font-bold text-on-surface truncate">{label}</span>
         </div>
-        {!isConnected && (
+        {!isConnected && onConnect ? (
+          <button
+            type="button"
+            onClick={onConnect}
+            disabled={isConnecting}
+            className="shrink-0 text-[10px] font-black uppercase tracking-widest text-primary hover:underline disabled:cursor-wait disabled:opacity-60"
+          >
+            {isConnecting ? 'Opening...' : 'Fix'}
+          </button>
+        ) : !isConnected ? (
           <Link
             href="/connections"
             onClick={onFix}
@@ -1666,13 +1784,831 @@ function ConnectedAccountDisplay({
           >
             Fix →
           </Link>
-        )}
+        ) : null}
       </div>
       {!isConnected && (
         <p className="mt-1 ml-[22px] text-[11px] text-on-surface-variant/60">
           {isPending ? 'Awaiting authorisation' : 'Connection error — reconnect in Connections'}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * PromptEditor — full-screen prompt editor with:
+ *  - Slash command (/) to insert {{variables}} inline
+ *  - Right sidebar to create & preview variables
+ */
+interface PromptEditorProps {
+  instructions: string;
+  setInstructions: (value: string) => void;
+  isOptimizingPrompt: boolean;
+  handleOptimizePrompt: () => void;
+  stopBuilderFieldKeyDown: (e: ReactKeyboardEvent<HTMLTextAreaElement>) => void;
+  name: string;
+  t: (key: string) => string;
+  onClose: () => void;
+}
+
+function PromptEditor({
+  instructions,
+  setInstructions,
+  isOptimizingPrompt,
+  handleOptimizePrompt,
+  stopBuilderFieldKeyDown,
+  name,
+  t,
+  onClose,
+}: PromptEditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Track the cursor position + scroll offset so sidebar inserts land in the right place
+  const lastCursorPos = useRef(0);
+  const lastScrollTop = useRef(0);
+
+  // Slash-command state
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  const [slashAnchor, setSlashAnchor] = useState(0); // position of '/' character in string
+  const [slashIdx, setSlashIdx] = useState(0);
+
+  // Right sidebar: preview values keyed by variable key
+  const [previewValues, setPreviewValues] = useState<Record<string, string>>({});
+  const [newVarDraft, setNewVarDraft] = useState('');
+  const newVarRef = useRef<HTMLInputElement>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Preview mode: show the prompt with variables replaced by their filled values
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // All {{variables}} detected in the prompt in real-time
+  const detectedVars = useMemo(() => parseVariableKeys(instructions), [instructions]);
+
+  // Slash menu filtered options — existing vars matching query + "create new" if query is non-empty
+  const slashOptions = useMemo(() => {
+    const q = slashQuery.toLowerCase().replace(/\s+/g, '_');
+    const filtered = detectedVars.filter((k) => k.includes(q));
+    const isNew = q.length > 0 && !detectedVars.includes(q);
+    return [...filtered, ...(isNew ? [`__new__:${q}`] : [])];
+  }, [detectedVars, slashQuery]);
+
+  /** Insert {{token}} at position pos in the string, removing the `/query` prefix */
+  function insertVariableAt(key: string, slashPos: number, queryLen: number) {
+    const token = `{{${key}}}`;
+    const before = instructions.slice(0, slashPos); // cut before '/'
+    const after = instructions.slice(slashPos + 1 + queryLen); // skip /query
+    const next = before + token + after;
+    setInstructions(next);
+    setSlashOpen(false);
+    setSlashQuery('');
+
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      const pos = slashPos + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  /** Insert {{token}} at the saved cursor position (used from sidebar — textarea may not be focused) */
+  function insertAtCursor(key: string) {
+    const el = textareaRef.current;
+    // Use the saved position; fall back to end of string if nothing was ever tracked
+    const pos = lastCursorPos.current;
+    const savedScroll = lastScrollTop.current;
+    const token = `{{${key}}}`;
+    const next = instructions.slice(0, pos) + token + instructions.slice(pos);
+    setInstructions(next);
+    // After React re-renders, restore scroll and move cursor to just after the token
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const newPos = pos + token.length;
+      el.setSelectionRange(newPos, newPos);
+      // Restore scroll so the view doesn't jump to the insertion point
+      el.scrollTop = savedScroll;
+      // Update tracking refs to the new cursor position
+      lastCursorPos.current = newPos;
+    });
+  }
+
+  /** Handle textarea keydown — detect '/' to open slash menu */
+  function handleTextareaKeyDown(e: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (slashOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashIdx((i) => (i + 1) % Math.max(slashOptions.length, 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashIdx((i) => (i - 1 + Math.max(slashOptions.length, 1)) % Math.max(slashOptions.length, 1));
+        return;
+      }
+      if (e.key === 'Enter' && slashOptions.length > 0) {
+        e.preventDefault();
+        const raw = slashOptions[slashIdx] ?? slashOptions[0];
+        const key = raw.startsWith('__new__:') ? raw.slice(8) : raw;
+        insertVariableAt(key, slashAnchor, slashQuery.length);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSlashOpen(false);
+        setSlashQuery('');
+        return;
+      }
+      if (e.key === 'Backspace' && slashQuery.length === 0) {
+        setSlashOpen(false);
+        setSlashQuery('');
+      }
+    }
+
+    if (e.key === 'Escape' && !slashOpen && !isOptimizingPrompt) {
+      onClose();
+    }
+
+    // Detect '/' to open the slash command menu
+    if (e.key === '/' && !slashOpen && !isOptimizingPrompt) {
+      const el = textareaRef.current;
+      if (el) {
+        // Use setTimeout so the '/' is written first, then we anchor after it
+        setTimeout(() => {
+          setSlashAnchor(el.selectionStart - 1);
+          setSlashQuery('');
+          setSlashIdx(0);
+          setSlashOpen(true);
+        }, 0);
+      }
+    }
+
+    stopBuilderFieldKeyDown(e);
+  }
+
+  /** Handle textarea onChange — update slash query if menu is open */
+  function handleTextareaChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value;
+    setInstructions(val);
+
+    if (slashOpen) {
+      // Grab everything the user typed after the '/'
+      const afterSlash = val.slice(slashAnchor + 1, e.target.selectionStart);
+
+      // Only close if the cursor moved back behind the '/' (e.g. user deleted it)
+      if (e.target.selectionStart <= slashAnchor) {
+        setSlashOpen(false);
+        setSlashQuery('');
+      } else {
+        // Keep the raw query including spaces — normalisation to _ happens in slashOptions
+        setSlashQuery(afterSlash);
+        setSlashIdx(0);
+      }
+    }
+  }
+
+
+  /** Create a new variable from sidebar draft and insert it */
+  function handleCreateVar() {
+    const key = newVarDraft.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    if (!key) return;
+    insertAtCursor(key);
+    setNewVarDraft('');
+  }
+
+  /** Count how many variables have been filled in */
+  const filledCount = useMemo(
+    () => detectedVars.filter((k) => (previewValues[k] ?? '').trim().length > 0).length,
+    [detectedVars, previewValues],
+  );
+
+  /** Build the highlighted overlay text — renders variable tokens as styled chips */
+  const overlayContent = useMemo(() => {
+    if (!instructions) return null;
+    const TOKEN_RE = /\{\{([a-z][a-z0-9_]*)\}\}/gi;
+    const parts: { type: 'text' | 'var'; value: string; key?: string }[] = [];
+    let lastIdx = 0;
+    let m: RegExpExecArray | null;
+    TOKEN_RE.lastIndex = 0;
+    while ((m = TOKEN_RE.exec(instructions)) !== null) {
+      if (m.index > lastIdx) {
+        parts.push({ type: 'text', value: instructions.slice(lastIdx, m.index) });
+      }
+      parts.push({ type: 'var', value: m[0], key: m[1].toLowerCase() });
+      lastIdx = m.index + m[0].length;
+    }
+    if (lastIdx < instructions.length) {
+      parts.push({ type: 'text', value: instructions.slice(lastIdx) });
+    }
+    return parts;
+  }, [instructions]);
+
+  /** Sync overlay scroll with textarea scroll */
+  function handleEditorScroll(e: React.UIEvent<HTMLTextAreaElement>) {
+    lastScrollTop.current = e.currentTarget.scrollTop;
+    if (overlayRef.current) {
+      overlayRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex flex-col"
+      style={{ background: 'var(--color-surface)', animation: 'peIn 0.2s ease both' }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+        @keyframes peIn { from { opacity:0 } to { opacity:1 } }
+        @keyframes slashIn { from { opacity:0; transform:translateY(6px) scale(0.97) } to { opacity:1; transform:none } }
+        @keyframes sideIn { from { opacity:0; transform:translateX(12px) } to { opacity:1; transform:none } }
+        @keyframes varChipPulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb,var(--color-primary) 20%,transparent); } 50% { box-shadow: 0 0 0 4px color-mix(in srgb,var(--color-primary) 0%,transparent); } }
+        @keyframes filledPop { from { transform: scale(0.92); opacity: 0.6; } to { transform: scale(1); opacity: 1; } }
+        .pe-textarea {
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 1.05rem; line-height: 1.9;
+          letter-spacing: 0.012em; font-weight: 400;
+          caret-color: var(--color-primary);
+          -webkit-font-smoothing: antialiased;
+        }
+        .pe-textarea::placeholder { font-style: italic; opacity: 0.25; }
+        .pe-textarea:focus { outline: none; }
+        .pe-textarea::-webkit-scrollbar { display: none; }
+        .pe-overlay {
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 1.05rem; line-height: 1.9;
+          letter-spacing: 0.012em; font-weight: 400;
+          -webkit-font-smoothing: antialiased;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+        .pe-var-chip {
+          display: inline;
+          position: relative;
+          border-radius: 6px;
+          padding: 1px 6px;
+          font-weight: 600;
+          font-size: 0.95rem;
+          pointer-events: auto;
+          cursor: default;
+          transition: all 0.2s ease;
+        }
+        .pe-var-chip--empty {
+          background: color-mix(in srgb,var(--color-primary) 12%,transparent);
+          color: transparent;
+          border: 1.5px dashed color-mix(in srgb,var(--color-primary) 35%,transparent);
+        }
+        .pe-var-chip--filled {
+          background: color-mix(in srgb,var(--color-primary) 15%,transparent);
+          color: transparent;
+          border: 1.5px solid color-mix(in srgb,var(--color-primary) 30%,transparent);
+          animation: filledPop 0.2s ease both;
+        }
+        /* Tooltip on hover — shows the filled preview value */
+        .pe-var-chip[data-preview]::after {
+          content: attr(data-preview);
+          position: absolute;
+          bottom: calc(100% + 8px);
+          left: 50%;
+          transform: translateX(-50%) translateY(4px);
+          opacity: 0;
+          pointer-events: none;
+          background: var(--color-surface-container-high, var(--color-surface-container));
+          color: var(--color-primary);
+          padding: 6px 14px;
+          border-radius: 12px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          white-space: nowrap;
+          max-width: 280px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          letter-spacing: 0.01em;
+          box-shadow: 0 8px 24px -4px rgba(0,0,0,0.18), 0 2px 8px -2px rgba(0,0,0,0.1);
+          border: 1px solid color-mix(in srgb,var(--color-primary) 20%,transparent);
+          transition: opacity 0.18s cubic-bezier(0.16,1,0.3,1), transform 0.18s cubic-bezier(0.16,1,0.3,1);
+          z-index: 50;
+        }
+        .pe-var-chip[data-preview]::before {
+          content: '';
+          position: absolute;
+          bottom: calc(100% + 2px);
+          left: 50%;
+          transform: translateX(-50%) translateY(4px);
+          opacity: 0;
+          pointer-events: none;
+          width: 8px;
+          height: 8px;
+          background: var(--color-surface-container-high, var(--color-surface-container));
+          border-right: 1px solid color-mix(in srgb,var(--color-primary) 20%,transparent);
+          border-bottom: 1px solid color-mix(in srgb,var(--color-primary) 20%,transparent);
+          rotate: 45deg;
+          transition: opacity 0.18s cubic-bezier(0.16,1,0.3,1), transform 0.18s cubic-bezier(0.16,1,0.3,1);
+          z-index: 50;
+        }
+        .pe-var-chip[data-preview]:hover::after {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+        .pe-var-chip[data-preview]:hover::before {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+        .pe-var-chip:hover {
+          filter: brightness(1.08);
+        }
+        .pe-preview-text {
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 1.05rem; line-height: 1.9;
+          letter-spacing: 0.012em; font-weight: 400;
+          -webkit-font-smoothing: antialiased;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+        }
+        .pe-preview-replaced {
+          background: color-mix(in srgb,var(--color-primary) 12%,transparent);
+          color: var(--color-primary);
+          font-weight: 600;
+          border-radius: 4px;
+          padding: 1px 4px;
+          border-bottom: 2px solid color-mix(in srgb,var(--color-primary) 40%,transparent);
+        }
+      `}</style>
+
+      {/* ─── Top bar ─── */}
+      <header
+        className="flex shrink-0 items-center justify-between px-6 py-3.5"
+        style={{ borderBottom: '1px solid color-mix(in srgb,var(--color-on-surface) 7%,transparent)' }}
+      >
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            disabled={isOptimizingPrompt}
+            className="group flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-semibold text-on-surface-variant/60 transition-colors hover:text-on-surface active:scale-95 disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined text-[15px] transition-transform group-hover:-translate-x-0.5">arrow_back</span>
+            Back
+          </button>
+          <span className="h-4 w-px opacity-10" style={{ background: 'currentColor' }} />
+          <span className="text-[11px] font-medium text-on-surface-variant/40">
+            {name ? `${name} — ` : ''}{t('agentBuilder.operationalInstructions')}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="mr-1 text-[10px] tabular-nums text-on-surface-variant/25">
+            {instructions.trim().split(/\s+/).filter(Boolean).length}w
+          </span>
+          {/* Preview mode toggle — only show if there are variables detected */}
+          {detectedVars.length > 0 && (
+            <button
+              onClick={() => setIsPreviewMode((p) => !p)}
+              disabled={isOptimizingPrompt}
+              className={`flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-40 ${
+                isPreviewMode
+                  ? 'text-on-surface'
+                  : 'text-on-surface-variant/60 hover:text-on-surface'
+              }`}
+              style={{
+                background: isPreviewMode
+                  ? 'color-mix(in srgb,var(--color-primary) 18%,transparent)'
+                  : 'color-mix(in srgb,var(--color-on-surface) 6%,transparent)',
+                color: isPreviewMode ? 'var(--color-primary)' : undefined,
+              }}
+              title={isPreviewMode ? 'Back to editing' : 'Preview with variable values'}
+            >
+              <span className="material-symbols-outlined text-[14px]">
+                {isPreviewMode ? 'edit' : 'visibility'}
+              </span>
+              {isPreviewMode ? 'Edit' : 'Preview'}
+            </button>
+          )}
+          <button
+            onClick={handleOptimizePrompt}
+            disabled={isOptimizingPrompt}
+            className="flex h-8 items-center gap-2 rounded-full px-4 text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-40"
+            style={{ background: 'color-mix(in srgb,var(--color-primary) 12%,transparent)', color: 'var(--color-primary)' }}
+          >
+            <span className="material-symbols-outlined text-[14px]">auto_fix_high</span>
+            {t('agentBuilder.optimizePrompt')}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={isOptimizingPrompt}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/40 transition-colors hover:text-on-surface active:scale-95 disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+      </header>
+
+      {/* ─── Body: editor + sidebar ─── */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+
+        {/* Writing area */}
+        <div className="relative flex min-h-0 flex-1 overflow-y-auto">
+          {/* Preview mode — read-only rendered view with variables replaced */}
+          {isPreviewMode ? (
+            <div
+              className="pe-preview-text block w-full flex-1 text-on-surface px-12 py-10 md:px-20 lg:px-32 xl:px-48 overflow-y-auto"
+              style={{ minHeight: 'calc(100vh - 120px)' }}
+            >
+              {overlayContent?.map((part, i) => {
+                if (part.type === 'text') {
+                  return <span key={i}>{part.value}</span>;
+                }
+                const filled = part.key ? (previewValues[part.key] ?? '').trim() : '';
+                return (
+                  <span
+                    key={i}
+                    className="pe-preview-replaced"
+                    title={part.value}
+                  >
+                    {filled || part.value}
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              {/* Highlight overlay — sits above the textarea; text is invisible so you see
+                  the textarea text underneath, but variable chips are visible and hoverable
+                  to show their preview value as a tooltip */}
+              {detectedVars.length > 0 && (
+                <div
+                  ref={overlayRef}
+                  aria-hidden
+                  className="pe-overlay pointer-events-none absolute inset-0 z-[3] text-transparent px-12 py-10 md:px-20 lg:px-32 xl:px-48 overflow-hidden"
+                  style={{ minHeight: 'calc(100vh - 120px)' }}
+                >
+                  {overlayContent?.map((part, i) => {
+                    if (part.type === 'text') {
+                      return <span key={i}>{part.value}</span>;
+                    }
+                    const filled = part.key ? (previewValues[part.key] ?? '').trim() : '';
+                    return (
+                      <span
+                        key={i}
+                        className={`pe-var-chip ${filled ? 'pe-var-chip--filled' : 'pe-var-chip--empty'}`}
+                        {...(filled ? { 'data-preview': filled } : {})}
+                      >
+                        {part.value}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              <textarea
+                ref={textareaRef}
+                value={instructions}
+                onChange={handleTextareaChange}
+                onKeyDown={handleTextareaKeyDown}
+                // Track cursor position + scroll so sidebar inserts always land in the right spot
+                onSelect={(e) => {
+                  lastCursorPos.current = e.currentTarget.selectionStart;
+                }}
+                onMouseUp={(e) => {
+                  lastCursorPos.current = e.currentTarget.selectionStart;
+                }}
+                onBlur={(e) => {
+                  // Save both cursor and scroll before focus leaves
+                  lastCursorPos.current = e.currentTarget.selectionStart;
+                  lastScrollTop.current = e.currentTarget.scrollTop;
+                }}
+                onScroll={handleEditorScroll}
+                disabled={isOptimizingPrompt}
+                placeholder={"Start writing your agent's instructions…\n\nTip: type  /  to insert a variable like {{company_name}}"}
+                className={`pe-textarea relative z-[2] block w-full flex-1 resize-none border-0 bg-transparent text-on-surface transition-opacity px-12 py-10 md:px-20 lg:px-32 xl:px-48 ${
+                  isOptimizingPrompt ? 'opacity-20 pointer-events-none cursor-not-allowed' : 'opacity-100'
+                }`}
+                style={{ minHeight: 'calc(100vh - 120px)', display: 'block' }}
+                autoFocus
+                spellCheck
+              />
+            </>
+          )}
+
+          {/* Slash menu — floats near the bottom of the textarea */}
+          {slashOpen && (
+            <div
+              className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 w-72 overflow-hidden rounded-2xl shadow-2xl"
+              style={{
+                background: 'var(--color-surface-container)',
+                border: '1px solid color-mix(in srgb,var(--color-outline-variant) 25%,transparent)',
+                animation: 'slashIn 0.16s cubic-bezier(0.16,1,0.3,1) both',
+              }}
+            >
+              {/* Header */}
+              <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: '1px solid color-mix(in srgb,var(--color-outline-variant) 12%,transparent)' }}>
+
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">
+                  Insert variable
+                </span>
+                {slashQuery && (
+                  <span className="ml-auto rounded-md px-1.5 py-0.5 text-[10px] font-mono font-bold text-primary" style={{ background: 'color-mix(in srgb,var(--color-primary) 10%,transparent)' }}>
+                    /{slashQuery.toLowerCase().replace(/\s+/g, '_')}
+                  </span>
+                )}
+              </div>
+
+              {/* Options */}
+              <div className="py-1.5 max-h-52 overflow-y-auto">
+                {slashOptions.length === 0 && (
+                  <p className="px-4 py-3 text-[12px] text-on-surface-variant/40 italic">
+                    Type a name to create a new variable…
+                  </p>
+                )}
+                {slashOptions.map((opt, i) => {
+                  const isNew = opt.startsWith('__new__:');
+                  const key = isNew ? opt.slice(8) : opt;
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => insertVariableAt(key, slashAnchor, slashQuery.length)}
+                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                        i === slashIdx
+                          ? 'bg-primary/10 text-on-surface'
+                          : 'text-on-surface-variant/80 hover:bg-surface-container-low'
+                      }`}
+                    >
+                      {isNew && (
+                        <span
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-[11px]"
+                          style={{ background: 'color-mix(in srgb,var(--color-secondary) 12%,transparent)', color: 'var(--color-secondary)' }}
+                        >
+                          <span className="material-symbols-outlined text-[14px]">add</span>
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-semibold truncate">
+                          {isNew ? `Create "{{${key}}}"` : `{{${key}}}`}
+                        </p>
+                        <p className="text-[10px] text-on-surface-variant/45">
+                          {isNew ? 'New variable' : 'Insert existing'}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center gap-3 px-4 py-2" style={{ borderTop: '1px solid color-mix(in srgb,var(--color-outline-variant) 10%,transparent)' }}>
+                <span className="text-[10px] text-on-surface-variant/35">
+                  <kbd className="rounded px-1 py-0.5 text-[9px] font-bold" style={{ background: 'color-mix(in srgb,var(--color-on-surface) 8%,transparent)' }}>↑↓</kbd> navigate
+                </span>
+                <span className="text-[10px] text-on-surface-variant/35">
+                  <kbd className="rounded px-1 py-0.5 text-[9px] font-bold" style={{ background: 'color-mix(in srgb,var(--color-on-surface) 8%,transparent)' }}>Enter</kbd> insert
+                </span>
+                <span className="text-[10px] text-on-surface-variant/35">
+                  <kbd className="rounded px-1 py-0.5 text-[9px] font-bold" style={{ background: 'color-mix(in srgb,var(--color-on-surface) 8%,transparent)' }}>Esc</kbd> close
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Optimizing overlay */}
+          {isOptimizingPrompt && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="relative">
+                <div className="h-11 w-11 animate-spin rounded-full border-2 border-primary/15 border-t-primary" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-sm text-primary">auto_fix_high</span>
+                </div>
+              </div>
+              <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.35em] text-primary/60 animate-pulse">
+                {t('agentBuilder.optimizing')}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ─── Right sidebar: Variables ─── */}
+        <aside
+          className="flex shrink-0 flex-col overflow-hidden transition-all duration-300 ease-in-out"
+          style={{
+            width: sidebarCollapsed ? '40px' : '19rem',
+            borderLeft: '1px solid color-mix(in srgb,var(--color-on-surface) 7%,transparent)',
+            animation: 'sideIn 0.25s cubic-bezier(0.16,1,0.3,1) 0.05s both',
+          }}
+        >
+          {/* Sidebar header */}
+          <div
+            className="flex shrink-0 items-center px-3 py-4"
+            style={{ borderBottom: '1px solid color-mix(in srgb,var(--color-on-surface) 7%,transparent)', justifyContent: sidebarCollapsed ? 'center' : 'space-between' }}
+          >
+            {!sidebarCollapsed && (
+              <div className="flex items-center gap-2 overflow-hidden">
+                <span className="material-symbols-outlined text-[14px] text-primary/60">data_object</span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/60 whitespace-nowrap">
+                  Variables
+                </span>
+                {detectedVars.length > 0 && (
+                  <span
+                    className="flex h-5 items-center gap-1 rounded-full px-2 text-[10px] font-black"
+                    style={{
+                      background: filledCount === detectedVars.length && detectedVars.length > 0
+                        ? 'color-mix(in srgb,#22c55e 15%,transparent)'
+                        : 'color-mix(in srgb,var(--color-primary) 15%,transparent)',
+                      color: filledCount === detectedVars.length && detectedVars.length > 0
+                        ? '#22c55e'
+                        : 'var(--color-primary)',
+                    }}
+                  >
+                    {filledCount === detectedVars.length && detectedVars.length > 0 && (
+                      <span className="material-symbols-outlined text-[11px]">check</span>
+                    )}
+                    {filledCount}/{detectedVars.length}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Collapse / expand toggle */}
+            <button
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              title={sidebarCollapsed ? 'Expand variables panel' : 'Collapse variables panel'}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-on-surface-variant/40 transition-all hover:bg-surface-container hover:text-on-surface active:scale-90"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {sidebarCollapsed ? 'chevron_left' : 'chevron_right'}
+              </span>
+            </button>
+          </div>
+
+          {/* Collapsed state: show variable count badge vertically */}
+          {sidebarCollapsed && (
+            <div className="flex flex-1 flex-col items-center gap-3 pt-4">
+              <span className="material-symbols-outlined text-[16px] text-primary/40">data_object</span>
+              {detectedVars.length > 0 && (
+                <span
+                  className="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black"
+                  style={{
+                    background: filledCount === detectedVars.length
+                      ? 'color-mix(in srgb,#22c55e 15%,transparent)'
+                      : 'color-mix(in srgb,var(--color-primary) 15%,transparent)',
+                    color: filledCount === detectedVars.length ? '#22c55e' : 'var(--color-primary)',
+                  }}
+                >
+                  {detectedVars.length}
+                </span>
+              )}
+            </div>
+          )}
+
+          {!sidebarCollapsed && (
+            <>
+              {/* Variable list */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2.5">
+                {detectedVars.length === 0 ? (
+                  <div className="flex flex-col items-center gap-4 rounded-2xl px-4 py-10 text-center" style={{ border: '1px dashed color-mix(in srgb,var(--color-outline-variant) 20%,transparent)' }}>
+                    <div
+                      className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                      style={{ background: 'color-mix(in srgb,var(--color-primary) 8%,transparent)' }}
+                    >
+                      <span className="material-symbols-outlined text-xl text-primary/40">data_object</span>
+                    </div>
+                    <div>
+                      <p className="text-[12px] font-semibold text-on-surface-variant/50">No variables yet</p>
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-on-surface-variant/35">
+                        Type <kbd className="rounded px-1 py-0.5 text-[10px] font-bold" style={{ background: 'color-mix(in srgb,var(--color-on-surface) 8%,transparent)' }}>/</kbd> in the editor to insert one, or create one below
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Hint text when some are unfilled */}
+                    {filledCount < detectedVars.length && (
+                      <p className="mb-1 text-[10px] leading-relaxed text-on-surface-variant/40 px-1">
+                        Fill in values below to see them in the <button onClick={() => setIsPreviewMode(true)} className="font-bold text-primary/70 hover:text-primary underline decoration-primary/30 underline-offset-2 transition-colors">preview</button>.
+                      </p>
+                    )}
+                    {detectedVars.map((key) => {
+                      const val = (previewValues[key] ?? '').trim();
+                      const isFilled = val.length > 0;
+                      return (
+                        <div
+                          key={key}
+                          className="group rounded-2xl p-3.5 transition-all duration-200"
+                          style={{
+                            background: isFilled
+                              ? 'color-mix(in srgb,var(--color-primary) 4%,transparent)'
+                              : 'color-mix(in srgb,var(--color-on-surface) 3%,transparent)',
+                            border: isFilled
+                              ? '1px solid color-mix(in srgb,var(--color-primary) 18%,transparent)'
+                              : '1px solid color-mix(in srgb,var(--color-outline-variant) 10%,transparent)',
+                          }}
+                        >
+                          {/* Variable name badge + status */}
+                          <div className="mb-2.5 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-bold truncate"
+                                style={{
+                                  background: 'color-mix(in srgb,var(--color-primary) 10%,transparent)',
+                                  color: 'var(--color-primary)',
+                                }}
+                              >
+                                <span className="material-symbols-outlined text-[11px]">data_object</span>
+                                {key}
+                              </span>
+                              {/* Filled indicator */}
+                              {isFilled && (
+                                <span
+                                  className="flex h-4 w-4 items-center justify-center rounded-full"
+                                  style={{ background: 'color-mix(in srgb,#22c55e 18%,transparent)' }}
+                                  title="Value set"
+                                >
+                                  <span className="material-symbols-outlined text-[10px]" style={{ color: '#22c55e' }}>check</span>
+                                </span>
+                              )}
+                            </div>
+                            {/* Insert at cursor button */}
+                            <button
+                              onClick={() => { setIsPreviewMode(false); insertAtCursor(key); }}
+                              title="Insert at cursor"
+                              className="opacity-0 group-hover:opacity-100 flex h-6 w-6 items-center justify-center rounded-lg text-on-surface-variant/50 transition-all hover:text-primary active:scale-90"
+                              style={{ background: 'color-mix(in srgb,var(--color-on-surface) 6%,transparent)' }}
+                            >
+                              <span className="material-symbols-outlined text-[12px]">add_circle</span>
+                            </button>
+                          </div>
+
+                          {/* Fill-in value input with inline label */}
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={previewValues[key] ?? ''}
+                              onChange={(e) => setPreviewValues((prev) => ({ ...prev, [key]: e.target.value }))}
+                              placeholder={`Enter value for ${key.split('_').join(' ')}…`}
+                              className={`w-full rounded-xl border bg-surface-container-lowest px-3 py-2.5 text-[12px] font-medium text-on-surface outline-none transition-all placeholder:text-on-surface-variant/25 focus:ring-2 focus:ring-primary/10 ${
+                                isFilled
+                                  ? 'border-primary/25 focus:border-primary/45'
+                                  : 'border-outline-variant/10 focus:border-primary/40'
+                              }`}
+                            />
+                            {/* Clear button when filled */}
+                            {isFilled && (
+                              <button
+                                onClick={() => setPreviewValues((prev) => ({ ...prev, [key]: '' }))}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full text-on-surface-variant/30 transition-all hover:text-on-surface-variant/60 active:scale-90"
+                                title="Clear value"
+                              >
+                                <span className="material-symbols-outlined text-[12px]">close</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Show preview of what it resolves to */}
+                          {isFilled && (
+                            <p className="mt-2 px-1 text-[10px] text-on-surface-variant/45 truncate">
+                              <span className="font-semibold text-on-surface-variant/55">Resolves to:</span>{' '}
+                              <span className="text-primary/70 font-medium">&ldquo;{val}&rdquo;</span>
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+
+              {/* Create new variable */}
+              <div className="shrink-0 px-4 py-4" style={{ borderTop: '1px solid color-mix(in srgb,var(--color-on-surface) 7%,transparent)' }}>
+                <label className="mb-2 block text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/40">
+                  Create variable
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={newVarRef}
+                    type="text"
+                    value={newVarDraft}
+                    onChange={(e) => setNewVarDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleCreateVar(); }
+                      if (e.key === 'Escape') setNewVarDraft('');
+                    }}
+                    placeholder="company_name"
+                    className="flex-1 rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-3 py-2.5 text-[12px] font-medium text-on-surface outline-none transition-all placeholder:text-on-surface-variant/25 focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+                  />
+                  <button
+                    onClick={handleCreateVar}
+                    disabled={!newVarDraft.trim()}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-90 disabled:opacity-30"
+                    style={{ background: 'color-mix(in srgb,var(--color-primary) 15%,transparent)', color: 'var(--color-primary)' }}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add</span>
+                  </button>
+                </div>
+                <p className="mt-2.5 text-[10px] leading-relaxed text-on-surface-variant/35">
+                  Or type <kbd className="rounded px-1 py-0.5 text-[9px] font-bold" style={{ background: 'color-mix(in srgb,var(--color-on-surface) 8%,transparent)' }}>/</kbd> anywhere in the editor
+                </p>
+              </div>
+            </>
+          )}
+        </aside>
+      </div>
     </div>
   );
 }
@@ -1696,6 +2632,7 @@ export default function AgentBuilderPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [connections, setConnections] = useState<ConnectionRecord[]>([]);
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceRecord[]>([]);
+  const [knowledgeFolders, setKnowledgeFolders] = useState<KnowledgeFolderWithSources[]>([]);
   const [versions, setVersions] = useState<AgentVersionRecord[]>([]);
   const [automationRecord, setAutomationRecord] = useState<AgentAutomationRecord | null>(null);
   const [automationEvents, setAutomationEvents] = useState<AutomationEventRecord[]>([]);
@@ -1738,12 +2675,15 @@ export default function AgentBuilderPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isSubmittingLibrary, setIsSubmittingLibrary] = useState(false);
   const [automationStatusAction, setAutomationStatusAction] =
     useState<'activate' | 'pause' | null>(null);
   const [isRollingBackVersionId, setIsRollingBackVersionId] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<BuilderStatusNote>({ kind: 'draftInitial' });
   const [isToolPickerOpen, setIsToolPickerOpen] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [connectingToolKind, setConnectingToolKind] = useState<ToolNodeKind | null>(null);
+  const [pendingToolConnectionKind, setPendingToolConnectionKind] = useState<ToolNodeKind | null>(null);
   const [shouldClearExternalTrigger, setShouldClearExternalTrigger] = useState(false);
   const [actionEditorNodeId, setActionEditorNodeId] = useState<string | null>(null);
   const [actionSearchQuery, setActionSearchQuery] = useState('');
@@ -1902,7 +2842,8 @@ export default function AgentBuilderPage() {
       nodes.some(
         (node) =>
           node.data.kind === 'knowledge' &&
-          (node.data as KnowledgeBuilderNodeData).sourceIds.length > 0,
+          ((node.data as KnowledgeBuilderNodeData).sourceIds.length > 0 ||
+            ((node.data as KnowledgeBuilderNodeData).folderIds ?? []).length > 0),
       ),
     [nodes],
   );
@@ -2027,6 +2968,7 @@ export default function AgentBuilderPage() {
       },
       body: JSON.stringify({
         sourceIds: getKnowledgeSourceIdsFromNodes(nextNodes),
+        folderIds: getKnowledgeFolderIdsFromNodes(nextNodes),
       }),
     });
     const payload = await response.json();
@@ -2100,6 +3042,9 @@ export default function AgentBuilderPage() {
     const attachedKnowledgeSourceIds = (
       ((attachedKnowledgeResult.payload.sources ?? []) as KnowledgeSourceRecord[]) ?? []
     ).map((item) => item.id);
+    const attachedKnowledgeFolderIds = (
+      ((attachedKnowledgeResult.payload.folders ?? []) as KnowledgeFolderWithSources[]) ?? []
+    ).map((item) => item.id);
 
     const loadedAgent = agentResult.data as AgentRecord;
     const fallbackDefinition = buildInitialDefinition('custom', loadedAgent.surface);
@@ -2110,6 +3055,7 @@ export default function AgentBuilderPage() {
       chatConnections,
       attachedConnectionIds,
       attachedKnowledgeSourceIds,
+      attachedKnowledgeFolderIds,
     );
     let normalizedNodes = normalized.nodes;
     const hasExternalTrigger = normalizedNodes.some(
@@ -2158,46 +3104,12 @@ export default function AgentBuilderPage() {
     }
 
     const hydratedNodes = normalizedNodes.map((node) => {
-      if (!isToolNodeData(node.data) || node.data.connectionId !== null) {
+      if (!isToolNodeData(node.data)) {
         return node;
       }
 
-      const kind = node.data.kind as ToolNodeKind;
-      const match = chatConnections.find(
-        (connection) => connection.toolkit_slug === kind && connection.status === 'connected',
-      );
-
-      if (!match) {
-        return node;
-      }
-
-      if (kind === 'googlecalendar') {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            connectionId: match.id,
-            timezone: null,
-            calendarId: null,
-            calendarLabel: null,
-          },
-        };
-      }
-
-      if (kind === 'cal') {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            connectionId: match.id,
-            timezone: null,
-            eventTypeId: null,
-            eventTypeLabel: null,
-          },
-        };
-      }
-
-      return { ...node, data: { ...node.data, connectionId: match.id } };
+      const resolved = resolveToolNodeConnection(node.data, chatConnections);
+      return resolved.changed ? { ...node, data: resolved.data } : node;
     });
 
     setAgent(loadedAgent);
@@ -2217,6 +3129,10 @@ export default function AgentBuilderPage() {
     setVersions((versionsResult.data ?? []) as AgentVersionRecord[]);
     setConnections(chatConnections);
     setKnowledgeSources((knowledgeSourcesResult.data ?? []) as KnowledgeSourceRecord[]);
+    setKnowledgeFolders(
+      ((attachedKnowledgeResult.payload.availableFolders ?? []) as KnowledgeFolderWithSources[]) ??
+        [],
+    );
     setAutomationRecord(automationPayload?.automation ?? null);
     setAutomationEvents(automationPayload?.events ?? []);
     setAutomationRuns(automationPayload?.runs ?? []);
@@ -2727,12 +3643,123 @@ export default function AgentBuilderPage() {
       kind === 'slack' ? createSlackNode(DEFAULT_POSITIONS.slack, connectionId) :
       kind === 'hubspot' ? createHubSpotNode(DEFAULT_POSITIONS.hubspot, connectionId) :
       kind === 'shopify' ? createShopifyNode(DEFAULT_POSITIONS.shopify, connectionId) :
+      kind === 'googleads' ? createGoogleAdsNode(DEFAULT_POSITIONS.googleads, connectionId) :
       kind === 'cal' ? createCalNode(DEFAULT_POSITIONS.cal, connectionId) :
       createGoogleCalendarNode(DEFAULT_POSITIONS.googlecalendar, connectionId);
     setNodes((currentNodes) => [...currentNodes, nextNode]);
     setSelectedNodeId(nextNode.id);
     setIsToolPickerOpen(false);
   };
+
+  const refreshBuilderConnections = useCallback(async () => {
+    const response = await fetch('/api/connections/toolkits', {
+      cache: 'no-store',
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error ?? t('connections.loadError'));
+    }
+
+    const chatConnections = ((payload.connections ?? []) as ConnectionRecord[])
+      .map((connection) => ({
+        ...connection,
+        status: getEffectiveConnectionStatus(connection),
+      }))
+      .filter((connection) => isChatIntegrationSlug(connection.toolkit_slug));
+
+    setConnections(chatConnections);
+    return chatConnections;
+  }, [t]);
+
+  const handleConnectToolNode = async (kind: ToolNodeKind) => {
+    const integration = getSupportedIntegration(kind);
+    setConnectingToolKind(kind);
+
+    try {
+      const response = await fetch('/api/connections/authorize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ toolkitSlug: kind }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? t('connections.startFlowError'));
+      }
+
+      if (payload.redirectUrl) {
+        window.open(payload.redirectUrl, '_blank', 'noopener,noreferrer');
+        setPendingToolConnectionKind(kind);
+        showToast(
+          t('agentBuilder.finishToolConnection', {
+            tool: integration?.displayName ?? kind,
+          }),
+          'info',
+        );
+      }
+
+      await refreshBuilderConnections();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t('connections.startFlowError');
+      showToast(message, 'error');
+    } finally {
+      setConnectingToolKind(null);
+    }
+  };
+
+  const handleToolPickerAction = async (kind: ToolNodeKind) => {
+    const connection = getSingleConnection(connections, kind);
+
+    if (connection?.status === 'connected') {
+      handleAddToolNode(kind);
+      return;
+    }
+
+    await handleConnectToolNode(kind);
+  };
+
+  useEffect(() => {
+    if (!pendingToolConnectionKind || !isToolPickerOpen) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const pollConnection = async () => {
+      try {
+        const nextConnections = await refreshBuilderConnections();
+        const connected = nextConnections.some(
+          (connection) =>
+            connection.toolkit_slug === pendingToolConnectionKind &&
+            connection.status === 'connected',
+        );
+
+        if (connected && !cancelled) {
+          showToast(
+            t('agentBuilder.toolConnectionReady', {
+              tool: getSupportedIntegration(pendingToolConnectionKind)?.displayName ?? pendingToolConnectionKind,
+            }),
+            'success',
+          );
+          setPendingToolConnectionKind(null);
+        }
+      } catch {
+        // Keep polling; transient auth/sync failures should not break the picker.
+      }
+    };
+
+    void pollConnection();
+    const intervalId = window.setInterval(() => void pollConnection(), 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [isToolPickerOpen, pendingToolConnectionKind, refreshBuilderConnections, showToast, t]);
 
   const updateKnowledgeSources = (sourceId: string, checked: boolean) => {
     const knowledgeNode = nodes.find((node) => node.data.kind === 'knowledge');
@@ -2750,6 +3777,29 @@ export default function AgentBuilderPage() {
           sourceIds: checked
             ? Array.from(new Set([...currentSourceIds, sourceId]))
             : currentSourceIds.filter((id) => id !== sourceId),
+        },
+      };
+    });
+  };
+
+  const updateKnowledgeFolders = (folderId: string, checked: boolean) => {
+    const knowledgeNode = nodes.find((node) => node.data.kind === 'knowledge');
+
+    if (!knowledgeNode || !isKnowledgeNodeData(knowledgeNode.data)) {
+      return;
+    }
+
+    updateNode(knowledgeNode.id, (node) => {
+      const currentFolderIds = isKnowledgeNodeData(node.data)
+        ? node.data.folderIds ?? []
+        : [];
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          folderIds: checked
+            ? Array.from(new Set([...currentFolderIds, folderId]))
+            : currentFolderIds.filter((id) => id !== folderId),
         },
       };
     });
@@ -2798,14 +3848,24 @@ export default function AgentBuilderPage() {
     setSelectedNodeId(null);
   };
 
-  const buildDefinition = (): BuilderDefinition => {
-    const triggerNode = nodes.find((node) => node.data.kind === 'trigger');
+  const resolveToolConnectionNodes = (sourceNodes: BuilderFlowNode[]) =>
+    sourceNodes.map((node) => {
+      if (!isToolNodeData(node.data)) {
+        return node;
+      }
+
+      const resolved = resolveToolNodeConnection(node.data, connections);
+      return resolved.changed ? { ...node, data: resolved.data } : node;
+    });
+
+  const buildDefinition = (definitionNodes = nodes): BuilderDefinition => {
+    const triggerNode = definitionNodes.find((node) => node.data.kind === 'trigger');
     const triggerData =
       triggerNode && isTriggerNodeData(triggerNode.data) ? triggerNode.data : null;
 
     return {
-      nodes,
-      edges: buildEdges(nodes),
+      nodes: definitionNodes,
+      edges: buildEdges(definitionNodes),
       viewport: flowInstance?.getViewport(),
       config: {
         model,
@@ -2886,7 +3946,8 @@ export default function AgentBuilderPage() {
     setIsSaving(true);
 
     try {
-      const definition = buildDefinition();
+      const resolvedNodes = resolveToolConnectionNodes(nodes);
+      const definition = buildDefinition(resolvedNodes);
       const nextSurface =
         agent.surface === 'assistant'
           ? 'assistant'
@@ -2932,9 +3993,11 @@ export default function AgentBuilderPage() {
         throw draftResult.error;
       }
 
-      await syncSelectedConnections(nodes);
-      await syncSelectedKnowledgeSources(nodes);
+      await syncSelectedConnections(resolvedNodes);
+      await syncSelectedKnowledgeSources(resolvedNodes);
       await syncExternalTriggerBinding(definition);
+      setNodes(resolvedNodes);
+      setEdges(buildEdges(resolvedNodes));
       setAgent((current) =>
         current
           ? {
@@ -3031,6 +4094,38 @@ export default function AgentBuilderPage() {
       showToast(message, 'error');
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const submitToAgentLibrary = async () => {
+    if (!agent || !canEditCurrentAgent) {
+      return;
+    }
+
+    setIsSubmittingLibrary(true);
+
+    try {
+      await saveDraft();
+      const response = await fetch('/api/agent-library/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ agentId }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? t('agentBuilder.submitLibraryError'));
+      }
+
+      showToast(t('agentBuilder.submitLibrarySuccess'), 'success');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t('agentBuilder.submitLibraryError');
+      showToast(message, 'error');
+    } finally {
+      setIsSubmittingLibrary(false);
     }
   };
 
@@ -3159,6 +4254,8 @@ export default function AgentBuilderPage() {
       (connection) => connection.toolkit_slug === kind && connection.status === 'connected',
     ).length;
     const isAdded = nodes.some((node) => node.data.kind === kind);
+    const isConnecting = connectingToolKind === kind;
+    const isWaiting = pendingToolConnectionKind === kind;
 
     return {
       kind,
@@ -3174,19 +4271,27 @@ export default function AgentBuilderPage() {
                 ? t('agentBuilder.hubspotDescription')
                 : kind === 'shopify'
                   ? t('agentBuilder.shopifyDescription')
-                  : kind === 'cal'
-                    ? t('agentBuilder.calDescription')
-                    : t('agentBuilder.googleCalendarDescription'),
+                  : kind === 'googleads'
+                    ? t('agentBuilder.googleAdsDescription')
+                    : kind === 'cal'
+                      ? t('agentBuilder.calDescription')
+                      : t('agentBuilder.googleCalendarDescription'),
       icon: integration?.icon ?? 'extension',
       simpleIcon: integration?.simpleIcon,
       simpleIconColor: integration?.simpleIconColor,
       isAdded,
+      isConnecting,
+      isWaiting,
       canAdd: connectedCount > 0 && !isAdded,
       stateLabel: isAdded
         ? t('common.added')
-        : connectedCount > 0
+        : isConnecting
+          ? t('common.processing')
+          : isWaiting
+            ? t('agentBuilder.waitingForConnection')
+            : connectedCount > 0
           ? t('statuses.connection.connected')
-          : t('agentBuilder.connectFirst'),
+          : t('connections.connect'),
     };
   });
 
@@ -3312,6 +4417,8 @@ export default function AgentBuilderPage() {
               <ConnectedAccountDisplay
                 connection={automationSelectedConnection}
                 toolkitLabel="Gmail"
+                isConnecting={connectingToolKind === 'gmail'}
+                onConnect={() => void handleConnectToolNode('gmail')}
               />
               <p className="text-[11px] leading-relaxed text-on-surface-variant/60">
                 {t('agentBuilder.composioTriggerHelp')}
@@ -3507,54 +4614,20 @@ export default function AgentBuilderPage() {
                 </p>
               </div>
 
-              <Modal
-                isOpen={isInstructionsModalOpen}
-                onClose={() => setIsInstructionsModalOpen(false)}
-                title={t('agentBuilder.operationalInstructions')}
-                size="5xl"
-              >
-                <div className="flex flex-col gap-5">
-                  <div className="relative group/modal">
-                    <textarea
-                      value={instructions}
-                      onChange={(event) => setInstructions(event.target.value)}
-                      onKeyDown={stopBuilderFieldKeyDown}
-                      rows={16}
-                      disabled={isOptimizingPrompt}
-                      placeholder={t('agentBuilder.operationalInstructions')}
-                      className={`h-[min(58vh,720px)] min-h-[320px] w-full resize-y rounded-[2rem] border border-outline-variant/10 px-5 py-5 text-base font-medium leading-relaxed outline-none shadow-inner transition-all sm:px-8 sm:py-8 sm:text-lg focus:border-primary/30 ${
-                        isOptimizingPrompt ? 'bg-surface-container-lowest opacity-50 cursor-not-allowed' : 'bg-surface-container-low focus:bg-surface-container-lowest'
-                      }`}
-                      autoFocus
-                    />
-                    {isOptimizingPrompt && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-[2rem] bg-surface-container-highest/10 backdrop-blur-[4px]">
-                        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
-                        <p className="mt-6 text-sm font-black tracking-[0.3em] text-primary uppercase animate-pulse">
-                          {t('agentBuilder.optimizing')}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col-reverse gap-3 px-1 sm:flex-row sm:items-center sm:justify-between sm:px-2">
-                    <button
-                      onClick={handleOptimizePrompt}
-                      disabled={isOptimizingPrompt}
-                      className="flex items-center justify-center gap-3 rounded-[1.25rem] bg-surface-container-high px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-primary shadow-sm transition-all hover:bg-primary/5 hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <span className="material-symbols-outlined text-xl">auto_fix_high</span>
-                      {t('agentBuilder.optimizePrompt')}
-                    </button>
-                    <button
-                      onClick={() => setIsInstructionsModalOpen(false)}
-                      disabled={isOptimizingPrompt}
-                      className="rounded-[1.25rem] bg-primary px-10 py-4 text-xs font-black uppercase tracking-[0.2em] text-on-primary shadow-xl shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-2xl active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {t('common.done')}
-                    </button>
-                  </div>
-                </div>
-              </Modal>
+              {/* Full-screen immersive prompt editor */}
+              {isInstructionsModalOpen && typeof document !== 'undefined' && createPortal(
+                <PromptEditor
+                  instructions={instructions}
+                  setInstructions={setInstructions}
+                  isOptimizingPrompt={isOptimizingPrompt}
+                  handleOptimizePrompt={handleOptimizePrompt}
+                  stopBuilderFieldKeyDown={stopBuilderFieldKeyDown}
+                  name={name}
+                  t={t}
+                  onClose={() => setIsInstructionsModalOpen(false)}
+                />,
+                document.body,
+              )}
             </div>
 
             <div>
@@ -3616,9 +4689,21 @@ export default function AgentBuilderPage() {
 
     if (knowledgeNode && isKnowledgeNodeData(knowledgeNode.data)) {
       const attachedSourceIds = knowledgeNode.data.sourceIds;
+      const attachedFolderIds = knowledgeNode.data.folderIds ?? [];
       const validAttachedSourceIds = attachedSourceIds.filter((id) =>
         knowledgeSources.some((source) => source.id === id)
       );
+      const validAttachedFolderIds = attachedFolderIds.filter((id) =>
+        knowledgeFolders.some((folder) => folder.id === id)
+      );
+      const effectiveSourceIds = Array.from(
+        new Set([
+          ...validAttachedSourceIds,
+          ...knowledgeFolders
+            .filter((folder) => validAttachedFolderIds.includes(folder.id))
+            .flatMap((folder) => folder.sourceIds),
+        ]),
+      ).filter((id) => knowledgeSources.some((source) => source.id === id));
 
       return (
           <div className="space-y-10">
@@ -3631,19 +4716,89 @@ export default function AgentBuilderPage() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                     </span>
-                    {validAttachedSourceIds.length === 1
-                      ? t('agentBuilder.sourceCount', { count: validAttachedSourceIds.length })
-                      : t('agentBuilder.sourceCountPlural', { count: validAttachedSourceIds.length })}
+                    {effectiveSourceIds.length === 1
+                      ? t('agentBuilder.sourceCount', { count: effectiveSourceIds.length })
+                      : t('agentBuilder.sourceCountPlural', { count: effectiveSourceIds.length })}
                   </div>
                 </div>
                 <p className="text-xs leading-relaxed text-on-surface-variant/70 font-medium">
                   {t('agentBuilder.semanticSourcesDescription')}
                 </p>
+                <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-on-surface-variant/50">
+                  <span>{t('agentBuilder.folderCount', { count: validAttachedFolderIds.length })}</span>
+                  <span>{t('agentBuilder.effectiveSourceCount', { count: effectiveSourceIds.length })}</span>
+                </div>
               </div>
               <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-primary/5 blur-2xl" />
             </div>
             
             <div className="space-y-4">
+              {knowledgeFolders.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
+                      {t('agentBuilder.knowledgeFolders')}
+                    </h4>
+                    <span className="text-[10px] font-black uppercase tracking-[0.16em] text-on-surface-variant/35">
+                      {t('agentBuilder.liveFolders')}
+                    </span>
+                  </div>
+                  {knowledgeFolders.map((folder) => {
+                    const checked = attachedFolderIds.includes(folder.id);
+                    const readySourceCount = folder.sourceIds.filter((id) =>
+                      knowledgeSources.some((source) => source.id === id && isReadyKnowledgeSource(source)),
+                    ).length;
+
+                    return (
+                      <label
+                        key={folder.id}
+                        className={`group relative flex items-center justify-between gap-4 rounded-[1.75rem] border p-5 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] cursor-pointer ${
+                          checked
+                            ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-lg shadow-primary/5'
+                            : 'border-outline-variant/10 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low hover:shadow-xl hover:shadow-black/5'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 pl-1">
+                          <p className={`text-sm font-bold tracking-tight truncate pr-4 transition-colors ${checked ? 'text-primary' : 'text-on-surface'}`}>
+                            {folder.name}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="rounded-full bg-primary/5 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-primary">
+                              {t('agentBuilder.liveFolder')}
+                            </span>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/30">
+                              {t('agentBuilder.readySourceCount', { count: readySourceCount })}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => updateKnowledgeFolders(folder.id, event.target.checked)}
+                            className="peer absolute h-full w-full opacity-0 cursor-pointer z-10"
+                          />
+                          <div className={`h-7 w-7 rounded-xl border-2 transition-all duration-300 ${
+                            checked 
+                              ? 'border-primary bg-primary scale-110' 
+                              : 'border-outline-variant/20 bg-background group-hover:border-primary/50'
+                          }`} />
+                          <span className={`material-symbols-outlined absolute text-white text-[18px] transition-all duration-300 ${
+                            checked ? 'scale-100 opacity-100 rotate-0' : 'scale-50 opacity-0 rotate-12'
+                          }`}>check</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between px-1 pt-2">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
+                  {t('agentBuilder.individualSources')}
+                </h4>
+              </div>
+
               {knowledgeSources.length === 0 ? (
                 <div className="flex flex-col items-center gap-4 rounded-[2.5rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-8 py-16 text-center">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/5 text-primary/40">
@@ -3732,32 +4887,32 @@ export default function AgentBuilderPage() {
     }
 
     if (toolNode && isToolNodeData(toolNode.data)) {
-      const selectedConnection = toolNode.data.connectionId
-        ? connections.find((connection) => connection.id === toolNode.data.connectionId) ?? null
-        : null;
+      const resolvedToolConnection = resolveToolNodeConnection(toolNode.data, connections);
+      const toolData = resolvedToolConnection.data;
+      const selectedConnection = resolvedToolConnection.displayConnection;
       const emailRecipientEmail =
-        toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook' ? toolNode.data.recipientEmail ?? '' : '';
+        toolData.kind === 'gmail' || toolData.kind === 'outlook' ? toolData.recipientEmail ?? '' : '';
       const selectedCalendarConnectionId =
-        toolNode.data.kind === 'googlecalendar' ? toolNode.data.connectionId : null;
+        toolData.kind === 'googlecalendar' ? toolData.connectionId : null;
       const calendarOptions = selectedCalendarConnectionId
         ? calendarOptionsByConnectionId[selectedCalendarConnectionId] ?? []
         : [];
       const resolvedCalendar =
-        toolNode.data.kind === 'googlecalendar'
+        toolData.kind === 'googlecalendar'
           ? resolveCalendarOption(
               calendarOptions,
-              (toolNode.data as GoogleCalendarBuilderNodeData).calendarId,
+              (toolData as GoogleCalendarBuilderNodeData).calendarId,
             )
           : null;
       const resolvedCalendarTimezone =
-        toolNode.data.kind === 'googlecalendar'
-          ? resolvedCalendar?.timezone ?? (toolNode.data as GoogleCalendarBuilderNodeData).timezone
+        toolData.kind === 'googlecalendar'
+          ? resolvedCalendar?.timezone ?? (toolData as GoogleCalendarBuilderNodeData).timezone
           : null;
       const calendarOptionsStatus = selectedCalendarConnectionId
         ? calendarOptionsStatusByConnectionId[selectedCalendarConnectionId] ?? 'idle'
         : 'idle';
       const selectedCalConnectionId =
-        toolNode.data.kind === 'cal' ? toolNode.data.connectionId : null;
+        toolData.kind === 'cal' ? toolData.connectionId : null;
       const calEventTypes = selectedCalConnectionId
         ? calEventTypesByConnectionId[selectedCalConnectionId] ?? []
         : [];
@@ -3765,10 +4920,10 @@ export default function AgentBuilderPage() {
         ? calEventTypesStatusByConnectionId[selectedCalConnectionId] ?? 'idle'
         : 'idle';
       const hasValidSpecificRecipient =
-        (toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook') &&
-        toolNode.data.recipientMode === 'specific_email' &&
-        Boolean(normalizeGmailRecipientEmail(toolNode.data.recipientEmail));
-      const enabledToolNames = getEnabledToolNames(toolNode.data.kind, toolNode.data);
+        (toolData.kind === 'gmail' || toolData.kind === 'outlook') &&
+        toolData.recipientMode === 'specific_email' &&
+        Boolean(normalizeGmailRecipientEmail(toolData.recipientEmail));
+      const enabledToolNames = getEnabledToolNames(toolData.kind, toolData);
       const enabledActionLabels = enabledToolNames.map(formatToolActionName);
 
       return (
@@ -3779,19 +4934,21 @@ export default function AgentBuilderPage() {
                 <span className="material-symbols-outlined text-xl">info</span>
               </div>
               <p className="text-sm leading-relaxed text-on-surface-variant font-medium">
-                {toolNode.data.kind === 'gmail'
+                {toolData.kind === 'gmail'
                   ? t('agentBuilder.useGmail')
-                  : toolNode.data.kind === 'outlook'
+                  : toolData.kind === 'outlook'
                     ? t('agentBuilder.useOutlook')
-                    : toolNode.data.kind === 'slack'
+                    : toolData.kind === 'slack'
                       ? t('agentBuilder.useSlack')
-                      : toolNode.data.kind === 'hubspot'
+                      : toolData.kind === 'hubspot'
                         ? t('agentBuilder.useHubSpot')
-                        : toolNode.data.kind === 'shopify'
+                        : toolData.kind === 'shopify'
                           ? t('agentBuilder.useShopify')
-                          : toolNode.data.kind === 'cal'
-                            ? t('agentBuilder.useCal')
-                            : t('agentBuilder.useCalendar')}
+                          : toolData.kind === 'googleads'
+                            ? t('agentBuilder.useGoogleAds')
+                            : toolData.kind === 'cal'
+                              ? t('agentBuilder.useCal')
+                              : t('agentBuilder.useCalendar')}
               </p>
             </div>
           </div>
@@ -3800,10 +4957,12 @@ export default function AgentBuilderPage() {
           <div className="space-y-6">
             <ConnectedAccountDisplay
               connection={selectedConnection}
-              toolkitLabel={toolNode.data.label}
+              toolkitLabel={toolData.label}
+              isConnecting={connectingToolKind === toolData.kind}
+              onConnect={() => void handleConnectToolNode(toolData.kind)}
             />
 
-            {(toolNode.data.kind === 'gmail' || toolNode.data.kind === 'outlook') && (
+            {(toolData.kind === 'gmail' || toolData.kind === 'outlook') && (
               <div className="space-y-4 pt-2">
                 <div>
                   <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
@@ -3811,7 +4970,7 @@ export default function AgentBuilderPage() {
                   </label>
                   <div className="relative">
                     <select
-                      value={toolNode.data.recipientMode}
+                      value={toolData.recipientMode}
                       onChange={(event) =>
                         updateEmailRecipientSettings(toolNode.id, {
                           recipientMode:
@@ -3831,7 +4990,7 @@ export default function AgentBuilderPage() {
                   </div>
                 </div>
                 
-                {toolNode.data.recipientMode === 'specific_email' && (
+                {toolData.recipientMode === 'specific_email' && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div>
                       <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
@@ -3907,7 +5066,7 @@ export default function AgentBuilderPage() {
               </div>
             </div>
 
-            {toolNode.data.kind === 'googlecalendar' && (
+            {toolData.kind === 'googlecalendar' && (
               <div className="space-y-6 pt-2">
                 <div>
                   <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
@@ -3915,7 +5074,7 @@ export default function AgentBuilderPage() {
                   </label>
                   <div className="relative">
                     <select
-                      value={(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ?? ''}
+                      value={(toolData as GoogleCalendarBuilderNodeData).calendarId ?? ''}
                       onChange={(event) => {
                         const nextCalendarId = event.target.value || null;
                         const selectedCalendar = resolveCalendarOption(calendarOptions, nextCalendarId);
@@ -3956,12 +5115,12 @@ export default function AgentBuilderPage() {
                   </div>
                 </div>
 
-                {(toolNode.data as GoogleCalendarBuilderNodeData).calendarId ? (
+                {(toolData as GoogleCalendarBuilderNodeData).calendarId ? (
                   <label className="group flex items-start gap-4 rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-5 transition-all hover:bg-surface-container-low cursor-pointer shadow-sm">
                     <div className="relative flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
                       <input
                         type="checkbox"
-                        checked={(toolNode.data as GoogleCalendarBuilderNodeData).includePrimaryCalendar}
+                        checked={(toolData as GoogleCalendarBuilderNodeData).includePrimaryCalendar}
                         onChange={(event) => {
                           updateGoogleCalendarSettings(toolNode.id, {
                             includePrimaryCalendar: event.target.checked,
@@ -3998,7 +5157,7 @@ export default function AgentBuilderPage() {
                       </p>
                       <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/60 font-medium">
                         {resolvedCalendarTimezone
-                          ? resolvedCalendar?.primary && !(toolNode.data as GoogleCalendarBuilderNodeData).calendarId
+                          ? resolvedCalendar?.primary && !(toolData as GoogleCalendarBuilderNodeData).calendarId
                             ? t('agentBuilder.primaryCalendarResolved')
                             : t('agentBuilder.selectedCalendarResolved')
                           : t('agentBuilder.bookingTimezoneFallback')}
@@ -4009,7 +5168,7 @@ export default function AgentBuilderPage() {
               </div>
             )}
 
-            {toolNode.data.kind === 'cal' && (
+            {toolData.kind === 'cal' && (
               <div className="space-y-6 pt-2">
                 <div>
                   <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
@@ -4017,7 +5176,7 @@ export default function AgentBuilderPage() {
                   </label>
                   <div className="relative">
                     <select
-                      value={(toolNode.data as CalBuilderNodeData).eventTypeMode}
+                      value={(toolData as CalBuilderNodeData).eventTypeMode}
                       onChange={(event) => {
                         const nextMode = event.target.value === 'specific_event_type' 
                           ? 'specific_event_type' 
@@ -4050,14 +5209,14 @@ export default function AgentBuilderPage() {
                   <div className="mt-3 flex items-start gap-2 px-1">
                     <span className="material-symbols-outlined text-sm text-primary/60 mt-0.5">info</span>
                     <p className="text-[11px] leading-relaxed text-on-surface-variant/60 font-medium">
-                      {(toolNode.data as CalBuilderNodeData).eventTypeMode === 'specific_event_type'
+                      {(toolData as CalBuilderNodeData).eventTypeMode === 'specific_event_type'
                         ? t('agentBuilder.specificEventTypeDesc')
                         : t('agentBuilder.aiDecidesEventTypeDesc')}
                     </p>
                   </div>
                 </div>
 
-                {(toolNode.data as CalBuilderNodeData).eventTypeMode === 'specific_event_type' && (
+                {(toolData as CalBuilderNodeData).eventTypeMode === 'specific_event_type' && (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                     <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
                       {t('agentBuilder.eventType')}
@@ -4065,7 +5224,7 @@ export default function AgentBuilderPage() {
                     <div className="relative">
                       {calEventTypes.length > 0 ? (
                         <select
-                          value={(toolNode.data as CalBuilderNodeData).eventTypeId ?? ''}
+                          value={(toolData as CalBuilderNodeData).eventTypeId ?? ''}
                           onChange={(event) => {
                             const nextEventTypeId = event.target.value || null;
                             const selectedEventType = calEventTypes.find(et => et.id === nextEventTypeId);
@@ -4097,7 +5256,7 @@ export default function AgentBuilderPage() {
                       ) : (
                         <input
                           type="text"
-                          value={(toolNode.data as CalBuilderNodeData).eventTypeId ?? ''}
+                          value={(toolData as CalBuilderNodeData).eventTypeId ?? ''}
                           onChange={(event) => {
                             const nextEventTypeId = event.target.value || null;
                             updateNode(toolNode.id, (node) => {
@@ -4155,7 +5314,7 @@ export default function AgentBuilderPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-on-surface truncate">
-                        {(toolNode.data as CalBuilderNodeData).timezone ?? timezone}
+                        {(toolData as CalBuilderNodeData).timezone ?? timezone}
                       </p>
                     </div>
                   </div>
@@ -4164,7 +5323,7 @@ export default function AgentBuilderPage() {
             )}
             
             <button
-              onClick={() => removeOptionalNode(toolNode.data.kind)}
+              onClick={() => removeOptionalNode(toolData.kind)}
               className="w-full flex items-center justify-center gap-3 rounded-[1.25rem] bg-error/5 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-error transition-all hover:bg-error hover:text-on-error hover:shadow-lg hover:shadow-error/20 active:scale-[0.98]"
             >
               <span className="material-symbols-outlined text-lg">delete</span>
@@ -4364,6 +5523,16 @@ export default function AgentBuilderPage() {
               className="px-5 py-2.5 text-xs font-bold text-on-surface-variant transition-all hover:text-on-surface disabled:opacity-40"
             >
               {isSaving ? t('agentBuilder.savingDraft') : t('agentBuilder.saveDraft')}
+            </button>
+
+            <button
+              onClick={() => void submitToAgentLibrary()}
+              disabled={isSaving || isSubmittingLibrary || !canEditCurrentAgent}
+              className="h-10 rounded-full border border-outline-variant/15 bg-surface-container-low px-5 text-xs font-bold text-on-surface-variant shadow-sm transition-all hover:bg-surface-container hover:text-on-surface active:scale-95 disabled:opacity-50"
+            >
+              {isSubmittingLibrary
+                ? t('agentBuilder.submittingLibrary')
+                : t('agentBuilder.publishToLibrary')}
             </button>
 
             {agent?.surface === 'widget' ? (
@@ -4620,52 +5789,84 @@ export default function AgentBuilderPage() {
       </div>
 
       {isToolPickerOpen ? (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/60 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
-                  {t('agentBuilder.nodeLibrary.tools')}
-                </p>
-                <h3 className="mt-2 text-lg font-semibold text-on-surface">
-                  {t('agentBuilder.chooseToolNode')}
-                </h3>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-background/70 p-4 backdrop-blur-md sm:p-6">
+          <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[34rem] flex-col overflow-hidden rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
+            <div className="shrink-0 border-b border-outline-variant/10 px-5 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">
+                    {t('agentBuilder.nodeLibrary.tools')}
+                  </p>
+                  <h3 className="mt-2 text-lg font-semibold text-on-surface">
+                    {t('agentBuilder.chooseToolNode')}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsToolPickerOpen(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                  aria-label={t('common.close')}
+                >
+                  <span className="material-symbols-outlined text-base">close</span>
+                </button>
               </div>
-              <button
-                onClick={() => setIsToolPickerOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/15 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-              >
-                <span className="material-symbols-outlined text-base">close</span>
-              </button>
             </div>
-            <div className="mt-5 space-y-3">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 py-4">
               {toolOptions.map((option) => (
                 <button
                   key={option.kind}
-                  onClick={() => handleAddToolNode(option.kind)}
-                  disabled={!option.canAdd}
-                  className="flex w-full items-start gap-3 rounded-2xl border border-outline-variant/10 bg-background px-4 py-4 text-left transition-colors hover:border-primary/30 hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => void handleToolPickerAction(option.kind)}
+                  disabled={option.isAdded || option.isConnecting}
+                  className={`flex w-full items-start gap-3 rounded-[1.15rem] border px-3.5 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                    option.canAdd
+                      ? 'border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10'
+                      : option.isWaiting
+                        ? 'border-amber-500/20 bg-amber-500/5 hover:border-amber-500/30'
+                        : 'border-outline-variant/10 bg-background hover:border-primary/30 hover:bg-surface-container'
+                  }`}
                 >
                   {option.simpleIcon ? (
                     <SimpleIcon 
                       iconKey={option.simpleIcon} 
                       color={option.simpleIconColor}
                       size={24} 
-                      className="text-primary"
+                      className="mt-0.5 shrink-0 text-primary"
                     />
                   ) : (
-                    <span className="material-symbols-outlined text-primary">{option.icon}</span>
+                    <span className="material-symbols-outlined mt-0.5 shrink-0 text-primary">{option.icon}</span>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-on-surface">{option.displayName}</p>
-                      <span className="rounded-full bg-surface-container px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 text-sm font-semibold leading-5 text-on-surface">
+                        {option.displayName}
+                      </p>
+                      <span
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
+                          option.canAdd
+                            ? 'bg-success/10 text-success'
+                            : option.isWaiting
+                              ? 'bg-amber-500/10 text-amber-500'
+                              : 'bg-surface-container text-on-surface-variant'
+                        }`}
+                      >
+                        {option.isConnecting ? (
+                          <span className="material-symbols-outlined text-[13px] animate-spin">sync</span>
+                        ) : null}
                         {option.stateLabel}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
                       {option.description}
                     </p>
+                    {!option.isAdded && !option.canAdd ? (
+                      <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-primary">
+                        <span className="material-symbols-outlined text-sm">
+                          {option.isWaiting ? 'sync' : 'open_in_new'}
+                        </span>
+                        {option.isWaiting
+                          ? t('agentBuilder.connectionPollingHint')
+                          : t('agentBuilder.connectFromBuilderHint')}
+                      </p>
+                    ) : null}
                   </div>
                 </button>
               ))}

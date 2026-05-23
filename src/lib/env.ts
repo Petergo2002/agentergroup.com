@@ -1,4 +1,4 @@
-import { OPENROUTER_DEFAULT_AGENT_MODEL } from "@/lib/openrouter-models";
+import { OPENROUTER_DEFAULT_AGENT_MODEL } from "./openrouter-models";
 
 /** Shared environment helpers for the dashboard app and widget runtime. */
 
@@ -200,10 +200,6 @@ export function getRateLimitSecret(): string {
   const widgetSecret = process.env.WIDGET_ACCESS_SECRET?.trim();
   if (widgetSecret) {
     return widgetSecret;
-  }
-
-  if (hasSupabaseServiceRoleEnv()) {
-    return getSupabaseServiceRoleKey();
   }
 
   if (process.env.NODE_ENV !== "production") {

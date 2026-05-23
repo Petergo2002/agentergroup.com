@@ -26,6 +26,10 @@ import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import { extractCalSelectionFromDefinition } from "@/lib/cal";
+import {
+  consumeWorkspaceMessageUsage,
+  MessageLimitExceededError,
+} from "@/lib/message-usage";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
 import {
@@ -168,19 +172,19 @@ export async function POST(
       };
 
       try {
-        // Enforce message limits
-        const { data: allowed, error: rpcError } = await admin.rpc(
-          "increment_workspace_message_usage",
-          { p_workspace_id: assistant.workspace_id },
-        );
+        try {
+          await consumeWorkspaceMessageUsage(admin, assistant.workspace_id);
+        } catch (usageError) {
+          if (usageError instanceof MessageLimitExceededError) {
+            send({
+              type: "error",
+              error: usageError.message,
+            });
+            controller.close();
+            return;
+          }
 
-        if (rpcError || !allowed) {
-          send({
-            type: "error",
-            error: "You have reached your monthly message limit. Please upgrade your plan.",
-          });
-          controller.close();
-          return;
+          throw usageError;
         }
 
         const { data: run, error: runError } = await admin

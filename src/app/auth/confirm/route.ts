@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { type EmailOtpType } from "@supabase/supabase-js";
+import { sanitizePostAuthRedirectTo } from "@/lib/auth-redirect";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
@@ -7,10 +8,10 @@ export async function GET(request: NextRequest) {
   const token_hash = searchParams.get("token_hash");
   const code = searchParams.get("code");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = sanitizePostAuthRedirectTo(searchParams.get("next"));
 
   // Helper to normalize the redirect URL and avoid double slashes
-  const redirectTo = new URL(next, request.url);
+  const redirectTo = new URL(next, request.nextUrl.origin);
 
   const supabase = await createClient();
 
@@ -34,5 +35,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Redirect to error page if verification fails
-  return NextResponse.redirect(new URL("/login?error=Invalid+or+expired+link", request.url));
+  return NextResponse.redirect(
+    new URL("/login?error=Invalid+or+expired+link", request.nextUrl.origin),
+  );
 }

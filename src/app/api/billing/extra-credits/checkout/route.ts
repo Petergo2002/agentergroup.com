@@ -6,8 +6,9 @@ import {
 } from "@/lib/billing-credits";
 import { getAppUrl } from "@/lib/env";
 import {
-  STRIPE_EXTRA_CREDITS_500_PRICE_ID,
-  stripe,
+  BillingConfigurationError,
+  getStripe,
+  getStripeExtraCredits500PriceId,
 } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 
@@ -36,13 +37,6 @@ export async function POST(req: Request) {
       user.id,
     );
 
-    if (!STRIPE_EXTRA_CREDITS_500_PRICE_ID) {
-      return NextResponse.json(
-        { error: "Extra credits checkout is not configured." },
-        { status: 503 },
-      );
-    }
-
     const { data: subscription, error: subscriptionError } = await supabase
       .from("workspace_subscriptions")
       .select("stripe_customer_id, plan_tier")
@@ -64,6 +58,8 @@ export async function POST(req: Request) {
     }
 
     let stripeCustomerId = subscription.stripe_customer_id;
+    const stripe = getStripe();
+    const extraCreditsPriceId = getStripeExtraCredits500PriceId();
 
     if (!stripeCustomerId) {
       const { data: profile } = await supabase
@@ -99,7 +95,7 @@ export async function POST(req: Request) {
       mode: "payment",
       line_items: [
         {
-          price: STRIPE_EXTRA_CREDITS_500_PRICE_ID,
+          price: extraCreditsPriceId,
           quantity: 1,
         },
       ],
@@ -122,6 +118,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     if (error instanceof BillingAuthorizationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    if (error instanceof BillingConfigurationError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 

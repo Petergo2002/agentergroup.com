@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, Filter, Activity } from "lucide-react";
+import { Search, Plus, Filter, Activity, Library } from "lucide-react";
 import { AppIcon } from "@/components/icons/AppIcon";
 import { canEditAgentRecord } from "@/lib/agents/access";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { useModals } from "@/components/ui/ModalProvider";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
+import { AgentLibraryDialog } from "@/components/agents/AgentLibraryDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAppContext } from "@/components/app/AppContext";
 import { AgentCard } from "@/components/agents/AgentCard";
@@ -29,6 +30,7 @@ export default function AgentsPageClient({
   const [togglingAgentId, setTogglingAgentId] = useState<string | null>(null);
   const [agentToDelete, setAgentToDelete] = useState<AgentRecord | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 9;
   const isLoading = false;
@@ -170,18 +172,33 @@ export default function AgentsPageClient({
           </p>
         </div>
 
-        <button
-          onClick={() => openCreateAgent()}
-          className="signature-gradient group relative flex h-14 items-center justify-between rounded-full pl-6 pr-2 text-sm font-bold shadow-xl shadow-black/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <div className="flex items-center gap-3">
-            <Plus className="h-5 w-5" />
-            <span className="uppercase tracking-[0.15em] pr-4">{t('agents.createAgent')}</span>
-          </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/5 backdrop-blur-sm transition-colors group-hover:bg-black/10">
-            <AppIcon name="arrow_forward" className="h-4 w-4 text-black" />
-          </div>
-        </button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <button
+            onClick={() => setIsLibraryOpen(true)}
+            className="group relative flex h-14 items-center justify-between rounded-full border border-outline-variant/15 bg-surface-container-low pl-6 pr-2 text-sm font-bold text-on-surface shadow-sm transition-all hover:bg-surface-container hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-3">
+              <Library className="h-5 w-5 text-primary" />
+              <span className="uppercase tracking-[0.15em] pr-4">{t('agents.library')}</span>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high transition-colors group-hover:bg-primary/10">
+              <AppIcon name="arrow_forward" className="h-4 w-4 text-primary" />
+            </div>
+          </button>
+
+          <button
+            onClick={() => openCreateAgent()}
+            className="signature-gradient group relative flex h-14 items-center justify-between rounded-full pl-6 pr-2 text-sm font-bold shadow-xl shadow-black/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-3">
+              <Plus className="h-5 w-5" />
+              <span className="uppercase tracking-[0.15em] pr-4">{t('agents.createAgent')}</span>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/5 backdrop-blur-sm transition-colors group-hover:bg-black/10">
+              <AppIcon name="arrow_forward" className="h-4 w-4 text-black" />
+            </div>
+          </button>
+        </div>
       </header>
 
       {/* ─── Filters & Search ──────────────────────────────────── */}
@@ -288,6 +305,11 @@ export default function AgentsPageClient({
         onClose={() => setAgentToDelete(null)}
         onConfirm={() => void confirmPermanentDelete()}
         isDeleting={deletingAgentId === agentToDelete?.id}
+      />
+
+      <AgentLibraryDialog
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
       />
     </div>
   );

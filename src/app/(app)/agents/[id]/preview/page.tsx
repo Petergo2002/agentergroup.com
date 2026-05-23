@@ -37,6 +37,21 @@ interface AgentKnowledgeJoinRow {
   source: KnowledgeSourceRecord | KnowledgeSourceRecord[] | null;
 }
 
+interface AgentKnowledgeFolderJoinRow {
+  folder:
+    | {
+        sources?: Array<{
+          source: KnowledgeSourceRecord | KnowledgeSourceRecord[] | null;
+        }>;
+      }
+    | Array<{
+        sources?: Array<{
+          source: KnowledgeSourceRecord | KnowledgeSourceRecord[] | null;
+        }>;
+      }>
+    | null;
+}
+
 function getKnowledgeMatches(message: MessageRecord) {
   const value = message.metadata?.knowledgeMatches;
 
@@ -225,7 +240,7 @@ export default function AgentPreviewPage() {
 
     const load = async () => {
       try {
-        const [agentResult, threadResult, runResult, connectionResult, knowledgeResult, draftResult] = await Promise.all([
+        const [agentResult, threadResult, runResult, connectionResult, knowledgeResult, folderKnowledgeResult, draftResult] = await Promise.all([
           supabase.from('agents').select('*').eq('id', agentId).single(),
           supabase
             .from('chat_threads')
@@ -249,6 +264,10 @@ export default function AgentPreviewPage() {
             .select('source:knowledge_sources(*)')
             .eq('agent_id', agentId),
           supabase
+            .from('agent_knowledge_folders')
+            .select('folder:knowledge_folders(sources:knowledge_folder_sources(source:knowledge_sources(*)))')
+            .eq('agent_id', agentId),
+          supabase
             .from('agent_drafts')
             .select('definition')
             .eq('agent_id', agentId)
@@ -261,6 +280,10 @@ export default function AgentPreviewPage() {
 
         if (knowledgeResult.error) {
           throw knowledgeResult.error;
+        }
+
+        if (folderKnowledgeResult.error) {
+          throw folderKnowledgeResult.error;
         }
 
         if (!isMounted) {
@@ -301,12 +324,27 @@ export default function AgentPreviewPage() {
               status: getEffectiveConnectionStatus(connection),
             })),
         );
-        setKnowledgeSources(
-          ((knowledgeResult.data ?? []) as unknown as AgentKnowledgeJoinRow[])
+        const directKnowledgeSources = ((knowledgeResult.data ?? []) as unknown as AgentKnowledgeJoinRow[])
             .map((item) =>
               Array.isArray(item.source) ? item.source[0] ?? null : item.source,
             )
-            .filter(Boolean) as KnowledgeSourceRecord[],
+            .filter(Boolean) as KnowledgeSourceRecord[];
+        const folderKnowledgeSources = ((folderKnowledgeResult.data ?? []) as unknown as AgentKnowledgeFolderJoinRow[])
+          .flatMap((item) => {
+            const folder = Array.isArray(item.folder) ? item.folder[0] ?? null : item.folder;
+            return (folder?.sources ?? [])
+              .map((link) => (Array.isArray(link.source) ? link.source[0] ?? null : link.source))
+              .filter(Boolean) as KnowledgeSourceRecord[];
+          });
+        setKnowledgeSources(
+          Array.from(
+            new Map(
+              [...directKnowledgeSources, ...folderKnowledgeSources].map((source) => [
+                source.id,
+                source,
+              ]),
+            ).values(),
+          ),
         );
         setEndChatPolicy(
           extractEndChatPolicyFromDefinition(draftResult.data?.definition ?? null),

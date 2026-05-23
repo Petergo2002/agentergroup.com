@@ -20,7 +20,12 @@ import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calen
 import { extractCalSelectionFromDefinition } from "@/lib/cal";
 import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import {
+  consumeWorkspaceMessageUsage,
+  MessageLimitExceededError,
+} from "@/lib/message-usage";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import {
   completeRunStep,
@@ -178,6 +183,21 @@ export async function POST(
       };
 
       try {
+        try {
+          await consumeWorkspaceMessageUsage(createAdminClient(), agent.workspace_id);
+        } catch (usageError) {
+          if (usageError instanceof MessageLimitExceededError) {
+            send({
+              type: "error",
+              error: usageError.message,
+            });
+            controller.close();
+            return;
+          }
+
+          throw usageError;
+        }
+
         const { data: run, error: runError } = await supabase
           .from("runs")
           .insert({

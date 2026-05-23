@@ -39,6 +39,34 @@ export interface AgentKnowledgeSourceRecord {
   created_at: string;
 }
 
+export interface KnowledgeFolderRecord {
+  id: string;
+  workspace_id: string;
+  created_by: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeFolderSourceRecord {
+  id: string;
+  folder_id: string;
+  knowledge_source_id: string;
+  created_at: string;
+}
+
+export interface AgentKnowledgeFolderRecord {
+  id: string;
+  agent_id: string;
+  knowledge_folder_id: string;
+  created_at: string;
+}
+
+export interface KnowledgeFolderWithSources extends KnowledgeFolderRecord {
+  sourceIds: string[];
+}
+
 export interface DriveImportFileRecord {
   id: string;
   name: string;

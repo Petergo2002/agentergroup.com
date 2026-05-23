@@ -34,6 +34,7 @@ export type BuilderNodeKind =
   | "slack"
   | "hubspot"
   | "shopify"
+  | "googleads"
   | "googlecalendar"
   | "cal"
   | "endchat";

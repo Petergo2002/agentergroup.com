@@ -11,7 +11,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAppUrl } from '@/lib/env';
-import { stripe } from '@/lib/stripe';
+import { BillingConfigurationError, getStripe } from '@/lib/stripe';
 import {
   BillingAuthorizationError,
   assertWorkspaceBillingAdmin,
@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     }
 
     const appUrl = getAppUrl();
+    const stripe = getStripe();
 
     // Create the Stripe Billing Portal session
     const portalSession = await stripe.billingPortal.sessions.create({
@@ -71,6 +72,10 @@ export async function POST(req: Request) {
 
   } catch (err) {
     if (err instanceof BillingAuthorizationError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+
+    if (err instanceof BillingConfigurationError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
 

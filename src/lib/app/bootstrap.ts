@@ -111,6 +111,35 @@ async function createWorkspaceRecord(
   throw new Error("Failed to generate a unique workspace slug.");
 }
 
+async function createWorkspaceMembership(
+  supabase: SupabaseLike,
+  input: {
+    workspaceId: string;
+    userId: string;
+  },
+) {
+  const membershipUpsertResult = await supabase
+    .from("workspace_members")
+    .upsert(
+      {
+        workspace_id: input.workspaceId,
+        user_id: input.userId,
+        role: "owner",
+      },
+      {
+        onConflict: "workspace_id,user_id",
+      },
+    )
+    .select()
+    .single();
+
+  if (membershipUpsertResult.error || !membershipUpsertResult.data) {
+    throw membershipUpsertResult.error ?? new Error("Failed to create workspace membership.");
+  }
+
+  return membershipUpsertResult.data as WorkspaceMemberRecord;
+}
+
 export async function createWorkspaceForUser(
   supabase: SupabaseLike,
   user: User,
@@ -128,28 +157,77 @@ export async function createWorkspaceForUser(
     name: workspaceName,
     description: workspaceDescription,
   });
-  const membershipUpsertResult = await supabase
-    .from("workspace_members")
-    .upsert(
-      {
-        workspace_id: workspace.id,
-        user_id: user.id,
-        role: "owner",
-      },
-      {
-        onConflict: "workspace_id,user_id",
-      },
-    )
-    .select()
-    .single();
-
-  if (membershipUpsertResult.error || !membershipUpsertResult.data) {
-    throw membershipUpsertResult.error ?? new Error("Failed to create workspace membership.");
-  }
+  const membership = await createWorkspaceMembership(supabase, {
+    workspaceId: workspace.id,
+    userId: user.id,
+  });
 
   return {
     workspace,
-    membership: membershipUpsertResult.data as WorkspaceMemberRecord,
+    membership,
+  };
+}
+
+async function loadOwnedWorkspaceBySlug(
+  supabase: SupabaseLike,
+  input: {
+    ownerId: string;
+    slug: string;
+  },
+) {
+  const workspaceResult = await supabase
+    .from("workspaces")
+    .select("id, name, slug, description, owner_id, internal_assistants_enabled, automations_enabled, onboarding_completed")
+    .eq("owner_id", input.ownerId)
+    .eq("slug", input.slug)
+    .maybeSingle();
+
+  if (workspaceResult.error) {
+    throw workspaceResult.error;
+  }
+
+  return workspaceResult.data as WorkspaceRecord | null;
+}
+
+async function createPrimaryWorkspaceForUser(
+  supabase: SupabaseLike,
+  user: User,
+): Promise<AvailableWorkspace> {
+  const workspaceName = buildWorkspaceName(user);
+  const workspaceDescription = "Primary workspace for managing agents, connections, and runs.";
+  const slug = generateWorkspaceSlug(workspaceName, user.id.slice(0, 8));
+
+  const workspaceInsertResult = await supabase
+    .from("workspaces")
+    .insert({
+      name: workspaceName,
+      slug,
+      description: workspaceDescription,
+      owner_id: user.id,
+    })
+    .select()
+    .single();
+
+  if (workspaceInsertResult.error && !isDuplicateKeyError(workspaceInsertResult.error)) {
+    throw workspaceInsertResult.error;
+  }
+
+  const workspace = workspaceInsertResult.error
+    ? await loadOwnedWorkspaceBySlug(supabase, { ownerId: user.id, slug })
+    : (workspaceInsertResult.data as WorkspaceRecord);
+
+  if (!workspace) {
+    throw new Error("Failed to load primary workspace after concurrent creation.");
+  }
+
+  const membership = await createWorkspaceMembership(supabase, {
+    workspaceId: workspace.id,
+    userId: user.id,
+  });
+
+  return {
+    workspace,
+    membership,
   };
 }
 
@@ -188,7 +266,7 @@ async function getOrCreateUserWorkspaces(
   // We use a small delay or a retry logic to handle potential race conditions
   // where two concurrent requests both try to create a workspace.
   try {
-    const createdWorkspace = await createWorkspaceForUser(supabase, user);
+    const createdWorkspace = await createPrimaryWorkspaceForUser(supabase, user);
     return [createdWorkspace];
   } catch (error) {
     // 3. If creation fails (e.g. due to a slug conflict or other race condition), 

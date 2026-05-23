@@ -40,4 +40,6 @@ export const login = {
   privacyPolicy: "Integritetspolicy",
   termsOfService: "Användarvillkor",
   logoAlt: "Agentergroup-logotyp",
+  continueWithGoogle: "Fortsätt med Google",
+  orContinueWith: "eller fortsätt med e-post",
 };

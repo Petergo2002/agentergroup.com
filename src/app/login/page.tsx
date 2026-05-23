@@ -1,10 +1,12 @@
 import Link from "next/link";
-import Image from "next/image";
-import { sanitizeRedirectTo } from "@/lib/auth-redirect";
+import { redirect } from "next/navigation";
+import { sanitizePostAuthRedirectTo } from "@/lib/auth-redirect";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
 import { login, signup } from "@/app/login/actions";
+import { GoogleSignInButton } from "@/app/login/GoogleSignInButton";
+import { createClient } from "@/lib/supabase/server";
 
 interface LoginPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -17,31 +19,125 @@ function getSearchValue(value: string | string[] | undefined) {
   return value ?? "";
 }
 
+function BrandLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="200 550 1100 400"
+      className={className}
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <defs>
+        <clipPath id="logo-clip-1">
+          <path d="M 215 578.742188 L 457.773438 578.742188 L 457.773438 937.992188 L 215 937.992188 Z" clipRule="nonzero"/>
+        </clipPath>
+        <clipPath id="logo-clip-2">
+          <rect x="0" width="686" y="0" height="211"/>
+        </clipPath>
+        <clipPath id="logo-clip-3">
+          <rect x="0" width="232" y="0" height="73"/>
+        </clipPath>
+      </defs>
+      <path strokeLinecap="round" transform="matrix(0, 0.75, -0.75, 0, 518.829709, 569.100339)" fill="none" strokeLinejoin="miter" d="M 2.001632 2.002112 L 502.949591 2.002112" stroke="currentColor" strokeWidth="4" strokeOpacity="1" strokeMiterlimit="4"/>
+      <g clipPath="url(#logo-clip-1)">
+        <path fill="#ff5c00" d="M 244.5625 811.589844 L 232.296875 795.992188 C 201.296875 756.558594 214.511719 698.578125 259.535156 676.460938 L 458.097656 578.914062 L 458.097656 619.070312 C 458.097656 649.78125 440.558594 677.808594 412.949219 691.261719 L 280.945312 755.589844 C 271.339844 760.269531 262.921875 767.132812 256.566406 775.726562 C 250.1875 784.359375 244.703125 796.199219 245.128906 811.136719 C 249.480469 807.683594 254.296875 804.625 259.527344 802.058594 L 458.089844 704.511719 L 458.089844 744.664062 C 458.089844 775.378906 440.550781 803.402344 412.941406 816.859375 L 280.945312 881.179688 C 271.339844 885.859375 262.921875 892.71875 256.566406 901.316406 C 250.011719 910.195312 244.398438 922.441406 245.179688 937.964844 L 232.296875 921.585938 C 205.054688 886.929688 211.945312 837.964844 244.5625 811.589844 Z M 373.535156 893.976562 L 458.03125 938.003906 L 458 828.027344 L 373.699219 870.46875 C 364.085938 875.3125 363.996094 889.007812 373.535156 893.976562 Z M 373.535156 893.976562" fillOpacity="1" fillRule="nonzero"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, 603, 636)">
+        <g clipPath="url(#logo-clip-2)">
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(0.906837, 157.543844)">
+              <path d="M 74.375 -18.484375 L 35.328125 -18.484375 L 29.0625 0 L 2.390625 0 L 40.25 -104.640625 L 69.765625 -104.640625 L 107.625 0 L 80.640625 0 Z M 67.828125 -38.15625 L 54.859375 -76.46875 L 42.03125 -38.15625 Z M 67.828125 -38.15625"/>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(110.763529, 157.543844)">
+              <path d="M 78.703125 -71.546875 C 76.816406 -75.023438 74.109375 -77.679688 70.578125 -79.515625 C 67.054688 -81.359375 62.910156 -82.28125 58.140625 -82.28125 C 49.890625 -82.28125 43.28125 -79.570312 38.3125 -74.15625 C 33.34375 -68.738281 30.859375 -61.507812 30.859375 -52.46875 C 30.859375 -42.832031 33.460938 -35.304688 38.671875 -29.890625 C 43.890625 -24.472656 51.070312 -21.765625 60.21875 -21.765625 C 66.476562 -21.765625 71.769531 -23.351562 76.09375 -26.53125 C 80.414062 -29.707031 83.570312 -34.28125 85.5625 -40.25 L 53.21875 -40.25 L 53.21875 -59.03125 L 108.671875 -59.03125 L 108.671875 -35.328125 C 106.773438 -28.960938 103.566406 -23.046875 99.046875 -17.578125 C 94.523438 -12.117188 88.785156 -7.695312 81.828125 -4.3125 C 74.878906 -0.9375 67.03125 0.75 58.28125 0.75 C 47.945312 0.75 38.726562 -1.507812 30.625 -6.03125 C 22.53125 -10.550781 16.222656 -16.835938 11.703125 -24.890625 C 7.179688 -32.941406 4.921875 -42.132812 4.921875 -52.46875 C 4.921875 -62.800781 7.179688 -72.015625 11.703125 -80.109375 C 16.222656 -88.210938 22.503906 -94.523438 30.546875 -99.046875 C 38.597656 -103.566406 47.796875 -105.828125 58.140625 -105.828125 C 70.660156 -105.828125 81.21875 -102.796875 89.8125 -96.734375 C 98.40625 -90.679688 104.09375 -82.285156 106.875 -71.546875 Z M 78.703125 -71.546875"/>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(224.346716, 157.543844)">
+              <path d="M 34.734375 -84.21875 L 34.734375 -63.046875 L 68.859375 -63.046875 L 68.859375 -43.375 L 34.734375 -43.375 L 34.734375 -20.421875 L 73.34375 -20.421875 L 73.34375 0 L 9.234375 0 L 9.234375 -104.640625 L 73.34375 -104.640625 L 73.34375 -84.21875 Z M 34.734375 -84.21875"/>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(304.98777, 157.543844)">
+              <path d="M 102.859375 0 L 77.359375 0 L 34.734375 -64.546875 L 34.734375 0 L 9.234375 0 L 9.234375 -104.640625 L 34.734375 -104.640625 L 77.359375 -39.796875 L 77.359375 -104.640625 L 102.859375 -104.640625 Z M 102.859375 0"/>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(417.08037, 157.543844)">
+              <path d="M 84.515625 -104.640625 L 84.515625 -84.21875 L 56.796875 -84.21875 L 56.796875 0 L 31.296875 0 L 31.296875 -84.21875 L 3.578125 -84.21875 L 3.578125 -104.640625 Z M 84.515625 -104.640625"/>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(505.174423, 157.543844)">
+              <path d="M 34.734375 -84.21875 L 34.734375 -63.046875 L 68.859375 -63.046875 L 68.859375 -43.375 L 34.734375 -43.375 L 34.734375 -20.421875 L 73.34375 -20.421875 L 73.34375 0 L 9.234375 0 L 9.234375 -104.640625 L 73.34375 -104.640625 L 73.34375 -84.21875 Z M 34.734375 -84.21875"/>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(585.815477, 157.543844)">
+              <path d="M 62.609375 0 L 40.84375 -39.5 L 34.734375 -39.5 L 34.734375 0 L 9.234375 0 L 9.234375 -104.640625 L 52.015625 -104.640625 C 60.265625 -104.640625 67.296875 -103.195312 73.109375 -100.3125 C 78.921875 -97.4375 83.269531 -93.488281 86.15625 -88.46875 C 89.039062 -83.445312 90.484375 -77.859375 90.484375 -71.703125 C 90.484375 -64.742188 88.519531 -58.53125 84.59375 -53.0625 C 80.664062 -47.601562 74.878906 -43.726562 67.234375 -41.4375 L 91.375 0 Z M 34.734375 -57.53125 L 50.53125 -57.53125 C 55.195312 -57.53125 58.695312 -58.671875 61.03125 -60.953125 C 63.375 -63.242188 64.546875 -66.476562 64.546875 -70.65625 C 64.546875 -74.632812 63.375 -77.765625 61.03125 -80.046875 C 58.695312 -82.328125 55.195312 -83.46875 50.53125 -83.46875 L 34.734375 -83.46875 Z M 34.734375 -57.53125"/>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, 617, 805)">
+        <g clipPath="url(#logo-clip-3)">
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(0.0955271, 54.588059)">
+              <path d="M 30.6875 -25.109375 C 29.707031 -27.171875 28.285156 -28.769531 26.421875 -29.90625 C 24.566406 -31.039062 22.40625 -31.609375 19.9375 -31.609375 C 17.46875 -31.609375 15.242188 -31.039062 13.265625 -29.90625 C 11.285156 -28.769531 9.726562 -27.144531 8.59375 -25.03125 C 7.46875 -22.914062 6.90625 -20.472656 6.90625 -17.703125 C 6.90625 -14.929688 7.46875 -12.492188 8.59375 -10.390625 C 9.726562 -8.296875 11.285156 -6.679688 13.265625 -5.546875 C 15.242188 -4.421875 17.46875 -3.859375 19.9375 -3.859375 C 23.382812 -3.859375 26.222656 -4.890625 28.453125 -6.953125 C 30.691406 -9.015625 32 -11.804688 32.375 -15.328125 L 18.265625 -15.328125 L 18.265625 -19.078125 L 37.296875 -19.078125 L 37.296875 -15.53125 C 37.023438 -12.613281 36.109375 -9.945312 34.546875 -7.53125 C 32.992188 -5.113281 30.945312 -3.203125 28.40625 -1.796875 C 25.875 -0.398438 23.050781 0.296875 19.9375 0.296875 C 16.65625 0.296875 13.660156 -0.46875 10.953125 -2 C 8.253906 -3.539062 6.117188 -5.679688 4.546875 -8.421875 C 2.972656 -11.160156 2.1875 -14.253906 2.1875 -17.703125 C 2.1875 -21.148438 2.972656 -24.253906 4.546875 -27.015625 C 6.117188 -29.773438 8.253906 -31.921875 10.953125 -33.453125 C 13.660156 -34.992188 16.65625 -35.765625 19.9375 -35.765625 C 23.6875 -35.765625 27.007812 -34.832031 29.90625 -32.96875 C 32.800781 -31.113281 34.90625 -28.492188 36.21875 -25.109375 Z M 30.6875 -25.109375"/>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(50.628049, 54.588059)">
+              <path d="M 22.53125 0 L 14.109375 -14.453125 L 8.515625 -14.453125 L 8.515625 0 L 3.90625 0 L 3.90625 -35.359375 L 15.328125 -35.359375 C 17.992188 -35.359375 20.25 -34.898438 22.09375 -33.984375 C 23.9375 -33.078125 25.3125 -31.84375 26.21875 -30.28125 C 27.132812 -28.726562 27.59375 -26.957031 27.59375 -24.96875 C 27.59375 -22.53125 26.890625 -20.378906 25.484375 -18.515625 C 24.085938 -16.660156 21.984375 -15.425781 19.171875 -14.8125 L 28.0625 0 Z M 8.515625 -18.15625 L 15.328125 -18.15625 C 17.828125 -18.15625 19.703125 -18.769531 20.953125 -20 C 22.203125 -21.238281 22.828125 -22.894531 22.828125 -24.96875 C 22.828125 -27.0625 22.207031 -28.679688 20.96875 -29.828125 C 19.738281 -30.984375 17.859375 -31.5625 15.328125 -31.5625 L 8.515625 -31.5625 Z M 8.515625 -18.15625"/>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(92.535839, 54.588059)">
+              <path d="M 19.9375 0.359375 C 16.65625 0.359375 13.660156 -0.410156 10.953125 -1.953125 C 8.253906 -3.492188 6.117188 -5.640625 4.546875 -8.390625 C 2.972656 -11.148438 2.1875 -14.253906 2.1875 -17.703125 C 2.1875 -21.148438 2.972656 -24.253906 4.546875 -27.015625 C 6.117188 -29.773438 8.253906 -31.921875 10.953125 -33.453125 C 13.660156 -34.992188 16.65625 -35.765625 19.9375 -35.765625 C 23.25 -35.765625 26.257812 -34.992188 28.96875 -33.453125 C 31.675781 -31.921875 33.804688 -29.785156 35.359375 -27.046875 C 36.921875 -24.304688 37.703125 -21.191406 37.703125 -17.703125 C 37.703125 -14.222656 36.921875 -11.113281 35.359375 -8.375 C 33.804688 -5.632812 31.675781 -3.492188 28.96875 -1.953125 C 26.257812 -0.410156 23.25 0.359375 19.9375 0.359375 Z M 19.9375 -3.65625 C 22.40625 -3.65625 24.628906 -4.226562 26.609375 -5.375 C 28.585938 -6.53125 30.144531 -8.171875 31.28125 -10.296875 C 32.414062 -12.429688 32.984375 -14.898438 32.984375 -17.703125 C 32.984375 -20.546875 32.414062 -23.023438 31.28125 -25.140625 C 30.144531 -27.253906 28.59375 -28.882812 26.625 -30.03125 C 24.664062 -31.1875 22.4375 -31.765625 19.9375 -31.765625 C 17.4375 -31.765625 15.203125 -31.1875 13.234375 -30.03125 C 11.273438 -28.882812 9.726562 -27.253906 8.59375 -25.140625 C 7.46875 -23.023438 6.90625 -20.546875 6.90625 -17.703125 C 6.90625 -14.898438 7.46875 -12.492188 8.59375 -10.296875 C 9.726562 -8.171875 11.285156 -6.53125 13.265625 -5.375 C 15.242188 -4.226562 17.46875 -3.65625 19.9375 -3.65625 Z M 19.9375 -3.65625 "/>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(143.474237, 54.588059)">
+              <path d="M 8.421875 -35.359375 L 8.421875 -12.984375 C 8.421875 -9.835938 9.1875 -7.503906 10.71875 -5.984375 C 12.257812 -4.460938 14.398438 -3.703125 17.140625 -3.703125 C 19.847656 -3.703125 21.972656 -4.460938 23.515625 -5.984375 C 25.054688 -7.503906 25.828125 -9.835938 25.828125 -12.984375 L 25.828125 -35.359375 L 30.4375 -35.359375 L 30.4375 -13.03125 C 30.4375 -10.09375 29.84375 -7.617188 28.65625 -5.609375 C 27.476562 -3.597656 25.882812 -2.097656 23.875 -1.109375 C 21.863281 -0.128906 19.601562 0.359375 17.09375 0.359375 C 14.59375 0.359375 12.335938 -0.128906 10.328125 -1.109375 C 8.316406 -2.097656 6.726562 -3.597656 5.5625 -5.609375 C 4.394531 -7.617188 3.8125 -10.09375 3.8125 -13.03125 L 3.8125 -35.359375 Z M 8.421875 -35.359375 "/></g>
+            </g>
+          </g>
+          <g fill="currentColor" fillOpacity="1">
+            <g transform="translate(188.781169, 54.588059)">
+              <path d="M 27.546875 -25.015625 C 27.546875 -22.066406 26.539062 -19.617188 24.53125 -17.671875 C 22.519531 -15.734375 19.453125 -14.765625 15.328125 -14.765625 L 8.515625 -14.765625 L 8.515625 0 L 3.90625 0 L 3.90625 -35.359375 L 15.328125 -35.359375 C 19.316406 -35.359375 22.347656 -34.394531 24.421875 -32.46875 C 26.503906 -30.539062 27.546875 -28.054688 27.546875 -25.015625 Z M 15.328125 -18.5625 C 17.890625 -18.5625 19.78125 -19.117188 21 -20.234375 C 22.21875 -21.359375 22.828125 -22.953125 22.828125 -25.015625 C 22.828125 -29.378906 20.328125 -31.5625 15.328125 -31.5625 L 8.515625 -31.5625 L 8.515625 -18.5625 Z M 15.328125 -18.5625"/>
+            </g>
+          </g>
+        </g>
+    </svg>
+  );
+}
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const language = await getServerLanguage();
   const messages = await getMessages(language);
   const error = getSearchValue(params.error);
   const notice = getSearchValue(params.notice);
-  const redirectTo = sanitizeRedirectTo(getSearchValue(params.redirectTo));
+  const redirectTo = sanitizePostAuthRedirectTo(getSearchValue(params.redirectTo));
   const view = getSearchValue(params.view) === "signup" ? "signup" : "login";
 
   if (!hasSupabaseEnv()) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center p-6 text-on-surface">
-        <div className="mx-auto flex max-w-2xl flex-col gap-8 rounded-[2.5rem] border border-outline-variant/15 bg-surface-container-lowest p-12 shadow-2xl">
+      <main className="min-h-screen bg-[#050505] flex items-center justify-center p-6 text-[#f5f1eb]">
+        <div className="mx-auto flex max-w-2xl flex-col gap-8 rounded-[2px] border border-[#161616] bg-[#0d0d0d] p-12 shadow-2xl">
           <div className="space-y-4">
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#ff5c00]">
               {messages.login.systemConfiguration}
             </p>
-            <h1 className="font-headline text-4xl font-bold tracking-tight">
+            <h1 className="font-headline text-4xl font-extrabold tracking-tight text-white">
               {messages.login.readyToBuild}
             </h1>
-            <p className="max-w-2xl text-sm leading-7 text-on-surface-variant">
+            <p className="max-w-2xl text-sm leading-relaxed text-[#9d948a]">
               {messages.login.setupDatabase}
             </p>
           </div>
-          <pre className="overflow-x-auto rounded-2xl bg-surface-container-low p-6 text-xs text-on-surface-variant border border-outline-variant/10">
+          <pre className="overflow-x-auto rounded-[2px] bg-[#050505] p-6 text-xs text-[#9d948a]/80 border border-[#161616]">
 {`NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 OPENROUTER_API_KEY=
@@ -54,186 +150,144 @@ COMPOSIO_API_KEY=`}
     );
   }
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect(redirectTo);
+  }
+
   return (
-    <main className="min-h-screen flex flex-col lg:flex-row bg-background overflow-hidden font-body">
-      {/* Left Column: Branding & Visuals */}
-      <section className="relative flex-1 border-b border-outline-variant/10 bg-background p-12 lg:min-h-screen lg:border-b-0 lg:border-r lg:border-outline-variant/10 lg:p-20 flex flex-col justify-between overflow-hidden">
-        {/* Abstract Background Elements */}
-        <div className="absolute inset-0 opacity-20 pointer-events-none">
-          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary rounded-full blur-[120px] opacity-18" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary-container rounded-full blur-[100px] opacity-12" />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: "radial-gradient(circle at 2px 2px, var(--color-on-surface-variant) 1px, transparent 0)",
-              backgroundSize: "32px 32px",
-              opacity: 0.05
-            }}
-          />
-        </div>
-
-        <div className="relative z-10 flex flex-col gap-12 max-w-xl">
-          <div className="flex items-center">
-            <Image
-              src="/dashboardlogo.svg"
-              alt={messages.login.logoAlt}
-              width={220}
-              height={73}
-              priority
-              className="h-[72px] w-auto object-contain object-left"
-            />
-          </div>
-
-          <div className="space-y-6">
-            <h1 className="text-5xl lg:text-6xl font-headline font-bold text-on-surface leading-[1.1] tracking-tight">
-              {messages.login.headline}
-            </h1>
-            <p className="text-lg text-on-surface-variant leading-relaxed font-medium">
-              {messages.login.subheadline}
-            </p>
-          </div>
-        </div>
-
-        <div className="relative z-10 flex gap-8 mt-12 lg:mt-0">
-          <div className="flex flex-col gap-1">
-            <span className="text-on-surface font-bold text-xl font-headline">{messages.login.seamless}</span>
-            <span className="text-on-surface-variant text-xs font-semibold uppercase tracking-widest">{messages.login.architecture}</span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-on-surface font-bold text-xl font-headline">{messages.login.scalable}</span>
-            <span className="text-on-surface-variant text-xs font-semibold uppercase tracking-widest">{messages.login.deployment}</span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-on-surface font-bold text-xl font-headline">{messages.login.secure}</span>
-            <span className="text-on-surface-variant text-xs font-semibold uppercase tracking-widest">{messages.login.runtime}</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Right Column: Auth Form */}
-      <section className="w-full lg:w-[450px] xl:w-[500px] flex items-center justify-center p-8 lg:p-16 bg-surface-container-lowest">
-        <div className="w-full max-w-sm space-y-10">
-          <div className="space-y-3 text-center lg:text-left">
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-              {messages.login.workspacePortal}
-            </p>
-            <h2 className="font-headline text-3xl font-bold tracking-tight text-on-background">
-              {view === "login" ? messages.login.signInTitle : messages.login.signupTitle}
-            </h2>
-            <p className="text-sm text-on-surface-variant font-medium">
-              {view === "login" ? messages.login.signInSubtitle : messages.login.signupSubtitle}
-            </p>
-          </div>
-
-          {error ? (
-            <div className="rounded-2xl border border-error/20 bg-error-container px-4 py-3 text-sm text-error font-medium">
-              {error}
-            </div>
-          ) : null}
-
-          {notice ? (
-            <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary font-medium">
-              {notice}
-            </div>
-          ) : null}
-
-          <form className="space-y-6">
-            <input type="hidden" name="redirectTo" value={redirectTo} />
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
-                {messages.login.emailAddress}
-              </label>
-              <input
-                className="w-full rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm text-on-surface outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-on-surface-variant/40"
-                name="email"
-                type="email"
-                placeholder={messages.login.emailPlaceholder}
-                required
-              />
+    <main className="min-h-screen flex items-center justify-center p-4 lg:p-8 bg-gradient-to-br from-[#ff5c00]/5 via-white to-[#ff5c00]/10 font-body">
+      <div className="w-full max-w-[1000px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col lg:flex-row min-h-[640px] animate-in fade-in zoom-in-95 duration-500 border border-slate-100">
+        
+        {/* Left Column: Form */}
+        <section className="w-full lg:w-1/2 flex flex-col p-8 lg:p-14 relative">
+          
+          <div className="mx-auto w-full max-w-[340px] flex-1 flex flex-col justify-center">
+            {/* Header */}
+            <div className="flex flex-col items-center text-center space-y-3 mb-8">
+              <BrandLogo className="h-8 w-auto text-slate-900 mb-4" />
+              <h2 className="text-[22px] font-bold tracking-tight text-slate-900">
+                {view === "login" ? "Log in to Agentergroup" : "Get started with Agentergroup"}
+              </h2>
+              <p className="text-[13px] leading-relaxed text-slate-500">
+                Start managing your work, stay organized, and keep your team moving forward.
+              </p>
             </div>
 
-            {view === "login" && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
-                    {messages.login.password}
-                  </label>
-                  <Link
-                    href="/login/forgot-password"
-                    className="text-xs font-medium text-primary hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
+            {/* Simple Message Alerts */}
+            {error ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 font-medium animate-shake mb-6">
+                {error}
+              </div>
+            ) : null}
+
+            {notice ? (
+              <div className="rounded-lg border border-[#ff5c00]/20 bg-[#ff5c00]/5 px-4 py-3 text-sm text-[#ff5c00] font-medium mb-6">
+                {notice}
+              </div>
+            ) : null}
+
+            {/* Credentials Email/Password form */}
+            <form className="space-y-4">
+              <input type="hidden" name="redirectTo" value={redirectTo} />
+
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="block text-[11px] font-bold text-slate-700">
+                  Email
+                </label>
                 <input
-                  className="w-full rounded-2xl border border-outline-variant/15 bg-surface-container-low px-5 py-4 text-sm text-on-surface outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 placeholder:text-on-surface-variant/40"
-                  name="password"
-                  type="password"
-                  placeholder={messages.login.passwordPlaceholder}
-                  minLength={6}
+                  id="email"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition-colors hover:border-slate-300 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none placeholder:text-slate-400"
+                  name="email"
+                  type="email"
+                  placeholder="Enter your email"
                   required
                 />
               </div>
-            )}
 
-            <div className="pt-4">
-              {view === "login" ? (
-                <div className="space-y-4">
-                  <button
-                    formAction={login}
-                    className="w-full signature-gradient rounded-2xl px-5 py-4 text-sm font-bold shadow-premium transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-[0.98]"
-                  >
-                    {messages.login.signIn}
-                  </button>
-                  <p className="text-center text-sm text-on-surface-variant font-medium">
-                    New to Agentergroup?{" "}
+              {view === "login" && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="password" className="block text-[11px] font-bold text-slate-700">
+                      Password
+                    </label>
                     <Link
-                      href={`/login?view=signup&redirectTo=${encodeURIComponent(redirectTo)}`}
-                      className="text-primary hover:underline"
+                      href="/login/forgot-password"
+                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 transition-colors"
                     >
-                      {messages.login.createAccount}
+                      Forgot password?
                     </Link>
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <button
-                    formAction={signup}
-                    className="w-full signature-gradient rounded-2xl px-5 py-4 text-sm font-bold shadow-premium transition-all hover:border-primary/25 hover:bg-primary/8 active:scale-[0.98]"
-                  >
-                    {messages.login.createAccount}
-                  </button>
-                  <p className="text-center text-sm text-on-surface-variant font-medium">
-                    Already have an account?{" "}
-                    <Link
-                      href={`/login?view=login&redirectTo=${encodeURIComponent(redirectTo)}`}
-                      className="text-primary hover:underline"
-                    >
-                      {messages.login.signIn}
-                    </Link>
-                  </p>
+                  </div>
+                  <input
+                    id="password"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition-colors hover:border-slate-300 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none placeholder:text-slate-400"
+                    name="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    minLength={6}
+                    required
+                  />
                 </div>
               )}
-            </div>
-          </form>
 
-          <p className="text-[11px] text-center text-on-surface-variant leading-relaxed opacity-60 px-4">
-            {messages.login.legalPrefix}{" "}
-            <span className="underline-offset-4 hover:text-on-surface">
-              {messages.login.termsOfService}
-            </span>{" "}
-            {messages.login.legalAnd}{" "}
-            <Link
-              href="/privacy-policy"
-              className="underline underline-offset-4 transition-colors hover:text-on-surface"
-            >
-              {messages.login.privacyPolicy}
-            </Link>
-            .
-          </p>
-        </div>
-      </section>
+              <div className="pt-2">
+                <button
+                  formAction={view === "login" ? login : signup}
+                  className="w-full flex h-10 items-center justify-center rounded-lg bg-black hover:bg-gray-800 text-white text-[13px] font-semibold transition-all duration-200 shadow-sm active:scale-[0.98] cursor-pointer"
+                >
+                  {view === "login" ? "Log in with email" : "Sign up with email"}
+                </button>
+              </div>
+            </form>
+
+            {/* Divider */}
+            <div className="relative flex items-center gap-4 my-6">
+              <div className="h-px flex-1 bg-slate-100" />
+              <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-widest select-none">
+                OR
+              </span>
+              <div className="h-px flex-1 bg-slate-100" />
+            </div>
+
+            {/* Google OAuth */}
+            <GoogleSignInButton
+              label={messages.login.continueWithGoogle}
+              redirectTo={redirectTo}
+            />
+
+            <p className="text-center text-[12px] font-medium text-slate-500 mt-6">
+              {view === "login" ? "Don't have an account? " : "Already have an account? "}
+              <Link
+                href={`/login?view=${view === "login" ? "signup" : "login"}&redirectTo=${encodeURIComponent(redirectTo)}`}
+                className="font-bold text-slate-900 hover:text-slate-700 transition-colors"
+              >
+                {view === "login" ? "Sign up" : "Log in"}
+              </Link>
+            </p>
+          </div>
+
+          {/* Footer Terms */}
+          <div className="mt-8 text-center lg:mt-auto pt-8">
+            <p className="text-[10px] font-medium text-slate-400">
+              By Continuing, you agree to Agentergroup's <Link href="/privacy-policy" className="font-bold text-slate-600 hover:text-slate-900 transition-colors">Terms of Service</Link> and <Link href="/privacy-policy" className="font-bold text-slate-600 hover:text-slate-900 transition-colors">Privacy Policy</Link>
+            </p>
+          </div>
+        </section>
+
+        {/* Right Column: Hero Image */}
+        <section className="hidden lg:block w-1/2 relative bg-slate-50 border-l border-slate-100">
+          <img 
+            src="/stocksnap-robot-2587571.jpg" 
+            alt="Hero Image" 
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </section>
+
+      </div>
     </main>
   );
 }

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { sanitizeRedirectTo } from "@/lib/auth-redirect";
+import { sanitizePostAuthRedirectTo } from "@/lib/auth-redirect";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -12,7 +12,7 @@ function getCredentials(formData: FormData) {
   return {
     email: String(formData.get("email") ?? "").trim(),
     password: String(formData.get("password") ?? ""),
-    redirectTo: sanitizeRedirectTo(String(formData.get("redirectTo") ?? "/onboarding")),
+    redirectTo: sanitizePostAuthRedirectTo(String(formData.get("redirectTo") ?? "/onboarding")),
   };
 }
 
@@ -36,7 +36,7 @@ function buildLoginRedirectUrl(args: {
     params.set("notice", args.notice);
   }
 
-  const redirectTo = sanitizeRedirectTo(args.redirectTo);
+  const redirectTo = sanitizePostAuthRedirectTo(args.redirectTo);
   if (redirectTo !== "/dashboard") {
     params.set("redirectTo", redirectTo);
   }
@@ -71,7 +71,7 @@ export async function login(formData: FormData) {
 export async function signup(formData: FormData) {
   const supabase = await createClient();
   const email = String(formData.get("email") ?? "").trim();
-  const redirectTo = sanitizeRedirectTo(String(formData.get("redirectTo") ?? "/dashboard"));
+  const redirectTo = sanitizePostAuthRedirectTo(String(formData.get("redirectTo") ?? "/dashboard"));
   const messages = await getLoginMessages();
 
   if (!email) {

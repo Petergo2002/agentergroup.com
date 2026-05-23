@@ -1,8 +1,12 @@
-import type { ConnectionRecord, KnowledgeSourceRecord } from "@/lib/types";
+import type { ConnectionRecord, KnowledgeFolderWithSources, KnowledgeSourceRecord } from "@/lib/types";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { syncConnectedAccountsToDatabase } from "@/lib/composio";
 import { getEffectiveConnectionStatus } from "@/lib/connections";
 import { SUPPORTED_INTEGRATIONS } from "@/lib/integrations";
+import {
+  toKnowledgeFolderWithSources,
+  type KnowledgeFolderJoinRow,
+} from "@/lib/knowledge-folders";
 import { createClient } from "@/lib/supabase/server";
 import KnowledgePageClient from "./KnowledgePageClient";
 
@@ -20,11 +24,20 @@ async function loadKnowledgePageData() {
 
   await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id);
 
-  const [{ data: sourcesData, error: sourcesError }, { data: storedConnections, error: connectionsError }] =
+  const [
+    { data: sourcesData, error: sourcesError },
+    { data: foldersData, error: foldersError },
+    { data: storedConnections, error: connectionsError },
+  ] =
     await Promise.all([
       supabase
         .from("knowledge_sources")
         .select("*")
+        .eq("workspace_id", context.workspace.id)
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("knowledge_folders")
+        .select("*, sources:knowledge_folder_sources(knowledge_source_id)")
         .eq("workspace_id", context.workspace.id)
         .order("updated_at", { ascending: false }),
       supabase
@@ -36,6 +49,10 @@ async function loadKnowledgePageData() {
 
   if (sourcesError) {
     throw sourcesError;
+  }
+
+  if (foldersError) {
+    throw foldersError;
   }
 
   if (connectionsError) {
@@ -59,16 +76,21 @@ async function loadKnowledgePageData() {
 
   return {
     initialSources: (sourcesData ?? []) as KnowledgeSourceRecord[],
+    initialFolders: ((foldersData ?? []) as unknown as KnowledgeFolderJoinRow[]).map(
+      toKnowledgeFolderWithSources,
+    ) as KnowledgeFolderWithSources[],
     initialDriveConnections: connectionRows,
     subscription: context.subscription,
   };
 }
 
 export default async function KnowledgePage() {
-  const { initialSources, initialDriveConnections, subscription } = await loadKnowledgePageData();
+  const { initialSources, initialFolders, initialDriveConnections, subscription } =
+    await loadKnowledgePageData();
   return (
     <KnowledgePageClient
       initialSources={initialSources}
+      initialFolders={initialFolders}
       initialDriveConnections={initialDriveConnections}
       subscription={subscription}
     />

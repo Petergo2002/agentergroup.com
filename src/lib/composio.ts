@@ -4,6 +4,15 @@ import {
   buildWorkspaceComposioUserId,
   getConnectionComposioUserId,
 } from "@/lib/connections";
+import { assertComposioToolCallRuntime } from "@/lib/composio-tool-runtime";
+import {
+  listCalEventTypesWithExecutor,
+  type CalEventType,
+} from "@/lib/cal-event-types";
+import {
+  isComposioAuthenticationError,
+  isConnectedAccountMissingError,
+} from "@/lib/composio-errors";
 import { getComposioWebhookSecret, hasComposioEnv } from "@/lib/env";
 import { normalizeGmailRecipientEmail } from "@/lib/gmail";
 import { extractGoogleCalendarListItems } from "@/lib/google-calendar";
@@ -71,10 +80,24 @@ interface MCPSessionInfo {
   headers: Record<string, string>;
 }
 
+interface CachedComposioSession<TSession> {
+  value: TSession;
+  createdAt: number;
+}
+
 export interface ToolkitActionOption {
   name: string;
   description: string;
   recommended: boolean;
+}
+
+type ComposioToolMessages = Array<
+  OpenAI.Chat.ChatCompletionToolMessageParam | Record<string, unknown>
+>;
+
+export interface HandleChatToolCallsResult {
+  results: ComposioToolMessages;
+  sessionWasRecreated: boolean;
 }
 
 export interface ComposioTriggerConnectionRef {
@@ -97,55 +120,6 @@ interface ConnectionSyncRow {
   last_synced_at: string | null;
 }
 
-interface ConnectionSyncSupabaseTable {
-  select: (columns: string) => {
-    eq: (column: string, value: string) => {
-      eq: (
-        column: string,
-        value: string,
-      ) => {
-        maybeSingle: () => Promise<{
-          data: ConnectionSyncRow | null;
-          error: { message: string } | null;
-        }>;
-        in: (
-          column: string,
-          values: string[],
-        ) => Promise<{
-          data: ConnectionSyncRow[] | null;
-          error: { message: string } | null;
-        }>;
-      };
-      in: (
-        column: string,
-        values: string[],
-      ) => Promise<{
-        data: ConnectionSyncRow[] | null;
-        error: { message: string } | null;
-      }>;
-    };
-  };
-  update: (values: Record<string, unknown>) => {
-    eq: (column: string, value: string) => {
-      in: (
-        column: string,
-        values: string[],
-      ) => Promise<{ error: { message: string } | null }>;
-      eq: (
-        column: string,
-        value: string,
-      ) => Promise<{ error: { message: string } | null }>;
-    };
-  };
-  insert: (
-    values: Record<string, unknown>,
-  ) => Promise<{ error: { message: string } | null }>;
-  upsert: (
-    values: unknown,
-    options?: Record<string, unknown>,
-  ) => Promise<{ error: { message: string } | null }>;
-}
-
 const GMAIL_SEND_EMAIL_TOOL = "GMAIL_SEND_EMAIL";
 const OUTLOOK_SEND_EMAIL_TOOL = "OUTLOOK_SEND_EMAIL";
 const GOOGLE_CALENDAR_CREATE_EVENT_TOOL = "GOOGLECALENDAR_CREATE_EVENT";
@@ -164,13 +138,17 @@ const DEFAULT_COMPOSIO_TOOLKIT_VERSIONS = {
   slack: process.env.COMPOSIO_TOOLKIT_VERSION_SLACK ?? "20260511_01",
   hubspot: process.env.COMPOSIO_TOOLKIT_VERSION_HUBSPOT ?? "20260501_00",
   shopify: process.env.COMPOSIO_TOOLKIT_VERSION_SHOPIFY ?? "20260506_00",
+  googleads: process.env.COMPOSIO_TOOLKIT_VERSION_GOOGLEADS ?? "20260506_00",
   text_to_pdf: process.env.COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF ?? "latest",
 } as const;
 
 const SESSION_TTL_MS = 1000 * 60 * 30;
 const toolRouterSessionCache = new Map<string, ToolRouterSessionRef>();
-const composioSessionCache = new Map<string, Awaited<ReturnType<Composio["create"]>>>();
-const MCP_SESSION_CACHE = new Map<string, MCPSessionInfo>();
+const composioSessionCache = new Map<
+  string,
+  CachedComposioSession<Awaited<ReturnType<Composio["create"]>>>
+>();
+const MCP_SESSION_CACHE = new Map<string, CachedComposioSession<MCPSessionInfo>>();
 const DEFAULT_COMPOSIO_OAUTH_REDIRECT_URI =
   "https://backend.composio.dev/api/v3/toolkits/auth/callback";
 const COMPOSIO_SESSION_TOOLKITS = [
@@ -551,7 +529,10 @@ export async function getOrCreateToolRouterSession(userId: string) {
     };
 
     toolRouterSessionCache.set(userId, nextValue);
-    composioSessionCache.set(userId, session);
+    composioSessionCache.set(userId, {
+      value: session,
+      createdAt: nextValue.createdAt,
+    });
     return nextValue;
   } catch (error) {
     console.error("[Composio] Failed to create session:", error);
@@ -565,8 +546,12 @@ export async function getComposioSession(
 ) {
   const cached = composioSessionCache.get(userId);
 
-  if (cached && !authConfigOverrides) {
-    return cached;
+  if (
+    cached &&
+    !authConfigOverrides &&
+    Date.now() - cached.createdAt < SESSION_TTL_MS
+  ) {
+    return cached.value;
   }
 
   const composio = createComposioClient();
@@ -582,7 +567,10 @@ export async function getComposioSession(
       : {}),
   });
 
-  composioSessionCache.set(userId, session);
+  composioSessionCache.set(userId, {
+    value: session,
+    createdAt: Date.now(),
+  });
   return session;
 }
 
@@ -590,8 +578,8 @@ export async function getMCPSession(userId: string) {
   const cacheKey = `${userId}`;
   const cached = MCP_SESSION_CACHE.get(cacheKey);
 
-  if (cached) {
-    return cached;
+  if (cached && Date.now() - cached.createdAt < SESSION_TTL_MS) {
+    return cached.value;
   }
 
   const session = await getComposioSession(userId);
@@ -605,7 +593,10 @@ export async function getMCPSession(userId: string) {
     headers: session.mcp.headers ?? {},
   };
 
-  MCP_SESSION_CACHE.set(cacheKey, mcpInfo);
+  MCP_SESSION_CACHE.set(cacheKey, {
+    value: mcpInfo,
+    createdAt: Date.now(),
+  });
   return mcpInfo;
 }
 
@@ -626,7 +617,12 @@ export async function listConnectedAccounts(composioUserId: string) {
     ? response.items
     : []) as unknown as ComposioConnectedAccountItem[];
 
-  const toolRouterSession = toolRouterSessionCache.get(composioUserId);
+  const cachedToolRouterSession = toolRouterSessionCache.get(composioUserId);
+  const toolRouterSession =
+    cachedToolRouterSession &&
+    Date.now() - cachedToolRouterSession.createdAt < SESSION_TTL_MS
+      ? cachedToolRouterSession
+      : null;
 
   const normalizedAccounts = items
     .map((item) =>
@@ -651,7 +647,20 @@ export async function syncConnectedAccountsToDatabase(
   }
 
   const composioUserId = buildWorkspaceComposioUserId(workspaceId);
-  const connectedAccounts = await listConnectedAccounts(composioUserId);
+  let connectedAccounts: SyncedConnectedAccount[];
+
+  try {
+    connectedAccounts = await listConnectedAccounts(composioUserId);
+  } catch (error) {
+    if (isComposioAuthenticationError(error)) {
+      console.warn(
+        "[Composio] Skipping connected account sync because the API key is invalid.",
+      );
+      return [];
+    }
+
+    throw error;
+  }
   const syncTimestamp = new Date().toISOString();
   const connectedExternalIds = new Set(
     connectedAccounts
@@ -1055,25 +1064,28 @@ export async function handleChatToolCalls(
     googleCalendarSelection?: GoogleCalendarSelection | null;
     calSelection?: CalSelection | null;
   },
-) {
+): Promise<HandleChatToolCallsResult> {
   const composio = createComposioClient();
 
-  if (!composio) {
-    console.error("[Composio] No composio client available in handleChatToolCalls");
-    return [];
-  }
+  assertComposioToolCallRuntime({
+    hasClient: Boolean(composio),
+    hasSession: true,
+    hasProvider: true,
+    userId,
+  });
 
   const session = await getComposioSession(userId);
 
-  if (!session) {
-    console.error("[Composio] No session available in handleChatToolCalls for user:", userId);
-    return [];
-  }
-
-  if (!composio.provider) {
-    console.error("[Composio] No provider available in handleChatToolCalls");
-    return [];
-  }
+  assertComposioToolCallRuntime({
+    hasClient: true,
+    hasSession: Boolean(session),
+    hasProvider: Boolean(composio?.provider),
+    userId,
+  });
+  const activeComposio = composio as NonNullable<typeof composio>;
+  const provider = activeComposio.provider as NonNullable<
+    typeof activeComposio.provider
+  >;
 
     const patchedCompletion = applyEmailRecipientPolicyToCompletion(
       applyCalSelectionToCompletion(
@@ -1089,7 +1101,7 @@ export async function handleChatToolCalls(
 
     // Retry once if we get a serverless cache miss error from Composio.
     try {
-      const results = await composio.provider.handleToolCalls(userId, patchedCompletion);
+      const results = await provider.handleToolCalls(userId, patchedCompletion);
 
       return {
         results: sanitizeEmailToolMessages(results, options?.gmailRecipientPolicy ?? null),
@@ -1101,16 +1113,19 @@ export async function handleChatToolCalls(
         const msg = String(error.message).toLowerCase();
         if (msg.includes("session") || msg.includes("unauthorized") || msg.includes("not found")) {
           console.warn("[Composio] Session appears missing or expired, attempting recreation...", userId);
-          const newSession = await composio.create(userId, {
+          const newSession = await activeComposio.create(userId, {
             toolkits: COMPOSIO_SESSION_TOOLKITS,
           });
           
           if (newSession) {
-            composioSessionCache.set(userId, newSession);
+            composioSessionCache.set(userId, {
+              value: newSession,
+              createdAt: Date.now(),
+            });
             sessionWasRecreated = true;
 
             // Retry handling tool calls with the new session
-            const retryResults = await composio.provider.handleToolCalls(userId, patchedCompletion);
+            const retryResults = await provider.handleToolCalls(userId, patchedCompletion);
             return {
               results: sanitizeEmailToolMessages(
                 retryResults,
@@ -1562,7 +1577,12 @@ export async function executeToolCall(
   } as Record<string, unknown>);
 
   if (!result.successful) {
-    throw new Error(result.error ?? `Failed to execute tool: ${toolName}`);
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : `Failed to execute tool: ${toolName}`,
+      { cause: result.error },
+    );
   }
 
   return result.data;
@@ -1751,120 +1771,14 @@ function applyCalSelectionToCompletion(
   };
 }
 
-export interface CalEventType {
-  id: string;
-  title: string;
-  slug: string;
-}
-
-// Maps a raw array of Cal.com event type objects to CalEventType[], handling both
-// string and integer id fields (the API returns integers).
-function flattenEventTypeItems(items: unknown[]): CalEventType[] {
-  return items
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const record = item as Record<string, unknown>;
-      const rawId = record.id ?? record.eventTypeId;
-      const id =
-        typeof rawId === "number" && rawId > 0
-          ? String(rawId)
-          : pickString(rawId);
-      const title = pickString(record.title) ?? pickString(record.name);
-      const slug = pickString(record.slug);
-      if (!id || !title) return null;
-      return { id, title, slug: slug ?? "" } satisfies CalEventType;
-    })
-    .filter(Boolean) as CalEventType[];
-}
-
-function extractCalEventTypes(payload: unknown): CalEventType[] {
-  // Composio sometimes returns data as a JSON-encoded string — parse it first.
-  let root = payload;
-  if (typeof root === "string") {
-    try {
-      root = JSON.parse(root);
-    } catch {
-      return [];
-    }
-  }
-
-  const candidate =
-    typeof root === "object" && root !== null
-      ? (root as Record<string, unknown>)
-      : null;
-
-  // Parse candidate.data if it's also a JSON string
-  let parsedData: Record<string, unknown> | null = null;
-  if (candidate?.data && typeof candidate.data === "string") {
-    try {
-      const d = JSON.parse(candidate.data as string);
-      parsedData = typeof d === "object" && d !== null ? (d as Record<string, unknown>) : null;
-    } catch {
-      // ignored
-    }
-  } else if (candidate?.data && typeof candidate.data === "object") {
-    parsedData = candidate.data as Record<string, unknown>;
-  }
-
-  // ─── PRIMARY: CAL API v2 shape ─────────────────────────────────────────────
-  // CAL_LIST_EVENT_TYPES returns: { data: { eventTypeGroups: [{ eventTypes: [...] }] } }
-  // Flatten all groups into a single array.
-  const groups = parsedData?.eventTypeGroups;
-  if (Array.isArray(groups) && groups.length > 0) {
-    const flattened = groups.flatMap((group) => {
-      const g = group as Record<string, unknown>;
-      return Array.isArray(g.eventTypes) ? (g.eventTypes as unknown[]) : [];
-    });
-    if (flattened.length > 0) {
-      return flattenEventTypeItems(flattened);
-    }
-  }
-
-  // ─── FALLBACKS: other possible shapes ──────────────────────────────────────
-  const buckets = [
-    candidate?.event_types,
-    candidate?.eventTypes,
-    candidate?.result,
-    Array.isArray(root) ? root : null,
-    parsedData?.event_types,
-    parsedData?.eventTypes,
-    parsedData?.result,
-    parsedData?.data,
-    candidate?.data,
-  ];
-
-  for (const bucket of buckets) {
-    if (!Array.isArray(bucket)) {
-      continue;
-    }
-
-    const eventTypes = flattenEventTypeItems(bucket);
-
-    if (eventTypes.length > 0) {
-      return eventTypes;
-    }
-  }
-
-  return [];
-}
-
 export async function listCalEventTypes(
   composioUserId: string,
   connectedAccountId?: string | null,
 ): Promise<CalEventType[]> {
-  try {
-    const result = await executeToolCall(
-      composioUserId,
-      "CAL_LIST_EVENT_TYPES",
-      {},
-      { connectedAccountId },
-    );
-    return extractCalEventTypes(result);
-  } catch (error) {
-    console.warn(
-      `[Cal.com] CAL_LIST_EVENT_TYPES failed for compUserId: ${composioUserId}, connectionId: ${connectedAccountId ?? "none"}. Falling back to manual input.`,
-      error instanceof Error ? error.message : error,
-    );
-    return [];
-  }
+  return listCalEventTypesWithExecutor(
+    executeToolCall,
+    composioUserId,
+    connectedAccountId,
+    isConnectedAccountMissingError,
+  );
 }

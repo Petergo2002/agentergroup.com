@@ -4,7 +4,7 @@ import packageJson from "../../../package.json";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
-import { ArrowLeft, LayoutGrid, Shield, Users } from "lucide-react";
+import { ArrowLeft, LayoutGrid, Shield, ShieldCheck, Users } from "lucide-react";
 
 export function AdminSidebar() {
   const pathname = usePathname();
@@ -12,6 +12,7 @@ export function AdminSidebar() {
   const navItems = [
     { href: "/admin", label: t("admin.overviewTitle"), icon: LayoutGrid },
     { href: "/admin/customers", label: t("admin.customersBadge"), icon: Users },
+    { href: "/admin/verification", label: t("admin.verification"), icon: ShieldCheck },
   ];
 
   return (
@@ -31,8 +32,10 @@ export function AdminSidebar() {
           const isActive =
             item.href === "/admin"
               ? pathname === "/admin"
-              : pathname?.startsWith(item.href) ||
-                pathname?.startsWith("/admin/workspaces/");
+              : item.href === "/admin/customers"
+                ? pathname?.startsWith(item.href) ||
+                  pathname?.startsWith("/admin/workspaces/")
+                : pathname?.startsWith(item.href);
           const Icon = item.icon;
 
           return (

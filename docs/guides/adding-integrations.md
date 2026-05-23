@@ -1,6 +1,6 @@
 # End-to-End Integration Guide — Adding New Toolkits
 
-Last updated: 2026-05-12
+Last updated: 2026-05-20
 
 This document defines the complete workflow for adding a new Composio toolkit (integration) to the Agenter platform. Follow these steps in order to ensure the integration is registered, secured, and properly exposed in the Agent Builder and Runtime.
 

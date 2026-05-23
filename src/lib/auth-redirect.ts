@@ -1,4 +1,9 @@
 const DEFAULT_POST_LOGIN_REDIRECT = "/dashboard";
+const POST_AUTH_BLOCKED_PREFIXES = ["/auth", "/login"] as const;
+
+function matchesPathPrefix(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
 
 export function sanitizeRedirectTo(
   value: string | null | undefined,
@@ -14,4 +19,18 @@ export function sanitizeRedirectTo(
   }
 
   return trimmed;
+}
+
+export function sanitizePostAuthRedirectTo(
+  value: string | null | undefined,
+  fallback = DEFAULT_POST_LOGIN_REDIRECT,
+) {
+  const redirectTo = sanitizeRedirectTo(value, fallback);
+  const pathname = redirectTo.split(/[?#]/, 1)[0] ?? redirectTo;
+
+  if (POST_AUTH_BLOCKED_PREFIXES.some((prefix) => matchesPathPrefix(pathname, prefix))) {
+    return fallback;
+  }
+
+  return redirectTo;
 }
