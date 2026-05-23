@@ -21,6 +21,7 @@ import { connections } from "./sv/connections";
 import { settings } from "./sv/settings";
 import { admin } from "./sv/admin";
 import { privacyPolicy } from "./sv/privacyPolicy";
+import { termsOfService } from "./sv/termsOfService";
 import { dataProcessing } from "./sv/dataProcessing";
 import { subprocessors } from "./sv/subprocessors";
 
@@ -47,6 +48,7 @@ export const sv = {
   settings,
   admin,
   privacyPolicy,
+  termsOfService,
   dataProcessing,
   subprocessors,
 } satisfies Messages;

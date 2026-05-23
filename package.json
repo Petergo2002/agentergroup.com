@@ -16,7 +16,7 @@
     "widget:build": "npm --prefix apps/widget-v2 run build"
   },
   "dependencies": {
-    "@composio/core": "^0.6.6",
+    "@composio/core": "^0.10.0",
     "@mendable/firecrawl-js": "^4.18.3",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.102.0",

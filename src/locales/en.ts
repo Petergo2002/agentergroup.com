@@ -20,6 +20,7 @@ import { connections } from "./en/connections";
 import { settings } from "./en/settings";
 import { admin } from "./en/admin";
 import { privacyPolicy } from "./en/privacyPolicy";
+import { termsOfService } from "./en/termsOfService";
 import { dataProcessing } from "./en/dataProcessing";
 import { subprocessors } from "./en/subprocessors";
 
@@ -46,6 +47,7 @@ export const en = {
   settings,
   admin,
   privacyPolicy,
+  termsOfService,
   dataProcessing,
   subprocessors,
 } as const;

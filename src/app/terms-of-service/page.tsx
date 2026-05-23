@@ -8,12 +8,12 @@ import { getServerLanguage } from "@/lib/i18n-server";
 import { LegalLayout } from "@/components/legal/LegalLayout";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Agentergroup",
+  title: "Terms of Service | Agentergroup",
   description:
-    "Public privacy policy for Agentergroup and Agentergroup-powered widgets.",
+    "Public terms of service for Agentergroup and Agentergroup-powered widgets.",
 };
 
-export default async function PrivacyPolicyPage({
+export default async function TermsOfServicePage({
   searchParams,
 }: {
   searchParams: Promise<{ lang?: string }>;
@@ -23,13 +23,13 @@ export default async function PrivacyPolicyPage({
   const language: PlatformLanguage = lang
     ? resolvePlatformLanguage(lang)
     : defaultLanguage;
-  const copy = (await getMessages(language)).privacyPolicy;
+  const copy = (await getMessages(language)).termsOfService;
 
   return (
     <LegalLayout
       copy={copy}
       language={language}
-      pageType="privacy-policy"
+      pageType="terms-of-service"
     />
   );
 }

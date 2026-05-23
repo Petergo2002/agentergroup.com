@@ -18,6 +18,7 @@ import {
  * - /api/internal/privacy/retention
  * - /connect/*
  * - /privacy-policy
+ * - /terms-of-service
  * - /data-processing
  * - /subprocessors
  * - /_next/*
@@ -33,6 +34,7 @@ const PUBLIC_EXACT_PATHS = [
   "/signup",
   "/api/health",
   "/privacy-policy",
+  "/terms-of-service",
   "/data-processing",
   "/subprocessors",
 ] as const;
