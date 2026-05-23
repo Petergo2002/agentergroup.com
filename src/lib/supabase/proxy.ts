@@ -30,6 +30,7 @@ import {
  */
 const PUBLIC_EXACT_PATHS = [
   "/",
+  "/signup",
   "/api/health",
   "/privacy-policy",
   "/data-processing",

@@ -1,5 +1,5 @@
 const DEFAULT_POST_LOGIN_REDIRECT = "/dashboard";
-const POST_AUTH_BLOCKED_PREFIXES = ["/auth", "/login"] as const;
+const POST_AUTH_BLOCKED_PREFIXES = ["/auth", "/login", "/signup"] as const;
 
 function matchesPathPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);

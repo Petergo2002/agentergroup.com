@@ -31,6 +31,11 @@ test("keeps successful auth out of auth and login pages", () => {
     sanitizePostAuthRedirectTo("/login?redirectTo=/dashboard"),
     DEFAULT_POST_LOGIN_REDIRECT,
   );
+  assert.equal(sanitizePostAuthRedirectTo("/signup"), DEFAULT_POST_LOGIN_REDIRECT);
+  assert.equal(
+    sanitizePostAuthRedirectTo("/signup?plan=pro"),
+    DEFAULT_POST_LOGIN_REDIRECT,
+  );
   assert.equal(sanitizePostAuthRedirectTo("/auth/logout"), DEFAULT_POST_LOGIN_REDIRECT);
   assert.equal(sanitizePostAuthRedirectTo("/settings/billing"), "/settings/billing");
 });
