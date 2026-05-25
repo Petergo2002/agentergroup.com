@@ -36,13 +36,13 @@ export default async function AdminOverviewPage({
   return (
     <div className="space-y-8 admin-fade-in">
       <header>
-        <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+        <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-on-surface-variant">
           {language === "sv" ? "Intern admin" : "Internal admin"}
         </p>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-on-surface">
           {language === "sv" ? "Översikt" : "Overview"}
         </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-500">
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant">
           {language === "sv"
             ? "Övergripande insyn i kundkonton, vad de har byggt och hur aktivt plattformen används."
             : "High-level visibility into customer accounts, what they have built, and how actively the platform is being used."}
@@ -53,10 +53,10 @@ export default async function AdminOverviewPage({
 
       <section id="customers" className="space-y-4">
         <div>
-          <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+          <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-on-surface-variant">
             {language === "sv" ? "Workspaces" : "Workspaces"}
           </p>
-          <h2 className="mt-2 text-xl font-semibold text-white">
+          <h2 className="mt-2 text-xl font-semibold text-on-surface">
             {language === "sv" ? "Kundaktivitet" : "Customer activity"}
           </h2>
         </div>

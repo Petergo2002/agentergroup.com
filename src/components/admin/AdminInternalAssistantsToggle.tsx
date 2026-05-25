@@ -56,20 +56,20 @@ export function AdminInternalAssistantsToggle({
   };
 
   return (
-    <div className="rounded-2xl border border-[#262626] bg-[#121212] p-4">
+    <div className="rounded-2xl border border-outline bg-surface p-4 shadow-tactile">
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-2">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-on-surface-variant">
             {t("admin.internalAssistants")}
           </p>
-          <p className="text-sm text-neutral-300">
+          <p className="text-sm text-on-surface">
             {t("admin.internalAssistantsDescription")}
           </p>
           <div
             className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
               isEnabled
-                ? "bg-emerald-500/10 text-emerald-300"
-                : "bg-neutral-800 text-neutral-400"
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "bg-surface-container-high text-on-surface-variant"
             }`}
           >
             {isEnabled ? t("common.enabled") : t("common.disabled")}
@@ -82,8 +82,8 @@ export function AdminInternalAssistantsToggle({
           disabled={isSaving}
           className={`rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
             isEnabled
-              ? "bg-white text-black hover:bg-neutral-200"
-              : "bg-neutral-800 text-white hover:bg-neutral-700"
+              ? "bg-on-surface text-surface hover:opacity-90"
+              : "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
           } disabled:cursor-not-allowed disabled:opacity-60`}
         >
           {isSaving
@@ -95,7 +95,7 @@ export function AdminInternalAssistantsToggle({
       </div>
 
       {errorMessage ? (
-        <p className="mt-3 text-xs text-red-300">{errorMessage}</p>
+        <p className="mt-3 text-xs text-error">{errorMessage}</p>
       ) : null}
     </div>
   );

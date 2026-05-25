@@ -20,7 +20,7 @@ export function AdminTabs({ currentTab, workspaceId }: AdminTabsProps) {
   ];
 
   return (
-    <nav className="flex items-center gap-6 border-b border-[#1a1a1a]">
+    <nav className="flex items-center gap-6 border-b border-outline">
       {tabs.map((tab) => {
         const isActive = tab.key === currentTab;
 
@@ -30,8 +30,8 @@ export function AdminTabs({ currentTab, workspaceId }: AdminTabsProps) {
             href={`/admin/workspaces/${workspaceId}?tab=${tab.key}`}
             className={`border-b px-1 py-3 text-sm font-medium transition-colors ${
               isActive
-                ? "border-[#FF5C00] text-white"
-                : "border-transparent text-neutral-500 hover:text-neutral-200"
+                ? "border-[#FF5C00] text-on-surface"
+                : "border-transparent text-on-surface-variant hover:text-on-surface"
             }`}
           >
             {tab.label}

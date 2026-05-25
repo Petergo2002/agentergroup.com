@@ -39,17 +39,17 @@ export function AdminWorkspaceAnalytics({
         {stats.map((stat) => (
           <article
             key={stat.label}
-            className="rounded-3xl border border-[#222] bg-[#171717] px-6 py-5"
+            className="rounded-3xl border border-outline bg-surface px-6 py-5 shadow-tactile"
           >
-            <p className="text-[12px] uppercase tracking-[0.14em] text-neutral-500">
+            <p className="text-[12px] uppercase tracking-[0.14em] text-on-surface-variant">
               {stat.label}
             </p>
             {stat.label === (language === "sv" ? "Senast aktiv" : "Last active") ? (
-              <div className="mt-4 text-lg font-medium text-white">
+              <div className="mt-4 text-lg font-medium text-on-surface">
                 <AdminTimestamp value={workspace.lastActiveAt} language={language} />
               </div>
             ) : (
-              <p className="mt-4 text-[28px] font-semibold tracking-tight text-white">
+              <p className="mt-4 text-[28px] font-semibold tracking-tight text-on-surface">
                 {stat.value}
               </p>
             )}

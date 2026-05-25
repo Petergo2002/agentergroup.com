@@ -1,6 +1,6 @@
 # Agentergroup Architecture
 
-Last updated: 2026-05-20
+Last updated: 2026-05-23
 
 ## Purpose
 
@@ -403,6 +403,25 @@ Key fields:
 - `storage_limit_bytes`: maximum knowledge base storage (default 10MB, premium 50MB)
 - `billing_cycle_start` / `billing_cycle_end`: current cycle window
 - `stripe_customer_id` / `stripe_subscription_id`: Stripe identifiers (nullable for free plans)
+
+### Message quota enforcement
+
+Billable model entry points must call `consumeWorkspaceMessageUsage()` in `src/lib/message-usage.ts`
+before making an OpenRouter-backed request. The helper calls the service-role-only
+`increment_workspace_message_usage()` RPC and returns `402 MESSAGE_LIMIT_REACHED` semantics when
+the workspace has exhausted its cycle allowance.
+
+Current quota-covered entry points:
+
+- public widget chat: `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
+- internal assistant chat: `src/app/api/assistants/[id]/chat/route.ts`
+- agent preview chat: `src/app/api/agents/[id]/chat/route.ts`
+- prompt optimization: `src/app/api/agents/[id]/optimize-prompt/route.ts`
+- automation trigger execution: `src/lib/automation/executor.ts`
+
+Prompt optimization and preview chat count against the same monthly allowance as normal chat.
+Automations also count against the workspace allowance so external trigger volume cannot create
+unbounded OpenRouter spend.
 
 ### Bootstrap integration
 
@@ -808,6 +827,29 @@ direct RPC access.
 
 After the MCP migration run, the only remaining Supabase security advisor warning was leaked
 password protection, which is an Auth dashboard setting and is intentionally not fixed in SQL.
+
+## Route Protection
+
+Middleware is centralized in `src/lib/supabase/proxy.ts`.
+
+Current policy:
+
+- explicitly public routes are listed in `PUBLIC_EXACT_PATHS` and `PUBLIC_PATH_PREFIXES`
+- all other middleware-matched routes require a valid Supabase session by default
+- public webhook/internal routes must perform their own signature or shared-secret verification
+- route classification is covered by `tests/security/middleware-protection.test.ts`
+
+Current explicit public classes include:
+
+- public marketing/legal pages: `/`, `/privacy-policy`, `/data-processing`, `/subprocessors`
+- auth and login flows: `/login/*`, `/auth/*`
+- public widget APIs: `/api/public/*`
+- public connection auth-link flow: `/connect/*`
+- externally called signed/secret-protected endpoints: `/api/billing/webhook`,
+  `/api/composio/webhook`, `/api/internal/privacy/retention`
+
+When adding a new unauthenticated route, add it to the public lists deliberately and document the
+route-level verification it relies on.
 
 ## Agent Model
 
@@ -1391,7 +1433,6 @@ Current behavior:
 - widget session/activity data, widget messages, and widget leads are currently covered by a 180 day retention policy enforced by an internal purge route
 - public widget POST endpoints now enforce volumetric rate limiting for hosted and embedded traffic
 - preview-token traffic is intentionally excluded from the public widget rate limiter
-- the current rollout design and thresholds are documented in `docs/implementation-plans/20260409-widget-rate-limits-plan.md`
 - the rate-limit RPC must upsert with `ON CONFLICT ON CONSTRAINT rate_limit_windows_scope_window_constraint`; using a bare column-list conflict target can reintroduce ambiguous `window_started_at` failures in Postgres
 - self-service password reset and a backup/restore operator runbook remain follow-up work outside this batch
 - file uploads support images and documents (up to 5MB) via the public `upload` endpoint and are stored securely in the `widget-attachments` storage bucket
@@ -1490,6 +1531,7 @@ Important note:
 - OpenRouter is currently the only LLM transport layer
 - the model can be configured per agent, but the transport path is centralized
 - request-level privacy enforcement now lives in code, not only in OpenRouter dashboard settings
+- all current model entry points consume workspace message quota before invoking OpenRouter
 
 ## Composio Architecture
 
@@ -1569,12 +1611,13 @@ The current implementation creates Composio tool-router sessions per user.
 
 Important operational detail:
 
-- sessions are cached in memory inside the Next.js server process
-- TTL is currently 30 minutes
+- tool-router, Composio SDK session, and MCP session references are cached in memory inside the Next.js server process
+- all three cache maps carry a `createdAt` timestamp and use a 30-minute TTL
 - this improves repeated use during a session
 - it is not durable across deploys or cold starts
 
-This is acceptable for the current MVP, but it is an important scaling constraint for future infrastructure work.
+This is acceptable for the current MVP, but it is still process-local best-effort caching. It should
+not be treated as durable cross-instance state on serverless infrastructure.
 
 ### Toolkit versioning
 
@@ -2110,6 +2153,13 @@ The core environment contract is:
 - `RATE_LIMIT_SECRET`
 - `GDPR_RETENTION_CRON_SECRET`
 
+Billing and rate-limit env rules:
+
+- Stripe helpers in `src/lib/stripe.ts` are import-safe, but billing routes return `503` when required Stripe env is missing.
+- `NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID` and `NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID` are required for plan checkout and webhook price-to-plan mapping; there are no hardcoded price id fallbacks.
+- `STRIPE_EXTRA_CREDITS_500_PRICE_ID` is required for the 500-message extra credit checkout.
+- `RATE_LIMIT_SECRET` must be a dedicated production secret. It can fall back to `WIDGET_ACCESS_SECRET`, but it never falls back to `SUPABASE_SERVICE_ROLE_KEY`.
+
 ### Supabase Edge Functions
 
 Expected inside Supabase function runtime:
@@ -2177,7 +2227,9 @@ Drive is intentionally excluded from live chat tool execution.
 
 ### 3. Composio session cache is process-local
 
-The current session cache uses in-memory storage in the Next.js process. This is fine for MVP but should be revisited if multi-instance or high-scale deployment becomes a priority.
+The current session cache uses in-memory storage in the Next.js process with a 30-minute TTL. This is
+fine for MVP latency and repeated-use optimization, but it is not cross-instance state and should be
+revisited if multi-instance or high-scale deployment becomes a priority.
 
 ### 4. Runtime uses two state models today
 

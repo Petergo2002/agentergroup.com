@@ -17,8 +17,5 @@ Practical instructions for common tasks:
 - **[Widget Security](./guides/widget-embed-security.md)** - Security protocols for public embeds.
 - **[Privacy Operations](./guides/privacy-operations.md)** - GDPR and data processing details.
 
-## 📁 [Archive](./archive/plans/)
-Historical implementation plans and completed feature specs.
-
 ---
 *Last updated: May 2026*

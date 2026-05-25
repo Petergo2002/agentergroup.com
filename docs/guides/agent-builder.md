@@ -151,7 +151,7 @@ When the `agent` node is selected, the right panel edits:
 
 **New AI Features:**
 - **Expanded Editor:** A large-scale modal for deep prompt engineering, accessible via the "Expand" button.
-- **Magic Wand Optimizer:** An OpenRouter-powered feature that rewrites raw instructions into structured, industry-standard system prompts (using the `/api/agents/[id]/optimize-prompt` endpoint).
+- **Magic Wand Optimizer:** An OpenRouter-powered feature that rewrites raw instructions into structured, industry-standard system prompts (using the `/api/agents/[id]/optimize-prompt` endpoint). Optimizer calls consume the workspace message quota before the model request.
 
 **Agent Metrics:**
 - **Setup Readiness Score:** Replaces the static "Confidence" bar. This is a dynamic score (0-100%) calculated in the UI based on:
@@ -205,7 +205,7 @@ When the `trigger` node is selected, the builder lets the user choose what start
 Current trigger sources:
 
 - `user_message`: internal chat trigger used by Website Chat agents
-- `gmail_new_message`: external Composio trigger used by Automation agents
+- `gmail_new_message`: external Composio trigger used by Automation agents. This option is only shown when automations/external triggers are enabled for the current workspace.
 
 Important current behavior:
 

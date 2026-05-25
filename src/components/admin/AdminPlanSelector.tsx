@@ -17,17 +17,17 @@ const PLAN_META: Record<
 > = {
   free: {
     label: "Free",
-    badgeClasses: "bg-neutral-800 text-neutral-300",
+    badgeClasses: "bg-surface-container-high text-on-surface-variant",
     description: "50 messages / 1 agent / No integrations",
   },
   starter: {
     label: "Starter",
-    badgeClasses: "bg-sky-500/15 text-sky-300",
+    badgeClasses: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
     description: "500 messages / 3 agents / Integrations",
   },
   premium: {
     label: "Premium",
-    badgeClasses: "bg-amber-500/15 text-amber-300",
+    badgeClasses: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
     description: "4,000 messages / Unlimited agents / Integrations",
   },
 };
@@ -93,11 +93,11 @@ export function AdminPlanSelector({
   const meta = PLAN_META[activePlan];
 
   return (
-    <div className="rounded-2xl border border-[#262626] bg-[#121212] p-4">
+    <div className="rounded-2xl border border-outline bg-surface p-4 shadow-tactile">
       {/* Header row */}
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-2">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-on-surface-variant">
             Subscription Plan
           </p>
           {/* Current plan badge */}
@@ -106,7 +106,7 @@ export function AdminPlanSelector({
           >
             {meta.label}
           </div>
-          <p className="text-[11px] text-neutral-500">{meta.description}</p>
+          <p className="text-[11px] text-on-surface-variant">{meta.description}</p>
         </div>
       </div>
 
@@ -124,11 +124,11 @@ export function AdminPlanSelector({
                 ${
                   isActive
                     ? plan === "premium"
-                      ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30"
+                      ? "bg-amber-500/20 text-amber-700 ring-1 ring-amber-500/30 dark:text-amber-300"
                       : plan === "starter"
-                        ? "bg-sky-500/20 text-sky-300 ring-1 ring-sky-500/30"
-                        : "bg-neutral-700 text-white ring-1 ring-neutral-600"
-                    : "bg-transparent text-neutral-600 hover:bg-neutral-800 hover:text-neutral-300"
+                        ? "bg-sky-500/20 text-sky-700 ring-1 ring-sky-500/30 dark:text-sky-300"
+                        : "bg-surface-container-high text-on-surface ring-1 ring-outline"
+                    : "bg-transparent text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
                 } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {PLAN_META[plan].label}
@@ -139,12 +139,12 @@ export function AdminPlanSelector({
 
       {/* Saving indicator */}
       {isSaving && (
-        <p className="mt-3 text-[11px] text-neutral-500">Applying plan…</p>
+        <p className="mt-3 text-[11px] text-on-surface-variant">Applying plan...</p>
       )}
 
       {/* Error message */}
       {errorMessage && (
-        <p className="mt-3 text-xs text-red-300">{errorMessage}</p>
+        <p className="mt-3 text-xs text-error">{errorMessage}</p>
       )}
     </div>
   );

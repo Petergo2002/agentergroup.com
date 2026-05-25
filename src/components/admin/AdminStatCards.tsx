@@ -20,12 +20,12 @@ export function AdminStatCards({ summary, language }: AdminStatCardsProps) {
       {items.map(([label, value]) => (
         <article
           key={label}
-          className="rounded-3xl border border-[#222] bg-[#171717] px-6 py-6"
+          className="rounded-3xl border border-outline bg-surface px-6 py-6 shadow-tactile"
         >
-          <p className="text-[12px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+          <p className="text-[12px] font-medium uppercase tracking-[0.16em] text-on-surface-variant">
             {label}
           </p>
-          <p className="mt-5 text-[32px] font-semibold tracking-tight text-white">
+          <p className="mt-5 text-[32px] font-semibold tracking-tight text-on-surface">
             {formatAdminNumber(value, language)}
           </p>
         </article>

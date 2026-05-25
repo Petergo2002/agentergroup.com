@@ -1,5 +1,5 @@
 function SkeletonBlock({ className }: { className: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-white/[0.05] ${className}`} />;
+  return <div className={`animate-pulse rounded-2xl bg-surface-container-high ${className}`} />;
 }
 
 export function AdminOverviewSkeleton() {
@@ -15,7 +15,7 @@ export function AdminOverviewSkeleton() {
         {Array.from({ length: 4 }, (_, index) => (
           <div
             key={index}
-            className="rounded-3xl border border-[#222] bg-[#171717] p-6"
+            className="rounded-3xl border border-outline bg-surface p-6 shadow-tactile"
           >
             <SkeletonBlock className="h-3 w-24" />
             <SkeletonBlock className="mt-5 h-9 w-20" />
@@ -23,7 +23,7 @@ export function AdminOverviewSkeleton() {
         ))}
       </div>
 
-      <div className="rounded-3xl border border-[#222] bg-[#171717] p-6">
+      <div className="rounded-3xl border border-outline bg-surface p-6 shadow-tactile">
         <div className="grid grid-cols-8 gap-4">
           {Array.from({ length: 8 }, (_, index) => (
             <SkeletonBlock key={index} className="h-3 w-full" />

@@ -75,45 +75,45 @@ export function AdminExtraCreditsGrant({
   };
 
   return (
-    <div className="rounded-2xl border border-[#262626] bg-[#121212] p-4">
+    <div className="rounded-2xl border border-outline bg-surface p-4 shadow-tactile">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-on-surface-variant">
             {language === "sv" ? "Extra credits" : "Extra credits"}
           </p>
-          <p className="text-sm text-neutral-300">
+          <p className="text-sm text-on-surface">
             {language === "sv"
               ? "Lägg till extra meddelanden i denna billing cycle."
               : "Add extra messages to this billing cycle."}
           </p>
         </div>
-        <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-300">
+        <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
           <Coins aria-hidden className="h-4 w-4" />
         </div>
       </div>
 
       <dl className="mt-4 grid grid-cols-3 gap-2">
-        <div className="rounded-xl bg-neutral-900 px-3 py-2">
-          <dt className="text-[10px] uppercase tracking-[0.12em] text-neutral-600">
+        <div className="rounded-xl bg-surface-container-low px-3 py-2">
+          <dt className="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant">
             {language === "sv" ? "Använt" : "Used"}
           </dt>
-          <dd className="mt-1 text-sm font-semibold text-white">
+          <dd className="mt-1 text-sm font-semibold text-on-surface">
             {formatAdminNumber(messagesUsed, language)}
           </dd>
         </div>
-        <div className="rounded-xl bg-neutral-900 px-3 py-2">
-          <dt className="text-[10px] uppercase tracking-[0.12em] text-neutral-600">
+        <div className="rounded-xl bg-surface-container-low px-3 py-2">
+          <dt className="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant">
             {language === "sv" ? "Limit" : "Limit"}
           </dt>
-          <dd className="mt-1 text-sm font-semibold text-white">
+          <dd className="mt-1 text-sm font-semibold text-on-surface">
             {formatAdminNumber(currentLimit, language)}
           </dd>
         </div>
-        <div className="rounded-xl bg-neutral-900 px-3 py-2">
-          <dt className="text-[10px] uppercase tracking-[0.12em] text-neutral-600">
+        <div className="rounded-xl bg-surface-container-low px-3 py-2">
+          <dt className="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant">
             {language === "sv" ? "Kvar" : "Left"}
           </dt>
-          <dd className="mt-1 text-sm font-semibold text-white">
+          <dd className="mt-1 text-sm font-semibold text-on-surface">
             {formatAdminNumber(remainingMessages, language)}
           </dd>
         </div>
@@ -126,7 +126,7 @@ export function AdminExtraCreditsGrant({
             type="button"
             disabled={activeAmount !== null}
             onClick={() => void grantCredits(amount)}
-            className="rounded-xl bg-neutral-800 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-200 transition-colors hover:bg-emerald-500/15 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl bg-surface-container-high px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface transition-colors hover:bg-emerald-500/15 hover:text-emerald-700 dark:hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {activeAmount === amount ? "..." : `+${amount}`}
           </button>
@@ -134,10 +134,10 @@ export function AdminExtraCreditsGrant({
       </div>
 
       {successMessage ? (
-        <p className="mt-3 text-xs text-emerald-300">{successMessage}</p>
+        <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">{successMessage}</p>
       ) : null}
       {errorMessage ? (
-        <p className="mt-3 text-xs text-red-300">{errorMessage}</p>
+        <p className="mt-3 text-xs text-error">{errorMessage}</p>
       ) : null}
     </div>
   );

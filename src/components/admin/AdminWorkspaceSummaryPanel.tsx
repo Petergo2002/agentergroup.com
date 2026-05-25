@@ -21,39 +21,39 @@ export function AdminWorkspaceSummaryPanel({
   ] as const;
 
   return (
-    <aside className="sticky top-8 rounded-3xl border border-[#222] bg-[#171717] p-6">
-      <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-neutral-500">
+    <aside className="sticky top-8 rounded-3xl border border-outline bg-surface p-6 shadow-tactile">
+      <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-on-surface-variant">
         {language === "sv" ? "Kund" : "Customer"}
       </p>
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight text-white">
+      <h1 className="mt-4 text-2xl font-semibold tracking-tight text-on-surface">
         {workspace.name}
       </h1>
-      <p className="mt-2 text-sm text-neutral-400">
+      <p className="mt-2 text-sm text-on-surface-variant">
         {workspace.ownerEmail ?? (language === "sv" ? "Ingen ägaradress" : "No owner email")}
       </p>
 
-      <dl className="mt-6 space-y-4 border-t border-[#222] pt-6">
+      <dl className="mt-6 space-y-4 border-t border-outline pt-6">
         <div>
-          <dt className="text-[12px] uppercase tracking-[0.14em] text-neutral-600">
+          <dt className="text-[12px] uppercase tracking-[0.14em] text-on-surface-variant">
             {language === "sv" ? "Skapad" : "Created"}
           </dt>
-          <dd className="mt-1 text-sm text-neutral-200">
+          <dd className="mt-1 text-sm text-on-surface">
             <AdminTimestamp value={workspace.createdAt} language={language} />
           </dd>
         </div>
         <div>
-          <dt className="text-[12px] uppercase tracking-[0.14em] text-neutral-600">
+          <dt className="text-[12px] uppercase tracking-[0.14em] text-on-surface-variant">
             {language === "sv" ? "Senast aktiv" : "Last active"}
           </dt>
-          <dd className="mt-1 text-sm text-neutral-200">
+          <dd className="mt-1 text-sm text-on-surface">
             <AdminTimestamp value={workspace.lastActiveAt} language={language} />
           </dd>
         </div>
         <div>
-          <dt className="text-[12px] uppercase tracking-[0.14em] text-neutral-600">
+          <dt className="text-[12px] uppercase tracking-[0.14em] text-on-surface-variant">
             {language === "sv" ? "Konversationer" : "Conversations"}
           </dt>
-          <dd className="mt-1 text-sm text-neutral-200">
+          <dd className="mt-1 text-sm text-on-surface">
             {formatAdminNumber(workspace.conversationCount, language)}
           </dd>
         </div>
@@ -63,12 +63,12 @@ export function AdminWorkspaceSummaryPanel({
         {pills.map((pill) => (
           <div
             key={pill.label}
-            className="flex-1 rounded-2xl bg-neutral-800/40 px-4 py-3"
+            className="flex-1 rounded-2xl bg-surface-container-low px-4 py-3"
           >
-            <p className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+            <p className="text-[10px] uppercase tracking-[0.14em] text-on-surface-variant">
               {pill.label}
             </p>
-            <p className="mt-1 text-lg font-medium tracking-tight text-white">
+            <p className="mt-1 text-lg font-medium tracking-tight text-on-surface">
               {formatAdminNumber(pill.value, language)}
             </p>
           </div>

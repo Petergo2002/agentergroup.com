@@ -1,6 +1,7 @@
 export const nav = {
   dashboard: "Översikt",
   analytics: "Analys",
+  newAnalyticsActivity: "Ny analysaktivitet",
   agents: "Agenter",
   agentLibrary: "Agentbibliotek",
   assistants: "Assistenter",

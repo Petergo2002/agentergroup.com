@@ -33,13 +33,13 @@ export default async function AdminCustomersPage({
   return (
     <div className="space-y-8 admin-fade-in">
       <header>
-        <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+        <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-on-surface-variant">
           {language === "sv" ? "Kunder" : "Customers"}
         </p>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-on-surface">
           {language === "sv" ? "Workspace-katalog" : "Workspace directory"}
         </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-500">
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant">
           {language === "sv"
             ? "En tydlig workspace-vy över vem som använder plattformen och hur aktiva de är."
             : "A clean workspace-level view of who is using the platform and how active they are."}

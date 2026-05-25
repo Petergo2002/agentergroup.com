@@ -72,13 +72,13 @@ export default async function AdminWorkspaceDetailPage({
 
       <section className="min-w-0 space-y-6">
         <header className="admin-fade-in">
-          <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+          <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-on-surface-variant">
             {language === "sv" ? "Kunddetalj" : "Customer detail"}
           </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-on-surface">
             {workspace.name}
           </h2>
-          <p className="mt-3 text-sm leading-6 text-neutral-500">
+          <p className="mt-3 text-sm leading-6 text-on-surface-variant">
             {language === "sv"
               ? "Skrivskyddad aktivitet, byggdata och widgetanvändning för detta workspace."
               : "Read-only activity, build, and widget usage for this workspace."}
@@ -90,7 +90,7 @@ export default async function AdminWorkspaceDetailPage({
         {currentTab === "customer" ? (
           <div className="space-y-6 admin-fade-in">
             <div>
-              <h3 className="text-xl font-semibold text-white">
+              <h3 className="text-xl font-semibold text-on-surface">
                 {language === "sv" ? "Kundinformation" : "Customer Information"}
               </h3>
             </div>
@@ -124,10 +124,10 @@ export default async function AdminWorkspaceDetailPage({
         {currentTab === "agents" ? (
           <div className="space-y-4 admin-fade-in">
             <div>
-              <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+              <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-on-surface-variant">
                 {language === "sv" ? "Agenter" : "Agents"}
               </p>
-              <h3 className="mt-2 text-xl font-semibold text-white">
+              <h3 className="mt-2 text-xl font-semibold text-on-surface">
                 {language === "sv" ? "Workspace-agenter" : "Workspace agents"}
               </h3>
             </div>
@@ -138,10 +138,10 @@ export default async function AdminWorkspaceDetailPage({
         {currentTab === "widgets" ? (
           <div className="space-y-4 admin-fade-in">
             <div>
-              <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+              <p className="text-[14px] font-medium uppercase tracking-[0.16em] text-on-surface-variant">
                 {language === "sv" ? "Widgets" : "Widgets"}
               </p>
-              <h3 className="mt-2 text-xl font-semibold text-white">
+              <h3 className="mt-2 text-xl font-semibold text-on-surface">
                 {language === "sv" ? "Workspace-widgets" : "Workspace widgets"}
               </h3>
             </div>

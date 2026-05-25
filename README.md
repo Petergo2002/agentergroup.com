@@ -67,6 +67,11 @@ Root app variables:
 | `WIDGET_PREVIEW_SECRET` | Yes | Secret used to sign widget preview tokens |
 | `RATE_LIMIT_SECRET` | Yes in production | Dedicated secret used to hash public rate-limit identities |
 | `GDPR_RETENTION_CRON_SECRET` | Yes for retention job | Secret for the internal privacy retention route |
+| `STRIPE_SECRET_KEY` | Yes for billing | Stripe secret key used lazily by billing routes |
+| `STRIPE_WEBHOOK_SECRET` | Yes for billing webhooks | Stripe webhook signing secret |
+| `NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID` | Yes for billing | Stripe Starter recurring price id; no source fallback exists |
+| `NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID` | Yes for billing | Stripe Premium recurring price id; no source fallback exists |
+| `STRIPE_EXTRA_CREDITS_500_PRICE_ID` | Yes for extra credits | Stripe one-time price id for the 500-message credit pack |
 
 Widget package variables:
 
@@ -186,11 +191,15 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - Public lead submissions now return only `ok`, `leadId`, and `createdAt`.
 - The dashboard app now sends baseline browser protections through CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
 - Public widget rate limits are enforced through a Supabase RPC backed by a named uniqueness constraint on `rate_limit_windows`; do not switch that upsert back to a bare column-list conflict target or Postgres can reintroduce ambiguous `window_started_at` errors.
+- `RATE_LIMIT_SECRET` must be a dedicated production secret. The app no longer falls back to `SUPABASE_SERVICE_ROLE_KEY` for rate-limit identity hashing.
+- OpenRouter-backed turns consume workspace message quota before model calls in public widget chat, internal assistant chat, agent preview chat, prompt optimization, and automation runs.
+- Middleware is explicit-public/default-auth: any matched route not listed as public in `src/lib/supabase/proxy.ts` requires a valid Supabase session.
+- Stripe billing config is required at route execution time and has no hardcoded price id fallbacks.
 - Changes under `apps/widget-v2` require a separate widget-runtime deploy; pushing or deploying only the dashboard app does not update `widget.agentergroup.com`.
 - Internal assistant chat is serialized per `chat_threads` row; overlapping turns return `409 THREAD_BUSY`.
 - Internal assistants become usable after the first normal builder save; publish remains widget-only in v1.
 - `scripts/widget-load-test.mjs` exercises bootstrap/chat flows and the same-session lock path.
-- The security regression suite lives under `tests/security/*.test.ts` and currently covers redirect sanitization, trusted widget IP handling, widget CORS behavior, browser security headers, SSRF blocking, workspace ownership guards, DSAR normalization/sanitization, debug-trace redaction, and multi-account Drive selection.
+- The security regression suite lives under `tests/security/*.test.ts` and currently covers redirect sanitization, trusted widget IP handling, widget CORS behavior, browser security headers, SSRF blocking, workspace ownership guards, DSAR normalization/sanitization, debug-trace redaction, multi-account Drive selection, billing config hardening, quota coverage, middleware default protection, and Composio cache TTL behavior.
 - `npm audit --audit-level=moderate` currently passes in both the root app and `apps/widget-v2`.
 - The top-level `/data-processing` and `/subprocessors` routes are compatibility redirects into `/settings/...`.
 - Self-service password reset and a backup/restore operator runbook are follow-up work and are not part of the current launch-hardening batch.

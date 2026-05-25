@@ -1,10 +1,12 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { sanitizePostAuthRedirectTo } from "@/lib/auth-redirect";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
 import { login, signup } from "@/app/login/actions";
+import { EmailAuthSubmitButton } from "@/app/login/EmailAuthSubmitButton";
 import { GoogleSignInButton } from "@/app/login/GoogleSignInButton";
 import { createClient } from "@/lib/supabase/server";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -144,12 +146,11 @@ COMPOSIO_API_KEY=`}
               )}
 
               <div className="pt-2">
-                <button
-                  formAction={view === "login" ? login : signup}
-                  className="w-full flex h-10 items-center justify-center rounded-lg bg-black hover:bg-gray-800 text-white text-[13px] font-semibold transition-all duration-200 shadow-sm active:scale-[0.98] cursor-pointer"
-                >
-                  {view === "login" ? "Log in with email" : "Sign up with email"}
-                </button>
+                <EmailAuthSubmitButton
+                  action={view === "login" ? login : signup}
+                  idleLabel={view === "login" ? "Log in with email" : "Sign up with email"}
+                  pendingLabel={view === "login" ? "Signing in..." : "Sending link..."}
+                />
               </div>
             </form>
 
@@ -189,10 +190,13 @@ COMPOSIO_API_KEY=`}
 
         {/* Right Column: Hero Image */}
         <section className="hidden lg:block w-1/2 relative bg-slate-50 border-l border-slate-100">
-          <img 
-            src="/stocksnap-robot-2587571.jpg" 
-            alt="Hero Image" 
-            className="absolute inset-0 w-full h-full object-cover"
+          <Image
+            src="/stocksnap-robot-2587571.jpg"
+            alt="Hero Image"
+            fill
+            sizes="50vw"
+            className="object-cover"
+            priority
           />
         </section>
 

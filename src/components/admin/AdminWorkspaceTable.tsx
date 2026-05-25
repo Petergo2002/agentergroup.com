@@ -71,7 +71,7 @@ export function AdminWorkspaceTable({
 
   if (workspaces.length === 0) {
     return (
-      <section className="overflow-hidden rounded-3xl border border-[#222] bg-[#171717]">
+      <section className="overflow-hidden rounded-3xl border border-outline bg-surface shadow-tactile">
         <AdminEmptyState
           title={language === "sv" ? "Inga kunder ännu" : "No customers yet"}
           description={
@@ -85,41 +85,41 @@ export function AdminWorkspaceTable({
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-[#222] bg-[#171717]">
-      <div className="grid grid-cols-[1.45fr_1.4fr_0.8fr_0.65fr_0.65fr_1fr_1fr_1fr] gap-4 px-6 py-4 text-[12px] uppercase tracking-[0.14em] text-neutral-500">
+    <section className="overflow-hidden rounded-3xl border border-outline bg-surface shadow-tactile">
+      <div className="grid grid-cols-[1.45fr_1.4fr_0.8fr_0.65fr_0.65fr_1fr_1fr_1fr] gap-4 border-b border-outline bg-surface-container-low px-6 py-4 text-[12px] uppercase tracking-[0.14em] text-on-surface-variant">
         {columns.map((column) => (
           <Link
             key={column.key}
             href={buildSortHref(basePath, sortKey, direction, column.key)}
-            className="flex items-center gap-2 transition-colors hover:text-white"
+            className="flex items-center gap-2 transition-colors hover:text-on-surface"
           >
             <span>{column.label}</span>
             <SortIcon active={sortKey === column.key} direction={direction} />
           </Link>
         ))}
       </div>
-      <div className="divide-y divide-[#1a1a1a]">
+      <div className="divide-y divide-outline">
         {workspaces.map((workspace) => (
           <Link
             key={workspace.id}
             href={`/admin/workspaces/${workspace.id}`}
-            className="group grid grid-cols-[1.45fr_1.4fr_0.8fr_0.65fr_0.65fr_1fr_1fr_1fr] gap-4 px-6 py-4 text-sm text-neutral-200 transition-colors hover:bg-white/[0.025]"
+            className="group grid grid-cols-[1.45fr_1.4fr_0.8fr_0.65fr_0.65fr_1fr_1fr_1fr] gap-4 px-6 py-4 text-sm text-on-surface transition-colors hover:bg-surface-container-low"
           >
             <div className="flex items-center gap-3">
               <AdminStatusDot status={getAdminActivityState(workspace.lastActiveAt)} />
-              <span className="font-medium text-white">{workspace.name}</span>
+              <span className="font-medium text-on-surface">{workspace.name}</span>
             </div>
-            <span className="truncate text-neutral-400">
+            <span className="truncate text-on-surface-variant">
               {workspace.ownerEmail ?? (language === "sv" ? "Okänd" : "Unknown")}
             </span>
-            <AdminTimestamp value={workspace.createdAt} className="text-neutral-300" language={language} />
+            <AdminTimestamp value={workspace.createdAt} className="text-on-surface-variant" language={language} />
             <span>{formatAdminNumber(workspace.agentCount, language)}</span>
             <span>{formatAdminNumber(workspace.widgetCount, language)}</span>
             <span>{formatAdminNumber(workspace.conversationCount30d, language)}</span>
             <span>{formatAdminNumber(workspace.messageCount30d, language)}</span>
             <span className="flex items-center justify-between gap-3">
-              <AdminTimestamp value={workspace.lastActiveAt} className="text-neutral-300" language={language} />
-              <ChevronRight className="h-4 w-4 text-neutral-700 transition-transform group-hover:translate-x-0.5 group-hover:text-neutral-400" strokeWidth={1.8} />
+              <AdminTimestamp value={workspace.lastActiveAt} className="text-on-surface-variant" language={language} />
+              <ChevronRight className="h-4 w-4 text-on-surface-variant/40 transition-transform group-hover:translate-x-0.5 group-hover:text-on-surface-variant" strokeWidth={1.8} />
             </span>
           </Link>
         ))}

@@ -14,7 +14,7 @@ interface AdminAgentsTableProps {
 export function AdminAgentsTable({ agents, language }: AdminAgentsTableProps) {
   if (agents.length === 0) {
     return (
-      <section className="overflow-hidden rounded-3xl border border-[#222] bg-[#171717]">
+      <section className="overflow-hidden rounded-3xl border border-outline bg-surface shadow-tactile">
         <AdminEmptyState
           title={language === "sv" ? "Inga agenter i detta workspace" : "No agents in this workspace"}
           description={
@@ -28,25 +28,25 @@ export function AdminAgentsTable({ agents, language }: AdminAgentsTableProps) {
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-[#222] bg-[#171717]">
-      <div className="grid grid-cols-[1.5fr_0.9fr_0.9fr_0.9fr_1fr] gap-4 px-6 py-4 text-[12px] uppercase tracking-[0.14em] text-neutral-500">
+    <section className="overflow-hidden rounded-3xl border border-outline bg-surface shadow-tactile">
+      <div className="grid grid-cols-[1.5fr_0.9fr_0.9fr_0.9fr_1fr] gap-4 border-b border-outline bg-surface-container-low px-6 py-4 text-[12px] uppercase tracking-[0.14em] text-on-surface-variant">
         <span>{language === "sv" ? "Agent" : "Agent"}</span>
         <span>{language === "sv" ? "Skapad" : "Created"}</span>
         <span>{language === "sv" ? "Konversationer" : "Conversations"}</span>
         <span>{language === "sv" ? "Meddelanden" : "Messages"}</span>
         <span>{language === "sv" ? "Senast aktiv" : "Last active"}</span>
       </div>
-      <div className="divide-y divide-[#1a1a1a]">
+      <div className="divide-y divide-outline">
         {agents.map((agent) => (
           <div
             key={agent.id}
-            className="grid grid-cols-[1.5fr_0.9fr_0.9fr_0.9fr_1fr] gap-4 px-6 py-4 text-sm text-neutral-200"
+            className="grid grid-cols-[1.5fr_0.9fr_0.9fr_0.9fr_1fr] gap-4 px-6 py-4 text-sm text-on-surface"
           >
-            <span className="font-medium text-white">{agent.name}</span>
-            <AdminTimestamp value={agent.createdAt} className="text-neutral-300" language={language} />
+            <span className="font-medium text-on-surface">{agent.name}</span>
+            <AdminTimestamp value={agent.createdAt} className="text-on-surface-variant" language={language} />
             <span>{formatAdminNumber(agent.conversationCount, language)}</span>
             <span>{formatAdminNumber(agent.messageCount, language)}</span>
-            <AdminTimestamp value={agent.lastActiveAt} className="text-neutral-300" language={language} />
+            <AdminTimestamp value={agent.lastActiveAt} className="text-on-surface-variant" language={language} />
           </div>
         ))}
       </div>

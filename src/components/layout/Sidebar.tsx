@@ -15,12 +15,21 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  type LucideIcon,
 } from "lucide-react";
 import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { hasInternalAssistantsEnabled } from "@/lib/assistants/feature-flags";
+import { formatRelativeDate } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+
+interface AnalyticsActivitySummary {
+  agentName: string | null;
+  widgetName: string;
+  latestSnippet: string | null;
+  lastActivityAt: string;
+}
 
 interface SidebarProps {
   mobile?: boolean;
@@ -28,6 +37,17 @@ interface SidebarProps {
   userEmail?: string | null;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  analyticsHasNewActivity?: boolean;
+  analyticsActivitySummary?: AnalyticsActivitySummary | null;
+}
+
+interface SidebarNavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  beta?: boolean;
+  hasAttention?: boolean;
+  attentionSummary?: AnalyticsActivitySummary | null;
 }
 
 export function Sidebar({
@@ -35,6 +55,8 @@ export function Sidebar({
   onNavigate,
   isCollapsed = false,
   onToggleCollapse,
+  analyticsHasNewActivity = false,
+  analyticsActivitySummary = null,
 }: SidebarProps) {
   const pathname = usePathname();
   const { membership, workspace, subscription } = useAppContext();
@@ -50,12 +72,18 @@ export function Sidebar({
   );
   const isFreePlan = subscription?.plan_tier === "free";
 
-  const navGroups = [
+  const navGroups: Array<{ title: string; items: SidebarNavItem[] }> = [
     {
       title: t("nav.groups.overview"),
       items: [
         { name: t("nav.dashboard"), href: "/dashboard", icon: LayoutGrid },
-        { name: t("nav.analytics"), href: "/analytics", icon: BarChart3 },
+        {
+          name: t("nav.analytics"),
+          href: "/analytics",
+          icon: BarChart3,
+          hasAttention: analyticsHasNewActivity,
+          attentionSummary: analyticsActivitySummary,
+        },
       ],
     },
     {
@@ -152,6 +180,14 @@ export function Sidebar({
             {group.items.map((item) => {
               const isActive = pathname?.startsWith(item.href);
               const Icon = item.icon;
+              const hasAttention = Boolean(item.hasAttention && !isActive);
+              const attentionAgent =
+                item.attentionSummary?.agentName || t("common.unknownAgent");
+              const attentionWidget =
+                item.attentionSummary?.widgetName || t("analytics.globalWidget");
+              const attentionTime = item.attentionSummary?.lastActivityAt
+                ? formatRelativeDate(item.attentionSummary.lastActivityAt, language)
+                : null;
               
               return (
                 <Link
@@ -160,12 +196,20 @@ export function Sidebar({
                   onClick={onNavigate}
                   aria-label={
                     isCollapsed && !mobile
-                      ? `${item.name}${item.beta ? ` (${t("common.beta")})` : ""}`
+                      ? `${item.name}${item.beta ? ` (${t("common.beta")})` : ""}${
+                          hasAttention
+                            ? ` (${t("nav.newAnalyticsActivity")}: ${attentionAgent}, ${attentionWidget})`
+                            : ""
+                        }`
                       : undefined
                   }
                   title={
                     isCollapsed && !mobile
-                      ? `${item.name}${item.beta ? ` (${t("common.beta")})` : ""}`
+                      ? `${item.name}${item.beta ? ` (${t("common.beta")})` : ""}${
+                          hasAttention
+                            ? ` (${t("nav.newAnalyticsActivity")}: ${attentionAgent}, ${attentionWidget})`
+                            : ""
+                        }`
                       : undefined
                   }
                   className={`group relative flex items-center gap-3 rounded-xl py-3 transition-all duration-200 ${
@@ -183,11 +227,37 @@ export function Sidebar({
                     className={`h-[1.125rem] w-[1.125rem] shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-primary" : "text-on-surface-variant/70 group-hover:text-primary"}`}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
+                  {hasAttention && isCollapsed && !mobile ? (
+                    <span
+                      className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-orange-500 shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-surface-container-low)_85%,transparent)] ring-1 ring-orange-300/80"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                   {(!isCollapsed || mobile) && (
-                    <span className={`text-sm tracking-tight whitespace-nowrap overflow-hidden transition-all duration-300 ${isActive ? "font-bold" : "font-medium"}`}>
-                      {item.name}
+                    <span className="min-w-0 flex-1 overflow-hidden transition-all duration-300">
+                      <span className={`block truncate text-sm tracking-tight ${isActive ? "font-bold" : "font-medium"}`}>
+                        {item.name}
+                      </span>
+                      {hasAttention ? (
+                        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] font-bold leading-none text-orange-600 dark:text-orange-400">
+                          <span className="truncate">{attentionAgent}</span>
+                          <span className="h-1 w-1 shrink-0 rounded-full bg-orange-400/70" />
+                          <span className="truncate text-on-surface-variant/70">
+                            {attentionWidget}
+                          </span>
+                        </span>
+                      ) : null}
                     </span>
                   )}
+                  {hasAttention && (!isCollapsed || mobile) ? (
+                    <span
+                      className="ml-2 h-2.5 w-2.5 shrink-0 rounded-full bg-orange-500 shadow-[0_0_0_4px_color-mix(in_srgb,var(--color-orange-500)_14%,transparent)] ring-1 ring-orange-300/80"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  {hasAttention ? (
+                    <span className="sr-only">{t("nav.newAnalyticsActivity")}</span>
+                  ) : null}
                   {(!isCollapsed || mobile) && item.beta ? (
                     <span
                       className={`ml-auto rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${
@@ -202,9 +272,28 @@ export function Sidebar({
 
                   {/* Tooltip for collapsed mode */}
                   {isCollapsed && !mobile && (
-                    <div className="fixed left-[70px] rounded-md bg-on-surface px-3 py-2 text-xs font-bold text-background opacity-0 shadow-xl ring-1 ring-outline-variant pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 z-[9999] whitespace-nowrap">
-                      {item.name}
-                      {item.beta && ` (${t("common.beta")})`}
+                    <div className="fixed left-[70px] max-w-[260px] rounded-md bg-on-surface px-3 py-2 text-xs font-bold text-background opacity-0 shadow-xl ring-1 ring-outline-variant pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 z-[9999]">
+                      <div className="whitespace-nowrap">
+                        {item.name}
+                        {item.beta && ` (${t("common.beta")})`}
+                      </div>
+                      {hasAttention ? (
+                        <div className="mt-1.5 space-y-1 font-medium text-background/70">
+                          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-300">
+                            {t("nav.newAnalyticsActivity")}
+                            {attentionTime ? ` - ${attentionTime}` : ""}
+                          </div>
+                          <div className="truncate text-[11px] text-background">
+                            {attentionAgent}
+                          </div>
+                          <div className="truncate text-[11px]">{attentionWidget}</div>
+                          {item.attentionSummary?.latestSnippet ? (
+                            <div className="line-clamp-2 max-w-[230px] text-[11px] leading-snug">
+                              {item.attentionSummary.latestSnippet}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </Link>

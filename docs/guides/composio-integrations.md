@@ -1,6 +1,6 @@
 # Composio Integrations — Implementation Guide
 
-Last updated: 2026-05-20
+Last updated: 2026-05-23
 
 This document is the mandatory reference for building and debugging Composio tool integrations
 in this codebase. Read this before writing any new integration. All lessons here were earned
@@ -52,6 +52,11 @@ This path is shared by:
 - automation runs
 
 Automation runs are still limited by the selected builder tool nodes. They do not get every Composio action by default.
+
+Runtime sessions are cached only as process-local best-effort state in `src/lib/composio.ts`.
+Tool-router sessions, Composio SDK sessions, and MCP session refs all carry a timestamp and use a
+30-minute TTL. Do not rely on these maps as durable or cross-instance state; serverless cold starts
+and scale-out can recreate sessions at any time.
 
 ### Auth config strategy
 

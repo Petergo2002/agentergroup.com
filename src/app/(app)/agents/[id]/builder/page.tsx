@@ -254,6 +254,10 @@ const TRIGGER_SOURCE_ORDER: BuilderTriggerSource[] = [
   'gmail_new_message',
 ];
 
+function getAvailableTriggerSources(allowExternalTriggers: boolean): BuilderTriggerSource[] {
+  return allowExternalTriggers ? TRIGGER_SOURCE_ORDER : ['user_message'];
+}
+
 function getStarterPromptFields(prompts: string[]) {
   return Array.from({ length: 3 }, (_, index) => prompts[index] ?? '');
 }
@@ -4302,7 +4306,10 @@ export default function AgentBuilderPage() {
 
     if (selectedNode.data.kind === 'trigger') {
       const triggerNode = selectedNode as BuilderFlowNode & { data: TriggerBuilderNodeData };
-      const selectedSource = triggerNode.data.triggerSource ?? 'user_message';
+      const externalTriggersEnabled = hasAutomationsEnabled(workspace);
+      const selectedSource =
+        externalTriggersEnabled ? triggerNode.data.triggerSource ?? 'user_message' : 'user_message';
+      const triggerSourceOptions = getAvailableTriggerSources(externalTriggersEnabled);
 
       return (
         <div className="space-y-7">
@@ -4326,19 +4333,17 @@ export default function AgentBuilderPage() {
           </div>
 
           <div className="space-y-3">
-            {TRIGGER_SOURCE_ORDER.map((source) => {
+            {triggerSourceOptions.map((source) => {
               const sourceText = getTriggerSourceText(source, t);
               const isSelected = selectedSource === source;
               const isExternal = source === 'gmail_new_message';
-              const isLocked = isExternal && !hasAutomationsEnabled(workspace);
 
               return (
                 <button
                   key={source}
                   type="button"
-                  disabled={isLocked}
                   onClick={() => {
-                    if (isLocked) return;
+                    if (isExternal && !externalTriggersEnabled) return;
                     if (selectedSource === 'gmail_new_message' && source !== 'gmail_new_message') {
                       setShouldClearExternalTrigger(true);
                     }
@@ -4370,22 +4375,18 @@ export default function AgentBuilderPage() {
                   className={`group flex w-full items-start gap-4 rounded-[1.5rem] border p-4 text-left transition-all ${
                     isSelected
                       ? 'border-primary/35 bg-primary/5 shadow-sm'
-                      : isLocked
-                        ? 'cursor-not-allowed border-outline-variant/10 bg-surface-container-lowest opacity-50'
-                        : 'border-outline-variant/10 bg-surface-container-lowest hover:border-primary/25 hover:bg-surface-container-low'
+                      : 'border-outline-variant/10 bg-surface-container-lowest hover:border-primary/25 hover:bg-surface-container-low'
                   }`}
                 >
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
                       isSelected
                         ? 'bg-primary text-on-primary'
-                        : isLocked
-                          ? 'bg-surface-container-high text-on-surface-variant/40'
-                          : 'bg-surface-container-high text-on-surface-variant'
+                        : 'bg-surface-container-high text-on-surface-variant'
                     }`}
                   >
                     <span className="material-symbols-outlined text-xl">
-                      {isLocked ? 'lock' : sourceText.icon}
+                      {sourceText.icon}
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">

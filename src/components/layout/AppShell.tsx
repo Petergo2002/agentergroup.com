@@ -7,7 +7,11 @@ import { Topbar } from "@/components/layout/Topbar";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { ModalProvider } from "@/components/ui/ModalProvider";
 import { AppContextProvider } from "@/components/app/AppContext";
-import type { AppWorkspaceContext } from "@/lib/types";
+import type {
+  AppWorkspaceContext,
+  DashboardAnalyticsConversationListItem,
+  DashboardAnalyticsResponse,
+} from "@/lib/types";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -18,12 +22,23 @@ interface AppShellProps {
   };
 }
 
+const ANALYTICS_ACTIVITY_SEEN_PREFIX = "agenter_analytics_last_seen_at";
+
 export function AppShell({ children, context, user }: AppShellProps) {
+  const analyticsStorageKey = `${ANALYTICS_ACTIVITY_SEEN_PREFIX}:${context.workspace.id}`;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     () =>
       typeof window !== "undefined" &&
       localStorage.getItem("agenter_sidebar_collapsed") === "true",
+  );
+  const [latestAnalyticsConversation, setLatestAnalyticsConversation] =
+    useState<DashboardAnalyticsConversationListItem | null>(null);
+  const [lastSeenAnalyticsActivityAt, setLastSeenAnalyticsActivityAt] = useState<string | null>(
+    () =>
+      typeof window !== "undefined"
+        ? localStorage.getItem(analyticsStorageKey)
+        : null,
   );
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -109,6 +124,63 @@ export function AppShell({ children, context, user }: AppShellProps) {
     /^\/widgets\/[^/]+\/preview$/.test(pathname) ||
     /^\/assistants\/[^/]+$/.test(pathname);
   const isAnalyticsRoute = pathname.startsWith("/analytics");
+  const latestAnalyticsActivityAt = latestAnalyticsConversation?.lastActivityAt ?? null;
+  const hasNewAnalyticsActivity =
+    !isAnalyticsRoute &&
+    Boolean(
+      latestAnalyticsActivityAt &&
+        (!lastSeenAnalyticsActivityAt ||
+          latestAnalyticsActivityAt > lastSeenAnalyticsActivityAt),
+    );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      setLastSeenAnalyticsActivityAt(localStorage.getItem(analyticsStorageKey));
+    }, 0);
+
+    async function loadLatestAnalyticsActivity() {
+      try {
+        const response = await fetch("/api/dashboard/analytics?range=30d&limit=1", {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as DashboardAnalyticsResponse;
+        setLatestAnalyticsConversation(payload.conversations[0] ?? null);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
+    }
+
+    void loadLatestAnalyticsActivity();
+    const intervalId = window.setInterval(loadLatestAnalyticsActivity, 60_000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+      controller.abort();
+    };
+  }, [analyticsStorageKey]);
+
+  useEffect(() => {
+    if (!isAnalyticsRoute) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const seenAt = latestAnalyticsActivityAt ?? new Date().toISOString();
+      localStorage.setItem(analyticsStorageKey, seenAt);
+      setLastSeenAnalyticsActivityAt(seenAt);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [analyticsStorageKey, isAnalyticsRoute, latestAnalyticsActivityAt]);
 
   return (
     <AppContextProvider value={{ ...context, user }}>
@@ -123,6 +195,19 @@ export function AppShell({ children, context, user }: AppShellProps) {
                   userEmail={user.email} 
                   isCollapsed={isSidebarCollapsed}
                   onToggleCollapse={toggleSidebarCollapse}
+                  analyticsHasNewActivity={hasNewAnalyticsActivity}
+                  analyticsActivitySummary={
+                    latestAnalyticsConversation
+                      ? {
+                          agentName:
+                            latestAnalyticsConversation.agentLabel ??
+                            latestAnalyticsConversation.agentName,
+                          widgetName: latestAnalyticsConversation.widgetName,
+                          latestSnippet: latestAnalyticsConversation.latestSnippet,
+                          lastActivityAt: latestAnalyticsConversation.lastActivityAt,
+                        }
+                      : null
+                  }
                 />
               </div>
 
@@ -151,6 +236,19 @@ export function AppShell({ children, context, user }: AppShellProps) {
                   mobile
                   onNavigate={closeMobileSidebar}
                   userEmail={user.email}
+                  analyticsHasNewActivity={hasNewAnalyticsActivity}
+                  analyticsActivitySummary={
+                    latestAnalyticsConversation
+                      ? {
+                          agentName:
+                            latestAnalyticsConversation.agentLabel ??
+                            latestAnalyticsConversation.agentName,
+                          widgetName: latestAnalyticsConversation.widgetName,
+                          latestSnippet: latestAnalyticsConversation.latestSnippet,
+                          lastActivityAt: latestAnalyticsConversation.lastActivityAt,
+                        }
+                      : null
+                  }
                 />
               </div>
 
