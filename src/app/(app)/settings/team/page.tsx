@@ -129,8 +129,10 @@ export default function TeamSettingsPage() {
         showToast(t('settings.team.inviteSent') || `Invite sent to ${inviteEmail}`, 'success');
       } else {
         showToast(
-          t('settings.team.inviteCreatedNoEmail') || 'Invite created! Copy the link to share it.',
-          'success',
+          payload.emailError
+            ? `Invite created, but email was not sent: ${payload.emailError}. Copy the link to share it.`
+            : (t('settings.team.inviteCreatedNoEmail') || 'Invite created! Copy the link to share it.'),
+          payload.emailError ? 'error' : 'success',
         );
       }
 

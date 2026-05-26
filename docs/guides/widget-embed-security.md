@@ -26,6 +26,13 @@ For this product, that tradeoff is intentional: installation stays copy-paste si
 - requests without a trusted header fall back to the shared `"unknown"` bucket
 - widget chat still enforces one active turn per session and returns `409 SESSION_BUSY` on overlap
 
+Signed widget-builder preview traffic is different from customer-facing hosted/embed traffic:
+
+- preview requests use `WIDGET_PREVIEW_SECRET` signed tokens and can load draft config without deploying the widget
+- preview-token chat is intentionally excluded from the public volumetric rate limiter because it is an authenticated operator surface, not anonymous customer traffic
+- preview-token chat still calls the same OpenRouter-backed runtime path and must consume workspace message credits before model execution
+- exhausted workspaces receive the same `402 MESSAGE_LIMIT_REACHED` semantics as live widget chat
+
 ## Browser and API protections
 
 - the dashboard app sends baseline browser protections through CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`

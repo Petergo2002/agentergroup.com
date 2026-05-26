@@ -45,3 +45,37 @@ test("OpenRouter entry points consume workspace message quota before model calls
     );
   }
 });
+
+test("widget builder preview chat is billed even though preview skips public rate limits", () => {
+  const source = readFileSync(
+    "src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts",
+    "utf8",
+  );
+  const previewRateLimitGuardIndex = source.indexOf(
+    'if (access.source !== "preview")',
+  );
+  const rateLimitIndex = source.indexOf("await enforceRateLimits", previewRateLimitGuardIndex);
+  const quotaIndex = source.indexOf("await consumeWorkspaceMessageUsage", rateLimitIndex);
+  const modelIndex = source.indexOf("await runAgentChat", quotaIndex);
+
+  assert.notEqual(
+    previewRateLimitGuardIndex,
+    -1,
+    "public widget chat must keep preview-token traffic out of public rate limiting",
+  );
+  assert.notEqual(rateLimitIndex, -1, "public widget chat must enforce public rate limits");
+  assert.notEqual(
+    quotaIndex,
+    -1,
+    "public widget chat must consume quota after access/rate-limit handling",
+  );
+  assert.notEqual(modelIndex, -1, "public widget chat must call the model after quota");
+  assert.ok(
+    previewRateLimitGuardIndex < rateLimitIndex && rateLimitIndex < quotaIndex,
+    "quota consumption must be outside the non-preview-only rate-limit branch",
+  );
+  assert.ok(
+    quotaIndex < modelIndex,
+    "widget preview chat must consume credits before invoking OpenRouter",
+  );
+});

@@ -190,6 +190,7 @@ export async function POST(
             send({
               type: "error",
               error: usageError.message,
+              code: usageError.code,
             });
             controller.close();
             return;

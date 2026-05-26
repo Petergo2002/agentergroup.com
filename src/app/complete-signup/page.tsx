@@ -21,6 +21,8 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
   const language = await getServerLanguage();
   const messages = await getMessages(language);
   const error = getSearchValue(params.error);
+  const redirectTo = getSearchValue(params.redirectTo);
+  const isInviteSignup = redirectTo.startsWith("/invite/accept");
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -63,6 +65,7 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
         ) : null}
 
         <form action={updatePassword} className="space-y-6">
+          <input type="hidden" name="redirectTo" value={redirectTo} />
           <div className="space-y-5">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
@@ -77,18 +80,20 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
-                Company Name
-              </label>
-              <input
-                className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
-                name="companyName"
-                type="text"
-                placeholder="Agentergroup AB"
-                required
-              />
-            </div>
+            {!isInviteSignup && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
+                  Company Name
+                </label>
+                <input
+                  className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
+                  name="companyName"
+                  type="text"
+                  placeholder="Agentergroup AB"
+                  required
+                />
+              </div>
+            )}
 
             <div className="h-px w-full bg-[#161616] my-4" />
 

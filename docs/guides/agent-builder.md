@@ -485,6 +485,8 @@ Preview chat uses:
 - `/api/agents/[id]/chat`
 - `runAgentChat(...)` in `src/lib/runtime/agent-chat.ts`
 
+Preview chat is billable. The route calls `consumeWorkspaceMessageUsage()` before the shared OpenRouter runtime runs, and exhausted workspaces receive `MESSAGE_LIMIT_REACHED` over the chat stream.
+
 Important implication:
 
 - preview does not auto-save on tab navigation
@@ -517,6 +519,13 @@ The preview chat route and automation executor also inspect the saved draft defi
 Automation does not use `endchat`, but it does use selected tool actions, selected knowledge sources, email recipient policy, Google Calendar selection, and Cal.com selection.
 
 ### Widgets and published agents
+
+The widget builder has a separate live preview path from the agent preview tab:
+
+- `/api/widgets/[id]/preview` creates or updates a `widget_preview_drafts` row and returns a signed preview token
+- the widget runtime then sends preview chat turns to `/api/public/widgets/[widgetPublicKey]/chat`
+- preview-token widget chat skips anonymous public rate limiting, but it still consumes workspace message credits before `runAgentChat(...)`
+- this means testing a widget agent in the builder spends the same monthly message allowance as deployed widget chat
 
 Widgets depend on published agent versions.
 

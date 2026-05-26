@@ -1,10 +1,10 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { slugify, titleFromEmail } from "@/lib/utils";
+import { syncUserProfile } from "@/lib/app/profile-sync";
 import type {
   AvailableWorkspace,
   AppWorkspaceContext,
-  ProfileRecord,
   WorkspaceMemberRecord,
   WorkspaceRecord,
   WorkspaceSubscriptionRecord,
@@ -305,26 +305,7 @@ export async function ensureWorkspaceContext(
   supabase: SupabaseLike,
   user: User,
 ): Promise<AppWorkspaceContext> {
-  const profilePayload = {
-    id: user.id,
-    email: user.email ?? null,
-    full_name:
-      user.user_metadata?.full_name ??
-      user.user_metadata?.name ??
-      titleFromEmail(user.email),
-    avatar_url: user.user_metadata?.avatar_url ?? null,
-  };
-
-  const profileResult = await supabase
-    .from("profiles")
-    .upsert(profilePayload, { onConflict: "id" })
-    .select("id, email, full_name, avatar_url")
-    .single();
-
-  if (profileResult.error) {
-    throw profileResult.error;
-  }
-
+  const profile = await syncUserProfile(supabase, user);
   const workspaces = await getOrCreateUserWorkspaces(supabase, user);
   const activeWorkspace = await resolveActiveWorkspace(workspaces);
 
@@ -339,7 +320,7 @@ export async function ensureWorkspaceContext(
   }
 
   return {
-    profile: profileResult.data as ProfileRecord,
+    profile,
     workspace: activeWorkspace.workspace,
     membership: activeWorkspace.membership,
     workspaces,

@@ -45,6 +45,25 @@ function buildLoginRedirectUrl(args: {
   return query ? `/login?${query}` : "/login";
 }
 
+function buildCompleteSignupRedirectUrl(args: {
+  error?: string;
+  redirectTo?: string;
+}) {
+  const params = new URLSearchParams();
+
+  if (args.error) {
+    params.set("error", args.error);
+  }
+
+  const redirectTo = sanitizePostAuthRedirectTo(args.redirectTo, "/onboarding");
+  if (redirectTo !== "/onboarding") {
+    params.set("redirectTo", redirectTo);
+  }
+
+  const query = params.toString();
+  return query ? `/complete-signup?${query}` : "/complete-signup";
+}
+
 export async function login(formData: FormData) {
   const supabase = await createClient();
   const credentials = getCredentials(formData);
@@ -81,7 +100,9 @@ export async function signup(formData: FormData) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${getAppUrl()}/auth/confirm?next=/complete-signup`,
+      emailRedirectTo: `${getAppUrl()}/auth/confirm?next=${encodeURIComponent(
+        buildCompleteSignupRedirectUrl({ redirectTo }),
+      )}`,
     },
   });
 
@@ -110,14 +131,24 @@ export async function updatePassword(formData: FormData) {
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
   const fullName = String(formData.get("fullName") ?? "").trim();
   const companyName = String(formData.get("companyName") ?? "").trim();
+  const redirectTo = sanitizePostAuthRedirectTo(
+    String(formData.get("redirectTo") ?? "/onboarding"),
+    "/onboarding",
+  );
   const messages = await getLoginMessages();
 
   if (password !== confirmPassword) {
-    redirect(`/complete-signup?error=${encodeURIComponent(messages.passwordsDoNotMatch)}`);
+    redirect(buildCompleteSignupRedirectUrl({
+      error: messages.passwordsDoNotMatch,
+      redirectTo,
+    }));
   }
 
   if (password.length < 6) {
-    redirect(`/complete-signup?error=${encodeURIComponent(messages.passwordPlaceholder)}`);
+    redirect(buildCompleteSignupRedirectUrl({
+      error: messages.passwordPlaceholder,
+      redirectTo,
+    }));
   }
 
   // Update password and store profile/workspace metadata
@@ -130,9 +161,12 @@ export async function updatePassword(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/complete-signup?error=${encodeURIComponent(error.message)}`);
+    redirect(buildCompleteSignupRedirectUrl({
+      error: error.message,
+      redirectTo,
+    }));
   }
 
   revalidatePath("/", "layout");
-  redirect("/onboarding");
+  redirect(redirectTo);
 }

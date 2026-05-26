@@ -192,7 +192,7 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - The dashboard app now sends baseline browser protections through CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
 - Public widget rate limits are enforced through a Supabase RPC backed by a named uniqueness constraint on `rate_limit_windows`; do not switch that upsert back to a bare column-list conflict target or Postgres can reintroduce ambiguous `window_started_at` errors.
 - `RATE_LIMIT_SECRET` must be a dedicated production secret. The app no longer falls back to `SUPABASE_SERVICE_ROLE_KEY` for rate-limit identity hashing.
-- OpenRouter-backed turns consume workspace message quota before model calls in public widget chat, internal assistant chat, agent preview chat, prompt optimization, and automation runs.
+- OpenRouter-backed turns consume workspace message quota before model calls in public widget chat, widget-builder preview chat, internal assistant chat, agent preview chat, prompt optimization, and automation runs.
 - Middleware is explicit-public/default-auth: any matched route not listed as public in `src/lib/supabase/proxy.ts` requires a valid Supabase session.
 - Stripe billing config is required at route execution time and has no hardcoded price id fallbacks.
 - Changes under `apps/widget-v2` require a separate widget-runtime deploy; pushing or deploying only the dashboard app does not update `widget.agentergroup.com`.

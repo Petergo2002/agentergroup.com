@@ -414,6 +414,7 @@ the workspace has exhausted its cycle allowance.
 Current quota-covered entry points:
 
 - public widget chat: `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
+  - includes signed widget-builder preview chat; preview-token traffic skips public volumetric rate limiting, not credit usage
 - internal assistant chat: `src/app/api/assistants/[id]/chat/route.ts`
 - agent preview chat: `src/app/api/agents/[id]/chat/route.ts`
 - prompt optimization: `src/app/api/agents/[id]/optimize-prompt/route.ts`
@@ -569,11 +570,13 @@ It provides:
 ### Invite flow
 
 1. Owner/admin creates an invite for an email address
-2. Invite row is created with `status = 'pending'` and a unique token
-3. The invited user sees pending invites through `GET /api/invites/incoming`
-4. The user accepts or declines the invite
-5. On accept: a `workspace_members` row is created and invite status becomes `accepted`
-6. On decline: invite status becomes `revoked`
+2. Invite row is created with `status = 'pending'`, a unique token, and a copyable `/invite/accept?token=...` link
+3. The system attempts to send the invite through Resend and reports returned email errors while keeping the copyable link available
+4. The public accept page asks unauthenticated recipients to log in or create an account, preserving the invite URL through Supabase auth redirects
+5. The invited user can also see pending invites through `GET /api/invites/incoming`
+6. The user accepts or declines the invite
+7. On accept: a `workspace_members` row is created, active workspace is switched, and invite status becomes `accepted`
+8. On decline: invite status becomes `revoked`
 
 ### APIs
 
@@ -845,6 +848,7 @@ Current explicit public classes include:
 - auth and login flows: `/login/*`, `/auth/*`
 - public widget APIs: `/api/public/*`
 - public connection auth-link flow: `/connect/*`
+- public workspace invite entry points: `/invite/*`, `/api/invites/*` route handlers still verify the authenticated user where required
 - externally called signed/secret-protected endpoints: `/api/billing/webhook`,
   `/api/composio/webhook`, `/api/internal/privacy/retention`
 
@@ -1432,7 +1436,7 @@ Current behavior:
 - consent is currently remembered client-side per widget public key so returning visitors are not blocked on every new session
 - widget session/activity data, widget messages, and widget leads are currently covered by a 180 day retention policy enforced by an internal purge route
 - public widget POST endpoints now enforce volumetric rate limiting for hosted and embedded traffic
-- preview-token traffic is intentionally excluded from the public widget rate limiter
+- preview-token traffic is intentionally excluded from the public widget rate limiter, but widget preview chat still consumes workspace message credits before model execution
 - the rate-limit RPC must upsert with `ON CONFLICT ON CONSTRAINT rate_limit_windows_scope_window_constraint`; using a bare column-list conflict target can reintroduce ambiguous `window_started_at` failures in Postgres
 - self-service password reset and a backup/restore operator runbook remain follow-up work outside this batch
 - file uploads support images and documents (up to 5MB) via the public `upload` endpoint and are stored securely in the `widget-attachments` storage bucket
@@ -1462,7 +1466,7 @@ Widget preview uses:
 - persisted preview-draft rows
 - signed preview tokens
 
-Preview requests can resolve runtime config without deploying the widget publicly.
+Preview requests can resolve runtime config without deploying the widget publicly. The preview token only changes access and rate-limit behavior: it lets the operator load draft config and bypass public anonymous volumetric limits. Chat turns still use `/api/public/widgets/[widgetPublicKey]/chat`, still call `consumeWorkspaceMessageUsage()`, and still stop with `402 MESSAGE_LIMIT_REACHED` when the workspace allowance is exhausted.
 
 ### Widget session lifecycle
 
@@ -1478,7 +1482,7 @@ Current behavior:
 - widget sessions store `active_turn_request_id` and `active_turn_started_at` to serialize live turns
 - public chat acquires a per-session turn lock before running agent/tool work
 - overlapping turns for the same session are rejected with `409 SESSION_BUSY` instead of being queued
-- public widget chat, events, completion, and lead submission routes are also protected by dedicated rate limits with `429` responses and `Retry-After`
+- customer-facing public widget chat, events, completion, and lead submission routes are also protected by dedicated rate limits with `429` responses and `Retry-After`; signed preview-token chat is excluded from those public rate limits but remains credit-metered
 - user, assistant, and tool messages are persisted
 - lead submissions are stored against the active widget session where possible and the public response is intentionally minimized to `leadId` plus `createdAt`
 - session completion can happen through explicit public completion calls, including inactivity-timeout completion
@@ -2092,7 +2096,7 @@ After import, the source behaves like any other workspace knowledge source.
 | --- | --- |
 | `GET /api/public/widgets/[widgetPublicKey]/bootstrap` | Validate runtime access, return config bootstrap, and issue widget access token |
 | `GET /api/public/widgets/[widgetPublicKey]/config` | Return current public widget runtime config |
-| `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a public widget chat message, reject overlapping same-session turns with `409 SESSION_BUSY`, and rate-limit abusive hosted/embed traffic with `429` |
+| `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a widget chat message, reject overlapping same-session turns with `409 SESSION_BUSY`, consume workspace message credits before model execution, and rate-limit abusive hosted/embed traffic with `429`; signed preview-token chat skips public rate limits but remains credit-metered |
 | `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout, refuse completion while a live turn is active, and apply public runtime rate limits backed by the named `rate_limit_windows_scope_window_constraint` upsert path |
 | `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events under public runtime rate limits without surfacing SQL ambiguity errors from the rate-limit RPC |
 | `POST /api/public/widgets/[widgetPublicKey]/leads` | Persist a lead submission from the widget under public runtime rate limits and return a minimal success payload |
@@ -2322,7 +2326,8 @@ When making major changes, verify all of the following:
 8. RLS policies still match the intended workspace boundaries
 9. Hosted and embedded widget bootstrap still respect the intended origin split
 10. Public widget chat still enforces one active turn per session with `SESSION_BUSY` on overlap
-11. Widget runtime changes still pass the load-test harness before shipping
+11. Widget-builder preview chat still consumes workspace credits before model execution even though preview-token traffic skips public rate limits
+12. Widget runtime changes still pass the load-test harness before shipping
 
 ## Source Files Worth Reading First
 

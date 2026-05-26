@@ -300,6 +300,8 @@ export async function POST(
       }
     }
 
+    // Preview-token chat skips the public volumetric limiter, but it still
+    // invokes OpenRouter and must spend workspace message credits.
     try {
       await consumeWorkspaceMessageUsage(
         supabase,

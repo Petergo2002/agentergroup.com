@@ -26,7 +26,7 @@ export async function sendInviteEmail(options: {
   workspaceName: string;
   inviterName: string;
   inviteToken: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; id?: string }> {
   if (!hasEmailEnv()) {
     console.warn("[email] RESEND_API_KEY not configured — skipping invite email.");
     return { success: false, error: "Email service not configured." };
@@ -37,7 +37,7 @@ export async function sendInviteEmail(options: {
 
   try {
     const resend = getResendClient();
-    await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: getFromAddress(),
       to: options.to,
       subject: `You've been invited to ${options.workspaceName} on Agentergroup`,
@@ -47,7 +47,16 @@ export async function sendInviteEmail(options: {
         acceptUrl,
       }),
     });
-    return { success: true };
+
+    if (error) {
+      const message = "message" in error && typeof error.message === "string"
+        ? error.message
+        : "Unknown email error.";
+      console.error("[email] Failed to send invite email:", message);
+      return { success: false, error: message };
+    }
+
+    return { success: true, id: data?.id };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown email error.";
     console.error("[email] Failed to send invite email:", message);

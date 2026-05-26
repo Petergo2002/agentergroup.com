@@ -17,6 +17,8 @@ import {
  * - /api/composio/webhook
  * - /api/internal/privacy/retention
  * - /connect/*
+ * - /invite/*
+ * - /api/invites/*
  * - /privacy-policy
  * - /terms-of-service
  * - /data-processing
@@ -47,6 +49,8 @@ const PUBLIC_PATH_PREFIXES = [
   "/api/composio/webhook",
   "/api/internal/privacy/retention",
   "/connect",
+  "/invite",
+  "/api/invites",
 ] as const;
 
 function createNonce() {

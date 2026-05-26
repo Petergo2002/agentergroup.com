@@ -154,6 +154,7 @@ export async function POST(
     invite: inviteRecord,
     inviteLink,
     emailSent: emailResult.success,
+    emailError: emailResult.success ? undefined : emailResult.error,
   });
 }
 

@@ -1,10 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-type AcceptState = 'loading' | 'success' | 'error';
+type AcceptState = 'loading' | 'success' | 'auth' | 'error';
+
+async function readJsonResponse(response: Response) {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    return {};
+  }
+
+  return response.json().catch(() => ({}));
+}
 
 export default function AcceptInvitePage() {
   const router = useRouter();
@@ -12,6 +21,11 @@ export default function AcceptInvitePage() {
   const token = searchParams.get('token');
   const [state, setState] = useState<AcceptState>(token ? 'loading' : 'error');
   const [errorMessage, setErrorMessage] = useState(token ? '' : 'No invite token provided. Please check your invite link.');
+  const invitePath = useMemo(
+    () => (token ? `/invite/accept?token=${encodeURIComponent(token)}` : '/dashboard'),
+    [token],
+  );
+  const authRedirect = encodeURIComponent(invitePath);
 
   useEffect(() => {
     if (!token) return;
@@ -24,7 +38,12 @@ export default function AcceptInvitePage() {
           body: JSON.stringify({ token }),
         });
 
-        const payload = await response.json();
+        const payload = await readJsonResponse(response) as { error?: string };
+
+        if (response.status === 401) {
+          setState('auth');
+          return;
+        }
 
         if (!response.ok) {
           setState('error');
@@ -34,10 +53,9 @@ export default function AcceptInvitePage() {
 
         setState('success');
 
-        // Redirect to dashboard after a short delay
         setTimeout(() => {
           router.push('/dashboard');
-        }, 2500);
+        }, 1800);
       } catch {
         setState('error');
         setErrorMessage('Something went wrong. Please try again.');
@@ -62,6 +80,34 @@ export default function AcceptInvitePage() {
           </>
         )}
 
+        {state === 'auth' && (
+          <>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <span className="material-symbols-outlined text-4xl text-primary">person_add</span>
+            </div>
+            <h1 className="mt-8 font-headline text-2xl font-bold tracking-tight text-on-surface">
+              Sign in to accept
+            </h1>
+            <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
+              Use the same email address that received this invite. After signing in, you will come back here automatically.
+            </p>
+            <div className="mt-8 flex flex-col gap-3">
+              <Link
+                href={`/login?redirectTo=${authRedirect}`}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-on-surface px-6 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+              >
+                Log in
+              </Link>
+              <Link
+                href={`/login?view=signup&redirectTo=${authRedirect}`}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Create an account
+              </Link>
+            </div>
+          </>
+        )}
+
         {state === 'success' && (
           <>
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
@@ -77,7 +123,7 @@ export default function AcceptInvitePage() {
               href="/dashboard"
               className="mt-8 inline-flex items-center gap-2 rounded-full bg-on-surface px-6 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-90"
             >
-              Go to Dashboard →
+              Go to Dashboard
             </Link>
           </>
         )}
@@ -101,7 +147,7 @@ export default function AcceptInvitePage() {
                 Go to Dashboard
               </Link>
               <Link
-                href="/auth/login"
+                href={`/login?redirectTo=${authRedirect}`}
                 className="text-sm font-medium text-primary hover:underline"
               >
                 Sign in with a different account

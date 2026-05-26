@@ -18,3 +18,13 @@ test("unauthenticated webhook routes remain explicitly public", () => {
   assert.match(source, /\/api\/composio\/webhook/);
   assert.match(source, /\/api\/internal\/privacy\/retention/);
 });
+
+test("invite accept routes stay public but route handlers enforce auth", () => {
+  const source = readFileSync("src/lib/supabase/proxy.ts", "utf8");
+  const acceptRouteSource = readFileSync("src/app/api/invites/accept/route.ts", "utf8");
+
+  assert.match(source, /"\/invite"/);
+  assert.match(source, /"\/api\/invites"/);
+  assert.match(acceptRouteSource, /if \(!user\)/);
+  assert.match(acceptRouteSource, /status: 401/);
+});
