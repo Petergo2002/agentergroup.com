@@ -1,5 +1,6 @@
 import type { AgentRecord } from "@/lib/types";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { DASHBOARD_AGENT_SELECT } from "@/lib/dashboard/summary";
 import { createClient } from "@/lib/supabase/server";
 import AgentsPageClient from "./AgentsPageClient";
 
@@ -16,7 +17,7 @@ async function loadAgentsPageData() {
   const context = await ensureWorkspaceContext(supabase as never, user);
   const { data, error } = await supabase
     .from("agents")
-    .select("*")
+    .select(DASHBOARD_AGENT_SELECT)
     .eq("workspace_id", context.workspace.id)
     .order("updated_at", { ascending: false });
 

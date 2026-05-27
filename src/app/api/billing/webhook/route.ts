@@ -24,6 +24,7 @@ import {
   getStripePriceToPlan,
   PLAN_LIMITS,
 } from '@/lib/stripe';
+import { getSupabaseAdminKey, getSupabaseEnv } from '@/lib/env';
 import type { PlanTier } from '@/lib/types/subscription';
 
 interface PurchasedCreditsRpcRow {
@@ -39,9 +40,8 @@ interface PurchasedCreditsRpcRow {
  * Required because the webhook runs outside of user sessions.
  */
 function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, serviceRoleKey);
+  const { url } = getSupabaseEnv();
+  return createClient(url, getSupabaseAdminKey());
 }
 
 /**

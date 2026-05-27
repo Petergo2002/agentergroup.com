@@ -4,11 +4,14 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import useSWR from "swr";
 
 import { useToast } from "@/components/ui/ToastProvider";
+import { jsonFetcher } from "@/lib/json-fetcher";
 import { formatRelativeDate } from "@/lib/utils";
 import type {
   DashboardAnalyticsAppliedFilters,
@@ -65,14 +68,14 @@ function buildAnalyticsUrl(
   filters: DashboardAnalyticsAppliedFilters,
   cursor?: string,
 ) {
-  const url = new URL("/api/dashboard/analytics", window.location.origin);
-  url.searchParams.set("range", filters.range);
-  if (filters.widgetId) url.searchParams.set("widgetId", filters.widgetId);
-  if (filters.agentId) url.searchParams.set("agentId", filters.agentId);
-  if (filters.search) url.searchParams.set("search", filters.search);
-  if (filters.sessionStatus !== "all") url.searchParams.set("sessionStatus", filters.sessionStatus);
-  if (cursor) url.searchParams.set("cursor", cursor);
-  return url.toString();
+  const params = new URLSearchParams();
+  params.set("range", filters.range);
+  if (filters.widgetId) params.set("widgetId", filters.widgetId);
+  if (filters.agentId) params.set("agentId", filters.agentId);
+  if (filters.search) params.set("search", filters.search);
+  if (filters.sessionStatus !== "all") params.set("sessionStatus", filters.sessionStatus);
+  if (cursor) params.set("cursor", cursor);
+  return `/api/dashboard/analytics?${params.toString()}`;
 }
 
 function AgentFilterSelector({ 
@@ -590,65 +593,59 @@ export function AnalyticsWorkspaceView() {
     selectedConversation: null,
     detailCache: {},
   });
+  const detailCacheRef = useRef<DashboardAnalyticsState["detailCache"]>({});
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
+  const analyticsUrl = useMemo(
+    () => buildAnalyticsUrl(effectiveFilters),
+    [effectiveFilters],
+  );
+  const {
+    data: analyticsData,
+    error: analyticsError,
+    isLoading: isAnalyticsLoading,
+  } = useSWR<DashboardAnalyticsResponse>(analyticsUrl, jsonFetcher);
 
   useEffect(() => {
-    let isMounted = true;
-    const controller = new AbortController();
+    detailCacheRef.current = state.detailCache;
+  }, [state.detailCache]);
 
-    const load = async () => {
-      setState((current) => ({
-        ...current,
-        isLoading: true,
-      }));
+  useEffect(() => {
+    setState((current) => ({
+      ...current,
+      isLoading: isAnalyticsLoading,
+    }));
+  }, [isAnalyticsLoading]);
 
-      try {
-        const response = await fetch(buildAnalyticsUrl(effectiveFilters), {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = await response.json().catch(() => null);
+  useEffect(() => {
+    if (!analyticsData) {
+      return;
+    }
 
-        if (!response.ok || !payload) {
-          throw new Error(payload?.error || t("analytics.loadError"));
-        }
+    setState((current) => ({
+      ...current,
+      isLoading: false,
+      data: analyticsData,
+    }));
+  }, [analyticsData]);
 
-        if (!isMounted) {
-          return;
-        }
+  useEffect(() => {
+    if (!analyticsError) {
+      return;
+    }
 
-        setState((current) => ({
-          ...current,
-          isLoading: false,
-          data: payload as DashboardAnalyticsResponse,
-        }));
-      } catch (error) {
-        if (controller.signal.aborted || !isMounted) {
-          return;
-        }
-
-        showToast(
-          error instanceof Error ? error.message : t("analytics.loadError"),
-          "error",
-        );
-        setState((current) => ({
-          ...current,
-          isLoading: false,
-          data: null,
-          selectedWidgetSessionId: null,
-          selectedConversation: null,
-          detailCache: {},
-        }));
-      }
-    };
-
-    void load();
-
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
-  }, [effectiveFilters, showToast, t]);
+    showToast(
+      analyticsError instanceof Error ? analyticsError.message : t("analytics.loadError"),
+      "error",
+    );
+    setState((current) => ({
+      ...current,
+      isLoading: false,
+      data: null,
+      selectedWidgetSessionId: null,
+      selectedConversation: null,
+      detailCache: {},
+    }));
+  }, [analyticsError, showToast, t]);
 
   useEffect(() => {
     const conversations = state.data?.conversations ?? [];
@@ -710,7 +707,7 @@ export function AnalyticsWorkspaceView() {
         return;
       }
 
-      const cachedDetail = state.detailCache[sessionId];
+      const cachedDetail = detailCacheRef.current[sessionId];
       if (cachedDetail) {
         setState((current) => ({
           ...current,
@@ -782,7 +779,7 @@ export function AnalyticsWorkspaceView() {
       isMounted = false;
       controller.abort();
     };
-  }, [showToast, state.detailCache, state.selectedWidgetSessionId, t]);
+  }, [showToast, state.selectedWidgetSessionId, t]);
 
   const loadMore = async () => {
     if (!state.data?.pageInfo.nextCursor) {
@@ -795,21 +792,13 @@ export function AnalyticsWorkspaceView() {
     }));
 
     try {
-      const response = await fetch(
+      const payload = await jsonFetcher<DashboardAnalyticsResponse>(
         buildAnalyticsUrl(effectiveFilters, state.data.pageInfo.nextCursor),
-        {
-          cache: "no-store",
-        },
       );
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok || !payload) {
-        throw new Error(payload?.error || t("analytics.loadMoreError"));
-      }
 
       setState((current) => {
         const previous = current.data;
-        const next = payload as DashboardAnalyticsResponse;
+        const next = payload;
 
         if (!previous) {
           return {

@@ -32,6 +32,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useParams, useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { useAppContext } from '@/components/app/AppContext';
 import { SimpleIcon } from '@/components/icons/SimpleIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
@@ -59,6 +60,7 @@ import {
   isToolNameForToolkit,
 } from '@/lib/integrations';
 import { getKnowledgeStatusTone, isReadyKnowledgeSource } from '@/lib/knowledge';
+import { jsonFetcher } from '@/lib/json-fetcher';
 import {
   createLegacyOpenRouterModelOption,
   getFallbackOpenRouterModelSections,
@@ -69,6 +71,7 @@ import {
 import { formatRelativeDate } from '@/lib/utils';
 import type {
   AgentRecord,
+  AgentBuilderBootstrapResponse,
   AgentAutomationRecord,
   AgentVersionRecord,
   AutomationEventRecord,
@@ -134,13 +137,6 @@ interface OpenRouterModelsApiResponse {
 interface AutomationEnvironmentStatus {
   hasComposio: boolean;
   hasWebhookSecret: boolean;
-}
-
-interface AutomationApiResponse {
-  automation: AgentAutomationRecord | null;
-  events?: AutomationEventRecord[];
-  runs?: RunRecord[];
-  environment?: AutomationEnvironmentStatus;
 }
 
 const FIXED_NODE_IDS = {
@@ -248,7 +244,6 @@ const TIMEZONE_OPTIONS = [
 ];
 
 const TOOL_NODE_KINDS: ToolNodeKind[] = ['gmail', 'outlook', 'slack', 'hubspot', 'shopify', 'googleads', 'googlecalendar', 'cal'];
-
 const TRIGGER_SOURCE_ORDER: BuilderTriggerSource[] = [
   'user_message',
   'gmail_new_message',
@@ -2626,6 +2621,13 @@ export default function AgentBuilderPage() {
   const { language, t } = useLanguage();
   const { showToast } = useToast();
   const agentId = params.id;
+  const builderBootstrapUrl = `/api/agents/${agentId}/builder`;
+  const {
+    data: builderBootstrap,
+    error: builderBootstrapError,
+    mutate: mutateBuilderBootstrap,
+  } = useSWR<AgentBuilderBootstrapResponse>(builderBootstrapUrl, jsonFetcher);
+  const hydratedAgentIdRef = useRef<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<BuilderFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<BuilderFlowEdge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -2702,6 +2704,13 @@ export default function AgentBuilderPage() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [pastStates, setPastStates] = useState<{ nodes: BuilderFlowNode[]; edges: BuilderFlowEdge[] }[]>([]);
   const [futureStates, setFutureStates] = useState<{ nodes: BuilderFlowNode[]; edges: BuilderFlowEdge[] }[]>([]);
+
+  // --- Autosave state ---
+  const [isDirty, setIsDirty] = useState(false);
+  const lastSavedSnapshotRef = useRef<string>('');
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAutosavingRef = useRef(false);
+  const AUTOSAVE_DEBOUNCE_MS = 30_000;
 
   const canUndo = pastStates.length > 0;
   const canRedo = futureStates.length > 0;
@@ -2982,77 +2991,14 @@ export default function AgentBuilderPage() {
     }
   };
 
-  const loadBuilder = useCallback(async () => {
-    const [
-      agentResult,
-      draftResult,
-      versionsResult,
-      connectionsResult,
-      attachedResult,
-      authResult,
-      knowledgeSourcesResult,
-      attachedKnowledgeResult,
-    ] = await Promise.all([
-      supabase.from('agents').select('*').eq('id', agentId).single(),
-      supabase.from('agent_drafts').select('*').eq('agent_id', agentId).maybeSingle(),
-      supabase
-        .from('agent_versions')
-        .select('*')
-        .eq('agent_id', agentId)
-        .order('version', { ascending: false }),
-      fetch('/api/connections/toolkits', {
-        cache: 'no-store',
-      }).then((response) => response.json().then((payload) => ({ ok: response.ok, payload }))),
-      supabase.from('agent_connections').select('connection_id').eq('agent_id', agentId),
-      supabase.auth.getUser(),
-      supabase
-        .from('knowledge_sources')
-        .select('*')
-        .order('updated_at', { ascending: false }),
-      fetch(`/api/agents/${agentId}/knowledge`, {
-        cache: 'no-store',
-      }).then((response) => response.json().then((payload) => ({ ok: response.ok, payload }))),
-    ]);
-
-    if (agentResult.error) {
-      throw agentResult.error;
-    }
-
-    if (knowledgeSourcesResult.error) {
-      throw knowledgeSourcesResult.error;
-    }
-
-    if (!connectionsResult.ok) {
-      throw new Error(connectionsResult.payload.error ?? t('connections.loadError'));
-    }
-
-    const chatConnections = ((connectionsResult.payload.connections ?? []) as ConnectionRecord[])
-      .map((connection) => ({
-        ...connection,
-        status: getEffectiveConnectionStatus(connection),
-      }))
-      .filter((connection) => isChatIntegrationSlug(connection.toolkit_slug));
-    const attachedConnectionIds = ((attachedResult.data ?? []) as Array<{ connection_id: string }>).map(
-      (item) => item.connection_id,
-    );
-
-    if (!attachedKnowledgeResult.ok) {
-      throw new Error(
-        attachedKnowledgeResult.payload.error ??
-          t('agentBuilder.loadKnowledgeAttachmentsError'),
-      );
-    }
-
-    const attachedKnowledgeSourceIds = (
-      ((attachedKnowledgeResult.payload.sources ?? []) as KnowledgeSourceRecord[]) ?? []
-    ).map((item) => item.id);
-    const attachedKnowledgeFolderIds = (
-      ((attachedKnowledgeResult.payload.folders ?? []) as KnowledgeFolderWithSources[]) ?? []
-    ).map((item) => item.id);
-
-    const loadedAgent = agentResult.data as AgentRecord;
+  const hydrateBuilder = useCallback((payload: AgentBuilderBootstrapResponse) => {
+    const chatConnections = payload.connections;
+    const attachedConnectionIds = payload.selectedConnectionIds;
+    const attachedKnowledgeSourceIds = payload.attachedKnowledgeSources.map((item) => item.id);
+    const attachedKnowledgeFolderIds = payload.attachedKnowledgeFolders.map((item) => item.id);
+    const loadedAgent = payload.agent;
     const fallbackDefinition = buildInitialDefinition('custom', loadedAgent.surface);
-    const definition = (draftResult.data?.definition ?? fallbackDefinition) as BuilderDefinition;
+    const definition = (payload.draft?.definition ?? fallbackDefinition) as BuilderDefinition;
     const normalized = normalizeDefinition(
       definition,
       loadedAgent.surface,
@@ -3062,29 +3008,7 @@ export default function AgentBuilderPage() {
       attachedKnowledgeFolderIds,
     );
     let normalizedNodes = normalized.nodes;
-    const hasExternalTrigger = normalizedNodes.some(
-      (node) =>
-        node.data.kind === 'trigger' &&
-        isTriggerNodeData(node.data) &&
-        node.data.provider === 'composio',
-    );
-
-    let automationPayload: AutomationApiResponse | null = null;
-
-    if (loadedAgent.surface === 'automation' || hasExternalTrigger) {
-      const automationResponse = await fetch(`/api/agents/${agentId}/automation`, {
-        cache: 'no-store',
-      });
-
-      if (automationResponse.ok) {
-        automationPayload = (await automationResponse.json()) as AutomationApiResponse;
-      } else if (loadedAgent.surface === 'automation') {
-        const payload = await automationResponse.json().catch(() => ({}));
-        throw new Error(
-          typeof payload.error === 'string' ? payload.error : t('agentBuilder.loadError'),
-        );
-      }
-    }
+    const automationPayload = payload.automation;
 
     if (automationPayload?.automation?.connection_id) {
       normalizedNodes = normalizedNodes.map((node) => {
@@ -3127,57 +3051,151 @@ export default function AgentBuilderPage() {
         definition.config?.starterPrompts ?? loadedAgent.starter_prompts,
       ),
     );
-    setDraftVersion(draftResult.data?.version ?? 1);
+    setDraftVersion(payload.draft?.version ?? 1);
     setNodes(hydratedNodes);
     setEdges(buildEdges(hydratedNodes));
-    setVersions((versionsResult.data ?? []) as AgentVersionRecord[]);
+    setVersions(payload.versions);
     setConnections(chatConnections);
-    setKnowledgeSources((knowledgeSourcesResult.data ?? []) as KnowledgeSourceRecord[]);
-    setKnowledgeFolders(
-      ((attachedKnowledgeResult.payload.availableFolders ?? []) as KnowledgeFolderWithSources[]) ??
-        [],
-    );
+    setKnowledgeSources(payload.knowledgeSources);
+    setKnowledgeFolders(payload.availableKnowledgeFolders);
     setAutomationRecord(automationPayload?.automation ?? null);
     setAutomationEvents(automationPayload?.events ?? []);
     setAutomationRuns(automationPayload?.runs ?? []);
     setAutomationEnvironment(automationPayload?.environment ?? null);
-    setCurrentUserId(authResult.data.user?.id ?? null);
+    setCurrentUserId(payload.currentUserId);
     setSelectedNodeId(null);
     setStatusNote(
-      draftResult.data?.updated_at
-        ? { kind: 'lastSaved', date: draftResult.data.updated_at }
+      payload.draft?.updated_at
+        ? { kind: 'lastSaved', date: payload.draft.updated_at }
         : { kind: 'draftInitial' },
     );
+    setIsDirty(false);
 
     if (normalized.requiresToolReview) {
       showToast(t('agentBuilder.multipleOldConnections'), 'error');
     }
-  }, [agentId, setNodes, setEdges, showToast, supabase, t]);
+  }, [setNodes, setEdges, showToast, t]);
 
   useEffect(() => {
-    let isMounted = true;
+    hydratedAgentIdRef.current = null;
+    setIsLoading(true);
+  }, [agentId]);
 
-    const run = async () => {
-      try {
-        await loadBuilder();
-      } catch (error) {
-        if (isMounted) {
-          const message = error instanceof Error ? error.message : t('agentBuilder.loadError');
-          showToast(message, 'error');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+  useEffect(() => {
+    if (!builderBootstrap || hydratedAgentIdRef.current === agentId) {
+      return;
+    }
+
+    hydrateBuilder(builderBootstrap);
+    hydratedAgentIdRef.current = agentId;
+    setIsLoading(false);
+  }, [agentId, builderBootstrap, hydrateBuilder]);
+
+  // --- Autosave: capture baseline snapshot once hydration completes ---
+  useEffect(() => {
+    if (isLoading || !agent) {
+      return;
+    }
+
+    // Only capture a baseline when the ref is empty (first hydration or reload)
+    if (!lastSavedSnapshotRef.current) {
+      lastSavedSnapshotRef.current = JSON.stringify({
+        name, description, instructions, model, timezone,
+        starterPromptFields,
+        nodes: nodes.map((n) => ({ id: n.id, kind: n.data.kind, data: n.data, position: n.position })),
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, agent]);
+
+  // --- Autosave: dirty detection ---
+  useEffect(() => {
+    if (isLoading || !agent || !lastSavedSnapshotRef.current) {
+      return;
+    }
+
+    const current = JSON.stringify({
+      name, description, instructions, model, timezone,
+      starterPromptFields,
+      nodes: nodes.map((n) => ({ id: n.id, kind: n.data.kind, data: n.data, position: n.position })),
+    });
+
+    if (current !== lastSavedSnapshotRef.current) {
+      setIsDirty(true);
+    } else {
+      setIsDirty(false);
+    }
+  }, [isLoading, agent, name, description, instructions, model, timezone, starterPromptFields, nodes]);
+
+  // --- Autosave: debounced save ---
+  useEffect(() => {
+    if (!isDirty || isSaving || isPublishing || isLoading || !agent || !canEditCurrentAgent) {
+      return;
+    }
+
+    autosaveTimerRef.current = setTimeout(() => {
+      // Guard: don't autosave if a manual save is already in progress
+      if (isAutosavingRef.current || isSaving) {
+        return;
       }
-    };
 
-    void run();
+      isAutosavingRef.current = true;
+
+      void (async () => {
+        try {
+          await saveDraft();
+        } catch {
+          // saveDraft already shows error toast
+        } finally {
+          isAutosavingRef.current = false;
+        }
+      })();
+    }, AUTOSAVE_DEBOUNCE_MS);
 
     return () => {
-      isMounted = false;
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
     };
-  }, [loadBuilder, showToast, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty, isSaving, isPublishing, isLoading, agent, canEditCurrentAgent]);
+
+  // --- Autosave: beforeunload warning ---
+  useEffect(() => {
+    if (!isDirty) {
+      return;
+    }
+
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  useEffect(() => {
+    if (!builderBootstrapError) {
+      return;
+    }
+
+    const message =
+      builderBootstrapError instanceof Error
+        ? builderBootstrapError.message
+        : t('agentBuilder.loadError');
+    showToast(message, 'error');
+    setIsLoading(false);
+  }, [builderBootstrapError, showToast, t]);
+
+  const reloadBuilder = useCallback(async () => {
+    const next = await mutateBuilderBootstrap();
+
+    if (next) {
+      hydrateBuilder(next);
+      hydratedAgentIdRef.current = agentId;
+    }
+  }, [agentId, hydrateBuilder, mutateBuilderBootstrap]);
 
   useEffect(() => {
     let isMounted = true;
@@ -3673,8 +3691,9 @@ export default function AgentBuilderPage() {
       .filter((connection) => isChatIntegrationSlug(connection.toolkit_slug));
 
     setConnections(chatConnections);
+    void mutateBuilderBootstrap();
     return chatConnections;
-  }, [t]);
+  }, [mutateBuilderBootstrap, t]);
 
   const handleConnectToolNode = async (kind: ToolNodeKind) => {
     const integration = getSupportedIntegration(kind);
@@ -4021,9 +4040,20 @@ export default function AgentBuilderPage() {
           : current,
       );
       setStatusNote({ kind: 'lastSaved', date: new Date().toISOString() });
-      showToast(t('agentBuilder.draftSaved'), 'success');
+      // Update autosave baseline and clear dirty flag
+      lastSavedSnapshotRef.current = JSON.stringify({
+        name, description, instructions, model, timezone,
+        starterPromptFields,
+        nodes: resolvedNodes.map((n) => ({ id: n.id, kind: n.data.kind, data: n.data, position: n.position })),
+      });
+      setIsDirty(false);
+      // Only show toast for manual saves, not autosave
+      if (!isAutosavingRef.current) {
+        showToast(t('agentBuilder.draftSaved'), 'success');
+      }
+      void mutateBuilderBootstrap();
     } catch (error) {
-      await loadBuilder().catch(() => undefined);
+      await reloadBuilder().catch(() => undefined);
       const message = error instanceof Error ? error.message : t('agentBuilder.saveError');
       showToast(message, 'error');
       throw error;
@@ -4092,6 +4122,7 @@ export default function AgentBuilderPage() {
         version: versionNumber,
       });
       showToast(t('agentBuilder.publishSuccess', { version: versionNumber }), 'success');
+      await reloadBuilder();
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : t('agentBuilder.publishError');
@@ -4158,7 +4189,7 @@ export default function AgentBuilderPage() {
         );
       }
 
-      await loadBuilder();
+      await reloadBuilder();
       router.refresh();
       showToast(
         action === 'activate'
@@ -4193,7 +4224,7 @@ export default function AgentBuilderPage() {
         throw new Error(payload.error ?? t('agentBuilder.rollbackError'));
       }
 
-      await loadBuilder();
+      await reloadBuilder();
       showToast(t('agentBuilder.rollbackSuccess'), 'success');
       setStatusNote({ kind: 'rolledBackAt', date: new Date().toISOString() });
       setIsHistoryOpen(false);
@@ -5494,9 +5525,18 @@ export default function AgentBuilderPage() {
             <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 line-clamp-1">
               {t('agentBuilder.lastUpdate')}
             </span>
-            <p className="text-[10px] font-medium tracking-wide text-on-surface-variant whitespace-nowrap">
-              {formatBuilderStatusNote(statusNote, language, t)}
-            </p>
+            <div className="flex items-center gap-1.5">
+              {isDirty && !isSaving ? (
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+              ) : null}
+              <p className="text-[10px] font-medium tracking-wide text-on-surface-variant whitespace-nowrap">
+                {isSaving
+                  ? t('agentBuilder.savingDraft')
+                  : isDirty
+                    ? t('agentBuilder.unsavedChanges')
+                    : formatBuilderStatusNote(statusNote, language, t)}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center rounded-xl bg-surface-container-low p-1 border border-outline-variant/10">
@@ -5521,9 +5561,17 @@ export default function AgentBuilderPage() {
             <button
               onClick={() => void saveDraft()}
               disabled={isSaving || !canEditCurrentAgent}
-              className="px-5 py-2.5 text-xs font-bold text-on-surface-variant transition-all hover:text-on-surface disabled:opacity-40"
+              className={`px-5 py-2.5 text-xs font-bold transition-all disabled:opacity-40 ${
+                !isDirty && !isSaving
+                  ? 'text-primary/70'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
             >
-              {isSaving ? t('agentBuilder.savingDraft') : t('agentBuilder.saveDraft')}
+              {isSaving
+                ? t('agentBuilder.savingDraft')
+                : isDirty
+                  ? t('agentBuilder.saveDraft')
+                  : t('agentBuilder.saved')}
             </button>
 
             <button

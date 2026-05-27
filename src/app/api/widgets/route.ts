@@ -14,6 +14,9 @@ import {
   getWidgetLimitForPlan,
 } from "@/lib/widget-limits";
 
+const WIDGET_AGENT_SEED_SELECT =
+  "id, workspace_id, created_by, surface, name, slug, description, status, model, instructions, starter_prompts, timezone, published_version_id, archived_at, archived_by, created_at, updated_at";
+
 function buildWidgetSlug(name: string) {
   const base = slugify(name) || "widget";
   return `${base}-${Date.now().toString().slice(-6)}`;
@@ -117,7 +120,7 @@ export async function POST(request: NextRequest) {
   if (requestedAgentId) {
     const { data: agent, error: agentError } = await supabase
       .from("agents")
-      .select("*")
+      .select(WIDGET_AGENT_SEED_SELECT)
       .eq("id", requestedAgentId)
       .eq("workspace_id", context.workspace.id)
       .eq("surface", "widget")
@@ -152,7 +155,7 @@ export async function POST(request: NextRequest) {
       ...widgetDefaults,
       description: requestedDescription,
     })
-    .select()
+    .select("id")
     .single();
 
   if (widgetError || !widget) {

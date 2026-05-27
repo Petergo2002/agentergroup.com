@@ -4,9 +4,44 @@ import Firecrawl from "npm:@mendable/firecrawl-js";
 import { buildClientSafeError, json } from "../_shared/http.ts";
 import { chunkKnowledgeText, extractTextFromFile, normalizeKnowledgeText } from "../_shared/knowledge.ts";
 
+function readFirstSupabaseSecretKey() {
+  const secretKeysJson = Deno.env.get("SUPABASE_SECRET_KEYS");
+
+  if (!secretKeysJson) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(secretKeysJson) as Record<string, unknown>;
+
+    for (const value of Object.values(parsed)) {
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+
+      if (value && typeof value === "object") {
+        const record = value as Record<string, unknown>;
+        const keyValue = record.key ?? record.value ?? record.secret ?? record.api_key;
+
+        if (typeof keyValue === "string" && keyValue.trim()) {
+          return keyValue.trim();
+        }
+      }
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabasePublishableKey =
+  Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
+const supabaseAdminKey =
+  Deno.env.get("SUPABASE_SECRET_KEY") ??
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
+  readFirstSupabaseSecretKey()!;
 const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
 const model = new Supabase.ai.Session("gte-small");
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
@@ -34,8 +69,52 @@ function isEphemeralWidgetUploadSource(source: Record<string, unknown> | null) {
   );
 }
 
+function extractBearerToken(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || value.trim();
+}
+
+function getConfiguredSecretKeys() {
+  const keys = [
+    Deno.env.get("SUPABASE_SECRET_KEY"),
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+    supabaseAdminKey,
+  ];
+  const secretKeysJson = Deno.env.get("SUPABASE_SECRET_KEYS");
+
+  if (secretKeysJson) {
+    try {
+      const parsed = JSON.parse(secretKeysJson) as Record<string, unknown>;
+
+      for (const value of Object.values(parsed)) {
+        if (typeof value === "string") {
+          keys.push(value);
+          continue;
+        }
+
+        if (value && typeof value === "object") {
+          const record = value as Record<string, unknown>;
+          const keyValue = record.key ?? record.value ?? record.secret ?? record.api_key;
+
+          if (typeof keyValue === "string") {
+            keys.push(keyValue);
+          }
+        }
+      }
+    } catch {
+      // Ignore malformed platform metadata and rely on explicit secrets.
+    }
+  }
+
+  return new Set(keys.map((key) => key?.trim()).filter(Boolean) as string[]);
+}
+
 Deno.serve(async (request) => {
-  const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+  const adminClient = createClient(supabaseUrl, supabaseAdminKey);
   const body = await request.json().catch(() => ({}));
   const sourceId = String(body.sourceId ?? "").trim();
 
@@ -44,6 +123,16 @@ Deno.serve(async (request) => {
   }
 
   const authHeader = request.headers.get("Authorization");
+  const apiKeyHeader = request.headers.get("apikey");
+  const internalServiceKey = request.headers.get("x-internal-service-key");
+  const configuredSecretKeys = getConfiguredSecretKeys();
+  const requestKeys = [
+    internalServiceKey,
+    apiKeyHeader,
+    extractBearerToken(authHeader),
+    authHeader,
+  ].map((value) => value?.trim()).filter(Boolean) as string[];
+  const isInternalRequest = requestKeys.some((key) => configuredSecretKeys.has(key));
   console.log(`[Process] Starting job for source: ${sourceId}`);
 
   const { data: source, error: sourceError } = await adminClient
@@ -61,8 +150,11 @@ Deno.serve(async (request) => {
     source as Record<string, unknown>,
   );
 
-  if (authHeader) {
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+  if (isInternalRequest) {
+    // Server-to-server call authenticated by a current Supabase secret key or
+    // the legacy service-role key.
+  } else if (authHeader) {
+    const userClient = createClient(supabaseUrl, supabasePublishableKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const {

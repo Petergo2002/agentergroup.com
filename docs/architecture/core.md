@@ -1,6 +1,6 @@
 # Agentergroup Architecture
 
-Last updated: 2026-05-23
+Last updated: 2026-05-27
 
 ## Purpose
 
@@ -207,6 +207,7 @@ Important implementation docs:
 
 - `src/lib/env.ts`
 - `src/lib/app/bootstrap.ts`
+- `src/lib/app/profile-sync.ts`
 - `src/lib/supabase/server.ts`
 - `src/lib/supabase/client.ts`
 - `src/lib/openrouter.ts`
@@ -221,6 +222,7 @@ Important implementation docs:
 - `src/lib/widgets.ts`
 - `src/lib/widgets/server.ts`
 - `src/lib/dashboard/analytics.ts`
+- `src/lib/dashboard/summary.ts`
 - `src/lib/privacy.ts`
 - `src/lib/end-chat.ts`
 - `src/lib/types.ts`
@@ -243,6 +245,23 @@ Important implementation docs:
 - `supabase/migrations/20260325_widget_session_turn_locks_fix_status_ambiguity.sql`
 - `supabase/migrations/20260325_widget_session_turn_locks_fix_active_turn_ambiguity.sql`
 - `supabase/migrations/20260326_internal_assistants.sql`
+- `supabase/migrations/20260409_widget_rate_limits.sql`
+- `supabase/migrations/20260409163000_widget_rate_limit_window_conflict_fix.sql`
+- `supabase/migrations/20260416_team_invites.sql`
+- `supabase/migrations/20260419110605_add_website_knowledge_source.sql`
+- `supabase/migrations/20260422183115_widget_attachments_bucket.sql`
+- `supabase/migrations/20260429114632_admin_extra_message_credits.sql`
+- `supabase/migrations/20260503102209_automation_agents_v1.sql`
+- `supabase/migrations/20260507000000_connections_one_per_toolkit.sql`
+- `supabase/migrations/20260512102248_purchased_message_credits.sql`
+- `supabase/migrations/20260512105825_connection_auth_links.sql`
+- `supabase/migrations/20260512113836_secure_security_definer_functions.sql`
+- `supabase/migrations/20260512114059_tighten_private_helper_function_grants.sql`
+- `supabase/migrations/20260518170742_agent_library_templates.sql`
+- `supabase/migrations/20260520132303_knowledge_folders.sql`
+- `supabase/migrations/20260525210001_app_slow_query_tuning.sql`
+- `supabase/migrations/20260526212615_dashboard_performance_quick_wins.sql`
+- `supabase/migrations/20260526213651_dashboard_conversation_summaries.sql`
 - `supabase/functions/process-knowledge-source/index.ts`
 - `supabase/functions/search-knowledge/index.ts`
 - `supabase/functions/_shared/knowledge.ts`
@@ -260,6 +279,13 @@ Important implementation docs:
 
 - `/`
 - `/login`
+- `/signup`
+- `/terms-of-service`
+- `/privacy-policy`
+- `/data-processing`
+- `/subprocessors`
+- `/invite/*`
+- `/connect/*`
 
 ### Authenticated app routes
 
@@ -319,6 +345,7 @@ Authentication is handled by Supabase Auth with a professional "Email-first" flo
 - **Signup/Login**: Users enter only their email. The system uses `signInWithOtp` to send a branded Magic Link.
 - **Verification**: The link directs users to `/auth/confirm`, which verifies the token and redirects to `/complete-signup`.
 - **Completion**: New users set their password on `/complete-signup` before being redirected to `/onboarding`.
+- **Legacy signup redirect**: `/signup` is a public route that redirects legacy signup links into the main login flow.
 - **SMTP**: External emails are delivered via **Resend** (SMTP) to ensure professional branding (`@agentergroup.com`) and high deliverability.
 - **Actions**: Login, signup, and password update actions live in `src/app/login/actions.ts`.
 - **Redirects**: Environment-agnostic redirects are managed via `getAppUrl()` in `src/lib/env.ts`.
@@ -332,6 +359,12 @@ Authentication is handled by Supabase Auth with a professional "Email-first" flo
 - at least one workspace membership
 - one active workspace in app context
 
+**Profile sync:**
+Profile upsert logic is now extracted into `src/lib/app/profile-sync.ts` as `syncUserProfile()`. It:
+- Compares the existing DB profile against Supabase Auth metadata (email, full_name, avatar_url)
+- Skips the write when nothing has changed (read-first optimization)
+- Handles concurrent first-login race conditions through duplicate-key detection and a retry read
+
 **Concurrency & Race Conditions:**
 The bootstrap logic is hardened against concurrent requests (e.g., a user opening multiple tabs during their first login). 
 - `getOrCreateUserWorkspaces` uses a `try/catch` block during workspace creation.
@@ -340,7 +373,7 @@ The bootstrap logic is hardened against concurrent requests (e.g., a user openin
 
 Current behavior:
 
-1. Upsert profile from authenticated user data
+1. Call `syncUserProfile()` to upsert the profile from Supabase Auth user metadata
 2. Load all workspace memberships for the user
 3. If none exist, attempt to create a default owner workspace (with concurrency protection)
 4. Resolve the active workspace using:
@@ -566,13 +599,14 @@ It provides:
 - pending invite list with revoke action
 - incoming invite notifications for the current user
 - plan-based team capacity feedback (`free = 0`, `starter = 2`, `premium = 10`)
+- incoming invite acceptance now handled by the public `src/app/invite/accept/page.tsx` (moved from the authenticated `(app)` route group so unauthenticated recipients can land on it directly)
 
 ### Invite flow
 
 1. Owner/admin creates an invite for an email address
 2. Invite row is created with `status = 'pending'`, a unique token, and a copyable `/invite/accept?token=...` link
 3. The system attempts to send the invite through Resend and reports returned email errors while keeping the copyable link available
-4. The public accept page asks unauthenticated recipients to log in or create an account, preserving the invite URL through Supabase auth redirects
+4. The public accept page (`src/app/invite/accept/page.tsx`) is unauthenticated — recipients land on it directly, see their state (loading / auth-required / success / error), and are prompted to log in or create an account if not yet authenticated. The invite URL is preserved through the auth redirect so the accept call fires automatically after login.
 5. The invited user can also see pending invites through `GET /api/invites/incoming`
 6. The user accepts or declines the invite
 7. On accept: a `workspace_members` row is created, active workspace is switched, and invite status becomes `accepted`
@@ -739,6 +773,22 @@ Purpose:
 - `agent_knowledge_folders`: live folder attachments for an agent
 - `match_agent_knowledge_chunks`: similarity search scoped to one agent and workspace, including direct sources and ready sources in attached folders
 
+### 4C. Dashboard conversation summaries
+
+- `dashboard_conversation_summaries`
+
+Purpose:
+
+- A materialized summary row per widget session, maintained automatically by Postgres triggers.
+- Populated and kept in sync by `private.refresh_dashboard_conversation_summary()` called from three triggers:
+  - `refresh_dashboard_conversation_summary_on_session` (on `widget_sessions`)
+  - `refresh_dashboard_conversation_summary_on_message` (on `widget_session_messages`)
+  - `refresh_dashboard_conversation_summary_on_lead` (on `widget_leads`)
+- Fields include: message/lead counts, latest snippet, lead contact info, page URL, referrer, status, and a `search_text` generated column backed by a `gin_trgm_ops` index.
+- Only covers `source IN ('embedded', 'hosted')` sessions; preview sessions are excluded.
+- Used by the analytics backend to serve paginated conversation lists and search without expensive per-request aggregations.
+- RLS mirrors `widget_sessions`: workspace members can select their own workspace rows.
+
 ### 4B. Agent library templates
 
 - `agent_library_templates`
@@ -844,11 +894,12 @@ Current policy:
 
 Current explicit public classes include:
 
-- public marketing/legal pages: `/`, `/privacy-policy`, `/data-processing`, `/subprocessors`
+- public marketing/legal pages: `/`, `/privacy-policy`, `/terms-of-service`, `/data-processing`, `/subprocessors`
 - auth and login flows: `/login/*`, `/auth/*`
+- legacy redirect: `/signup` (redirects into the main login flow)
 - public widget APIs: `/api/public/*`
 - public connection auth-link flow: `/connect/*`
-- public workspace invite entry points: `/invite/*`, `/api/invites/*` route handlers still verify the authenticated user where required
+- public workspace invite entry points: `/invite/*`; `/api/invites/*` route handlers still verify the authenticated user where required
 - externally called signed/secret-protected endpoints: `/api/billing/webhook`,
   `/api/composio/webhook`, `/api/internal/privacy/retention`
 
@@ -1496,8 +1547,10 @@ Analytics is a workspace-level operations surface focused on widget conversation
 Main surfaces:
 
 - `/analytics`
+- `/dashboard` (new home page with summary stats and recent activity)
 - `GET /api/dashboard/analytics`
 - `GET /api/dashboard/analytics/conversations/[widgetSessionId]`
+- `GET /api/dashboard/summary` (returns workspace stats for the dashboard home)
 
 Current behavior:
 
@@ -1506,6 +1559,20 @@ Current behavior:
 - analytics excludes preview sessions and focuses on customer-facing widget traffic
 - production does not persist raw tool debug payloads into stored assistant/widget traces
 - conversation-detail `debugTrace` remains available only to workspace owners and admins
+
+### Dashboard summary
+
+`src/lib/dashboard/summary.ts` is the server-side loader for the `/dashboard` home page.
+
+It loads in parallel:
+- recent widget conversations (last 30 days, max 4) from `listRecentDashboardConversations()`
+- active (non-archived) agents for the workspace
+- widget count and deployed widget count
+- connected app count
+- knowledge source count
+- widget lead count
+
+The dashboard home page renders stats cards, an agent status list, and a recent conversations activity panel.
 
 ## OpenRouter Integration
 
@@ -2150,6 +2217,7 @@ The core environment contract is:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_EXTRA_CREDITS_500_PRICE_ID`
+- `SUPABASE_SECRET_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `WIDGET_APP_URL`
 - `WIDGET_ACCESS_SECRET`
@@ -2169,8 +2237,13 @@ Billing and rate-limit env rules:
 Expected inside Supabase function runtime:
 
 - `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_PUBLISHABLE_KEY` or legacy `SUPABASE_ANON_KEY`
+- `SUPABASE_SECRET_KEY` or legacy `SUPABASE_SERVICE_ROLE_KEY`
+
+The knowledge Edge Functions accept current `sb_secret_...` keys through
+the `apikey` header. Because those keys are not JWTs, `search-knowledge`
+and `process-knowledge-source` run with `verify_jwt = false` and perform
+their own internal-key or user-token authorization in the handler.
 
 ## Observability and Debugging
 
@@ -2335,18 +2408,20 @@ For a new engineer joining this codebase, these are the most important files to 
 
 1. `src/app/(app)/layout.tsx`
 2. `src/lib/app/bootstrap.ts`
-3. `src/app/api/agents/[id]/chat/route.ts`
-4. `src/lib/composio.ts`
-5. `src/lib/integrations.ts`
-6. `src/lib/knowledge.ts`
-7. `supabase/functions/process-knowledge-source/index.ts`
-8. `supabase/functions/search-knowledge/index.ts`
-9. `src/app/(app)/agents/[id]/builder/page.tsx`
-10. `src/app/(app)/agents/[id]/preview/page.tsx`
-11. `src/lib/widgets/server.ts`
-12. `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
-13. `apps/widget-v2/src/Widget.tsx`
-14. `scripts/widget-load-test.mjs`
+3. `src/lib/app/profile-sync.ts`
+4. `src/app/api/agents/[id]/chat/route.ts`
+5. `src/lib/composio.ts`
+6. `src/lib/integrations.ts`
+7. `src/lib/knowledge.ts`
+8. `supabase/functions/process-knowledge-source/index.ts`
+9. `supabase/functions/search-knowledge/index.ts`
+10. `src/app/(app)/agents/[id]/builder/page.tsx`
+11. `src/app/(app)/agents/[id]/preview/page.tsx`
+12. `src/lib/widgets/server.ts`
+13. `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
+14. `apps/widget-v2/src/Widget.tsx`
+15. `scripts/widget-load-test.mjs`
+16. `src/lib/dashboard/summary.ts`
 
 ## Summary
 
@@ -2360,4 +2435,3 @@ The current architecture is a focused full-stack agent platform built around one
 - keep the end-user experience conversational and clean
 
 That gives the project a practical MVP foundation while keeping the core architecture extensible for future integrations and more capable agent behaviors.
-behaviors.

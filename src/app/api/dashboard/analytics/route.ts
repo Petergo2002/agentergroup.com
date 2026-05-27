@@ -57,14 +57,13 @@ export async function GET(request: NextRequest) {
       limit,
     });
     const { startIso } = getAnalyticsDateRange(appliedFilters.range);
-    const widgetStatusById = new Map(
-      conversationResult.widgetOptions.map((widget) => [widget.id, widget.status] as const),
-    );
     const overview = await getDashboardAnalyticsOverview(admin, {
       workspaceId: context.workspace.id,
       startIso,
-      filteredRows: conversationResult.filteredRows,
-      widgetStatusById,
+      conversationCount: conversationResult.overview.conversationCount,
+      messageCount: conversationResult.overview.messageCount,
+      leadCount: conversationResult.overview.leadCount,
+      activeWidgetIds: conversationResult.overview.activeWidgetIds,
     });
 
     return NextResponse.json({

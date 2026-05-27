@@ -32,7 +32,9 @@ async function loadKnowledgePageData() {
     await Promise.all([
       supabase
         .from("knowledge_sources")
-        .select("*")
+        .select(
+          "id, workspace_id, created_by, name, description, source_type, status, storage_bucket, storage_path, mime_type, file_size_bytes, chunk_count, last_processed_at, error_message, metadata, created_at, updated_at",
+        )
         .eq("workspace_id", context.workspace.id)
         .order("updated_at", { ascending: false }),
       supabase
@@ -42,7 +44,9 @@ async function loadKnowledgePageData() {
         .order("updated_at", { ascending: false }),
       supabase
         .from("connections")
-        .select("*")
+        .select(
+          "id, workspace_id, provider, toolkit_slug, display_name, status, external_id, account_label, toolkit_data, created_by, last_synced_at, created_at, updated_at",
+        )
         .eq("workspace_id", context.workspace.id)
         .order("display_name", { ascending: true }),
     ]);

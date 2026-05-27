@@ -52,6 +52,23 @@ interface AgentKnowledgeFolderJoinRow {
     | null;
 }
 
+const PREVIEW_AGENT_SELECT =
+  'id, workspace_id, created_by, surface, name, slug, description, status, model, instructions, starter_prompts, timezone, published_version_id, archived_at, archived_by, created_at, updated_at';
+const PREVIEW_THREAD_SELECT =
+  'id, workspace_id, agent_id, source, title, created_by, active_turn_request_id, active_turn_started_at, created_at, updated_at';
+const PREVIEW_MESSAGE_SELECT =
+  'id, thread_id, workspace_id, role, content, tool_name, tool_call_id, metadata, created_by, created_at';
+const PREVIEW_RUN_SELECT =
+  'id, workspace_id, agent_id, thread_id, status, model, input, output, error_message, started_at, completed_at, created_at';
+const PREVIEW_RUN_STEP_SELECT =
+  'id, run_id, workspace_id, agent_id, step_key, step_type, title, detail, status, payload, started_at, completed_at, created_at';
+const PREVIEW_RUN_APPROVAL_SELECT =
+  'id, run_id, workspace_id, agent_id, step_id, status, title, detail, requested_by, resolved_by, resolved_at, metadata, created_at';
+const PREVIEW_CONNECTION_SELECT =
+  'id, workspace_id, provider, toolkit_slug, display_name, status, external_id, account_label, toolkit_data, created_by, last_synced_at, created_at, updated_at';
+const PREVIEW_KNOWLEDGE_SOURCE_SELECT =
+  'id, workspace_id, created_by, name, description, source_type, status, storage_bucket, storage_path, mime_type, file_size_bytes, chunk_count, last_processed_at, error_message, metadata, created_at, updated_at';
+
 function getKnowledgeMatches(message: MessageRecord) {
   const value = message.metadata?.knowledgeMatches;
 
@@ -127,7 +144,7 @@ export default function AgentPreviewPage() {
   const loadMessages = useCallback(async (threadId: string) => {
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select(PREVIEW_MESSAGE_SELECT)
       .eq('thread_id', threadId)
       .order('created_at', { ascending: true });
 
@@ -148,7 +165,7 @@ export default function AgentPreviewPage() {
         created_by: user.id,
         title: title ?? t('assistants.newChat'),
       })
-      .select()
+      .select(PREVIEW_THREAD_SELECT)
       .single();
 
     if (error || !data) {
@@ -187,12 +204,12 @@ export default function AgentPreviewPage() {
       await Promise.all([
         supabase
           .from('run_steps')
-          .select('*')
+          .select(PREVIEW_RUN_STEP_SELECT)
           .eq('run_id', runId)
           .order('created_at', { ascending: true }),
         supabase
           .from('run_approvals')
-          .select('*')
+          .select(PREVIEW_RUN_APPROVAL_SELECT)
           .eq('run_id', runId)
           .order('created_at', { ascending: true }),
       ]);
@@ -217,7 +234,7 @@ export default function AgentPreviewPage() {
       loadMessages(threadId),
       supabase
         .from('runs')
-        .select('*')
+        .select(PREVIEW_RUN_SELECT)
         .eq('agent_id', agentId)
         .order('created_at', { ascending: false })
         .limit(6)
@@ -241,31 +258,31 @@ export default function AgentPreviewPage() {
     const load = async () => {
       try {
         const [agentResult, threadResult, runResult, connectionResult, knowledgeResult, folderKnowledgeResult, draftResult] = await Promise.all([
-          supabase.from('agents').select('*').eq('id', agentId).single(),
+          supabase.from('agents').select(PREVIEW_AGENT_SELECT).eq('id', agentId).single(),
           supabase
             .from('chat_threads')
-            .select('*')
+            .select(PREVIEW_THREAD_SELECT)
             .eq('agent_id', agentId)
             .eq('source', 'preview')
             .eq('created_by', user.id)
             .order('updated_at', { ascending: false }),
           supabase
             .from('runs')
-            .select('*')
+            .select(PREVIEW_RUN_SELECT)
             .eq('agent_id', agentId)
             .order('created_at', { ascending: false })
             .limit(6),
           supabase
             .from('agent_connections')
-            .select('connection:connections(*)')
+            .select(`connection:connections(${PREVIEW_CONNECTION_SELECT})`)
             .eq('agent_id', agentId),
           supabase
             .from('agent_knowledge_sources')
-            .select('source:knowledge_sources(*)')
+            .select(`source:knowledge_sources(${PREVIEW_KNOWLEDGE_SOURCE_SELECT})`)
             .eq('agent_id', agentId),
           supabase
             .from('agent_knowledge_folders')
-            .select('folder:knowledge_folders(sources:knowledge_folder_sources(source:knowledge_sources(*)))')
+            .select(`folder:knowledge_folders(sources:knowledge_folder_sources(source:knowledge_sources(${PREVIEW_KNOWLEDGE_SOURCE_SELECT})))`)
             .eq('agent_id', agentId),
           supabase
             .from('agent_drafts')

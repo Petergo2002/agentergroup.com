@@ -39,6 +39,7 @@ export type {
 } from "./types/subscription";
 
 export type { AgentRecord, AgentVersionRecord } from "./types/agent";
+export type { AgentBuilderBootstrapResponse } from "./agents/builder-bootstrap";
 export type {
   AgentLibraryTemplateRecord,
   AgentLibraryTemplateSourceRecord,
@@ -99,6 +100,7 @@ export type {
   DashboardAnalyticsAppliedFilters,
   DashboardAnalyticsConversationListItem,
   DashboardAnalyticsResponse,
+  DashboardLatestActivityResponse,
   DashboardSummaryResponse,
   DashboardConversationDetailResponse,
 } from "./types/dashboard";

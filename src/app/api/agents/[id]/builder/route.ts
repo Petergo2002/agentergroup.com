@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
-import { loadDashboardSummary } from "@/lib/dashboard/summary";
+import { NextRequest, NextResponse } from "next/server";
+import { loadAgentBuilderBootstrap } from "@/lib/agents/builder-bootstrap";
 import { createClient } from "@/lib/supabase/server";
 
-export const revalidate = 30;
-
-export async function GET() {
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id: agentId } = await params;
   const supabase = await createClient();
   const {
     data: { user },
@@ -15,14 +17,16 @@ export async function GET() {
   }
 
   try {
-    return NextResponse.json(await loadDashboardSummary(supabase as never, user));
+    return NextResponse.json(
+      await loadAgentBuilderBootstrap(supabase, user, agentId),
+    );
   } catch (error) {
     return NextResponse.json(
       {
         error:
           error instanceof Error
             ? error.message
-            : "Failed to load dashboard summary.",
+            : "Failed to load builder data.",
       },
       { status: 500 },
     );

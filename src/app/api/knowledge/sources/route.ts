@@ -11,6 +11,9 @@ import {
 import type { KnowledgeSourceRecord, KnowledgeSourceType } from "@/lib/types";
 
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
+const KNOWLEDGE_SOURCE_LIST_SELECT =
+  "id, workspace_id, created_by, name, description, source_type, status, storage_bucket, storage_path, mime_type, file_size_bytes, chunk_count, last_processed_at, error_message, metadata, created_at, updated_at";
+
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
 }
@@ -121,7 +124,7 @@ export async function GET() {
   const context = await ensureWorkspaceContext(supabase as never, user);
   const { data, error } = await supabase
     .from("knowledge_sources")
-    .select("*")
+    .select(KNOWLEDGE_SOURCE_LIST_SELECT)
     .eq("workspace_id", context.workspace.id)
     .order("updated_at", { ascending: false });
 

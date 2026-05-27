@@ -11,6 +11,11 @@ import { toKnowledgeFolderWithSources } from "@/lib/knowledge-folders";
 import type { KnowledgeFolderJoinRow } from "@/lib/knowledge-folders";
 import type { KnowledgeSourceRecord } from "@/lib/types";
 
+const KNOWLEDGE_SOURCE_LIST_SELECT =
+  "id, workspace_id, created_by, name, description, source_type, status, storage_bucket, storage_path, mime_type, file_size_bytes, chunk_count, last_processed_at, error_message, metadata, created_at, updated_at";
+const KNOWLEDGE_FOLDER_WITH_SOURCES_SELECT =
+  "id, workspace_id, created_by, name, description, created_at, updated_at, sources:knowledge_folder_sources(knowledge_source_id)";
+
 interface AgentKnowledgeJoinRow {
   source: KnowledgeSourceRecord | KnowledgeSourceRecord[] | null;
 }
@@ -58,15 +63,15 @@ export async function GET(
   const [sourcesResult, foldersResult, availableFoldersResult] = await Promise.all([
     supabase
       .from("agent_knowledge_sources")
-      .select("source:knowledge_sources(*)")
+      .select(`source:knowledge_sources(${KNOWLEDGE_SOURCE_LIST_SELECT})`)
       .eq("agent_id", agentId),
     supabase
       .from("agent_knowledge_folders")
-      .select("folder:knowledge_folders(*, sources:knowledge_folder_sources(knowledge_source_id))")
+      .select(`folder:knowledge_folders(${KNOWLEDGE_FOLDER_WITH_SOURCES_SELECT})`)
       .eq("agent_id", agentId),
     supabase
       .from("knowledge_folders")
-      .select("*, sources:knowledge_folder_sources(knowledge_source_id)")
+      .select(KNOWLEDGE_FOLDER_WITH_SOURCES_SELECT)
       .eq("workspace_id", context.workspace.id)
       .order("updated_at", { ascending: false }),
   ]);

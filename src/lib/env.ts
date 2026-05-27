@@ -49,9 +49,28 @@ export function hasSupabaseEnv(): boolean {
 }
 
 /**
- * Returns the required service-role key for privileged server operations.
+ * Returns the required privileged Supabase API key for server operations.
  *
- * @returns The configured Supabase service-role key.
+ * Prefer the current `sb_secret_...` key model, but keep the legacy
+ * service-role key as a rollout fallback while older Supabase surfaces are
+ * still being migrated.
+ *
+ * @returns The configured privileged Supabase key.
+ */
+export function getSupabaseAdminKey(): string {
+  return (
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    requireEnv(
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY",
+    )
+  );
+}
+
+/**
+ * Returns the legacy service-role key.
+ *
+ * @returns The configured legacy Supabase service-role key.
  */
 export function getSupabaseServiceRoleKey(): string {
   return requireEnv(
@@ -61,12 +80,24 @@ export function getSupabaseServiceRoleKey(): string {
 }
 
 /**
- * Checks whether the service-role key is configured.
+ * Checks whether a privileged Supabase server key is configured.
  *
- * @returns `true` when the service-role key exists.
+ * @returns `true` when a current secret key or legacy service-role key exists.
+ */
+export function hasSupabaseAdminEnv(): boolean {
+  return Boolean(
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+  );
+}
+
+/**
+ * Checks whether the legacy service-role key is configured.
+ *
+ * @returns `true` when the legacy service-role key exists.
  */
 export function hasSupabaseServiceRoleEnv(): boolean {
-  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
 }
 
 /**

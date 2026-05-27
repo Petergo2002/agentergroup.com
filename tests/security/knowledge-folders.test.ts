@@ -11,6 +11,18 @@ const migration = readFileSync(
   join(process.cwd(), "supabase/migrations/20260520132303_knowledge_folders.sql"),
   "utf8",
 );
+const supabaseConfig = readFileSync(
+  join(process.cwd(), "supabase/config.toml"),
+  "utf8",
+);
+const searchKnowledgeFunction = readFileSync(
+  join(process.cwd(), "supabase/functions/search-knowledge/index.ts"),
+  "utf8",
+);
+const processKnowledgeFunction = readFileSync(
+  join(process.cwd(), "supabase/functions/process-knowledge-source/index.ts"),
+  "utf8",
+);
 
 test("knowledge folder helpers dedupe source ids and expose source membership", () => {
   assert.deepEqual(
@@ -54,4 +66,19 @@ test("knowledge search RPC includes direct and folder-attached ready sources", (
   assert.match(migration, /from public\.agent_knowledge_folders akf/);
   assert.match(migration, /join public\.knowledge_folder_sources kfs/);
   assert.match(migration, /ks\.status = 'ready'/);
+});
+
+test("knowledge edge functions support current Supabase secret-key auth", () => {
+  assert.match(supabaseConfig, /\[functions\.search-knowledge\]\s+verify_jwt = false/s);
+  assert.match(supabaseConfig, /\[functions\.process-knowledge-source\]\s+verify_jwt = false/s);
+
+  for (const source of [searchKnowledgeFunction, processKnowledgeFunction]) {
+    assert.match(source, /SUPABASE_PUBLISHABLE_KEY/);
+    assert.match(source, /SUPABASE_SECRET_KEY/);
+    assert.match(source, /SUPABASE_SECRET_KEYS/);
+    assert.match(source, /requestKeys\.some\(\(key\) => configuredSecretKeys\.has\(key\)\)/);
+  }
+
+  assert.match(searchKnowledgeFunction, /input_widget_session_id/);
+  assert.match(searchKnowledgeFunction, /PGRST202/);
 });

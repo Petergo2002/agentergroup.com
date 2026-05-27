@@ -28,7 +28,9 @@ async function loadConnectionsPageData() {
 
   const { data: storedConnections, error } = await supabase
     .from("connections")
-    .select("*")
+    .select(
+      "id, workspace_id, provider, toolkit_slug, display_name, status, external_id, account_label, toolkit_data, created_by, last_synced_at, created_at, updated_at",
+    )
     .eq("workspace_id", context.workspace.id)
     .order("display_name", { ascending: true });
 

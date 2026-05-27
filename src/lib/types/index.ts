@@ -25,6 +25,7 @@ export type {
 } from "./workspace";
 
 export type { AgentRecord, AgentVersionRecord } from "./agent";
+export type { AgentBuilderBootstrapResponse } from "../agents/builder-bootstrap";
 export type {
   AgentLibraryTemplateRecord,
   AgentLibraryTemplateSourceRecord,
@@ -82,6 +83,7 @@ export type {
   DashboardAnalyticsAppliedFilters,
   DashboardAnalyticsConversationListItem,
   DashboardAnalyticsResponse,
+  DashboardLatestActivityResponse,
   DashboardSummaryResponse,
   DashboardConversationDetailResponse,
 } from "./dashboard";

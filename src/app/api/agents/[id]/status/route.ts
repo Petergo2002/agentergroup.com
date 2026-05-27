@@ -9,6 +9,9 @@ import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createAuditLog } from "@/lib/runtime/observability";
 import { createClient } from "@/lib/supabase/server";
 
+const STATUS_AGENT_SELECT =
+  "id, workspace_id, created_by, surface, status, published_version_id, archived_at";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -34,7 +37,7 @@ export async function POST(
 
   const { data: agent, error: agentError } = await supabase
     .from("agents")
-    .select("*")
+    .select(STATUS_AGENT_SELECT)
     .eq("id", agentId)
     .single();
 

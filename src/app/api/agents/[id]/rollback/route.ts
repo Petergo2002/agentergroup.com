@@ -9,6 +9,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAuditLog } from "@/lib/runtime/observability";
 import type { BuilderDefinition } from "@/lib/types";
 
+const ROLLBACK_AGENT_SELECT =
+  "id, workspace_id, created_by, surface, model, instructions, starter_prompts";
+const ROLLBACK_VERSION_SELECT =
+  "id, agent_id, workspace_id, version, definition, published_by, created_at";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -34,10 +39,10 @@ export async function POST(
 
   const [{ data: agent, error: agentError }, { data: version, error: versionError }, { data: draft }] =
     await Promise.all([
-      supabase.from("agents").select("*").eq("id", agentId).single(),
+      supabase.from("agents").select(ROLLBACK_AGENT_SELECT).eq("id", agentId).single(),
       supabase
         .from("agent_versions")
-        .select("*")
+        .select(ROLLBACK_VERSION_SELECT)
         .eq("id", versionId)
         .eq("agent_id", agentId)
         .single(),

@@ -641,9 +641,42 @@ export async function syncConnectedAccountsToDatabase(
   supabase: { from: (table: string) => unknown },
   workspaceId: string,
   userId: string,
+  options?: {
+    force?: boolean;
+    minSyncIntervalMs?: number;
+  },
 ) {
   if (!createComposioClient()) {
     return [];
+  }
+
+  const minSyncIntervalMs = options?.minSyncIntervalMs ?? 60_000;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const connectionsTable = supabase.from("connections") as any;
+  const existingConnectionsResult = await connectionsTable
+    .select("id, external_id, status, toolkit_data, last_synced_at")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", "composio");
+
+  if (existingConnectionsResult.error) {
+    throw new Error(existingConnectionsResult.error.message);
+  }
+
+  const existingConnections = (existingConnectionsResult.data ?? []) as ConnectionSyncRow[];
+
+  if (!options?.force && existingConnections.length > 0) {
+    const latestSyncTime = existingConnections.reduce((latest, connection) => {
+      if (!connection.last_synced_at) {
+        return latest;
+      }
+
+      const syncedAt = new Date(connection.last_synced_at).getTime();
+      return Number.isFinite(syncedAt) ? Math.max(latest, syncedAt) : latest;
+    }, 0);
+
+    if (latestSyncTime > 0 && Date.now() - latestSyncTime < minSyncIntervalMs) {
+      return [];
+    }
   }
 
   const composioUserId = buildWorkspaceComposioUserId(workspaceId);
@@ -668,18 +701,7 @@ export async function syncConnectedAccountsToDatabase(
       .filter((externalId): externalId is string => Boolean(externalId)),
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const connectionsTable = supabase.from("connections") as any;
-  const { data: existingConnections, error: existingConnectionsError } = await connectionsTable
-    .select("id, external_id, status, toolkit_data, last_synced_at")
-    .eq("workspace_id", workspaceId)
-    .eq("provider", "composio");
-
-  if (existingConnectionsError) {
-    throw new Error(existingConnectionsError.message);
-  }
-
-  const staleConnectionIds = ((existingConnections ?? []) as ConnectionSyncRow[])
+  const staleConnectionIds = existingConnections
     .filter(
       (connection) =>
         getConnectionComposioUserId(connection) === composioUserId &&

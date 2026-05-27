@@ -20,7 +20,7 @@ import {
   KNOWLEDGE_MATCH_THRESHOLD,
 } from "@/lib/knowledge";
 import { createOpenRouterChatCompletion } from "@/lib/openrouter";
-import { getSupabaseEnv, getSupabaseServiceRoleKey } from "@/lib/env";
+import { getSupabaseAdminKey, getSupabaseEnv } from "@/lib/env";
 import type { EnabledToolSelection } from "@/lib/tool-actions";
 import type {
   AgentRecord,
@@ -589,18 +589,22 @@ async function retrieveKnowledgeMatches({
 }) {
   void supabase;
 
-  const { url } = getSupabaseEnv();
-  const serviceRoleKey = getSupabaseServiceRoleKey();
+  const { url, publishableKey } = getSupabaseEnv();
+  const adminKey = getSupabaseAdminKey();
   const isUserScopedRequest = Boolean(knowledgeAccessToken);
-  const authToken = knowledgeAccessToken ?? serviceRoleKey;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${authToken}`,
-    apikey: isUserScopedRequest ? authToken : serviceRoleKey,
+    apikey: isUserScopedRequest ? publishableKey : adminKey,
   };
 
-  if (!isUserScopedRequest) {
-    headers["x-internal-service-key"] = serviceRoleKey;
+  if (isUserScopedRequest) {
+    headers.Authorization = `Bearer ${knowledgeAccessToken}`;
+  } else {
+    headers["x-internal-service-key"] = adminKey;
+
+    if (!adminKey.startsWith("sb_secret_")) {
+      headers.Authorization = `Bearer ${adminKey}`;
+    }
   }
 
   const response = await fetch(`${url}/functions/v1/search-knowledge`, {

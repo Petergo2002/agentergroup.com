@@ -19,6 +19,9 @@ interface AgentPayload {
   contactFormSettings?: Record<string, unknown>;
 }
 
+const WIDGET_AGENT_AVAILABLE_AGENT_SELECT =
+  "id, workspace_id, created_by, surface, name, slug, description, status, model, instructions, starter_prompts, timezone, published_version_id, archived_at, archived_by, created_at, updated_at";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -51,9 +54,9 @@ export async function POST(
   );
 
   const { data: agents, error: agentsError } = requestedAgentIds.length
-    ? await supabase
+      ? await supabase
         .from("agents")
-        .select("*")
+        .select(WIDGET_AGENT_AVAILABLE_AGENT_SELECT)
         .eq("workspace_id", context.workspace.id)
         .eq("surface", "widget")
         .in("id", requestedAgentIds)

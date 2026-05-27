@@ -1,6 +1,6 @@
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
-import { buildWidgetSummary, loadAllWidgetsWithAgents } from "@/lib/widgets/server";
+import { getWidgetNeedsRedeploy, loadAllWidgetsWithAgents } from "@/lib/widgets/server";
 import WidgetsPageClient from "./WidgetsPageClient";
 
 async function loadWidgetsPageData() {
@@ -17,15 +17,14 @@ async function loadWidgetsPageData() {
   const allWidgets = await loadAllWidgetsWithAgents(supabase as never, context.workspace.id);
 
   return allWidgets.map((loaded) => {
-    const summary = buildWidgetSummary(loaded.widget, loaded.widgetAgents);
     return {
-      id: summary.widget.id,
-      name: summary.widget.name,
-      description: summary.widget.description,
-      status: summary.widget.status,
-      attachedAgentCount: summary.attachedAgents.length,
-      needsRedeploy: summary.needsRedeploy,
-      updatedAt: summary.widget.updated_at,
+      id: loaded.widget.id,
+      name: loaded.widget.name,
+      description: loaded.widget.description,
+      status: loaded.widget.status,
+      attachedAgentCount: loaded.widgetAgents.length,
+      needsRedeploy: getWidgetNeedsRedeploy(loaded.widget, loaded.widgetAgents),
+      updatedAt: loaded.widget.updated_at,
     };
   });
 }

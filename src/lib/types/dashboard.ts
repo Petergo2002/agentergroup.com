@@ -68,6 +68,20 @@ export interface DashboardAnalyticsResponse {
   };
 }
 
+export interface DashboardLatestActivityResponse {
+  latestConversation: Pick<
+    DashboardAnalyticsConversationListItem,
+    | "widgetSessionId"
+    | "widgetId"
+    | "widgetName"
+    | "agentId"
+    | "agentName"
+    | "agentLabel"
+    | "latestSnippet"
+    | "lastActivityAt"
+  > | null;
+}
+
 export interface DashboardSummaryResponse {
   recentConversations: DashboardAnalyticsConversationListItem[];
   agents: AgentRecord[];

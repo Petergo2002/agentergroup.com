@@ -1,21 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
 import {
+  getSupabaseAdminKey,
   getSupabaseEnv,
-  getSupabaseServiceRoleKey,
-  hasSupabaseServiceRoleEnv,
+  hasSupabaseAdminEnv,
 } from "@/lib/env";
 
 export function createAdminClient() {
-  if (!hasSupabaseServiceRoleEnv()) {
+  if (!hasSupabaseAdminEnv()) {
     throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY is missing. Add it to .env.local and restart the Next.js dev server.",
+      "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is missing. Add it to .env.local and restart the Next.js dev server.",
     );
   }
 
   const { url } = getSupabaseEnv();
-  const serviceRoleKey = getSupabaseServiceRoleKey();
+  const adminKey = getSupabaseAdminKey();
 
-  return createClient(url, serviceRoleKey, {
+  return createClient(url, adminKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

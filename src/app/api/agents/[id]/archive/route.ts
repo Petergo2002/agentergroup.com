@@ -11,6 +11,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAuditLog } from "@/lib/runtime/observability";
 import type { AgentAutomationRecord } from "@/lib/types";
 
+const ARCHIVE_AGENT_SELECT =
+  "id, workspace_id, created_by, surface, archived_at";
+const ARCHIVE_AUTOMATION_SELECT =
+  "id, workspace_id, agent_id, connection_id, provider, toolkit_slug, trigger_slug, trigger_config, composio_trigger_id, status, last_event_at, last_error, created_at, updated_at";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -32,7 +37,7 @@ export async function POST(
 
   const { data: agent, error: agentError } = await supabase
     .from("agents")
-    .select("*")
+    .select(ARCHIVE_AGENT_SELECT)
     .eq("id", agentId)
     .single();
 
@@ -65,7 +70,7 @@ export async function POST(
   if (archived && agent.surface === "automation") {
     const { data: automation, error: automationError } = await supabase
       .from("agent_automations")
-      .select("*")
+      .select(ARCHIVE_AUTOMATION_SELECT)
       .eq("agent_id", agentId)
       .maybeSingle();
 

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { getEffectiveConnectionStatus, sortConnectedItemsFirst } from "@/lib/connections";
@@ -6,7 +6,7 @@ import { syncConnectedAccountsToDatabase } from "@/lib/composio";
 import { SUPPORTED_INTEGRATIONS } from "@/lib/integrations";
 import type { ConnectionRecord } from "@/lib/types";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -17,11 +17,15 @@ export async function GET() {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id);
+  await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id, {
+    force: request.nextUrl.searchParams.get("force") === "true",
+  });
 
   const { data: storedConnections } = await supabase
     .from("connections")
-    .select("*")
+    .select(
+      "id, workspace_id, provider, toolkit_slug, display_name, status, external_id, account_label, toolkit_data, created_by, last_synced_at, created_at, updated_at",
+    )
     .eq("workspace_id", context.workspace.id)
     .order("display_name", { ascending: true });
 

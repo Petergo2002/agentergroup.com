@@ -48,7 +48,8 @@ Root app variables:
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL for browser/server clients |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Privileged Supabase key for admin routes and jobs |
+| `SUPABASE_SECRET_KEY` | Yes | Current Supabase secret key for admin routes and jobs |
+| `SUPABASE_SERVICE_ROLE_KEY` | Temporary fallback | Legacy privileged Supabase key while older deployments are migrated |
 | `OPENROUTER_API_KEY` | Yes | OpenRouter API key |
 | `OPENROUTER_MODEL` | No | Default model id for agent turns |
 | `OPENROUTER_DATA_COLLECTION` | No | Provider privacy mode, defaults to `deny` |
@@ -128,7 +129,10 @@ npm run widget:load-test -- --help
 | Route | Purpose |
 | --- | --- |
 | `/login` | Supabase-authenticated login flow |
-| `/dashboard` | Workspace overview and operational summary |
+| `/signup` | Legacy signup redirect into the main login flow |
+| `/terms-of-service` | Public Terms of Service page |
+| `/invite/accept` | Public workspace invite acceptance (unauthenticated-friendly) |
+| `/dashboard` | Workspace overview with summary stats and recent conversations |
 | `/agents` | Agent list and lifecycle actions |
 | `/agents/[id]/builder` | Visual agent builder |
 | `/agents/[id]/preview` | Live chat preview for draft agents |
@@ -203,6 +207,10 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - `npm audit --audit-level=moderate` currently passes in both the root app and `apps/widget-v2`.
 - The top-level `/data-processing` and `/subprocessors` routes are compatibility redirects into `/settings/...`.
 - Self-service password reset and a backup/restore operator runbook are follow-up work and are not part of the current launch-hardening batch.
+- Profile upsert on each authenticated request is optimized via `src/lib/app/profile-sync.ts`: the helper reads the existing profile first and skips the write when nothing has changed.
+- The dashboard home page (`/dashboard`) loads workspace summary stats (agents, widgets, connected apps, knowledge sources, leads, and recent conversations) server-side through `src/lib/dashboard/summary.ts`.
+- `dashboard_conversation_summaries` is a materialized Postgres table kept current by triggers on `widget_sessions`, `widget_session_messages`, and `widget_leads`. It powers the analytics inbox without per-request aggregations.
+- Performance indexes added in `20260525210001_app_slow_query_tuning.sql` and `20260526212615_dashboard_performance_quick_wins.sql` improve common dashboard and connection queries.
 
 ## License
 

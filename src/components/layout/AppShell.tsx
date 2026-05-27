@@ -2,15 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import useSWR, { SWRConfig } from "swr";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { ModalProvider } from "@/components/ui/ModalProvider";
 import { AppContextProvider } from "@/components/app/AppContext";
+import { jsonFetcher } from "@/lib/json-fetcher";
 import type {
   AppWorkspaceContext,
-  DashboardAnalyticsConversationListItem,
-  DashboardAnalyticsResponse,
+  DashboardLatestActivityResponse,
 } from "@/lib/types";
 
 interface AppShellProps {
@@ -32,8 +33,13 @@ export function AppShell({ children, context, user }: AppShellProps) {
       typeof window !== "undefined" &&
       localStorage.getItem("agenter_sidebar_collapsed") === "true",
   );
-  const [latestAnalyticsConversation, setLatestAnalyticsConversation] =
-    useState<DashboardAnalyticsConversationListItem | null>(null);
+  const { data: latestActivityData } = useSWR<DashboardLatestActivityResponse>(
+    "/api/dashboard/latest-activity",
+    jsonFetcher,
+    {
+      refreshInterval: 60_000,
+    },
+  );
   const [lastSeenAnalyticsActivityAt, setLastSeenAnalyticsActivityAt] = useState<string | null>(
     () =>
       typeof window !== "undefined"
@@ -124,6 +130,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
     /^\/widgets\/[^/]+\/preview$/.test(pathname) ||
     /^\/assistants\/[^/]+$/.test(pathname);
   const isAnalyticsRoute = pathname.startsWith("/analytics");
+  const latestAnalyticsConversation = latestActivityData?.latestConversation ?? null;
   const latestAnalyticsActivityAt = latestAnalyticsConversation?.lastActivityAt ?? null;
   const hasNewAnalyticsActivity =
     !isAnalyticsRoute &&
@@ -134,37 +141,12 @@ export function AppShell({ children, context, user }: AppShellProps) {
     );
 
   useEffect(() => {
-    const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       setLastSeenAnalyticsActivityAt(localStorage.getItem(analyticsStorageKey));
     }, 0);
 
-    async function loadLatestAnalyticsActivity() {
-      try {
-        const response = await fetch("/api/dashboard/analytics?range=30d&limit=1", {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = (await response.json()) as DashboardAnalyticsResponse;
-        setLatestAnalyticsConversation(payload.conversations[0] ?? null);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-      }
-    }
-
-    void loadLatestAnalyticsActivity();
-    const intervalId = window.setInterval(loadLatestAnalyticsActivity, 60_000);
-
     return () => {
       window.clearTimeout(timeoutId);
-      window.clearInterval(intervalId);
-      controller.abort();
     };
   }, [analyticsStorageKey]);
 
@@ -184,8 +166,16 @@ export function AppShell({ children, context, user }: AppShellProps) {
 
   return (
     <AppContextProvider value={{ ...context, user }}>
-      <ToastProvider>
-        <ModalProvider>
+      <SWRConfig
+        value={{
+          fetcher: jsonFetcher,
+          revalidateOnFocus: false,
+          dedupingInterval: 30_000,
+          errorRetryCount: 2,
+        }}
+      >
+        <ToastProvider>
+          <ModalProvider>
           {isFocusedAgentRoute ? (
             <div className="min-h-screen bg-background">{children}</div>
           ) : (
@@ -264,8 +254,9 @@ export function AppShell({ children, context, user }: AppShellProps) {
               </div>
             </div>
           )}
-        </ModalProvider>
-      </ToastProvider>
+          </ModalProvider>
+        </ToastProvider>
+      </SWRConfig>
     </AppContextProvider>
   );
 }

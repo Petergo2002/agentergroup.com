@@ -91,9 +91,9 @@ export default function ConnectionsPageClient({
     setAuthLinks(payload.authLinks ?? []);
   }, [canManageAuthLinks, t]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     try {
-      const response = await fetch('/api/connections/toolkits', {
+      const response = await fetch(`/api/connections/toolkits${force ? '?force=true' : ''}`, {
         cache: 'no-store',
       });
       const payload = await response.json();
@@ -166,7 +166,7 @@ export default function ConnectionsPageClient({
 
       showToast(t('connections.disconnectSuccess'), 'success');
       setIsSyncing(true);
-      await load();
+      await load(true);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : t('connections.disconnectError');
@@ -277,7 +277,7 @@ export default function ConnectionsPageClient({
           <button
             onClick={() => {
               setIsSyncing(true);
-              void load();
+              void load(true);
             }}
             className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90"
           >

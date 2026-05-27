@@ -78,6 +78,8 @@ export const agentBuilder = {
   lastUpdate: "Senaste uppdatering",
   saveDraft: "Spara",
   savingDraft: "Sparar...",
+  saved: "Sparat ✓",
+  unsavedChanges: "Osparade ändringar",
   publishToLibrary: "Publicera i bibliotek",
   submittingLibrary: "Skickar...",
   deployBlueprint: "Publicera version",

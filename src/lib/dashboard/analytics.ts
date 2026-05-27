@@ -6,6 +6,7 @@ import type {
   DashboardAnalyticsOverview,
   DashboardAnalyticsRange,
   DashboardConversationDetailResponse,
+  DashboardLatestActivityResponse,
   DebugEvent,
   DebugTrace,
   WorkspaceMemberRecord,
@@ -43,14 +44,8 @@ interface AnalyticsWidgetSessionRow {
   active_agent_id: string | null;
   first_seen_at: string;
   last_seen_at: string;
-}
-
-interface AnalyticsWidgetMessageRow {
-  id: string;
-  widget_session_id: string;
-  role: "user" | "assistant" | "tool";
-  content: string;
-  created_at: string;
+  status?: "active" | "completed";
+  ended_at?: string | null;
 }
 
 interface AnalyticsTranscriptRow {
@@ -61,20 +56,38 @@ interface AnalyticsTranscriptRow {
   metadata?: Record<string, unknown> | null;
 }
 
-interface AnalyticsWidgetLeadRow {
-  id: string;
-  widget_session_id: string | null;
-  name: string;
-  email: string;
-  phone: string | null;
-  message: string | null;
-  created_at: string;
+interface DashboardConversationSummaryRow {
+  widget_session_id: string;
+  workspace_id: string;
+  widget_id: string;
+  session_id: string;
+  active_agent_id: string | null;
+  active_widget_agent_id: string | null;
+  source: "embedded" | "hosted";
+  status: "active" | "completed";
+  first_seen_at: string;
+  last_activity_at: string;
+  message_count: number;
+  user_message_count: number;
+  assistant_message_count: number;
+  latest_snippet: string | null;
+  lead_count: number;
+  lead_name: string | null;
+  lead_email: string | null;
+  lead_phone: string | null;
+  page_url: string | null;
+  referrer: string | null;
 }
 
 interface DashboardConversationAggregationResult {
   widgetOptions: Array<{ id: string; name: string; status: "draft" | "deployed" }>;
   agentOptions: Array<{ id: string; name: string }>;
-  filteredRows: DashboardAnalyticsConversationListItem[];
+  overview: {
+    conversationCount: number;
+    messageCount: number;
+    leadCount: number;
+    activeWidgetIds: string[];
+  };
   conversations: DashboardAnalyticsConversationListItem[];
   pageInfo: {
     nextCursor: string | null;
@@ -106,16 +119,8 @@ const STRUCTURED_NAME_PATTERN =
   /\b(?:name|namn)\s*[:\-]\s*([^\n,]+?)(?=(?:\s+(?:email|e-post|mail)\b)|$)/i;
 const INTRO_NAME_PATTERN =
   /\b(?:my name is|this is|jag heter|mitt namn är)\s+([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,79})/i;
-
-function chunkArray<T>(items: T[], chunkSize: number) {
-  const chunks: T[][] = [];
-
-  for (let index = 0; index < items.length; index += chunkSize) {
-    chunks.push(items.slice(index, index + chunkSize));
-  }
-
-  return chunks;
-}
+const DASHBOARD_CONVERSATION_SUMMARY_SELECT =
+  "widget_session_id, workspace_id, widget_id, session_id, active_agent_id, active_widget_agent_id, source, status, first_seen_at, last_activity_at, message_count, user_message_count, assistant_message_count, latest_snippet, lead_count, lead_name, lead_email, lead_phone, page_url, referrer";
 
 function normalizeLimit(limit: number | null | undefined) {
   if (!limit || Number.isNaN(limit)) {
@@ -123,18 +128,6 @@ function normalizeLimit(limit: number | null | undefined) {
   }
 
   return Math.min(Math.max(limit, 1), 50);
-}
-
-function trimSnippet(content: string | null | undefined, maxLength = 120) {
-  const normalized = (content ?? "").replace(/\s+/g, " ").trim();
-
-  if (!normalized) {
-    return null;
-  }
-
-  return normalized.length > maxLength
-    ? `${normalized.slice(0, maxLength - 1).trimEnd()}…`
-    : normalized;
 }
 
 function normalizeIdentityName(value: string | null | undefined) {
@@ -205,31 +198,6 @@ function compareConversationRows(
   }
 
   return right.widgetSessionId.localeCompare(left.widgetSessionId);
-}
-
-function matchesSearch(
-  row: DashboardAnalyticsConversationListItem,
-  search: string,
-) {
-  if (!search) {
-    return true;
-  }
-
-  const haystack = [
-    row.widgetName,
-    row.agentLabel,
-    row.agentName,
-    row.latestSnippet,
-    row.identitySummary?.name,
-    row.identitySummary?.email,
-    row.leadSummary?.name,
-    row.leadSummary?.email,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  return haystack.includes(search.toLowerCase());
 }
 
 export function getAnalyticsDateRange(range: DashboardAnalyticsRange) {
@@ -437,55 +405,162 @@ export async function listWorkspaceAgentsForAnalytics(
   return (data ?? []) as AnalyticsAgentRow[];
 }
 
-async function fetchAllCandidateSessions(
+async function buildConversationRowsFromSummaries(
   supabase: AdminSupabase,
   input: {
-    widgetIds: string[];
+    widgets: AnalyticsWidgetRow[];
+    agents: AnalyticsAgentRow[];
+    summaries: DashboardConversationSummaryRow[];
+  },
+) {
+  const widgetById = new Map(input.widgets.map((widget) => [widget.id, widget]));
+  const agentById = new Map(input.agents.map((agent) => [agent.id, agent]));
+  const sessionWidgetIds = Array.from(
+    new Set(input.summaries.map((summary) => summary.widget_id)),
+  );
+  const widgetAgents = await loadWidgetAgentsForWidgets(supabase, sessionWidgetIds);
+  const widgetAgentById = new Map(
+    widgetAgents.map((widgetAgent) => [widgetAgent.id, widgetAgent]),
+  );
+  const widgetAgentByCompositeKey = new Map(
+    widgetAgents.map((widgetAgent) => [
+      `${widgetAgent.widget_id}:${widgetAgent.agent_id}`,
+      widgetAgent,
+    ]),
+  );
+
+  return input.summaries
+    .map((summary) => {
+      const widget = widgetById.get(summary.widget_id);
+      if (!widget) {
+        return null;
+      }
+
+      const widgetAgent =
+        (summary.active_widget_agent_id
+          ? widgetAgentById.get(summary.active_widget_agent_id)
+          : null) ??
+        (summary.active_agent_id
+          ? widgetAgentByCompositeKey.get(
+              `${summary.widget_id}:${summary.active_agent_id}`,
+            ) ?? null
+          : null);
+      const agent = summary.active_agent_id
+        ? agentById.get(summary.active_agent_id) ?? null
+        : null;
+      const leadSummary =
+        summary.lead_count > 0
+          ? {
+              name: summary.lead_name,
+              email: summary.lead_email,
+              phone: summary.lead_phone,
+            }
+          : null;
+      const identitySummary = buildDisplayIdentitySummary(leadSummary);
+
+      return {
+        widgetSessionId: summary.widget_session_id,
+        sessionId: summary.session_id,
+        widgetId: summary.widget_id,
+        widgetName: widget.name,
+        widgetPublicKey: widget.widget_public_key,
+        widgetAgentId: widgetAgent?.id ?? summary.active_widget_agent_id ?? null,
+        agentId: summary.active_agent_id ?? null,
+        agentName: agent?.name ?? null,
+        agentLabel: agent?.name ?? widgetAgent?.label ?? null,
+        source: summary.source,
+        startedAt: summary.first_seen_at,
+        lastActivityAt: summary.last_activity_at,
+        messageCount: summary.message_count,
+        userMessageCount: summary.user_message_count,
+        assistantMessageCount: summary.assistant_message_count,
+        latestSnippet: summary.latest_snippet,
+        pageUrl: summary.page_url,
+        referrer: summary.referrer,
+        hasLead: summary.lead_count > 0,
+        leadCount: summary.lead_count,
+        leadSummary,
+        identitySummary,
+      } satisfies DashboardAnalyticsConversationListItem;
+    })
+    .filter(Boolean) as DashboardAnalyticsConversationListItem[];
+}
+
+function escapeIlikePattern(value: string) {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`).toLowerCase();
+}
+
+function applySummaryRowFilters(
+  // Supabase's fluent builder type becomes excessively deep when shared across helpers.
+  // Keep this helper structurally typed and let call sites cast result rows explicitly.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query: any,
+  input: {
+    workspaceId: string;
+    startIso: string;
     widgetId: string | null;
     agentId: string | null;
-    startIso: string;
+    search: string;
     sessionStatus: "all" | "active" | "completed";
   },
 ) {
-  if (input.widgetIds.length === 0) {
-    return [] as AnalyticsWidgetSessionRow[];
+  let nextQuery = query
+    .eq("workspace_id", input.workspaceId)
+    .gte("last_activity_at", input.startIso);
+
+  if (input.widgetId) {
+    nextQuery = nextQuery.eq("widget_id", input.widgetId);
   }
 
+  if (input.agentId) {
+    nextQuery = nextQuery.eq("active_agent_id", input.agentId);
+  }
+
+  if (input.sessionStatus !== "all") {
+    nextQuery = nextQuery.eq("status", input.sessionStatus);
+  }
+
+  if (input.search) {
+    nextQuery = nextQuery.ilike(
+      "search_text",
+      `%${escapeIlikePattern(input.search)}%`,
+    );
+  }
+
+  return nextQuery;
+}
+
+async function fetchAllMatchingSummaryRows(
+  supabase: AdminSupabase,
+  input: {
+    workspaceId: string;
+    startIso: string;
+    widgetId: string | null;
+    agentId: string | null;
+    search: string;
+    sessionStatus: "all" | "active" | "completed";
+  },
+) {
   const pageSize = 1000;
-  const rows: AnalyticsWidgetSessionRow[] = [];
+  const rows: DashboardConversationSummaryRow[] = [];
 
   for (let offset = 0; ; offset += pageSize) {
-    let query = supabase
-      .from("widget_sessions")
-      .select(
-        "id, widget_id, session_id, source, page_url, referrer, active_widget_agent_id, active_agent_id, first_seen_at, last_seen_at, status, ended_at",
-      )
-      .in("widget_id", input.widgetIds)
-      .in("source", ["embedded", "hosted"])
-      .gte("last_seen_at", input.startIso)
-      .order("last_seen_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(offset, offset + pageSize - 1);
-
-    if (input.widgetId) {
-      query = query.eq("widget_id", input.widgetId);
-    }
-
-    if (input.agentId) {
-      query = query.eq("active_agent_id", input.agentId);
-    }
-
-    if (input.sessionStatus !== "all") {
-      query = query.eq("status", input.sessionStatus);
-    }
-
+    const query = applySummaryRowFilters(
+      supabase
+        .from("dashboard_conversation_summaries")
+        .select(DASHBOARD_CONVERSATION_SUMMARY_SELECT)
+        .order("last_activity_at", { ascending: false })
+        .order("widget_session_id", { ascending: false })
+        .range(offset, offset + pageSize - 1),
+      input,
+    );
     const { data, error } = await query;
 
     if (error) {
       throw new Error(error.message);
     }
 
-    const pageRows = (data ?? []) as AnalyticsWidgetSessionRow[];
+    const pageRows = (data ?? []) as DashboardConversationSummaryRow[];
     rows.push(...pageRows);
 
     if (pageRows.length < pageSize) {
@@ -494,6 +569,124 @@ async function fetchAllCandidateSessions(
   }
 
   return rows;
+}
+
+async function fetchPagedSummaryRows(
+  supabase: AdminSupabase,
+  input: {
+    workspaceId: string;
+    startIso: string;
+    widgetId: string | null;
+    agentId: string | null;
+    search: string;
+    sessionStatus: "all" | "active" | "completed";
+    cursor: string | null;
+    limit: number;
+  },
+) {
+  let query = applySummaryRowFilters(
+    supabase
+      .from("dashboard_conversation_summaries")
+      .select(DASHBOARD_CONVERSATION_SUMMARY_SELECT)
+      .order("last_activity_at", { ascending: false })
+      .order("widget_session_id", { ascending: false }),
+    input,
+  );
+  const decodedCursor = decodeAnalyticsCursor(input.cursor);
+
+  if (decodedCursor) {
+    query = query.or(
+      `last_activity_at.lt.${decodedCursor.lastActivityAt},and(last_activity_at.eq.${decodedCursor.lastActivityAt},widget_session_id.lt.${decodedCursor.widgetSessionId})`,
+    );
+  }
+
+  const { data, error } = await query.limit(input.limit + 1);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as DashboardConversationSummaryRow[];
+}
+
+export async function listRecentDashboardConversations(
+  supabase: AdminSupabase,
+  input: {
+    workspaceId: string;
+    range?: DashboardAnalyticsRange;
+    limit: number;
+  },
+) {
+  const { startIso } = getAnalyticsDateRange(input.range ?? "30d");
+  const [widgets, agents] = await Promise.all([
+    listWorkspaceWidgetsForAnalytics(supabase, input.workspaceId),
+    listWorkspaceAgentsForAnalytics(supabase, input.workspaceId),
+  ]);
+
+  if (widgets.length === 0) {
+    return [];
+  }
+
+  const activeWidgets = widgets.filter((widget) => widget.status === "deployed");
+
+  if (activeWidgets.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("dashboard_conversation_summaries")
+    .select(DASHBOARD_CONVERSATION_SUMMARY_SELECT)
+    .in("widget_id", activeWidgets.map((widget) => widget.id))
+    .gte("last_activity_at", startIso)
+    .order("last_activity_at", { ascending: false })
+    .order("widget_session_id", { ascending: false })
+    .limit(normalizeLimit(input.limit));
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const summaries = (data ?? []) as DashboardConversationSummaryRow[];
+
+  if (summaries.length === 0) {
+    return [];
+  }
+
+  const rows = await buildConversationRowsFromSummaries(supabase, {
+    widgets: activeWidgets,
+    agents,
+    summaries,
+  });
+
+  return rows.sort(compareConversationRows);
+}
+
+export async function getDashboardLatestActivity(
+  supabase: AdminSupabase,
+  workspaceId: string,
+): Promise<DashboardLatestActivityResponse> {
+  const [latest] = await listRecentDashboardConversations(supabase, {
+    workspaceId,
+    range: "30d",
+    limit: 1,
+  });
+
+  if (!latest) {
+    return { latestConversation: null };
+  }
+
+  return {
+    latestConversation: {
+      widgetSessionId: latest.widgetSessionId,
+      widgetId: latest.widgetId,
+      widgetName: latest.widgetName,
+      agentId: latest.agentId,
+      agentName: latest.agentName,
+      agentLabel: latest.agentLabel,
+      latestSnippet: latest.latestSnippet,
+      lastActivityAt: latest.lastActivityAt,
+    },
+  };
 }
 
 async function loadWidgetAgentsForWidgets(
@@ -516,68 +709,15 @@ async function loadWidgetAgentsForWidgets(
   return (data ?? []) as AnalyticsWidgetAgentRow[];
 }
 
-async function loadMessagesForSessions(
-  supabase: AdminSupabase,
-  sessionIds: string[],
-) {
-  if (sessionIds.length === 0) {
-    return [] as AnalyticsWidgetMessageRow[];
-  }
-
-  const rows: AnalyticsWidgetMessageRow[] = [];
-
-  for (const chunk of chunkArray(sessionIds, 200)) {
-    const { data, error } = await supabase
-      .from("widget_session_messages")
-      .select("id, widget_session_id, role, content, created_at")
-      .in("widget_session_id", chunk)
-      .in("role", ["user", "assistant"])
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    rows.push(...((data ?? []) as AnalyticsWidgetMessageRow[]));
-  }
-
-  return rows;
-}
-
-async function loadLeadsForSessions(
-  supabase: AdminSupabase,
-  sessionIds: string[],
-) {
-  if (sessionIds.length === 0) {
-    return [] as AnalyticsWidgetLeadRow[];
-  }
-
-  const rows: AnalyticsWidgetLeadRow[] = [];
-
-  for (const chunk of chunkArray(sessionIds, 200)) {
-    const { data, error } = await supabase
-      .from("widget_leads")
-      .select("id, widget_session_id, name, email, phone, message, created_at")
-      .in("widget_session_id", chunk)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    rows.push(...((data ?? []) as AnalyticsWidgetLeadRow[]));
-  }
-
-  return rows;
-}
-
 export async function getDashboardAnalyticsOverview(
   supabase: AdminSupabase,
   input: {
     workspaceId: string;
     startIso: string;
-    filteredRows: DashboardAnalyticsConversationListItem[];
-    widgetStatusById: Map<string, AnalyticsWidgetRow["status"]>;
+    conversationCount: number;
+    messageCount: number;
+    leadCount: number;
+    activeWidgetIds: string[];
   },
 ): Promise<DashboardAnalyticsOverview> {
   const [agentsResult, connectionsResult, failuresResult] = await Promise.all([
@@ -611,20 +751,11 @@ export async function getDashboardAnalyticsOverview(
     throw new Error(failuresResult.error.message);
   }
 
-  const activeWidgetIds = new Set(
-    input.filteredRows
-      .filter((row) => input.widgetStatusById.get(row.widgetId) === "deployed")
-      .map((row) => row.widgetId),
-  );
-
   return {
-    conversations: input.filteredRows.length,
-    messages: input.filteredRows.reduce(
-      (sum, row) => sum + row.messageCount,
-      0,
-    ),
-    leads: input.filteredRows.reduce((sum, row) => sum + row.leadCount, 0),
-    activeWidgets: activeWidgetIds.size,
+    conversations: input.conversationCount,
+    messages: input.messageCount,
+    leads: input.leadCount,
+    activeWidgets: new Set(input.activeWidgetIds).size,
     agents: agentsResult.count ?? 0,
     connectedApps: connectionsResult.count ?? 0,
     failures: failuresResult.count ?? 0,
@@ -658,7 +789,12 @@ export async function listDashboardConversations(
     return {
       widgetOptions,
       agentOptions,
-      filteredRows: [],
+      overview: {
+        conversationCount: 0,
+        messageCount: 0,
+        leadCount: 0,
+        activeWidgetIds: [],
+      },
       conversations: [],
       pageInfo: {
         nextCursor: null,
@@ -667,19 +803,38 @@ export async function listDashboardConversations(
     };
   }
 
-  const candidateSessions = await fetchAllCandidateSessions(supabase, {
-    widgetIds: widgets.map((widget) => widget.id),
-    widgetId: input.appliedFilters.widgetId,
-    agentId: input.appliedFilters.agentId,
-    startIso,
-    sessionStatus: input.appliedFilters.sessionStatus,
-  });
+  const limit = normalizeLimit(input.limit);
+  const [matchingSummaries, pagedSummaries] = await Promise.all([
+    fetchAllMatchingSummaryRows(supabase, {
+      workspaceId: input.workspaceId,
+      widgetId: input.appliedFilters.widgetId,
+      agentId: input.appliedFilters.agentId,
+      search: input.appliedFilters.search,
+      sessionStatus: input.appliedFilters.sessionStatus,
+      startIso,
+    }),
+    fetchPagedSummaryRows(supabase, {
+      workspaceId: input.workspaceId,
+      widgetId: input.appliedFilters.widgetId,
+      agentId: input.appliedFilters.agentId,
+      search: input.appliedFilters.search,
+      sessionStatus: input.appliedFilters.sessionStatus,
+      cursor: input.cursor,
+      limit,
+      startIso,
+    }),
+  ]);
 
-  if (candidateSessions.length === 0) {
+  if (matchingSummaries.length === 0) {
     return {
       widgetOptions,
       agentOptions,
-      filteredRows: [],
+      overview: {
+        conversationCount: 0,
+        messageCount: 0,
+        leadCount: 0,
+        activeWidgetIds: [],
+      },
       conversations: [],
       pageInfo: {
         nextCursor: null,
@@ -688,212 +843,38 @@ export async function listDashboardConversations(
     };
   }
 
-  const widgetById = new Map(widgets.map((widget) => [widget.id, widget]));
-  const agentById = new Map(agents.map((agent) => [agent.id, agent]));
-  const widgetAgents = await loadWidgetAgentsForWidgets(
-    supabase,
-    Array.from(new Set(candidateSessions.map((session) => session.widget_id))),
-  );
-  const widgetAgentById = new Map(
-    widgetAgents.map((widgetAgent) => [widgetAgent.id, widgetAgent]),
-  );
-  const widgetAgentByCompositeKey = new Map(
-    widgetAgents.map((widgetAgent) => [
-      `${widgetAgent.widget_id}:${widgetAgent.agent_id}`,
-      widgetAgent,
-    ]),
-  );
-  const sessionIds = candidateSessions.map((session) => session.id);
-  const [messages, leads] = await Promise.all([
-    loadMessagesForSessions(supabase, sessionIds),
-    loadLeadsForSessions(supabase, sessionIds),
-  ]);
-
-  const messageSummaryBySessionId = new Map<
-    string,
-    {
-      messageCount: number;
-      userMessageCount: number;
-      assistantMessageCount: number;
-      latestSnippet: string | null;
-      latestCreatedAt: string | null;
-    }
-  >();
-
-  for (const message of messages) {
-    const current = messageSummaryBySessionId.get(message.widget_session_id) ?? {
-      messageCount: 0,
-      userMessageCount: 0,
-      assistantMessageCount: 0,
-      latestSnippet: null,
-      latestCreatedAt: null,
-    };
-
-    current.messageCount += 1;
-    if (message.role === "user") {
-      current.userMessageCount += 1;
-    }
-    if (message.role === "assistant") {
-      current.assistantMessageCount += 1;
-    }
-    if (
-      !current.latestCreatedAt ||
-      message.created_at > current.latestCreatedAt
-    ) {
-      current.latestCreatedAt = message.created_at;
-      current.latestSnippet = trimSnippet(message.content);
-    }
-
-    messageSummaryBySessionId.set(message.widget_session_id, current);
-  }
-
-  const leadSummaryBySessionId = new Map<
-    string,
-    {
-      leadCount: number;
-      leadSummary: {
-        name: string | null;
-        email: string | null;
-        phone: string | null;
-      } | null;
-      latestCreatedAt: string | null;
-    }
-  >();
-  const inferredIdentityBySessionId = new Map<
-    string,
-    {
-      identitySummary: AnalyticsIdentitySummary;
-      latestCreatedAt: string | null;
-    }
-  >();
-
-  for (const lead of leads) {
-    if (!lead.widget_session_id) {
-      continue;
-    }
-
-    const current = leadSummaryBySessionId.get(lead.widget_session_id) ?? {
-      leadCount: 0,
-      leadSummary: null,
-      latestCreatedAt: null,
-    };
-
-    current.leadCount += 1;
-    if (!current.latestCreatedAt || lead.created_at > current.latestCreatedAt) {
-      current.latestCreatedAt = lead.created_at;
-      current.leadSummary = {
-        name: lead.name ?? null,
-        email: lead.email ?? null,
-        phone: lead.phone ?? null,
-      };
-    }
-
-    leadSummaryBySessionId.set(lead.widget_session_id, current);
-  }
-
-  for (const message of messages) {
-    if (message.role !== "user") {
-      continue;
-    }
-
-    const identity = extractIdentityFromText(message.content);
-
-    if (!identity) {
-      continue;
-    }
-
-    const current = inferredIdentityBySessionId.get(message.widget_session_id);
-
-    if (!current || !current.latestCreatedAt || message.created_at > current.latestCreatedAt) {
-      inferredIdentityBySessionId.set(message.widget_session_id, {
-        identitySummary: identity,
-        latestCreatedAt: message.created_at,
-      });
-    }
-  }
-
-  const allRows = candidateSessions
-    .map((session) => {
-      const widget = widgetById.get(session.widget_id);
-      if (!widget) {
-        return null;
-      }
-
-      const widgetAgent =
-        (session.active_widget_agent_id
-          ? widgetAgentById.get(session.active_widget_agent_id)
-          : null) ??
-        (session.active_agent_id
-          ? widgetAgentByCompositeKey.get(
-              `${session.widget_id}:${session.active_agent_id}`,
-            ) ?? null
-          : null);
-      const agent = session.active_agent_id
-        ? agentById.get(session.active_agent_id) ?? null
-        : null;
-      const messageSummary = messageSummaryBySessionId.get(session.id);
-      const leadSummary = leadSummaryBySessionId.get(session.id);
-      const identitySummary = buildDisplayIdentitySummary(
-        leadSummary?.leadSummary ??
-          inferredIdentityBySessionId.get(session.id)?.identitySummary ??
-          null,
-      );
-
-      return {
-        widgetSessionId: session.id,
-        sessionId: session.session_id,
-        widgetId: session.widget_id,
-        widgetName: widget.name,
-        widgetPublicKey: widget.widget_public_key,
-        widgetAgentId: widgetAgent?.id ?? session.active_widget_agent_id ?? null,
-        agentId: session.active_agent_id ?? null,
-        agentName: agent?.name ?? null,
-        agentLabel: agent?.name ?? widgetAgent?.label ?? null,
-        source:
-          session.source === "hosted" ? "hosted" : "embedded",
-        startedAt: session.first_seen_at,
-        lastActivityAt: session.last_seen_at,
-        messageCount: messageSummary?.messageCount ?? 0,
-        userMessageCount: messageSummary?.userMessageCount ?? 0,
-        assistantMessageCount: messageSummary?.assistantMessageCount ?? 0,
-        latestSnippet: messageSummary?.latestSnippet ?? null,
-        pageUrl: session.page_url,
-        referrer: session.referrer,
-        hasLead: (leadSummary?.leadCount ?? 0) > 0,
-        leadCount: leadSummary?.leadCount ?? 0,
-        leadSummary: leadSummary?.leadSummary ?? null,
-        identitySummary,
-      } satisfies DashboardAnalyticsConversationListItem;
-    })
-    .filter(Boolean) as DashboardAnalyticsConversationListItem[];
-
-  const filteredRows = allRows
-    .filter((row) => matchesSearch(row, input.appliedFilters.search))
-    .sort(compareConversationRows);
-
-  const decodedCursor = decodeAnalyticsCursor(input.cursor);
-  const rowsAfterCursor = decodedCursor
-    ? filteredRows.filter((row) => {
-        if (row.lastActivityAt < decodedCursor.lastActivityAt) {
-          return true;
-        }
-
-        if (row.lastActivityAt > decodedCursor.lastActivityAt) {
-          return false;
-        }
-
-        return row.widgetSessionId < decodedCursor.widgetSessionId;
-      })
-    : filteredRows;
-  const limit = normalizeLimit(input.limit);
-  const conversations = rowsAfterCursor.slice(0, limit);
-  const hasMore = rowsAfterCursor.length > limit;
+  const widgetStatusById = new Map(widgets.map((widget) => [widget.id, widget.status]));
+  const pageRows = await buildConversationRowsFromSummaries(supabase, {
+    widgets,
+    agents,
+    summaries: pagedSummaries,
+  });
+  const conversations = pageRows.sort(compareConversationRows).slice(0, limit);
+  const hasMore = pagedSummaries.length > limit;
   const lastRow = conversations[conversations.length - 1];
+  const activeWidgetIds = Array.from(
+    new Set(
+      matchingSummaries
+        .filter((summary) => widgetStatusById.get(summary.widget_id) === "deployed")
+        .map((summary) => summary.widget_id),
+    ),
+  );
 
   return {
     widgetOptions,
     agentOptions,
-    filteredRows,
+    overview: {
+      conversationCount: matchingSummaries.length,
+      messageCount: matchingSummaries.reduce(
+        (sum, summary) => sum + summary.message_count,
+        0,
+      ),
+      leadCount: matchingSummaries.reduce(
+        (sum, summary) => sum + summary.lead_count,
+        0,
+      ),
+      activeWidgetIds,
+    },
     conversations,
     pageInfo: {
       nextCursor:

@@ -10,6 +10,9 @@ import {
 } from "@/lib/knowledge-folders";
 import { createClient } from "@/lib/supabase/server";
 
+const KNOWLEDGE_FOLDER_LIST_SELECT =
+  "id, workspace_id, created_by, name, description, created_at, updated_at, sources:knowledge_folder_sources(knowledge_source_id)";
+
 async function getValidSourceIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
@@ -45,7 +48,7 @@ export async function GET() {
   const context = await ensureWorkspaceContext(supabase as never, user);
   const { data, error } = await supabase
     .from("knowledge_folders")
-    .select("*, sources:knowledge_folder_sources(knowledge_source_id)")
+    .select(KNOWLEDGE_FOLDER_LIST_SELECT)
     .eq("workspace_id", context.workspace.id)
     .order("updated_at", { ascending: false });
 

@@ -77,6 +77,8 @@ export const agentBuilder = {
   lastUpdate: "Last Update",
   saveDraft: "Save",
   savingDraft: "Saving...",
+  saved: "Saved ✓",
+  unsavedChanges: "Unsaved changes",
   publishToLibrary: "Publish to Library",
   submittingLibrary: "Submitting...",
   deployBlueprint: "Publish Version",

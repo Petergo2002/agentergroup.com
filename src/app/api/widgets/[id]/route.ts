@@ -13,6 +13,11 @@ import {
 import { WorkspaceAccessError, assertOwnedWorkspaceResource } from "@/lib/workspace-security";
 import type { AgentRecord } from "@/lib/types";
 
+const WIDGET_AGENT_SELECT =
+  "id, workspace_id, created_by, surface, name, slug, description, status, model, instructions, starter_prompts, timezone, published_version_id, archived_at, archived_by, created_at, updated_at";
+const WIDGET_SELECT =
+  "id, workspace_id, name, slug, status, widget_public_key, brand_name, logo_url, primary_color, secondary_color, background_color, text_color, theme, language, home_title, home_subtitle, hosted_enabled, show_branding, privacy_policy_url, allowed_origins, description, created_at, updated_at, deployed_at";
+
 function parseString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -58,7 +63,7 @@ export async function GET(
 
   const { data: availableAgents, error: agentsError } = await supabase
     .from("agents")
-    .select("*")
+    .select(WIDGET_AGENT_SELECT)
     .eq("workspace_id", context.workspace.id)
     .eq("surface", "widget")
     .is("archived_at", null)
@@ -166,7 +171,7 @@ export async function PATCH(
     .update(payload)
     .eq("id", id)
     .eq("workspace_id", context.workspace.id)
-    .select("*")
+    .select(WIDGET_SELECT)
     .maybeSingle();
 
   if (error || !updatedWidget) {

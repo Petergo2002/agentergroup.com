@@ -11,6 +11,17 @@ import { hasComposioEnv, hasComposioWebhookSecret } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import type { AgentAutomationRecord, BuilderDefinition, ConnectionRecord } from "@/lib/types";
 
+const AUTOMATION_AGENT_SELECT =
+  "id, workspace_id, created_by, surface, name, slug, description, status, model, instructions, starter_prompts, timezone, published_version_id, archived_at, archived_by, created_at, updated_at";
+const AUTOMATION_RECORD_SELECT =
+  "id, workspace_id, agent_id, connection_id, provider, toolkit_slug, trigger_slug, trigger_config, composio_trigger_id, status, last_event_at, last_error, created_at, updated_at";
+const CONNECTION_SELECT =
+  "id, workspace_id, provider, toolkit_slug, display_name, status, external_id, account_label, toolkit_data, created_by, last_synced_at, created_at, updated_at";
+const RUN_SELECT =
+  "id, workspace_id, agent_id, thread_id, status, model, input, output, error_message, started_at, completed_at, created_at";
+const AUTOMATION_EVENT_SELECT =
+  "id, workspace_id, agent_id, automation_id, run_id, external_event_id, trigger_slug, payload, status, created_at, updated_at";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
@@ -45,7 +56,7 @@ async function loadAutomationHostAgent(
 ) {
   const { data: agent, error } = await supabase
     .from("agents")
-    .select("*")
+    .select(AUTOMATION_AGENT_SELECT)
     .eq("id", agentId)
     .eq("workspace_id", workspaceId)
     .maybeSingle();
@@ -85,23 +96,31 @@ export async function GET(
   await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id);
 
   const [draftResult, automationResult, connectionsResult, runsResult, eventsResult] = await Promise.all([
-    supabase.from("agent_drafts").select("*").eq("agent_id", agentId).maybeSingle(),
-    supabase.from("agent_automations").select("*").eq("agent_id", agentId).maybeSingle(),
+    supabase
+      .from("agent_drafts")
+      .select("id, agent_id, workspace_id, definition, version, updated_by, created_at, updated_at")
+      .eq("agent_id", agentId)
+      .maybeSingle(),
+    supabase
+      .from("agent_automations")
+      .select(AUTOMATION_RECORD_SELECT)
+      .eq("agent_id", agentId)
+      .maybeSingle(),
     supabase
       .from("connections")
-      .select("*")
+      .select(CONNECTION_SELECT)
       .eq("workspace_id", context.workspace.id)
       .eq("toolkit_slug", "gmail")
       .order("updated_at", { ascending: false }),
     supabase
       .from("runs")
-      .select("*")
+      .select(RUN_SELECT)
       .eq("agent_id", agentId)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("automation_events")
-      .select("*")
+      .select(AUTOMATION_EVENT_SELECT)
       .eq("agent_id", agentId)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -193,7 +212,7 @@ export async function PUT(
 
   const currentAutomationResult = await supabase
     .from("agent_automations")
-    .select("*")
+    .select(AUTOMATION_RECORD_SELECT)
     .eq("agent_id", agentId)
     .maybeSingle();
 
@@ -305,7 +324,7 @@ export async function DELETE(
 
   const { data: automation, error: automationError } = await supabase
     .from("agent_automations")
-    .select("*")
+    .select(AUTOMATION_RECORD_SELECT)
     .eq("agent_id", agentId)
     .maybeSingle();
 
