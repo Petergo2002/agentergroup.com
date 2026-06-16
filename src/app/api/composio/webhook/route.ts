@@ -4,7 +4,7 @@ import { processAutomationEvent } from "@/lib/automation/executor";
 import { verifyComposioWebhook } from "@/lib/composio";
 import { hasComposioEnv, hasComposioWebhookSecret } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { AgentAutomationRecord } from "@/lib/types";
+import type { AgentAutomationRecord, ConnectionRecord } from "@/lib/types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -18,6 +18,149 @@ function pickString(...values: unknown[]) {
   }
 
   return null;
+}
+
+function readNestedString(value: unknown, path: string[]) {
+  let current = value;
+
+  for (const key of path) {
+    if (!isRecord(current) || !Object.hasOwn(current, key)) {
+      return null;
+    }
+
+    current = Reflect.get(current, key);
+  }
+
+  return pickString(current);
+}
+
+async function markExpiredConnectedAccount(
+  supabase: ReturnType<typeof createAdminClient>,
+  eventPayload: Record<string, unknown>,
+) {
+  const data = isRecord(eventPayload.data) ? eventPayload.data : {};
+  const accountId = pickString(data.id, data.nanoid, data.connectedAccountId);
+  const toolkitSlug =
+    readNestedString(data, ["toolkit", "slug"]) ??
+    pickString(data.toolkitSlug, data.appName);
+  const status = pickString(data.status) ?? "EXPIRED";
+  const statusReason =
+    pickString(data.status_reason, data.statusReason) ??
+    "Connected account expired.";
+  const authConfigId =
+    readNestedString(data, ["auth_config", "id"]) ??
+    readNestedString(data, ["authConfig", "id"]);
+
+  if (!accountId) {
+    console.warn("[Composio] Ignoring expiry webhook without connected account id.");
+    return { status: "ignored", reason: "missing_account_id" };
+  }
+
+  let query = supabase
+    .from("connections")
+    .select(
+      "id, workspace_id, provider, toolkit_slug, display_name, status, external_id, account_label, toolkit_data, created_by, last_synced_at, created_at, updated_at",
+    )
+    .eq("provider", "composio")
+    .eq("external_id", accountId);
+
+  if (toolkitSlug) {
+    query = query.eq("toolkit_slug", toolkitSlug);
+  }
+
+  const { data: connections, error } = await query;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const connectionRows = (connections ?? []) as ConnectionRecord[];
+
+  if (connectionRows.length === 0) {
+    console.warn("[Composio] Expiry webhook did not match a local connection.", {
+      accountId,
+      toolkitSlug,
+    });
+    return { status: "ignored", reason: "connection_not_found" };
+  }
+
+  const syncTimestamp = new Date().toISOString();
+  const eventId = pickString(eventPayload.id);
+
+  for (const connection of connectionRows) {
+    const nextToolkitData = {
+      ...(connection.toolkit_data ?? {}),
+      ...data,
+      authConfig: isRecord(data.auth_config)
+        ? data.auth_config
+        : isRecord(data.authConfig)
+          ? data.authConfig
+          : connection.toolkit_data?.authConfig,
+      authConfigId:
+        authConfigId ??
+        pickString(connection.toolkit_data?.authConfigId) ??
+        readNestedString(connection.toolkit_data, ["authConfig", "id"]),
+      status,
+      statusReason,
+      status_reason: statusReason,
+      lastExpiryEvent: {
+        id: eventId,
+        accountId,
+        toolkitSlug: toolkitSlug ?? connection.toolkit_slug,
+        status,
+        statusReason,
+        receivedAt: syncTimestamp,
+      },
+    };
+
+    const { error: updateError } = await supabase
+      .from("connections")
+      .update({
+        status: "disconnected",
+        toolkit_data: nextToolkitData,
+        last_synced_at: syncTimestamp,
+      })
+      .eq("id", connection.id);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    const { data: automations, error: automationsError } = await supabase
+      .from("agent_automations")
+      .select("id, agent_id")
+      .eq("connection_id", connection.id)
+      .in("status", ["active", "provisioning"]);
+
+    if (automationsError) {
+      throw new Error(automationsError.message);
+    }
+
+    const automationRows = (automations ?? []) as Array<{ id: string; agent_id: string }>;
+
+    if (automationRows.length > 0) {
+      const message = `Connected account expired: ${statusReason}`;
+      const automationIds = automationRows.map((automation) => automation.id);
+      const agentIds = automationRows.map((automation) => automation.agent_id);
+      const [automationUpdate, agentUpdate] = await Promise.all([
+        supabase
+          .from("agent_automations")
+          .update({ status: "error", last_error: message })
+          .in("id", automationIds),
+        supabase.from("agents").update({ status: "paused" }).in("id", agentIds),
+      ]);
+
+      if (automationUpdate.error) {
+        throw new Error(automationUpdate.error.message);
+      }
+
+      if (agentUpdate.error) {
+        throw new Error(agentUpdate.error.message);
+      }
+    }
+  }
+
+  return { status: "accepted", updated: connectionRows.length };
 }
 
 function buildExternalEventId(triggerId: string, rawBody: string, payload: Record<string, unknown>) {
@@ -39,7 +182,7 @@ function buildExternalEventId(triggerId: string, rawBody: string, payload: Recor
 
 export async function POST(request: NextRequest) {
   if (!hasComposioEnv() || !hasComposioWebhookSecret()) {
-    return NextResponse.json({ error: "Composio webhook is not configured." }, { status: 500 });
+    return NextResponse.json({ error: "Connection webhook is not configured." }, { status: 500 });
   }
 
   const rawBody = await request.text();
@@ -53,6 +196,27 @@ export async function POST(request: NextRequest) {
   }
 
   const triggerPayload = verified.payload;
+  const eventRecord = isRecord(triggerPayload)
+    ? (triggerPayload as Record<string, unknown>)
+    : null;
+  const eventType = eventRecord ? pickString(eventRecord.type) : null;
+
+  if (eventType === "composio.connected_account.expired" && eventRecord) {
+    try {
+      const result = await markExpiredConnectedAccount(
+        createAdminClient(),
+        eventRecord,
+      );
+      return NextResponse.json({ ok: true, ...result });
+    } catch (error) {
+      console.error("Composio expiry webhook processing failed", error);
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Failed to process expiry webhook." },
+        { status: 500 },
+      );
+    }
+  }
+
   const triggerSlug = triggerPayload.triggerSlug;
   const rawPayload = triggerPayload.payload ?? triggerPayload.originalPayload ?? {};
   const payload = isRecord(rawPayload) ? rawPayload : { value: rawPayload };

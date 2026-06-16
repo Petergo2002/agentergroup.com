@@ -131,6 +131,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
     /^\/assistants\/[^/]+$/.test(pathname);
   const isAnalyticsRoute = pathname.startsWith("/analytics");
   const latestAnalyticsConversation = latestActivityData?.latestConversation ?? null;
+  const newLeadCount = latestActivityData?.newLeadCount ?? 0;
   const latestAnalyticsActivityAt = latestAnalyticsConversation?.lastActivityAt ?? null;
   const hasNewAnalyticsActivity =
     !isAnalyticsRoute &&
@@ -198,6 +199,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
                         }
                       : null
                   }
+                  newLeadCount={newLeadCount}
                 />
               </div>
 
@@ -239,6 +241,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
                         }
                       : null
                   }
+                  newLeadCount={newLeadCount}
                 />
               </div>
 

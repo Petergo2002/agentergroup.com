@@ -14,9 +14,19 @@ test("middleware protects matched routes by default", () => {
 test("unauthenticated webhook routes remain explicitly public", () => {
   const source = readFileSync("src/lib/supabase/proxy.ts", "utf8");
 
+  assert.match(source, /\/api\/health/);
   assert.match(source, /\/api\/billing\/webhook/);
   assert.match(source, /\/api\/composio\/webhook/);
   assert.match(source, /\/api\/internal\/privacy\/retention/);
+});
+
+test("public health endpoint is non-secret and no-store", () => {
+  const source = readFileSync("src/app/api/health/route.ts", "utf8");
+
+  assert.match(source, /ok: true/);
+  assert.match(source, /service: "agentergroup-web"/);
+  assert.match(source, /"Cache-Control": "no-store"/);
+  assert.doesNotMatch(source, /SUPABASE|SERVICE_ROLE|SECRET|API_KEY|OPENROUTER|COMPOSIO|STRIPE/);
 });
 
 test("invite accept routes stay public but route handlers enforce auth", () => {

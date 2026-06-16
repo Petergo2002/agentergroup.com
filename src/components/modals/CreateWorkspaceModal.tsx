@@ -53,10 +53,10 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
 
   return (
     <Modal isOpen={isOpen} onClose={isCreating ? () => {} : onClose} title={t('nav.createWorkspace') !== 'nav.createWorkspace' ? t('nav.createWorkspace') : 'Create workspace'}>
-      <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-5 pt-2">
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.25em] block">
+      <form onSubmit={handleSubmit} className="px-5 pb-5 pt-2">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="block text-[13px] font-medium text-on-surface">
               {t('settings.workspaceName') !== 'settings.workspaceName' ? t('settings.workspaceName') : 'Workspace Name'}
             </label>
             <input
@@ -65,12 +65,12 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={isCreating}
-              className="w-full bg-surface-container-low/40 border border-outline-variant/30 rounded-md px-4 py-3 text-sm text-on-surface transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 shadow-sm placeholder:text-on-surface-variant/60 disabled:opacity-50"
+              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-3 py-2.5 text-sm text-on-surface transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 placeholder:text-on-surface-variant/50 disabled:opacity-50"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.25em] block">
+          <div className="space-y-1.5">
+            <label className="block text-[13px] font-medium text-on-surface">
               {t('settings.workspaceDescription') !== 'settings.workspaceDescription' ? t('settings.workspaceDescription') : 'Description'}
             </label>
             <textarea
@@ -78,23 +78,23 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
               onChange={(e) => setDescription(e.target.value)}
               disabled={isCreating}
               rows={3}
-              className="w-full bg-surface-container-low/40 border border-outline-variant/30 rounded-md px-4 py-3 text-sm text-on-surface transition-all outline-none resize-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 shadow-sm placeholder:text-on-surface-variant/60 disabled:opacity-50"
+              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-3 py-2.5 text-sm text-on-surface transition-all outline-none resize-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 placeholder:text-on-surface-variant/50 disabled:opacity-50"
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-6 pt-6">
+        <div className="flex items-center justify-end gap-3 pt-6 mt-2">
           <button
             type="button"
             onClick={onClose}
             disabled={isCreating}
-            className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant hover:text-on-surface transition-all disabled:opacity-50"
+            className="rounded-lg px-4 py-2 text-[13px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all disabled:opacity-50"
           >
             {t('common.cancel') !== 'common.cancel' ? t('common.cancel') : 'Cancel'}
           </button>
           <button
             type="submit"
-            className="signature-gradient flex-1 rounded-md px-6 py-3 text-sm font-semibold uppercase tracking-wider shadow-md transition-all duration-150 hover:shadow-lg active:scale-[0.98] disabled:opacity-40"
+            className="signature-gradient rounded-lg px-5 py-2 text-[13px] font-semibold text-white shadow-sm transition-all duration-150 hover:shadow-md hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
           >
             <span className="flex items-center justify-center gap-2">
               {isCreating ? (

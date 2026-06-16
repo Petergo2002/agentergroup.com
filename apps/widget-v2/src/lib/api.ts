@@ -142,7 +142,13 @@ export async function sendWidgetMessage(
     language: "sv" | "en";
     pageUrl?: string;
     referrer?: string;
-    attachments?: { url: string; name: string; type: string; size: number }[];
+    attachments?: {
+      id: string;
+      url: string;
+      name: string;
+      type: string;
+      size: number;
+    }[];
   },
   context: WidgetRequestContext,
   options?: { signal?: AbortSignal },
@@ -160,7 +166,13 @@ export async function uploadWidgetAttachment(
   sessionId: string,
   file: File,
   context: WidgetRequestContext,
-): Promise<{ url: string; name: string; type: string; size: number }> {
+): Promise<{
+  id: string;
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}> {
   const formData = new FormData();
   formData.append("sessionId", sessionId);
   formData.append("file", file);

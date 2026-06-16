@@ -1,0 +1,40 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const source = readFileSync("src/lib/automation/executor.ts", "utf8");
+
+test("automation event processing atomically claims only received events", () => {
+  const claimStart = source.indexOf('from("automation_events")');
+  const claimBody = source.slice(claimStart, source.indexOf("if (claimResult.error)", claimStart));
+
+  assert.match(claimBody, /\.update\(\{ status: "processing" \}\)/);
+  assert.match(claimBody, /\.eq\("id", eventId\)/);
+  assert.match(claimBody, /\.eq\("status", "received"\)/);
+  assert.match(claimBody, /\.maybeSingle\(\)/);
+});
+
+test("automation event processing records ignored, processed, and failed states", () => {
+  assert.match(source, /async function markEventIgnored/);
+  assert.match(source, /\.update\(\{ status: "ignored" \}\)/);
+  assert.match(source, /return \{ ok: true, status: "ignored" as const \}/);
+
+  assert.match(source, /\.update\(\{ status: "processed" \}\)/);
+  assert.match(source, /return \{ ok: true, status: "processed" as const \}/);
+
+  assert.match(source, /\.update\(\{ status: "failed" \}\)/);
+  assert.match(source, /status: "failed",\s+error_message: message/s);
+  assert.match(source, /\.update\(\{ last_error: message \}\)/);
+});
+
+test("automation event processing consumes quota before running the agent runtime", () => {
+  const quotaIndex = source.indexOf("await consumeWorkspaceMessageUsage");
+  const runtimeIndex = source.indexOf("await runAgentChat", quotaIndex);
+
+  assert.notEqual(quotaIndex, -1, "automation executor must consume workspace quota");
+  assert.notEqual(runtimeIndex, -1, "automation executor must call the shared agent runtime");
+  assert.ok(
+    quotaIndex < runtimeIndex,
+    "automation executor must consume quota before invoking the model runtime",
+  );
+});

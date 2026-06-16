@@ -230,6 +230,11 @@ export function getRateLimitSecret(): string {
 
   const widgetSecret = process.env.WIDGET_ACCESS_SECRET?.trim();
   if (widgetSecret) {
+    if (process.env.NODE_ENV === "production") {
+      console.warn(
+        "RATE_LIMIT_SECRET is not set. Falling back to WIDGET_ACCESS_SECRET. Set a dedicated RATE_LIMIT_SECRET for production.",
+      );
+    }
     return widgetSecret;
   }
 

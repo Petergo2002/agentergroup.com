@@ -36,6 +36,7 @@ async function loadKnowledgePageData() {
           "id, workspace_id, created_by, name, description, source_type, status, storage_bucket, storage_path, mime_type, file_size_bytes, chunk_count, last_processed_at, error_message, metadata, created_at, updated_at",
         )
         .eq("workspace_id", context.workspace.id)
+        .is("widget_session_id", null)
         .order("updated_at", { ascending: false }),
       supabase
         .from("knowledge_folders")

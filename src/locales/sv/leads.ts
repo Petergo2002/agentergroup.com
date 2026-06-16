@@ -1,6 +1,34 @@
 export const leads = {
   badge: "Lead Inbox",
   title: "Leads",
+  pageDescription:
+    "Granska varje kontakt som fångats av dina webbwidgets och gå från konversation till uppföljning utan att tappa sammanhanget.",
+  capturedCount: "{count} fångade",
+  contactSearchPlaceholder: "Sök på namn, e-post eller telefon",
+  liveInbox: "Live-inkorg",
+  refreshing: "Uppdaterar",
+  noLeadsTitle: "Inga leads har fångats ännu",
+  noLeadsDescription:
+    "Leads visas här när din widget är publicerad och besökare delar sina kontaktuppgifter i en konversation.",
+  noSearchResultsTitle: "Inga matchande leads",
+  noSearchResultsDescription:
+    "Prova ett annat namn, en annan e-postadress eller ett annat telefonnummer.",
+  loadErrorTitle: "Leads kunde inte laddas",
+  loadErrorDescription:
+    "Inkorgen är tillfälligt otillgänglig. Dina fångade leads finns fortfarande kvar.",
+  tryAgain: "Försök igen",
+  detailsTitle: "Lead-detaljer",
+  closeDetails: "Stäng lead-detaljer",
+  openLeadDetails: "Öppna detaljer för {name}",
+  nameLabel: "Namn",
+  emailLabel: "E-post",
+  phoneLabel: "Telefon",
+  widgetLabel: "Widget",
+  agentLabel: "Agent",
+  capturedLabel: "Fångad",
+  messageLabel: "Meddelande",
+  noMessage: "Inget meddelande inkluderades med detta lead.",
+  unknownAgent: "Ej tilldelad",
   description:
     "Fånga interna leads från widgetkonversationer, se hela sammanhanget och ge kunden ett lättviktigt CRM utan onödig komplexitet.",
   inbox: "Inkorg",

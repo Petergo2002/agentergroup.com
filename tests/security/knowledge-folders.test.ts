@@ -11,6 +11,10 @@ const migration = readFileSync(
   join(process.cwd(), "supabase/migrations/20260520132303_knowledge_folders.sql"),
   "utf8",
 );
+const widgetSessionSearchMigration = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260531160122_folder_sources_in_widget_session_search.sql"),
+  "utf8",
+);
 const supabaseConfig = readFileSync(
   join(process.cwd(), "supabase/config.toml"),
   "utf8",
@@ -66,6 +70,15 @@ test("knowledge search RPC includes direct and folder-attached ready sources", (
   assert.match(migration, /from public\.agent_knowledge_folders akf/);
   assert.match(migration, /join public\.knowledge_folder_sources kfs/);
   assert.match(migration, /ks\.status = 'ready'/);
+});
+
+test("widget-session knowledge search RPC keeps folder-attached sources eligible", () => {
+  assert.match(widgetSessionSearchMigration, /input_widget_session_id uuid default null/);
+  assert.match(widgetSessionSearchMigration, /from public\.agent_knowledge_sources aks/);
+  assert.match(widgetSessionSearchMigration, /from public\.agent_knowledge_folders akf/);
+  assert.match(widgetSessionSearchMigration, /join public\.knowledge_folder_sources kfs/);
+  assert.match(widgetSessionSearchMigration, /sources\.widget_session_id = input_widget_session_id/);
+  assert.match(widgetSessionSearchMigration, /match_count,\n    null::uuid/);
 });
 
 test("knowledge edge functions support current Supabase secret-key auth", () => {

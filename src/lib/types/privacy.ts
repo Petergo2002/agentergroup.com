@@ -18,7 +18,7 @@ export interface PrivacyLeadMatch {
   agentId: string | null;
   agentName: string | null;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   message: string | null;
   createdAt: string;

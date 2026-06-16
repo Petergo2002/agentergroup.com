@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { ApprovalStatus, RunStepStatus } from "@/lib/types";
 
 type SupabaseLike = Pick<SupabaseClient, "from">;
@@ -101,8 +102,12 @@ export async function createApprovalRequest(supabase: SupabaseLike, input: Appro
   }
 }
 
-export async function createAuditLog(supabase: SupabaseLike, input: AuditInput) {
-  const { error } = await supabase.from("audit_logs").insert({
+export async function createAuditLog(
+  _supabase: SupabaseLike,
+  input: AuditInput,
+) {
+  const admin = createAdminClient();
+  const { error } = await admin.from("audit_logs").insert({
     workspace_id: input.workspaceId,
     agent_id: input.agentId ?? null,
     run_id: input.runId ?? null,

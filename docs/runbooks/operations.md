@@ -1,0 +1,96 @@
+# Agentergroup Operations Runbook
+
+Last updated: 2026-06-11
+
+## Purpose
+
+This runbook captures the minimum operational checks for release readiness, health checks, backup/restore confidence, and the separate widget runtime deployment path.
+
+## Local Release Gate
+
+Run these checks before shipping application changes:
+
+```bash
+npm run lint
+npm test
+npm run build
+npm run widget:build
+```
+
+Run `npm --prefix apps/widget-v2 ci` before the gate in clean CI or on a fresh checkout.
+
+When a release includes Supabase migrations, apply and verify them before deploying code that
+depends on the new schema. The widget session-knowledge change requires
+`20260531160122_folder_sources_in_widget_session_search.sql`.
+
+For the June production-hardening migration order, private attachment rollout,
+Stripe verification, and production drift checks, use
+[`production-readiness.md`](./production-readiness.md).
+
+## Health Check
+
+The public health endpoint is:
+
+- `GET /api/health`
+
+Expected response shape:
+
+```json
+{
+  "ok": true,
+  "service": "agentergroup-web",
+  "environment": "production",
+  "timestamp": "2026-06-04T00:00:00.000Z"
+}
+```
+
+The endpoint returns no secrets, does not check third-party credentials, and sends `Cache-Control: no-store`. Use it for process availability, not deep dependency health.
+
+## Deployment Verification
+
+After deploying the dashboard app:
+
+1. Confirm `/api/health` returns `ok: true`.
+2. Confirm `/login`, `/privacy-policy`, and `/terms-of-service` load without authentication.
+3. Confirm an authenticated app route redirects unauthenticated visitors to `/login`.
+4. Run a smoke test for the dashboard build artifact through the hosting provider.
+5. For billing, Composio, and privacy cron changes, verify the relevant route-level secret or signature checks before triggering live provider events.
+6. For widget document-upload changes, upload a PDF or text file before the first chat message and confirm the session-scoped knowledge source is created with an internal widget-session UUID.
+
+## Widget Runtime Deployment
+
+The dashboard and widget runtime deploy separately.
+
+Changes under `apps/widget-v2` are not live on `widget.agentergroup.com` until the widget runtime is deployed. After a widget runtime deploy:
+
+1. Run `npm run widget:build` locally or confirm the equivalent CI step passed.
+2. Open a hosted widget link for a deployed widget.
+3. Confirm bootstrap succeeds and the first chat turn streams.
+4. Confirm an expired widget access token path refreshes bootstrap once.
+5. When testing load or same-session locking, use `npm run widget:load-test -- --help` for the supported harness options.
+
+## Backup And Restore
+
+Supabase owns durable database and storage state. Before high-risk migrations or launch events:
+
+1. Confirm automated Supabase project backups are enabled for the production project.
+2. Record the latest backup timestamp and retention window.
+3. Export or snapshot critical configuration outside the app database when needed: environment variables, provider webhook URLs, Stripe product/price ids, and Composio project configuration.
+4. For migrations that touch RLS, storage policies, triggers, or `security definer` functions, review the Supabase security checklist in `.agents/skills/supabase/SKILL.md` before applying.
+5. Validate restore procedure in a non-production project before relying on it for production recovery.
+
+Restore drills should confirm:
+
+- workspace membership and RLS-protected data remain scoped correctly
+- widget runtime rows, messages, leads, and dashboard summaries are present
+- storage-backed knowledge files still resolve
+- Edge Functions can process and search knowledge after restore
+
+## Incident Notes
+
+For suspected data loss, privacy exposure, or provider webhook malfunction:
+
+1. Preserve timestamps, workspace ids, actor ids, request ids, provider event ids, and relevant route names.
+2. Check `audit_logs`, `runs`, `run_steps`, `automation_events`, and provider dashboards.
+3. Avoid retrying provider write actions until idempotency and external side effects are understood.
+4. Document the final cause and add or update a regression test when the issue maps to code.

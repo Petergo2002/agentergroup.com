@@ -2,6 +2,7 @@ export const nav = {
   dashboard: "Dashboard",
   analytics: "Analytics",
   newAnalyticsActivity: "New analytics activity",
+  newLeads: "{count} new leads in the last 24 hours",
   agents: "Agents",
   agentLibrary: "Agent Library",
   assistants: "Assistants",

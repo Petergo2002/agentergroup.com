@@ -2,15 +2,29 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, CheckCircle2, Clock3, Database, Download, Plug, Search, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, CheckCircle2, Clock3, Database, Download, Plug, Search, XCircle } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { TemplateVariableSetup } from "@/components/agents/TemplateVariableSetup";
+import { SimpleIcon } from "@/components/icons/SimpleIcon";
 import { useToast } from "@/components/ui/ToastProvider";
 import { parseTemplateVariables } from "@/lib/template-variables";
 import type {
   AgentLibraryTemplateRecord,
   AgentLibraryTemplateSourceRecord,
 } from "@/lib/types";
+
+/** Maps an integration slug (from required_integrations) to its SimpleIcon key and brand colour. */
+const INTEGRATION_ICON_MAP: Record<string, { iconKey: string; color: string; label: string }> = {
+  gmail:           { iconKey: "siGmail",             color: "#EA4335", label: "Gmail" },
+  outlook:         { iconKey: "siMicrosoftoutlook",  color: "#0078D4", label: "Outlook" },
+  slack:           { iconKey: "siSlack",             color: "#4A154B", label: "Slack" },
+  hubspot:         { iconKey: "siHubspot",           color: "#FF7A59", label: "HubSpot" },
+  shopify:         { iconKey: "siShopify",           color: "#7AB55C", label: "Shopify" },
+  googleads:       { iconKey: "siGoogleads",         color: "#4285F4", label: "Google Ads" },
+  googlecalendar:  { iconKey: "siGooglecalendar",    color: "#4285F4", label: "Calendar" },
+  cal:             { iconKey: "siCalcom",            color: "#292929", label: "Cal.com" },
+  googledrive:     { iconKey: "siGoogledrive",       color: "#4285F4", label: "Drive" },
+};
 
 type LibraryTemplate = AgentLibraryTemplateRecord & {
   sources: Pick<
@@ -34,11 +48,8 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
   const [isLoading, setIsLoading] = useState(false);
   const [importingId, setImportingId] = useState<string | null>(null);
 
-  /**
-   * When a template has {{variables}}, we store it here and show the
-   * TemplateVariableSetup panel. null = show the normal library grid.
-   */
   const [setupTemplate, setSetupTemplate] = useState<LibraryTemplate | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<LibraryTemplate | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -80,9 +91,12 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
     };
   }, [isOpen, showToast]);
 
-  // Reset setup panel when dialog is closed
+  // Reset panels when dialog is closed
   useEffect(() => {
-    if (!isOpen) setSetupTemplate(null);
+    if (!isOpen) {
+      setSetupTemplate(null);
+      setSelectedTemplate(null);
+    }
   }, [isOpen]);
 
   const visibleTemplates = activeView === "library" ? templates : submissions;
@@ -132,10 +146,6 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
     }
   };
 
-  /**
-   * Perform the actual import POST request.
-   * variableValues is optional — only passed when the template had variables.
-   */
   const importTemplate = async (
     template: LibraryTemplate,
     variableValues?: Record<string, string>,
@@ -162,11 +172,6 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
     }
   };
 
-  /**
-   * Called when the user clicks "Import Template" on a card.
-   * If the template has {{variables}}, show the setup panel first.
-   * Otherwise, import directly (original behaviour — no regression).
-   */
   function handleImportClick(template: LibraryTemplate) {
     const variables = parseTemplateVariables(template.instructions);
     if (variables.length > 0) {
@@ -176,10 +181,200 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
     }
   }
 
+  const renderFullView = () => {
+    if (!selectedTemplate) return null;
+
+    const variableCount = parseTemplateVariables(selectedTemplate.instructions).length;
+    const meta = statusMeta(selectedTemplate.status);
+    const StatusIcon = meta?.icon;
+
+    return (
+      <div className="animate-in slide-in-from-right-8 fade-in duration-500 fill-mode-both pb-6">
+        <button
+          onClick={() => setSelectedTemplate(null)}
+          className="mb-8 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors group/back"
+        >
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover/back:-translate-x-1" /> Back to library
+        </button>
+
+        <div className="flex flex-col lg:flex-row gap-10">
+          {/* Left Column: Meta & Actions */}
+          <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-6">
+            <div className="flex aspect-square w-full items-center justify-center rounded-[2.5rem] bg-surface-container-lowest text-primary font-black text-7xl shadow-sm border border-outline-variant/10 relative overflow-hidden group/avatar">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50" />
+              <span className="relative z-10 transition-transform duration-500 group-hover/avatar:scale-110">
+                {selectedTemplate.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-4 rounded-3xl border border-outline-variant/10 bg-surface-container-lowest/50 p-6 shadow-sm">
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center rounded-lg bg-primary/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-primary ring-1 ring-inset ring-primary/20">
+                  {selectedTemplate.surface}
+                </span>
+                {variableCount > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-surface-container-high/50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/60 ring-1 ring-inset ring-outline-variant/20">
+                    <span className="material-symbols-outlined text-[12px]">edit</span>
+                    {variableCount} variables
+                  </span>
+                )}
+                {activeView === "submissions" && StatusIcon && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] ring-1 ring-inset ${meta.className} ring-current/20`}
+                  >
+                    <StatusIcon className="h-3.5 w-3.5" />
+                    {meta.label}
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                <div className="rounded-2xl bg-surface-container p-4">
+                  <div className="flex items-center gap-2 text-on-surface-variant/60 font-medium mb-2">
+                    <Database className="h-3.5 w-3.5" /> Knowledge
+                  </div>
+                  <p className="font-black text-lg text-on-surface">
+                    {selectedTemplate.knowledge_source_count} <span className="text-xs font-medium text-on-surface-variant/50">sources</span>
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-surface-container p-4">
+                  <div className="flex items-center gap-2 text-on-surface-variant/60 font-medium mb-2">
+                    <Plug className="h-3.5 w-3.5" /> Integrations
+                  </div>
+                  {selectedTemplate.required_integrations.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {selectedTemplate.required_integrations.map((slug) => {
+                        const info = INTEGRATION_ICON_MAP[slug];
+                        return (
+                          <div
+                            key={slug}
+                            title={info?.label ?? slug}
+                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-surface-container-lowest border border-outline-variant/10 shadow-sm transition-transform hover:scale-110"
+                          >
+                            {info ? (
+                              <SimpleIcon iconKey={info.iconKey} color={info.color} size={16} />
+                            ) : (
+                              <Plug className="h-3.5 w-3.5 text-on-surface-variant/50" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="font-bold text-on-surface text-sm">None</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            {activeView === "library" ? (
+              <button
+                onClick={() => handleImportClick(selectedTemplate)}
+                disabled={importingId === selectedTemplate.id}
+                className="group/btn relative flex h-14 w-full items-center justify-center gap-3 overflow-hidden rounded-[1.25rem] bg-primary px-6 text-sm font-bold uppercase tracking-[0.16em] text-on-primary transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+              >
+                <div className="absolute inset-0 bg-white/20 translate-y-full transition-transform duration-300 group-hover/btn:translate-y-0" />
+                <span className="relative flex items-center gap-2">
+                  <Download className="h-5 w-5 transition-transform duration-300 group-hover/btn:-translate-y-0.5 group-hover/btn:scale-110" />
+                  {importingId === selectedTemplate.id
+                    ? "Importing..."
+                    : variableCount > 0
+                      ? "Set Up & Import"
+                      : "Import Template"}
+                </span>
+              </button>
+            ) : null}
+
+            {/* Rejection Feedback */}
+            {activeView === "submissions" && selectedTemplate.status === "rejected" && selectedTemplate.rejection_reason && (
+              <div className="rounded-2xl border border-red-500/15 bg-red-500/5 p-5 text-sm leading-relaxed text-red-700 dark:text-red-300">
+                <span className="font-bold flex items-center gap-2 mb-2 text-base">
+                  <XCircle className="w-5 h-5" /> Rejection Feedback
+                </span>
+                {selectedTemplate.rejection_reason}
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Details */}
+          <div className="flex-1 min-w-0">
+            <h2 className="text-4xl font-black text-on-surface tracking-tight mb-8 leading-tight">
+              {selectedTemplate.name}
+            </h2>
+
+            <div className="space-y-8">
+              <section>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant/40 mb-4 flex items-center gap-2">
+                  <Bot className="h-4 w-4" /> About this template
+                </h3>
+                <p className="text-base leading-relaxed text-on-surface-variant/80 whitespace-pre-wrap">
+                  {selectedTemplate.description || "No description provided."}
+                </p>
+              </section>
+
+              {selectedTemplate.sources && selectedTemplate.sources.length > 0 && (
+                <section>
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant/40 mb-4 flex items-center gap-2">
+                    <Database className="h-4 w-4" /> Attached Knowledge
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    {selectedTemplate.sources.map((source) => (
+                      <div
+                        key={source.id}
+                        className="flex items-center gap-3 rounded-xl bg-surface-container-lowest border border-outline-variant/10 p-4 text-sm font-medium text-on-surface"
+                      >
+                        <div className="h-2.5 w-2.5 rounded-full bg-primary/60" />
+                        {source.source_name}
+                        <span className="ml-auto text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/40 bg-surface-container px-2 py-1 rounded-md">
+                          {source.original_source_type}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {selectedTemplate.required_integrations.length > 0 && (
+                <section>
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant/40 mb-4 flex items-center gap-2">
+                    <Plug className="h-4 w-4" /> Required Connections
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    {selectedTemplate.required_integrations.map((slug) => {
+                      const info = INTEGRATION_ICON_MAP[slug];
+                      return (
+                        <div
+                          key={slug}
+                          className="flex items-center gap-3 rounded-xl bg-surface-container-lowest border border-outline-variant/10 p-4 text-sm font-medium text-on-surface transition-colors hover:border-primary/20"
+                        >
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-container border border-outline-variant/10 shadow-sm">
+                            {info ? (
+                              <SimpleIcon iconKey={info.iconKey} color={info.color} size={18} />
+                            ) : (
+                              <Plug className="h-4 w-4 text-on-surface-variant/50" />
+                            )}
+                          </div>
+                          {info?.label ?? slug}
+                          <span className="ml-auto text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/40 bg-surface-container px-2 py-1 rounded-md">
+                            Required
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Agent Library" size="6xl">
       <div className="space-y-8 pb-4">
-        {/* ── Setup step (slides in when template has variables) ── */}
         {setupTemplate ? (
           <TemplateVariableSetup
             templateName={setupTemplate.name}
@@ -188,10 +383,12 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
             onBack={() => setSetupTemplate(null)}
             onImport={(values) => void importTemplate(setupTemplate, values)}
           />
+        ) : selectedTemplate ? (
+          renderFullView()
         ) : (
-          <>
+          <div className="animate-in fade-in duration-500">
             {/* Header Section */}
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between mb-8">
               <div className="max-w-2xl">
                 <p className="text-base leading-relaxed text-on-surface-variant/80">
                   Import approved templates with their prompt, tools, and selected knowledge. Connections are seamlessly reattached from your workspace.
@@ -212,7 +409,7 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-2 border-b border-outline-variant/10 pb-6">
+            <div className="flex items-center gap-2 border-b border-outline-variant/10 pb-6 mb-8">
               <div className="flex inline-flex p-1 rounded-full bg-surface-container-lowest border border-outline-variant/10 shadow-inner">
                 {[
                   { id: "library" as const, label: "Public library", count: templates.length },
@@ -236,11 +433,11 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
             {/* Content Grid */}
             <div className="min-h-[20rem]">
               {isLoading ? (
-                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                  {Array.from({ length: 6 }).map((_, index) => (
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {Array.from({ length: 8 }).map((_, index) => (
                     <div
                       key={index}
-                      className="h-[20rem] animate-pulse rounded-3xl bg-surface-container-low/50 border border-outline-variant/5"
+                      className="h-[14rem] animate-pulse rounded-3xl bg-surface-container-low/50 border border-outline-variant/5"
                     />
                   ))}
                 </div>
@@ -257,120 +454,93 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredTemplates.map((template) => (
-                    (() => {
-                      const meta = statusMeta(template.status);
-                      const StatusIcon = meta.icon;
-                      // Count how many variables this template has
-                      const variableCount = parseTemplateVariables(template.instructions).length;
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {filteredTemplates.map((template) => {
+                    const meta = statusMeta(template.status);
+                    const StatusIcon = meta.icon;
+                    const variableCount = parseTemplateVariables(template.instructions).length;
 
-                      return (
-                        <article
-                          key={template.id}
-                          className="group relative flex flex-col h-[22rem] overflow-hidden rounded-3xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both"
-                          style={{ animationDelay: `${Math.random() * 150}ms` }}
-                        >
-                          {/* Subtle Background Glow */}
-                          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-
-                          <div className="relative z-10 flex flex-col h-full">
-                            {/* Card Header */}
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                  <span className="inline-flex items-center rounded-md bg-surface-container-high/50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary/80 ring-1 ring-inset ring-primary/20">
-                                    {template.surface}
-                                  </span>
-                                  {/* Variable badge */}
-                                  {variableCount > 0 && (
-                                    <span className="inline-flex items-center gap-1 rounded-md bg-surface-container-high/50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/60 ring-1 ring-inset ring-outline-variant/20">
-                                      <span className="material-symbols-outlined text-[11px]">edit</span>
-                                      {variableCount} {variableCount === 1 ? "variable" : "variables"}
-                                    </span>
-                                  )}
-                                  {activeView === "submissions" ? (
-                                    <span
-                                      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ring-1 ring-inset ${meta.className} ring-current/20`}
-                                    >
-                                      <StatusIcon className="h-3 w-3" />
-                                      {meta.label}
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <h2 className="truncate text-xl font-black tracking-tight text-on-surface group-hover:text-primary transition-colors duration-300">
-                                  {template.name}
-                                </h2>
-                              </div>
+                    return (
+                      <article
+                        key={template.id}
+                        onClick={() => setSelectedTemplate(template)}
+                        className="group relative flex flex-col h-[15rem] cursor-pointer overflow-hidden rounded-3xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both"
+                        style={{ animationDelay: `${Math.random() * 150}ms` }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                        <div className="relative z-10 flex flex-col h-full">
+                          <div className="flex items-start gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface-container-high/30 text-primary font-black text-xl shadow-inner border border-outline-variant/10 transition-transform duration-300 group-hover:scale-110">
+                              {template.name.charAt(0).toUpperCase()}
                             </div>
-
-                            {/* Description */}
-                            <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-on-surface-variant/70">
-                              {template.description || "No description provided."}
-                            </p>
-
-                            {/* Rejection Reason */}
-                            {activeView === "submissions" && template.status === "rejected" && template.rejection_reason ? (
-                              <div className="mt-4 rounded-2xl border border-red-500/15 bg-red-500/5 px-4 py-3 text-xs leading-relaxed text-red-700 dark:text-red-300">
-                                <span className="font-bold flex items-center gap-1.5 mb-1"><XCircle className="w-3.5 h-3.5"/> Feedback</span>
-                                {template.rejection_reason}
-                              </div>
-                            ) : null}
-
-                            {/* Stats Grid */}
-                            <div className={`mt-auto pt-6 grid grid-cols-2 gap-3 text-xs ${activeView === "submissions" && template.status === "rejected" && template.rejection_reason ? 'hidden' : ''}`}>
-                              <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low/50 px-4 py-3 transition-colors duration-300 group-hover:bg-surface-container-low">
-                                <div className="flex items-center gap-2 text-on-surface-variant/60 font-medium">
-                                  <Database className="h-3.5 w-3.5" />
-                                  Knowledge
-                                </div>
-                                <p className="mt-2 font-black text-base text-on-surface">
-                                  {template.knowledge_source_count} <span className="text-xs font-medium text-on-surface-variant/50">sources</span>
-                                </p>
-                              </div>
-                              <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low/50 px-4 py-3 transition-colors duration-300 group-hover:bg-surface-container-low">
-                                <div className="flex items-center gap-2 text-on-surface-variant/60 font-medium">
-                                  <Plug className="h-3.5 w-3.5" />
-                                  Integrations
-                                </div>
-                                <p className="mt-2 truncate font-bold text-on-surface text-sm">
-                                  {template.required_integrations.length > 0
-                                    ? template.required_integrations.join(", ")
-                                    : "None"}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Action Button */}
-                            <div className="mt-6">
-                              {activeView === "library" ? (
-                                <button
-                                  onClick={() => handleImportClick(template)}
-                                  disabled={importingId === template.id}
-                                  className="group/btn relative flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-on-surface px-4 text-xs font-bold uppercase tracking-[0.16em] text-background transition-all duration-300 hover:shadow-lg hover:shadow-on-surface/20 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
-                                >
-                                  <div className="absolute inset-0 bg-white/20 translate-y-full transition-transform duration-300 group-hover/btn:translate-y-0" />
-                                  <span className="relative flex items-center gap-2">
-                                    <Download className="h-4 w-4 transition-transform duration-300 group-hover/btn:-translate-y-0.5" />
-                                    {importingId === template.id ? "Importing..." : variableCount > 0 ? "Set Up & Import" : "Import Template"}
+                            <div className="min-w-0 flex-1 pt-0.5">
+                              <h2 className="truncate text-base font-black tracking-tight text-on-surface group-hover:text-primary transition-colors duration-300">
+                                {template.name}
+                              </h2>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                <span className="inline-flex items-center rounded bg-surface-container-high/50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-primary/80 ring-1 ring-inset ring-primary/20">
+                                  {template.surface}
+                                </span>
+                                {activeView === "submissions" && (
+                                  <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] ring-1 ring-inset ${meta.className} ring-current/20`}>
+                                    <StatusIcon className="h-2.5 w-2.5" />
+                                    {meta.label}
                                   </span>
-                                </button>
-                              ) : (
-                                <div className={`flex h-12 w-full items-center justify-center gap-2 rounded-2xl border px-4 text-xs font-bold uppercase tracking-[0.16em] ${meta.className} border-current/20 bg-transparent`}>
-                                  <StatusIcon className="h-4 w-4" />
-                                  {meta.label}
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </article>
-                      );
-                    })()
-                  ))}
+
+                          <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-on-surface-variant/70">
+                            {template.description || "No description provided."}
+                          </p>
+
+                          <div className="mt-auto flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {template.required_integrations.length > 0 && (
+                                <div className="flex items-center -space-x-1">
+                                  {template.required_integrations.slice(0, 4).map((slug) => {
+                                    const info = INTEGRATION_ICON_MAP[slug];
+                                    return (
+                                      <div
+                                        key={slug}
+                                        title={info?.label ?? slug}
+                                        className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-container border border-outline-variant/10 shadow-sm"
+                                      >
+                                        {info ? (
+                                          <SimpleIcon iconKey={info.iconKey} color={info.color} size={14} />
+                                        ) : (
+                                          <Plug className="h-3 w-3 text-on-surface-variant/50" />
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  {template.required_integrations.length > 4 && (
+                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-container border border-outline-variant/10 shadow-sm text-[9px] font-bold text-on-surface-variant/60">
+                                      +{template.required_integrations.length - 4}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {variableCount > 0 && (
+                                <span className="inline-flex items-center text-[10px] font-bold text-on-surface-variant/50">
+                                  <span className="material-symbols-outlined text-[12px] mr-1">edit</span>
+                                  Variables
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center text-[11px] font-bold uppercase tracking-wider text-primary opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0">
+                              View Details <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
     </Modal>

@@ -1,31 +1,25 @@
-/**
- * POST /api/billing/webhook
- *
- * Receives Stripe webhook events and updates the database accordingly.
- * This is the ONLY place the database subscription state is updated from Stripe.
- *
- * Events handled:
- * - checkout.session.completed      → activate new plan after payment
- * - customer.subscription.updated   → handle plan changes / renewals
- * - customer.subscription.deleted   → downgrade to free plan
- * - invoice.payment_failed          → log the failure (extendable to email alerts)
- */
-
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import Stripe from 'stripe';
+import { NextResponse } from "next/server";
+import Stripe from "stripe";
 import {
   EXTRA_MESSAGE_CREDIT_PACK_AMOUNT,
   EXTRA_MESSAGE_CREDIT_PURCHASE_TYPE,
-} from '@/lib/billing-credits';
+} from "@/lib/billing-credits";
 import {
   BillingConfigurationError,
   getStripe,
   getStripePriceToPlan,
   PLAN_LIMITS,
-} from '@/lib/stripe';
-import { getSupabaseAdminKey, getSupabaseEnv } from '@/lib/env';
-import type { PlanTier } from '@/lib/types/subscription';
+} from "@/lib/stripe";
+import {
+  getStripeCustomerId,
+  getStripeSubscriptionPeriod,
+  isStripeSubscriptionEntitled,
+  resolveStripePlan,
+  shouldReclaimStripeWebhookEvent,
+  UnknownStripePriceError,
+} from "@/lib/stripe-webhook";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { PlanTier } from "@/lib/types/subscription";
 
 interface PurchasedCreditsRpcRow {
   workspace_id: string;
@@ -35,93 +29,101 @@ interface PurchasedCreditsRpcRow {
   already_granted: boolean;
 }
 
-/**
- * Creates a privileged Supabase client using the service role key.
- * Required because the webhook runs outside of user sessions.
- */
-function createAdminClient() {
-  const { url } = getSupabaseEnv();
-  return createClient(url, getSupabaseAdminKey());
+interface StripeWebhookEventRow {
+  processing_status:
+    | "processing"
+    | "processed"
+    | "failed"
+    | "requires_review";
+  updated_at: string;
 }
 
-/**
- * Updates the workspace subscription in the database with the new plan state.
- * Called by every Stripe event that changes subscription status.
- */
-async function updateWorkspaceSubscription(
-  workspaceId: string,
-  planTier: PlanTier,
-  stripeCustomerId: string,
-  stripeSubscriptionId: string,
+const PROCESSING_STALE_MS = 5 * 60 * 1000;
+
+async function claimWebhookEvent(event: Stripe.Event) {
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  const { error: insertError } = await admin
+    .from("stripe_webhook_events")
+    .insert({
+      event_id: event.id,
+      event_type: event.type,
+      event_created_at: event.created,
+      processing_status: "processing",
+      updated_at: now,
+    });
+
+  if (!insertError) {
+    return true;
+  }
+
+  if (insertError.code !== "23505") {
+    throw new Error(`Failed to claim Stripe event: ${insertError.message}`);
+  }
+
+  const { data, error } = await admin
+    .from("stripe_webhook_events")
+    .select("processing_status, updated_at")
+    .eq("event_id", event.id)
+    .single();
+
+  if (error || !data) {
+    throw new Error(
+      error?.message ?? "Failed to load existing Stripe event state.",
+    );
+  }
+
+  const existing = data as StripeWebhookEventRow;
+  if (
+    !shouldReclaimStripeWebhookEvent(
+      {
+        processingStatus: existing.processing_status,
+        updatedAtMs: new Date(existing.updated_at).getTime(),
+      },
+      Date.now(),
+      PROCESSING_STALE_MS,
+    )
+  ) {
+    return false;
+  }
+
+  const { error: reclaimError } = await admin
+    .from("stripe_webhook_events")
+    .update({
+      processing_status: "processing",
+      error_message: null,
+      processed_at: null,
+      updated_at: now,
+    })
+    .eq("event_id", event.id);
+
+  if (reclaimError) {
+    throw new Error(`Failed to reclaim Stripe event: ${reclaimError.message}`);
+  }
+
+  return true;
+}
+
+async function updateWebhookEvent(
+  eventId: string,
+  status: "processed" | "failed" | "requires_review",
+  errorMessage?: string | null,
 ) {
   const admin = createAdminClient();
-  const limits = PLAN_LIMITS[planTier] ?? PLAN_LIMITS['free'];
-
-  const now = new Date();
-  const cycleEnd = new Date(now);
-  cycleEnd.setMonth(cycleEnd.getMonth() + 1);
-
+  const now = new Date().toISOString();
   const { error } = await admin
-    .from('workspace_subscriptions')
+    .from("stripe_webhook_events")
     .update({
-      plan_tier: planTier,
-      messages_limit: limits.messages_limit,
-      agents_limit: limits.agents_limit,
-      integrations_enabled: limits.integrations_enabled,
-      storage_limit_bytes: limits.storage_limit_bytes,
-      stripe_customer_id: stripeCustomerId,
-      stripe_subscription_id: stripeSubscriptionId,
-      billing_cycle_start: now.toISOString(),
-      billing_cycle_end: cycleEnd.toISOString(),
-      updated_at: now.toISOString(),
+      processing_status: status,
+      error_message: errorMessage?.slice(0, 1000) ?? null,
+      processed_at: status === "failed" ? null : now,
+      updated_at: now,
     })
-    .eq('workspace_id', workspaceId);
+    .eq("event_id", eventId);
 
   if (error) {
-    console.error('[webhook] Failed to update workspace subscription:', error);
-    throw error;
+    throw new Error(`Failed to update Stripe event ledger: ${error.message}`);
   }
-
-  // Also mark workspace as onboarding completed
-  const { error: workspaceError } = await admin
-    .from('workspaces')
-    .update({ onboarding_completed: true })
-    .eq('id', workspaceId);
-
-  if (workspaceError) {
-    console.error('[webhook] Failed to mark workspace as onboarding completed:', workspaceError);
-    // Non-fatal, but should be logged
-  }
-
-  console.log(`[webhook] Updated workspace ${workspaceId} → plan: ${planTier}`);
-}
-
-/**
- * Downgrades a workspace to the free plan when a subscription is cancelled.
- */
-async function downgradeToFree(workspaceId: string) {
-  const admin = createAdminClient();
-  const limits = PLAN_LIMITS['free'];
-
-  const { error } = await admin
-    .from('workspace_subscriptions')
-    .update({
-      plan_tier: 'free',
-      messages_limit: limits.messages_limit,
-      agents_limit: limits.agents_limit,
-      integrations_enabled: limits.integrations_enabled,
-      storage_limit_bytes: limits.storage_limit_bytes,
-      stripe_subscription_id: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('workspace_id', workspaceId);
-
-  if (error) {
-    console.error('[webhook] Failed to downgrade workspace:', error);
-    throw error;
-  }
-
-  console.log(`[webhook] Downgraded workspace ${workspaceId} → free plan`);
 }
 
 async function grantPurchasedMessageCredits(session: Stripe.Checkout.Session) {
@@ -150,8 +152,7 @@ async function grantPurchasedMessageCredits(session: Stripe.Checkout.Session) {
   });
 
   if (error) {
-    console.error("[webhook] Failed to grant purchased message credits:", error);
-    throw error;
+    throw new Error(error.message);
   }
 
   const grant = Array.isArray(data)
@@ -163,151 +164,233 @@ async function grantPurchasedMessageCredits(session: Stripe.Checkout.Session) {
       `[webhook] extra credits checkout session ${session.id} did not return a grant row`,
     );
   }
+}
 
-  console.log(
-    `[webhook] ${
-      grant.already_granted ? "Confirmed existing" : "Granted"
-    } ${grant.granted_amount} extra message credits for workspace ${workspaceId}`,
+async function applySubscriptionState(
+  event: Stripe.Event,
+  subscription: Stripe.Subscription,
+  workspaceIdOverride?: string | null,
+) {
+  const workspaceId =
+    subscription.metadata?.workspace_id ?? workspaceIdOverride ?? null;
+
+  if (!workspaceId) {
+    throw new Error(
+      `${event.type} is missing workspace_id in Stripe metadata.`,
+    );
+  }
+
+  const item = subscription.items.data[0];
+  const priceId = item?.price?.id ?? null;
+  const paidPlan = resolveStripePlan(priceId, getStripePriceToPlan());
+  const effectivePlan: PlanTier = isStripeSubscriptionEntitled(
+    subscription.status,
+  )
+    ? paidPlan
+    : "free";
+  const limits = PLAN_LIMITS[effectivePlan];
+  const period = getStripeSubscriptionPeriod(subscription);
+  const customerId = getStripeCustomerId(subscription.customer);
+  const admin = createAdminClient();
+  const { data: applied, error } = await admin.rpc(
+    "apply_workspace_subscription_event",
+    {
+      p_workspace_id: workspaceId,
+      p_plan_tier: effectivePlan,
+      p_messages_limit: limits.messages_limit,
+      p_agents_limit: limits.agents_limit,
+      p_integrations_enabled: limits.integrations_enabled,
+      p_storage_limit_bytes: limits.storage_limit_bytes,
+      p_subscription_status: subscription.status,
+      p_customer_id: customerId,
+      p_subscription_id: subscription.id,
+      p_price_id: priceId,
+      p_period_start: period.start,
+      p_period_end: period.end,
+      p_event_created_at: event.created,
+      p_event_id: event.id,
+    },
   );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (applied && isStripeSubscriptionEntitled(subscription.status)) {
+    const { error: workspaceError } = await admin
+      .from("workspaces")
+      .update({ onboarding_completed: true })
+      .eq("id", workspaceId);
+
+    if (workspaceError) {
+      throw new Error(workspaceError.message);
+    }
+  }
 }
 
 export async function POST(req: Request) {
   const body = await req.text();
-  const signature = req.headers.get('stripe-signature');
+  const signature = req.headers.get("stripe-signature");
 
   if (!signature) {
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing stripe-signature header" },
+      { status: 400 },
+    );
   }
 
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    console.error('[webhook] STRIPE_WEBHOOK_SECRET is not set');
-    return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
+    return NextResponse.json(
+      { error: "Webhook not configured" },
+      { status: 500 },
+    );
   }
 
-  // Verify the event came from Stripe (prevents spoofed events)
   let event: Stripe.Event;
   let stripe: ReturnType<typeof getStripe>;
+
   try {
     stripe = getStripe();
-    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    if (err instanceof BillingConfigurationError) {
-      console.error('[webhook] Stripe is not configured:', err.message);
-      return NextResponse.json({ error: 'Webhook not configured' }, { status: err.status });
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET,
+    );
+  } catch (error) {
+    if (error instanceof BillingConfigurationError) {
+      return NextResponse.json(
+        { error: "Webhook not configured" },
+        { status: error.status },
+      );
     }
 
-    console.error('[webhook] Signature verification failed:', err);
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  let stripePriceToPlan: Record<string, PlanTier>;
-
   try {
-    stripePriceToPlan = getStripePriceToPlan();
-  } catch (err) {
-    if (err instanceof BillingConfigurationError) {
-      console.error('[webhook] Stripe price mapping is not configured:', err.message);
-      return NextResponse.json({ error: 'Webhook not configured' }, { status: err.status });
+    const claimed = await claimWebhookEvent(event);
+    if (!claimed) {
+      return NextResponse.json({ received: true, duplicate: true });
     }
 
-    throw err;
-  }
-
-  // Process the verified event
-  try {
     switch (event.type) {
-
-      // ─── Checkout completed — user just paid for the first time ──────────────
-      case 'checkout.session.completed': {
+      case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
         if (
-          session.mode === 'payment' &&
-          session.metadata?.purchase_type === EXTRA_MESSAGE_CREDIT_PURCHASE_TYPE
+          session.mode === "payment" &&
+          session.metadata?.purchase_type ===
+            EXTRA_MESSAGE_CREDIT_PURCHASE_TYPE
         ) {
           await grantPurchasedMessageCredits(session);
           break;
         }
 
-        if (session.mode !== 'subscription') break;
-
-        // Retrieve the full subscription to get the price ID and metadata
-        const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-        const workspaceId = subscription.metadata?.workspace_id;
-
-        if (!workspaceId) {
-          console.error('[webhook] checkout.session.completed: missing workspace_id in subscription metadata');
+        if (session.mode !== "subscription" || !session.subscription) {
           break;
         }
 
-        const priceId = subscription.items.data[0]?.price?.id;
-        const planTier = priceId ? stripePriceToPlan[priceId] ?? 'free' : 'free';
+        const subscriptionId =
+          typeof session.subscription === "string"
+            ? session.subscription
+            : session.subscription.id;
+        const subscription =
+          await stripe.subscriptions.retrieve(subscriptionId);
 
-        await updateWorkspaceSubscription(
-          workspaceId,
-          planTier,
-          session.customer as string,
-          session.subscription as string,
+        await applySubscriptionState(
+          event,
+          subscription,
+          session.metadata?.workspace_id,
         );
         break;
       }
 
-      // ─── Subscription updated — plan change or renewal ───────────────────────
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
-        const workspaceId = subscription.metadata?.workspace_id;
-
-        if (!workspaceId) {
-          console.warn('[webhook] customer.subscription.updated: missing workspace_id, skipping');
-          break;
-        }
-
-        const priceId = subscription.items.data[0]?.price?.id;
-        const planTier = priceId ? stripePriceToPlan[priceId] ?? 'free' : 'free';
-
-        if (subscription.status === 'active') {
-          await updateWorkspaceSubscription(
-            workspaceId,
-            planTier,
-            subscription.customer as string,
-            subscription.id,
-          );
-        }
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const eventSubscription =
+          event.data.object as Stripe.Subscription;
+        const subscription = await stripe.subscriptions.retrieve(
+          eventSubscription.id,
+        );
+        await applySubscriptionState(event, subscription);
         break;
       }
 
-      // ─── Subscription deleted — user cancelled ────────────────────────────────
-      case 'customer.subscription.deleted': {
+      case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        const workspaceId = subscription.metadata?.workspace_id;
-
-        if (!workspaceId) {
-          console.warn('[webhook] customer.subscription.deleted: missing workspace_id, skipping');
-          break;
-        }
-
-        await downgradeToFree(workspaceId);
+        await applySubscriptionState(event, subscription);
         break;
       }
 
-      // ─── Payment failed — log it (extend to send email notifications later) ──
-      case 'invoice.payment_failed': {
+      case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        console.warn('[webhook] Payment failed for customer:', invoice.customer, '| Invoice:', invoice.id);
-        // TODO: send email notification via Resend
+        console.warn("[billing/webhook] Invoice payment failed", {
+          invoiceId: invoice.id,
+          customerId:
+            typeof invoice.customer === "string"
+              ? invoice.customer
+              : invoice.customer?.id ?? null,
+        });
         break;
       }
 
       default:
-        // Unhandled event types are OK — Stripe sends many event types
         break;
     }
 
+    await updateWebhookEvent(event.id, "processed");
     return NextResponse.json({ received: true });
+  } catch (error) {
+    if (error instanceof UnknownStripePriceError) {
+      console.error("[billing/webhook] Stripe price requires manual review", {
+        eventId: event.id,
+        eventType: event.type,
+        priceId: error.priceId,
+      });
 
-  } catch (err) {
-    console.error('[webhook] Error processing event:', event.type, err);
-    // Return 500 so Stripe will retry the webhook
-    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+      try {
+        await updateWebhookEvent(
+          event.id,
+          "requires_review",
+          error.message,
+        );
+      } catch (ledgerError) {
+        console.error(
+          "[billing/webhook] Failed to record manual review state",
+          ledgerError,
+        );
+        return NextResponse.json(
+          { error: "Webhook processing failed" },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({
+        received: true,
+        requiresReview: true,
+      });
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Webhook processing failed";
+    console.error("[billing/webhook] Error processing event", {
+      eventId: event.id,
+      eventType: event.type,
+      error: message,
+    });
+
+    try {
+      await updateWebhookEvent(event.id, "failed", message);
+    } catch (ledgerError) {
+      console.error(
+        "[billing/webhook] Failed to record webhook failure",
+        ledgerError,
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Webhook processing failed" },
+      { status: 500 },
+    );
   }
 }

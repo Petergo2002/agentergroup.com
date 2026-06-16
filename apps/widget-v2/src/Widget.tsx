@@ -288,7 +288,13 @@ export default function Widget({
         language: "sv" | "en";
         pageUrl?: string;
         referrer?: string;
-        attachments?: { url: string; name: string; type: string; size: number }[];
+        attachments?: {
+          id: string;
+          url: string;
+          name: string;
+          type: string;
+          size: number;
+        }[];
       },
       options?: { signal?: AbortSignal },
     ) => {

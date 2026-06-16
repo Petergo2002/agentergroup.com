@@ -39,6 +39,22 @@ function resolveToolkitIcon(icon: string) {
   return <AppIcon name="cloud" className="h-7 w-7" />;
 }
 
+function readConnectionStatusReason(connection: ConnectionRecord | null) {
+  if (!connection) {
+    return null;
+  }
+
+  const data = connection.toolkit_data ?? {};
+  const lastExpiryEvent = data.lastExpiryEvent;
+  const lastExpiryReason =
+    lastExpiryEvent && typeof lastExpiryEvent === 'object'
+      ? (lastExpiryEvent as Record<string, unknown>).statusReason
+      : null;
+  const reason = data.statusReason ?? data.status_reason ?? lastExpiryReason;
+
+  return typeof reason === 'string' && reason.trim() ? reason.trim() : null;
+}
+
 export default function ConnectionsPageClient({
   initialToolkits,
   initialConnections,
@@ -312,85 +328,94 @@ export default function ConnectionsPageClient({
                 className="h-56 animate-pulse rounded-[2rem] bg-surface-container-low"
               />
             ))
-          : toolkits.map((toolkit) => (
-              <div
-                key={toolkit.slug}
-                className="rounded-[1.65rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_22px_60px_rgba(15,23,42,0.09)]"
-              >
-                <div className="mb-8 flex items-start justify-between gap-3">
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
-                    toolkit.status === 'connected'
-                      ? 'bg-success/10 text-success'
-                      : 'bg-surface-container'
-                  }`}>
-                    {toolkit.simpleIcon ? (
-                      <SimpleIcon 
-                        iconKey={toolkit.simpleIcon} 
-                        color={toolkit.simpleIconColor}
-                        size={28} 
-                      />
-                    ) : (
-                      resolveToolkitIcon(toolkit.icon)
-                    )}
+          : toolkits.map((toolkit) => {
+              const statusReason = readConnectionStatusReason(toolkit.connection);
+
+              return (
+                <div
+                  key={toolkit.slug}
+                  className="rounded-[1.65rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_22px_60px_rgba(15,23,42,0.09)]"
+                >
+                  <div className="mb-8 flex items-start justify-between gap-3">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
+                      toolkit.status === 'connected'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-surface-container'
+                    }`}>
+                      {toolkit.simpleIcon ? (
+                        <SimpleIcon
+                          iconKey={toolkit.simpleIcon}
+                          color={toolkit.simpleIconColor}
+                          size={28}
+                        />
+                      ) : (
+                        resolveToolkitIcon(toolkit.icon)
+                      )}
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
+                      toolkit.status === 'connected'
+                        ? 'bg-success/10 text-success border border-success/20'
+                        : 'bg-background text-on-surface-variant'
+                    }`}>
+                      {toolkit.status}
+                    </span>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
-                    toolkit.status === 'connected'
-                      ? 'bg-success/10 text-success border border-success/20'
-                      : 'bg-background text-on-surface-variant'
-                  }`}>
-                    {toolkit.status}
-                  </span>
-                </div>
-                <p className="font-headline text-xl font-bold text-on-surface">
-                  {toolkit.displayName}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-                  {toolkit.description}
-                </p>
-                <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.2em] text-primary/70">
-                  {toolkit.category} · {toolkit.surface}
-                </p>
-                <div className="mt-8 flex items-center justify-between gap-3 border-t border-outline-variant/10 pt-4">
-                  <div className="text-xs text-on-surface-variant">
-                    {toolkit.connection?.last_synced_at
-                      ? t('connections.lastSync', { value: formatDateTime(toolkit.connection.last_synced_at) })
-                      : t('connections.noSyncYet')}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    {canManageAuthLinks ? (
+                  <p className="font-headline text-xl font-bold text-on-surface">
+                    {toolkit.displayName}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+                    {toolkit.description}
+                  </p>
+                  <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.2em] text-primary/70">
+                    {toolkit.category} · {toolkit.surface}
+                  </p>
+                  {statusReason && toolkit.status !== 'connected' ? (
+                    <p className="mt-4 rounded-2xl border border-error/15 bg-error-container/35 px-4 py-3 text-xs leading-5 text-error">
+                      {t('connections.statusReason', { value: statusReason })}
+                    </p>
+                  ) : null}
+                  <div className="mt-8 flex items-center justify-between gap-3 border-t border-outline-variant/10 pt-4">
+                    <div className="text-xs text-on-surface-variant">
+                      {toolkit.connection?.last_synced_at
+                        ? t('connections.lastSync', { value: formatDateTime(toolkit.connection.last_synced_at) })
+                        : t('connections.noSyncYet')}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {canManageAuthLinks ? (
+                        <button
+                          type="button"
+                          onClick={() => handleCreateAuthLink(toolkit.slug)}
+                          disabled={creatingAuthLinkSlug === toolkit.slug}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:border-primary/35 hover:bg-primary-container hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                          {creatingAuthLinkSlug === toolkit.slug
+                            ? t('common.processing')
+                            : t('connections.shareAuthLink')}
+                        </button>
+                      ) : null}
+                      {toolkit.connection && toolkit.status === 'connected' ? (
+                        <button
+                          onClick={() => handleDisconnect(toolkit.connection!.id)}
+                          disabled={disconnectingConnectionId === toolkit.connection.id}
+                          className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:border-error/30 hover:bg-error-container hover:text-error focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-error disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-outline-variant/15 disabled:hover:bg-transparent disabled:hover:text-on-surface-variant"
+                        >
+                          {disconnectingConnectionId === toolkit.connection.id
+                            ? t('connections.disconnecting')
+                            : t('connections.disconnect')}
+                        </button>
+                      ) : null}
                       <button
-                        type="button"
-                        onClick={() => handleCreateAuthLink(toolkit.slug)}
-                        disabled={creatingAuthLinkSlug === toolkit.slug}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:border-primary/35 hover:bg-primary-container hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={() => handleConnect(toolkit)}
+                        className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface transition-colors hover:border-primary/35 hover:bg-primary hover:text-on-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       >
-                        <Link2 className="h-3.5 w-3.5" />
-                        {creatingAuthLinkSlug === toolkit.slug
-                          ? t('common.processing')
-                          : t('connections.shareAuthLink')}
+                        {toolkit.status === 'connected' ? t('connections.replaceAccount') : t('connections.connect')}
                       </button>
-                    ) : null}
-                    {toolkit.connection && toolkit.status === 'connected' ? (
-                      <button
-                        onClick={() => handleDisconnect(toolkit.connection!.id)}
-                        disabled={disconnectingConnectionId === toolkit.connection.id}
-                        className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:border-error/30 hover:bg-error-container hover:text-error focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-error disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-outline-variant/15 disabled:hover:bg-transparent disabled:hover:text-on-surface-variant"
-                      >
-                        {disconnectingConnectionId === toolkit.connection.id
-                          ? t('connections.disconnecting')
-                          : t('connections.disconnect')}
-                      </button>
-                    ) : null}
-                    <button
-                      onClick={() => handleConnect(toolkit)}
-                      className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface transition-colors hover:border-primary/35 hover:bg-primary hover:text-on-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    >
-                      {toolkit.status === 'connected' ? t('connections.replaceAccount') : t('connections.connect')}
-                    </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
       </div>
 
       {canManageAuthLinks && isAuthLinksOpen ? (

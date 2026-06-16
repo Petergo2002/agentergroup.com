@@ -12,7 +12,7 @@ import type {
   WorkspaceMemberRecord,
 } from "@/lib/types";
 
-type AdminSupabase = Pick<SupabaseClient, "from">;
+type AdminSupabase = Pick<SupabaseClient, "from" | "storage">;
 
 interface AnalyticsWidgetRow {
   id: string;
@@ -121,6 +121,7 @@ const INTRO_NAME_PATTERN =
   /\b(?:my name is|this is|jag heter|mitt namn är)\s+([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,79})/i;
 const DASHBOARD_CONVERSATION_SUMMARY_SELECT =
   "widget_session_id, workspace_id, widget_id, session_id, active_agent_id, active_widget_agent_id, source, status, first_seen_at, last_activity_at, message_count, user_message_count, assistant_message_count, latest_snippet, lead_count, lead_name, lead_email, lead_phone, page_url, referrer";
+const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 function normalizeLimit(limit: number | null | undefined) {
   if (!limit || Number.isNaN(limit)) {
@@ -367,6 +368,113 @@ function buildTranscriptWithDebugTrace(messages: AnalyticsTranscriptRow[]) {
   }
 
   return transcript;
+}
+
+async function refreshTranscriptAttachmentUrls(
+  supabase: AdminSupabase,
+  widgetSessionId: string,
+  messages: AnalyticsTranscriptRow[],
+) {
+  const attachmentIds = Array.from(
+    new Set(
+      messages.flatMap((message) => {
+        const attachments = message.metadata?.attachments;
+        if (!Array.isArray(attachments)) return [];
+
+        return attachments.flatMap((attachment) => {
+          if (
+            !attachment ||
+            typeof attachment !== "object" ||
+            !("id" in attachment) ||
+            typeof attachment.id !== "string"
+          ) {
+            return [];
+          }
+
+          return [attachment.id];
+        });
+      }),
+    ),
+  );
+
+  if (attachmentIds.length === 0) {
+    return messages;
+  }
+
+  const { data, error } = await supabase
+    .from("widget_attachments")
+    .select(
+      "id, storage_bucket, storage_path, original_name, mime_type, file_size_bytes",
+    )
+    .eq("widget_session_id", widgetSessionId)
+    .in("id", attachmentIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const signedAttachments = await Promise.all(
+    ((data ?? []) as Array<{
+      id: string;
+      storage_bucket: string;
+      storage_path: string;
+      original_name: string;
+      mime_type: string;
+      file_size_bytes: number;
+    }>).map(async (attachment) => {
+      const { data: signedUrlData, error: signedUrlError } =
+        await supabase.storage
+          .from(attachment.storage_bucket)
+          .createSignedUrl(
+            attachment.storage_path,
+            ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+          );
+
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        return null;
+      }
+
+      return {
+        id: attachment.id,
+        url: signedUrlData.signedUrl,
+        name: attachment.original_name,
+        type: attachment.mime_type,
+        size: attachment.file_size_bytes,
+      };
+    }),
+  );
+  const attachmentById = new Map(
+    signedAttachments
+      .filter((attachment) => attachment !== null)
+      .map((attachment) => [attachment.id, attachment]),
+  );
+
+  return messages.map((message) => {
+    const attachments = message.metadata?.attachments;
+    if (!Array.isArray(attachments)) return message;
+
+    const refreshed = attachments.flatMap((attachment) => {
+      if (
+        !attachment ||
+        typeof attachment !== "object" ||
+        !("id" in attachment) ||
+        typeof attachment.id !== "string"
+      ) {
+        return [attachment];
+      }
+
+      const signedAttachment = attachmentById.get(attachment.id);
+      return signedAttachment ? [signedAttachment] : [];
+    });
+
+    return {
+      ...message,
+      metadata: {
+        ...message.metadata,
+        attachments: refreshed,
+      },
+    };
+  });
 }
 
 export async function listWorkspaceWidgetsForAnalytics(
@@ -661,18 +769,61 @@ export async function listRecentDashboardConversations(
   return rows.sort(compareConversationRows);
 }
 
+/**
+ * Counts leads captured during the last 24 hours for one workspace.
+ */
+async function countRecentWorkspaceLeads(
+  supabase: AdminSupabase,
+  workspaceId: string,
+) {
+  const widgetsResult = await supabase
+    .from("widgets")
+    .select("id")
+    .eq("workspace_id", workspaceId);
+
+  if (widgetsResult.error) {
+    throw new Error(widgetsResult.error.message);
+  }
+
+  const widgetIds = (widgetsResult.data ?? []).map((widget) => widget.id as string);
+
+  if (widgetIds.length === 0) {
+    return 0;
+  }
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const leadsResult = await supabase
+    .from("widget_leads")
+    .select("id", { count: "exact", head: true })
+    .in("widget_id", widgetIds)
+    .gte("created_at", since);
+
+  if (leadsResult.error) {
+    throw new Error(leadsResult.error.message);
+  }
+
+  return leadsResult.count ?? 0;
+}
+
+/**
+ * Returns the newest conversation summary and recent lead count for sidebar attention states.
+ */
 export async function getDashboardLatestActivity(
   supabase: AdminSupabase,
   workspaceId: string,
 ): Promise<DashboardLatestActivityResponse> {
-  const [latest] = await listRecentDashboardConversations(supabase, {
-    workspaceId,
-    range: "30d",
-    limit: 1,
-  });
+  const [recentConversations, newLeadCount] = await Promise.all([
+    listRecentDashboardConversations(supabase, {
+      workspaceId,
+      range: "30d",
+      limit: 1,
+    }),
+    countRecentWorkspaceLeads(supabase, workspaceId),
+  ]);
+  const [latest] = recentConversations;
 
   if (!latest) {
-    return { latestConversation: null };
+    return { latestConversation: null, newLeadCount };
   }
 
   return {
@@ -686,6 +837,7 @@ export async function getDashboardLatestActivity(
       latestSnippet: latest.latestSnippet,
       lastActivityAt: latest.lastActivityAt,
     },
+    newLeadCount,
   };
 }
 
@@ -978,7 +1130,11 @@ export async function getDashboardConversationDetail(
       : null);
 
   const agent = (agentResult.data ?? null) as AnalyticsAgentRow | null;
-  const transcriptRows = (transcriptData.data ?? []) as AnalyticsTranscriptRow[];
+  const transcriptRows = await refreshTranscriptAttachmentUrls(
+    supabase,
+    session.id,
+    (transcriptData.data ?? []) as AnalyticsTranscriptRow[],
+  );
   let inferredIdentitySummary: AnalyticsIdentitySummary | null = null;
 
   for (const message of [...transcriptRows].reverse()) {

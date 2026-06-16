@@ -1,6 +1,6 @@
 # Agent Builder
 
-Last updated: 2026-05-20
+Last updated: 2026-06-07
 
 ## Purpose
 
@@ -87,6 +87,7 @@ The builder currently supports these optional node kinds:
 - `googlecalendar`
 - `cal`
 - `endchat`
+- `annotation`
 
 Current limits:
 
@@ -100,10 +101,12 @@ Current limits:
 - only one `googlecalendar` node
 - only one `cal` node
 - only one `endchat` node
+- text annotation nodes are repeatable canvas notes
 - no custom node types
 - no arbitrary edge editing
 
 Edges are rebuilt automatically from the node list by `buildEdges(...)`.
+Text annotation nodes are deliberately unconnected and do not affect edge rebuilding or runtime behavior.
 
 The website chat flow shape is:
 
@@ -120,6 +123,8 @@ Chat Message Trigger -> Agent Core
                          -> Cal.com (optional)
                          -> End Chat (optional)
 ```
+
+Text annotations can be placed anywhere on the canvas as documentation notes. They are not part of the chat or automation execution path.
 
 The automation flow shape is:
 
@@ -188,6 +193,7 @@ Important current behavior:
 - missing, disconnected, or wrong-toolkit selected accounts are rebound to the newest connected account for the same toolkit when possible
 - if a Google Calendar or Cal.com account is rebound, account-specific calendar/event-type fields are cleared so stale selections are not reused
 - if no connected account exists for the toolkit, the node remains in a setup/error state and is not persisted as an active runtime attachment
+- the tool picker starts provider authorization when no connected account exists; after authorization completes, the tool node can be added
 - Gmail and Outlook both expose a per-node recipient policy:
   - `ai_decides`
   - `specific_email`
@@ -243,7 +249,20 @@ Important current behavior:
 - preview inactivity timeout behavior is coordinated by the preview UI
 - preview and widget runtimes both use this node to expose session-completed behavior, but not through one identical enforcement path
 
+### Text annotation inspector
+
+When `annotation` is selected, the builder edits only the note text.
+
+Important current behavior:
+
+- annotation nodes are canvas-only documentation
+- they do not create runtime tools, prompts, knowledge, triggers, or edges
+- they are preserved in the draft definition as `TextAnnotationBuilderNodeData`
+- they can be removed from the inspector
+
 Tool nodes expose an action editor. Recommended actions are enabled by default, and additional actions can be enabled from the toolkit action list loaded through `/api/connections/toolkits/[toolkitSlug]/tools`.
+
+Google Calendar and Cal.com perform read-only provider calls while loading their calendar/event-type selectors. Those routes sync account state first and mark stale provider accounts disconnected when the provider reports that the stored account no longer exists. Other tool nodes currently validate stored connection state without executing a provider probe.
 
 Default recommended actions:
 
@@ -312,7 +331,8 @@ Current behavior:
 - `Knowledge` can only be added once
 - `End Chat` can only be added once
 - `Connected Tools` opens a picker for Gmail, Microsoft Outlook, Slack, HubSpot, Shopify, Google Ads, Google Calendar, and Cal.com
-- a tool can only be added if there is at least one connected account for that tool
+- selecting an unconnected tool starts its provider authorization flow; the node is added after a connected account is available
+- `Text annotation` adds a repeatable note node
 - the drawer opens on hover and can also be pinned open by click/tap
 
 ## Create, Load, Normalize
@@ -367,6 +387,7 @@ It also includes backward-compatibility behavior:
 - a legacy combined tools node is dropped
 - tool nodes are rehydrated from the currently attached connections
 - `endchat` is preserved only when it matches the supported singleton node shape
+- `annotation` nodes are preserved as repeatable canvas notes
 
 This means the builder treats the current supported node set as canonical, not the raw historical JSON.
 
@@ -560,6 +581,7 @@ So the builder affects widgets in two stages:
 - add Google Calendar
 - add Cal.com
 - add End Chat
+- add text annotations
 - remove optional nodes
 - save draft
 - publish a version
@@ -574,7 +596,7 @@ So the builder affects widgets in two stages:
 - no custom node types
 - no multiple knowledge nodes
 - no multiple accounts per node
-- no node execution testing inside the builder
+- no arbitrary node execution testing inside the builder
 - no diff view between versions
 - undo/redo is in-memory only and resets on reload
 - history tracks node and edge state, not every text field edit as a separate durable event
@@ -609,6 +631,7 @@ Main files:
 - `src/app/api/agent-library/submit/route.ts`
 - `src/app/api/agent-library/[id]/import/route.ts`
 - `src/app/api/admin/agent-library/route.ts`
+- `src/app/api/admin/agent-library/[id]/route.ts`
 - `src/app/api/admin/agent-library/[id]/review/route.ts`
 - `src/app/(admin)/admin/verification/page.tsx`
 
@@ -628,9 +651,11 @@ Current behavior:
   - Composio trigger config is cleared
 - attached direct knowledge sources and sources reachable through selected folders are snapshotted into `agent_library_template_sources`; file sources are rebuilt from `knowledge_chunks` in chunk order
 - required integrations are derived from tool nodes and Composio trigger config
-- admins approve or reject templates from `/admin/verification`
+- admins approve, reject, or permanently remove templates from `/admin/verification`
+- removing a template also removes its bundled knowledge snapshots through the database cascade
 - only approved templates appear in the public library tab
 - workspace submissions appear in the user's submissions tab with their review status
+- the library grid opens a detail view before import, showing description, bundled knowledge, required integrations, review state, and rejection feedback when present
 - importing an approved template creates a draft agent, clones template knowledge as text knowledge sources, links those sources to the agent, and writes a starter `agent_drafts` row
 - import enforces workspace feature gates for `assistant` and `automation` surfaces, active agent limits, and knowledge storage limits
 
@@ -678,6 +703,7 @@ Current supported node data types in `src/lib/types.ts`:
 - `GoogleAdsBuilderNodeData`
 - `GoogleCalendarBuilderNodeData`
 - `CalBuilderNodeData`
+- `TextAnnotationBuilderNodeData`
 
 Important current tool-node fields:
 
@@ -711,6 +737,11 @@ Important current trigger-node fields:
   - `triggerSlug`
   - `connectionId`
   - `triggerConfig`
+
+Important current annotation-node fields:
+
+- `TextAnnotationBuilderNodeData`
+  - `text`
 
 ### Composio toolkit versions
 

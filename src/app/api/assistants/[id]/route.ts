@@ -58,7 +58,7 @@ export async function GET(
       assistant.workspace_id,
     );
     const canEdit = canEditAgentRecord(assistant, user.id, membershipRole);
-    const threads = await loadAssistantThreads(admin as never, assistant);
+    const threads = await loadAssistantThreads(admin as never, assistant, user.id);
     const requestedThreadId = request.nextUrl.searchParams.get("threadId")?.trim() ?? null;
     const resolvedThreadId = requestedThreadId || threads[0]?.id || null;
 
@@ -67,6 +67,7 @@ export async function GET(
         threadId: requestedThreadId,
         assistantId: assistant.id,
         workspaceId: assistant.workspace_id,
+        actorUserId: user.id,
       });
 
       if (!thread) {
@@ -150,6 +151,7 @@ export async function PATCH(
       threadId,
       assistantId: assistant.id,
       workspaceId: assistant.workspace_id,
+      actorUserId: user.id,
     });
 
     if (!thread) {

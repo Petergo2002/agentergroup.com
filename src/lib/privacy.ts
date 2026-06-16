@@ -21,7 +21,7 @@ import type {
   WorkspaceRecord,
 } from "@/lib/types";
 
-type AdminSupabase = Pick<SupabaseClient, "from" | "rpc">;
+type AdminSupabase = Pick<SupabaseClient, "from" | "rpc" | "storage">;
 
 const GDPR_RETENTION_DAYS = 180;
 
@@ -183,6 +183,54 @@ async function fetchSessionsByIds(
   }
 
   return rows;
+}
+
+async function deleteWidgetAttachmentObjects(
+  supabase: AdminSupabase,
+  widgetSessionIds: string[],
+) {
+  if (widgetSessionIds.length === 0) {
+    return;
+  }
+
+  const attachments: Array<{
+    storage_bucket: string;
+    storage_path: string;
+  }> = [];
+
+  for (const idChunk of chunkArray(widgetSessionIds, 100)) {
+    const { data, error } = await supabase
+      .from("widget_attachments")
+      .select("storage_bucket, storage_path")
+      .in("widget_session_id", idChunk);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    attachments.push(
+      ...((data ?? []) as Array<{
+        storage_bucket: string;
+        storage_path: string;
+      }>),
+    );
+  }
+
+  const pathsByBucket = new Map<string, string[]>();
+  for (const attachment of attachments) {
+    const paths = pathsByBucket.get(attachment.storage_bucket) ?? [];
+    paths.push(attachment.storage_path);
+    pathsByBucket.set(attachment.storage_bucket, paths);
+  }
+
+  for (const [bucket, paths] of pathsByBucket) {
+    for (const pathChunk of chunkArray(paths, 100)) {
+      const { error } = await supabase.storage.from(bucket).remove(pathChunk);
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+  }
 }
 
 async function fetchMessagesBySessionIds(
@@ -567,6 +615,8 @@ export async function deleteWorkspaceSubjectData(
   }
 
   if (sessionIds.length > 0) {
+    await deleteWidgetAttachmentObjects(supabase, sessionIds);
+
     for (const idChunk of chunkArray(sessionIds, 100)) {
       const { error } = await supabase.from("widget_sessions").delete().in("id", idChunk);
       if (error) throw new Error(error.message);
@@ -659,6 +709,8 @@ export async function purgeExpiredWidgetData(
     }
 
     if (expiredSessionIds.length > 0) {
+      await deleteWidgetAttachmentObjects(supabase, expiredSessionIds);
+
       for (const idChunk of chunkArray(expiredSessionIds, 100)) {
         const { error } = await supabase.from("widget_sessions").delete().in("id", idChunk);
         if (error) throw new Error(error.message);

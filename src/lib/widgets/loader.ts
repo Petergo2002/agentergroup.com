@@ -1,5 +1,9 @@
 import type { AgentRecord, AgentVersionRecord, WidgetAgentRecord, WidgetRecord } from "@/lib/types";
-import type { WidgetAdminSupabase, WidgetOrderedSelectBuilder, WidgetInSelectBuilder, WidgetQueryResult } from "./server-types";
+import type {
+  WidgetAdminSupabase,
+  WidgetInSelectBuilder,
+  WidgetOrderedSelectBuilder,
+} from "./server-types";
 import type { WidgetAgentWithAgent } from "@/lib/widgets";
 
 interface WorkspacePlanTierRow {
@@ -270,16 +274,11 @@ export async function loadWidgetAgentsByIds(
     return [] as AgentRecord[];
   }
 
-  const table = supabase.from("agents");
-  const selectBuilder = table.select("*").eq("workspace_id", workspaceId);
-
-  const result = "in" in selectBuilder
-    ? await (
-        selectBuilder as WidgetQueryResult<unknown[]> & {
-          in: (column: string, values: string[]) => Promise<WidgetQueryResult<unknown[]>>;
-        }
-      ).in("id", agentIds)
-    : await selectBuilder.maybeSingle();
+  const result = await supabase
+    .from("agents")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .in("id", agentIds);
 
   if (result.error) {
     throw new Error(result.error.message);

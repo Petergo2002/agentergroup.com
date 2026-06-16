@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildPublicWidgetRateLimitContext,
   buildRateLimitErrorPayload,
@@ -7,6 +6,13 @@ import {
   getPublicWidgetRateLimitRules,
 } from "@/lib/rate-limit";
 import { createClientSafeError } from "@/lib/server-errors";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  inspectWidgetAttachment,
+  MAX_WIDGET_ATTACHMENT_BYTES_PER_SESSION,
+  MAX_WIDGET_ATTACHMENTS_PER_SESSION,
+  sanitizeWidgetAttachmentName,
+} from "@/lib/widget-attachments";
 import {
   buildWidgetRuntimeCorsHeaders,
   loadWidgetByPublicKey,
@@ -14,19 +20,11 @@ import {
   resolveWidgetRuntimeRequestOrigin,
   resolveWidgetPreviewContext,
   resolveWidgetRuntimeAccess,
+  upsertWidgetSession,
   type WidgetAdminSupabase,
 } from "@/lib/widgets/server";
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_MIME_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-  "image/svg+xml",
-  "application/pdf",
-  "text/plain",
-];
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 function buildErrorResponse(
   request: NextRequest,
@@ -87,6 +85,8 @@ export async function POST(
   const { widgetPublicKey } = await params;
   const supabase = createAdminClient() as unknown as WidgetAdminSupabase;
   const runtimeOrigin = resolveWidgetRuntimeRequestOrigin(request);
+  let uploadedStoragePath: string | null = null;
+  let insertedAttachmentId: string | null = null;
 
   try {
     if (!runtimeOrigin.ok) {
@@ -109,7 +109,6 @@ export async function POST(
       loaded.widget,
       request,
     );
-
     const access = await resolveWidgetRuntimeAccess({
       request,
       widget: loaded.widget,
@@ -134,8 +133,11 @@ export async function POST(
       return buildErrorResponse(request, 400, "Invalid form data.");
     }
 
-    const sessionId = formData.get("sessionId");
-    if (typeof sessionId !== "string" || !sessionId.trim()) {
+    const rawSessionId = formData.get("sessionId");
+    const sessionId =
+      typeof rawSessionId === "string" ? rawSessionId.trim() : "";
+
+    if (!sessionId) {
       return buildErrorResponse(request, 400, "sessionId is required.");
     }
 
@@ -143,7 +145,7 @@ export async function POST(
       const rateLimitDecision = await enforceRateLimits(
         supabase,
         getPublicWidgetRateLimitRules(
-          "chat", // use the chat limit for uploads as well, or we could create a new rule
+          "uploads",
           buildPublicWidgetRateLimitContext({
             request,
             widgetId: loaded.widget.id,
@@ -183,23 +185,77 @@ export async function POST(
       return buildErrorResponse(request, 400, "File is required.");
     }
 
-    if (file.size > MAX_FILE_SIZE) {
-      return buildErrorResponse(request, 400, "File size exceeds 5MB limit.");
-    }
-
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return buildErrorResponse(request, 400, "File type is not supported.");
-    }
-
-    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storagePath = `${loaded.widget.id}/${sessionId}/${crypto.randomUUID()}_${safeName}`;
-
     const fileBuffer = await file.arrayBuffer();
+    let inspectedFile: ReturnType<typeof inspectWidgetAttachment>;
+
+    try {
+      inspectedFile = inspectWidgetAttachment(
+        new Uint8Array(fileBuffer),
+        file.name,
+        file.type,
+      );
+    } catch (validationError) {
+      return buildErrorResponse(
+        request,
+        400,
+        validationError instanceof Error
+          ? validationError.message
+          : "File type is not supported.",
+      );
+    }
+
+    const widgetSession =
+      existingSession ??
+      (await upsertWidgetSession(supabase, {
+        widgetId: loaded.widget.id,
+        sessionId,
+        source: access.source,
+        origin: access.origin,
+      }));
+    const { data: existingAttachments, error: existingAttachmentsError } =
+      await supabase
+        .from("widget_attachments")
+        .select<{ id: string; file_size_bytes: number }>(
+          "id, file_size_bytes",
+        )
+        .eq("widget_session_id", widgetSession.id);
+
+    if (existingAttachmentsError) {
+      throw new Error(
+        `Failed to check upload quota: ${existingAttachmentsError.message}`,
+      );
+    }
+
+    const attachmentRows = (existingAttachments ?? []) as Array<{
+      id: string;
+      file_size_bytes: number;
+    }>;
+    const existingBytes = attachmentRows.reduce(
+      (total, attachment) => total + attachment.file_size_bytes,
+      0,
+    );
+
+    if (
+      attachmentRows.length >= MAX_WIDGET_ATTACHMENTS_PER_SESSION ||
+      existingBytes + file.size > MAX_WIDGET_ATTACHMENT_BYTES_PER_SESSION
+    ) {
+      return buildErrorResponse(
+        request,
+        429,
+        "This chat has reached its file upload quota.",
+        "UPLOAD_QUOTA_EXCEEDED",
+      );
+    }
+
+    const attachmentId = crypto.randomUUID();
+    const safeName = sanitizeWidgetAttachmentName(file.name);
+    const storagePath = `${loaded.widget.workspace_id}/${loaded.widget.id}/${widgetSession.id}/${attachmentId}/${safeName}`;
+    uploadedStoragePath = storagePath;
 
     const { error: uploadError } = await supabase.storage
       .from("widget-attachments")
       .upload(storagePath, fileBuffer, {
-        contentType: file.type,
+        contentType: inspectedFile.mimeType,
         upsert: false,
       });
 
@@ -207,18 +263,44 @@ export async function POST(
       throw new Error(`Failed to upload to storage: ${uploadError.message}`);
     }
 
-    const { data: publicUrlData } = supabase.storage
+    const { data: attachment, error: attachmentError } = await supabase
+      .from("widget_attachments")
+      .insert({
+        id: attachmentId,
+        workspace_id: loaded.widget.workspace_id,
+        widget_id: loaded.widget.id,
+        widget_session_id: widgetSession.id,
+        storage_bucket: "widget-attachments",
+        storage_path: storagePath,
+        original_name: file.name,
+        mime_type: inspectedFile.mimeType,
+        file_size_bytes: file.size,
+      })
+      .select("id")
+      .single();
+
+    if (attachmentError || !attachment) {
+      throw new Error(
+        attachmentError?.message ?? "Failed to record uploaded file.",
+      );
+    }
+
+    insertedAttachmentId = attachmentId;
+
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from("widget-attachments")
-      .getPublicUrl(storagePath);
+      .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
 
-    // ─── Ephemeral Knowledge Indexing (Industry Standard RAG) ─────────────────
-    // If the uploaded file is a document (PDF, Text), we create an ephemeral 
-    // knowledge source record so the Edge Function can index it for the agent 
-    // to "read" during the current session.
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    const isText = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      throw new Error(
+        signedUrlError?.message ?? "Failed to create a secure file URL.",
+      );
+    }
 
-    if (isPdf || isText) {
+    if (
+      inspectedFile.mimeType === "application/pdf" ||
+      inspectedFile.mimeType === "text/plain"
+    ) {
       try {
         const workspaceResult = await supabase
           .from("workspaces")
@@ -236,56 +318,83 @@ export async function POST(
           );
         }
 
-        const effectiveMimeType = isPdf ? 'application/pdf' : 'text/plain';
         const { data: source, error: sourceError } = await supabase
-          .from('knowledge_sources')
+          .from("knowledge_sources")
           .insert({
             workspace_id: loaded.widget.workspace_id,
             created_by: workspaceOwner.owner_id,
             name: file.name,
             description: "",
-            source_type: 'file',
-            status: 'pending',
-            storage_bucket: 'widget-attachments',
+            source_type: "file",
+            status: "pending",
+            storage_bucket: "widget-attachments",
             storage_path: storagePath,
-            mime_type: effectiveMimeType,
+            mime_type: inspectedFile.mimeType,
             file_size_bytes: file.size,
-            widget_session_id: sessionId,
+            widget_session_id: widgetSession.id,
             metadata: {
               sessionId,
               widgetId: loaded.widget.id,
-              ephemeral: true
-            }
+              attachmentId,
+              ephemeral: true,
+            },
           })
-          .select('id')
+          .select("id")
           .single();
 
-        if (source && !sourceError) {
-          const typedSource = source as { id: string };
-          // Trigger the Edge Function to index the document immediately.
-          // We use a fresh admin client here because the widget-scoped client 
-          // might have restricted types.
-          const admin = createAdminClient();
-          void admin.functions.invoke('process-knowledge-source', {
-            body: { sourceId: typedSource.id }
-          });
+        if (sourceError || !source) {
+          throw sourceError ?? new Error("Failed to index the uploaded file.");
         }
-      } catch (err) {
-        console.error('[upload] Failed to create ephemeral knowledge source:', err);
-        // We don't fail the upload if indexing fails — the URL is still available
+
+        const typedSource = source as { id: string };
+        void createAdminClient().functions.invoke("process-knowledge-source", {
+          body: { sourceId: typedSource.id },
+        });
+      } catch (indexingError) {
+        console.error(
+          "[upload] Failed to create ephemeral knowledge source:",
+          indexingError,
+        );
       }
     }
 
     return Response.json(
       {
-        url: publicUrlData.publicUrl,
+        id: attachmentId,
+        url: signedUrlData.signedUrl,
         name: file.name,
-        type: file.type,
+        type: inspectedFile.mimeType,
         size: file.size,
       },
       { headers: buildWidgetRuntimeCorsHeaders(request) },
     );
   } catch (error) {
+    if (insertedAttachmentId) {
+      await supabase
+        .from("widget_attachments")
+        .delete()
+        .eq("id", insertedAttachmentId);
+    }
+
+    if (uploadedStoragePath) {
+      await supabase.storage
+        .from("widget-attachments")
+        .remove([uploadedStoragePath]);
+    }
+
+    const message = error instanceof Error ? error.message : "";
+    if (
+      message.includes("WIDGET_ATTACHMENT_COUNT_LIMIT_EXCEEDED") ||
+      message.includes("WIDGET_ATTACHMENT_BYTES_LIMIT_EXCEEDED")
+    ) {
+      return buildErrorResponse(
+        request,
+        429,
+        "This chat has reached its file upload quota.",
+        "UPLOAD_QUOTA_EXCEEDED",
+      );
+    }
+
     const safeError = createClientSafeError(
       "public widget file upload",
       error,

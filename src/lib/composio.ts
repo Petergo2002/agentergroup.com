@@ -189,7 +189,7 @@ function pickString(value: unknown) {
 }
 
 function getEnvValue(name: string) {
-  const value = process.env[name]?.trim();
+  const value = Reflect.get(process.env, name)?.trim();
 
   if (!value || value.endsWith("_replace_me") || value === "ac_...") {
     return null;
@@ -260,8 +260,8 @@ function preferConnectedAccount(
   current: SyncedConnectedAccount,
   next: SyncedConnectedAccount,
 ) {
-  const currentPriority = CONNECTION_STATUS_PRIORITY[current.status] ?? 0;
-  const nextPriority = CONNECTION_STATUS_PRIORITY[next.status] ?? 0;
+  const currentPriority = Reflect.get(CONNECTION_STATUS_PRIORITY, current.status) ?? 0;
+  const nextPriority = Reflect.get(CONNECTION_STATUS_PRIORITY, next.status) ?? 0;
 
   if (nextPriority !== currentPriority) {
     return nextPriority > currentPriority;
@@ -352,8 +352,8 @@ function prepareAccountsForSync(accounts: SyncedConnectedAccount[]) {
       }
 
       const priorityDelta =
-        (CONNECTION_STATUS_PRIORITY[right.status] ?? 0) -
-        (CONNECTION_STATUS_PRIORITY[left.status] ?? 0);
+        (Reflect.get(CONNECTION_STATUS_PRIORITY, right.status) ?? 0) -
+        (Reflect.get(CONNECTION_STATUS_PRIORITY, left.status) ?? 0);
       if (priorityDelta !== 0) {
         return priorityDelta;
       }
@@ -380,7 +380,9 @@ function buildDriveSearchQuery(search: string) {
     return baseQuery;
   }
 
-  const escapedSearch = search.replace(/'/g, "");
+  const escapedSearch = search
+    .replace(/['\\]/g, "")
+    .replace(/\b(not|and|or)\b/gi, "");
   return `${baseQuery} and name contains '${escapedSearch}'`;
 }
 
@@ -933,7 +935,7 @@ function getSelectedChatToolsForToolkits(
   return Array.from(
     new Set(
       toolkitSlugs.flatMap((toolkitSlug) => {
-        const configuredTools = enabledToolsByToolkit?.[toolkitSlug];
+        const configuredTools = enabledToolsByToolkit ? Reflect.get(enabledToolsByToolkit, toolkitSlug) : undefined;
         const candidates = Array.isArray(configuredTools)
           ? configuredTools
           : getRecommendedChatToolsForToolkit(toolkitSlug);

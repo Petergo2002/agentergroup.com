@@ -4,7 +4,7 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 
 ## Packages
 
-- `.`: Main dashboard app built with Next.js 16.2.2, React 19, and Tailwind CSS v4.
+- `.`: Main dashboard app built with Next.js 16, React 19, and Tailwind CSS v4. The resolved Next.js patch version is locked in `package-lock.json`.
 - `apps/widget-v2`: Standalone hosted/embedded widget built with Vite 8 and React 18.
 
 ## What The Platform Does
@@ -54,6 +54,9 @@ Root app variables:
 | `OPENROUTER_MODEL` | No | Default model id for agent turns |
 | `OPENROUTER_DATA_COLLECTION` | No | Provider privacy mode, defaults to `deny` |
 | `OPENROUTER_REQUIRE_ZDR` | No | Enables OpenRouter ZDR preference when truthy |
+| `FIRECRAWL_API_KEY` | Yes for website knowledge | Firecrawl API key for page mapping and ingestion |
+| `RESEND_API_KEY` | Yes for invite email delivery | Resend API key; invite creation still works without delivery |
+| `EMAIL_FROM_ADDRESS` | No | Invite-email sender, defaults to `Agentergroup <noreply@agentergroup.com>` |
 | `COMPOSIO_API_KEY` | Yes for tool integrations | Composio API key |
 | `COMPOSIO_WEBHOOK_SECRET` | Yes for automations | Secret used to verify Composio trigger webhooks |
 | `COMPOSIO_TOOLKIT_VERSION_GMAIL` | No | Gmail toolkit version override |
@@ -61,6 +64,21 @@ Root app variables:
 | `COMPOSIO_TOOLKIT_VERSION_CAL` | No | Cal.com toolkit version override |
 | `COMPOSIO_TOOLKIT_VERSION_GOOGLEDRIVE` | No | Google Drive toolkit version override |
 | `COMPOSIO_TOOLKIT_VERSION_OUTLOOK` | No | Microsoft Outlook toolkit version override |
+| `COMPOSIO_TOOLKIT_VERSION_SLACK` | No | Slack toolkit version override |
+| `COMPOSIO_TOOLKIT_VERSION_HUBSPOT` | No | HubSpot toolkit version override |
+| `COMPOSIO_TOOLKIT_VERSION_SHOPIFY` | No | Shopify toolkit version override |
+| `COMPOSIO_TOOLKIT_VERSION_GOOGLEADS` | No | Google Ads toolkit version override |
+| `COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF` | No | Internal assistant PDF toolkit version override |
+| `COMPOSIO_GMAIL_AUTH_CONFIG_ID` | No | Existing Gmail auth-config override; managed auth is used when empty |
+| `COMPOSIO_GMAIL_CLIENT_ID` | No | Gmail custom OAuth client id |
+| `COMPOSIO_GMAIL_CLIENT_SECRET` | No | Gmail custom OAuth client secret |
+| `COMPOSIO_GMAIL_OAUTH_REDIRECT_URI` | No | Gmail custom OAuth callback |
+| `COMPOSIO_GMAIL_SCOPES` | No | Gmail custom OAuth scopes |
+| `COMPOSIO_SHOPIFY_AUTH_CONFIG_ID` | No | Existing Shopify auth-config id |
+| `COMPOSIO_SHOPIFY_CLIENT_ID` | Required without Shopify auth config | Shopify custom OAuth client id |
+| `COMPOSIO_SHOPIFY_CLIENT_SECRET` | Required without Shopify auth config | Shopify custom OAuth client secret |
+| `COMPOSIO_SHOPIFY_OAUTH_REDIRECT_URI` | Required for custom Shopify OAuth | Shopify OAuth callback |
+| `COMPOSIO_SHOPIFY_SCOPES` | No | Optional Shopify OAuth scope override |
 | `NEXT_PUBLIC_APP_URL` | No | Dashboard origin, defaults to `http://localhost:3000` |
 | `NEXT_PUBLIC_WIDGET_APP_URL` | No | Hosted widget origin, defaults to `http://localhost:5173` |
 | `WIDGET_APP_URL` | No | Legacy fallback alias for the hosted widget origin |
@@ -190,12 +208,14 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - Hosted and embedded widget clients both retry bootstrap once when the runtime token expires.
 - Hosted standalone widget mode is desktop-first on large breakpoints and keeps the compact shell only for smaller screens.
 - Widget chat is serialized per session; overlapping turns return `409 SESSION_BUSY`.
+- PDF and text files uploaded in a widget are indexed as session-scoped knowledge. The source row references the internal `widget_sessions.id` UUID and is deleted with that session.
 - Embedded widget abuse controls trust only edge-supplied client IP headers (`x-vercel-forwarded-for` and `cf-connecting-ip`); requests without them fall back to the shared `"unknown"` rate-limit bucket.
 - Public widget/API failures now return stable client-safe errors while detailed exceptions stay in server logs.
 - Public lead submissions now return only `ok`, `leadId`, and `createdAt`.
-- The dashboard app now sends baseline browser protections through CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
+- The dashboard app now sends baseline browser protections through CSP, HSTS, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
+- Dashboard CSP allows Supabase only when `NEXT_PUBLIC_SUPABASE_URL` is configured; it must not fall back to a hardcoded project hostname.
 - Public widget rate limits are enforced through a Supabase RPC backed by a named uniqueness constraint on `rate_limit_windows`; do not switch that upsert back to a bare column-list conflict target or Postgres can reintroduce ambiguous `window_started_at` errors.
-- `RATE_LIMIT_SECRET` must be a dedicated production secret. The app no longer falls back to `SUPABASE_SERVICE_ROLE_KEY` for rate-limit identity hashing.
+- `RATE_LIMIT_SECRET` must be a dedicated production secret. The app no longer falls back to `SUPABASE_SERVICE_ROLE_KEY` for rate-limit identity hashing, and production logs a warning if it has to reuse `WIDGET_ACCESS_SECRET`.
 - OpenRouter-backed turns consume workspace message quota before model calls in public widget chat, widget-builder preview chat, internal assistant chat, agent preview chat, prompt optimization, and automation runs.
 - Middleware is explicit-public/default-auth: any matched route not listed as public in `src/lib/supabase/proxy.ts` requires a valid Supabase session.
 - Stripe billing config is required at route execution time and has no hardcoded price id fallbacks.
@@ -203,10 +223,13 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - Internal assistant chat is serialized per `chat_threads` row; overlapping turns return `409 THREAD_BUSY`.
 - Internal assistants become usable after the first normal builder save; publish remains widget-only in v1.
 - `scripts/widget-load-test.mjs` exercises bootstrap/chat flows and the same-session lock path.
-- The security regression suite lives under `tests/security/*.test.ts` and currently covers redirect sanitization, trusted widget IP handling, widget CORS behavior, browser security headers, SSRF blocking, workspace ownership guards, DSAR normalization/sanitization, debug-trace redaction, multi-account Drive selection, billing config hardening, quota coverage, middleware default protection, and Composio cache TTL behavior.
-- `npm audit --audit-level=moderate` currently passes in both the root app and `apps/widget-v2`.
+- The security regression suite lives under `tests/security/*.test.ts` and covers auth redirects, automation event claiming, billing guards, connection rebinding, Composio failures/cache behavior, knowledge folders and session search, quota enforcement, middleware defaults, widget CORS/headers/validation, SSRF, privacy sanitization, and workspace ownership.
+- `apps/widget-v2` currently passes `npm audit --audit-level=moderate`. The root
+  audit has no high-severity findings after patch updates, but reports the
+  upstream moderate PostCSS advisory bundled by Next.js; see
+  `docs/runbooks/production-readiness.md`.
 - The top-level `/data-processing` and `/subprocessors` routes are compatibility redirects into `/settings/...`.
-- Self-service password reset and a backup/restore operator runbook are follow-up work and are not part of the current launch-hardening batch.
+- Self-service password reset is available from `/login/forgot-password` and authenticated Settings. The backup/restore and deploy verification runbook lives in `docs/runbooks/operations.md`.
 - Profile upsert on each authenticated request is optimized via `src/lib/app/profile-sync.ts`: the helper reads the existing profile first and skips the write when nothing has changed.
 - The dashboard home page (`/dashboard`) loads workspace summary stats (agents, widgets, connected apps, knowledge sources, leads, and recent conversations) server-side through `src/lib/dashboard/summary.ts`.
 - `dashboard_conversation_summaries` is a materialized Postgres table kept current by triggers on `widget_sessions`, `widget_session_messages`, and `widget_leads`. It powers the analytics inbox without per-request aggregations.

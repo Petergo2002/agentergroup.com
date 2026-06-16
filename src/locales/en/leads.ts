@@ -1,6 +1,34 @@
 export const leads = {
   badge: "Lead Inbox",
   title: "Leads",
+  pageDescription:
+    "Review every contact captured by your website widgets and move from conversation to follow-up without losing context.",
+  capturedCount: "{count} captured",
+  contactSearchPlaceholder: "Search by name, email, or phone",
+  liveInbox: "Live inbox",
+  refreshing: "Refreshing",
+  noLeadsTitle: "No leads captured yet",
+  noLeadsDescription:
+    "Leads will appear here when your widget is deployed and visitors share their contact details during a conversation.",
+  noSearchResultsTitle: "No matching leads",
+  noSearchResultsDescription:
+    "Try a different name, email address, or phone number.",
+  loadErrorTitle: "Leads could not be loaded",
+  loadErrorDescription:
+    "The inbox is temporarily unavailable. Your captured leads are still safe.",
+  tryAgain: "Try again",
+  detailsTitle: "Lead details",
+  closeDetails: "Close lead details",
+  openLeadDetails: "Open details for {name}",
+  nameLabel: "Name",
+  emailLabel: "Email",
+  phoneLabel: "Phone",
+  widgetLabel: "Widget",
+  agentLabel: "Agent",
+  capturedLabel: "Captured",
+  messageLabel: "Message",
+  noMessage: "No message was included with this lead.",
+  unknownAgent: "Unassigned",
   description:
     "Capture internal leads from widget conversations, review the context, and give customers a lightweight CRM without unnecessary setup overhead.",
   inbox: "Inbox",

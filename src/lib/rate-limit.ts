@@ -24,7 +24,8 @@ export type PublicWidgetRateLimitEndpoint =
   | "chat"
   | "events"
   | "complete"
-  | "leads";
+  | "leads"
+  | "uploads";
 
 export interface RateLimitRule {
   endpoint: string;
@@ -174,6 +175,42 @@ const PUBLIC_WIDGET_RATE_LIMITS: Record<
             code: "RATE_LIMITED_LEADS",
             message:
               "Too many lead submissions are being sent right now. Please wait a few minutes and try again.",
+          } satisfies RateLimitRule,
+        ]
+      : []),
+  ],
+  uploads: (context) => [
+    {
+      endpoint: "public_widget_uploads",
+      scopeKind: "ip_global",
+      scopeKey: context.ipHash,
+      windowSeconds: 10 * 60,
+      limit: 30,
+      code: "RATE_LIMITED_UPLOADS",
+      message:
+        "Too many files are being uploaded right now. Please wait a few minutes and try again.",
+    },
+    {
+      endpoint: "public_widget_uploads",
+      scopeKind: "widget_ip",
+      scopeKey: context.widgetIpHash,
+      windowSeconds: 10 * 60,
+      limit: 20,
+      code: "RATE_LIMITED_UPLOADS",
+      message:
+        "This widget is receiving too many file uploads. Please wait a few minutes and try again.",
+    },
+    ...(context.widgetSessionHash
+      ? [
+          {
+            endpoint: "public_widget_uploads",
+            scopeKind: "widget_session",
+            scopeKey: context.widgetSessionHash,
+            windowSeconds: 10 * 60,
+            limit: 10,
+            code: "RATE_LIMITED_UPLOADS",
+            message:
+              "This chat has reached its upload limit. Please wait before uploading another file.",
           } satisfies RateLimitRule,
         ]
       : []),

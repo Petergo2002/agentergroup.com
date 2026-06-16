@@ -6,6 +6,7 @@ export const agentBuilder = {
     tools: "Anslutna verktyg",
     leads: "Internal Leads",
     endChat: "Avsluta chatt",
+    annotation: "Textanteckning",
     output: "Svar",
     triggerDescription:
       "Välj vad som startar agenten.",
@@ -19,6 +20,8 @@ export const agentBuilder = {
       "Fånga strukturerade interna leads från widgetkonversationer.",
     endChatDescription:
       "Definiera när backend ska avsluta konversationen.",
+    annotationDescription:
+      "Lägg till en anteckning på canvasen som inte påverkar körningen.",
     outputDescription:
       "Hur agenten levererar sitt slutliga svar. Finns redan på canvasen.",
   },
@@ -31,10 +34,12 @@ export const agentBuilder = {
   toolType: "Verktyg",
   outputType: "Utdata",
   controlType: "Kontroll",
+  annotationType: "Anteckning",
   triggerLabel: "Användarmeddelande",
   agentLabel: "Agent",
   outputLabel: "Assistentsvar",
   endChatLabel: "Avsluta chatt",
+  annotationLabel: "Textanteckning",
   internalAssistantsDisabled:
     "Interna assistenter är avstängda för detta workspace.",
   multipleOldConnections:
@@ -142,6 +147,11 @@ export const agentBuilder = {
   outputDescription: "Returnerar det slutliga svaret till användaren.",
   leadsNodeDescription: "Skapar eller uppdaterar interna leads från widgetchattar.",
   endChatNodeDescription: "Stänger sessionen när avslutsvillkoren uppfylls.",
+  annotationDescription: "Dokumentationsanteckning som bara visas på canvasen.",
+  annotationText: "Anteckningstext",
+  annotationPlaceholder: "Lägg till kontext för kollegor som arbetar med agenten...",
+  annotationHelp:
+    "Anteckningar sparas med utkastet men ignoreras av runtime och kantgenerering.",
   semanticSourcesDescription:
     "Välj de semantiska källor som buildern får hämta från.",
   dataSources: "Datakällor",

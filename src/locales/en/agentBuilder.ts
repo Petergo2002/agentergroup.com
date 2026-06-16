@@ -6,6 +6,7 @@ export const agentBuilder = {
     tools: "Connected Tools",
     leads: "Internal Leads",
     endChat: "End Chat",
+    annotation: "Text annotation",
     output: "Response",
     triggerDescription:
       "Choose what starts this agent.",
@@ -19,6 +20,8 @@ export const agentBuilder = {
       "Capture structured internal leads from widget conversations.",
     endChatDescription:
       "Define when the backend should close the conversation.",
+    annotationDescription:
+      "Add a canvas note that does not affect runtime behavior.",
     outputDescription:
       "How the agent delivers its final response. Already on canvas.",
   },
@@ -31,10 +34,12 @@ export const agentBuilder = {
   toolType: "Tool",
   outputType: "Output",
   controlType: "Control",
+  annotationType: "Note",
   triggerLabel: "User Message",
   agentLabel: "Agent",
   outputLabel: "Assistant Response",
   endChatLabel: "End Chat",
+  annotationLabel: "Text annotation",
   internalAssistantsDisabled:
     "Internal assistants are disabled for this workspace.",
   multipleOldConnections:
@@ -141,6 +146,11 @@ export const agentBuilder = {
   outputDescription: "Returns the final response to the user.",
   leadsNodeDescription: "Creates or updates internal leads from widget chats.",
   endChatNodeDescription: "Closes the session when end conditions are met.",
+  annotationDescription: "Canvas-only documentation note.",
+  annotationText: "Note text",
+  annotationPlaceholder: "Add context for teammates working on this agent...",
+  annotationHelp:
+    "Annotations are saved with the draft but are ignored by runtime execution and edge generation.",
   semanticSourcesDescription:
     "Choose the semantic sources this builder can retrieve from.",
   dataSources: "Data Sources",

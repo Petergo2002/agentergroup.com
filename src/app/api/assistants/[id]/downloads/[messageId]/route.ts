@@ -87,6 +87,7 @@ export async function GET(
       threadId: toolMessage.thread_id,
       assistantId: assistant.id,
       workspaceId: assistant.workspace_id,
+      actorUserId: user.id,
     });
 
     if (!thread) {

@@ -1,6 +1,6 @@
 # Agentergroup Architecture
 
-Last updated: 2026-05-27
+Last updated: 2026-06-07
 
 ## Purpose
 
@@ -74,7 +74,7 @@ Browser (Next.js App Router UI)
 
 ### Frontend and app server
 
-- Next.js `16.2.2`
+- Next.js 16, with the exact resolved patch version locked in `package-lock.json`
 - React `19.2.3`
 - TypeScript
 - Tailwind CSS v4
@@ -488,7 +488,7 @@ Current plan pricing:
 
 - subscription upgrades use Stripe Checkout and downgrade/payment-method changes hand off to the Stripe billing portal rather than editing billing details inline
 - extra credit purchases are fixed to one 500-message pack and require `STRIPE_EXTRA_CREDITS_500_PRICE_ID`
-- message counting enforcement at runtime is planned but not yet gated at the API level
+- message counting is enforced before OpenRouter-backed runtime calls; the security regression suite keeps those entry points covered
 
 ### Admin plan management
 
@@ -771,7 +771,7 @@ Purpose:
 - `knowledge_folder_sources`: many-to-many folder/source membership
 - `agent_knowledge_sources`: directly attached sources for an agent
 - `agent_knowledge_folders`: live folder attachments for an agent
-- `match_agent_knowledge_chunks`: similarity search scoped to one agent and workspace, including direct sources and ready sources in attached folders
+- `match_agent_knowledge_chunks`: similarity search scoped to one agent and workspace, including direct sources, ready sources in attached folders, and optional session-scoped widget upload sources
 
 ### 4C. Dashboard conversation summaries
 
@@ -1480,7 +1480,8 @@ Current behavior:
 - hosted and embedded widget clients both retry one bootstrap refresh automatically on `WIDGET_ACCESS_TOKEN_INVALID`
 - public widget POST endpoints rate-limit by trusted edge headers only (`x-vercel-forwarded-for` and `cf-connecting-ip`); requests without a trusted header fall back to the shared `"unknown"` bucket
 - public widget and related runtime APIs now return stable client-safe errors while full exception detail remains server-side in logs
-- the dashboard app sends baseline browser protections through CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`
+- the dashboard app sends baseline browser protections through CSP, HSTS, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`
+- dashboard CSP includes Supabase origins only when `NEXT_PUBLIC_SUPABASE_URL` is configured
 - widget appearance is configured through theme mode plus primary and secondary accent colors; base surfaces/text are derived in the runtime
 - preview mode uses a different signed preview token flow
 - the widget runtime shows a lightweight first-message consent gate before the first real chat turn and links it to the public `/privacy-policy` route
@@ -1489,8 +1490,9 @@ Current behavior:
 - public widget POST endpoints now enforce volumetric rate limiting for hosted and embedded traffic
 - preview-token traffic is intentionally excluded from the public widget rate limiter, but widget preview chat still consumes workspace message credits before model execution
 - the rate-limit RPC must upsert with `ON CONFLICT ON CONSTRAINT rate_limit_windows_scope_window_constraint`; using a bare column-list conflict target can reintroduce ambiguous `window_started_at` failures in Postgres
-- self-service password reset and a backup/restore operator runbook remain follow-up work outside this batch
+- self-service password reset is implemented through `/login/forgot-password` and authenticated Settings; backup/restore and deploy verification are documented in `docs/runbooks/operations.md`
 - file uploads support images and documents (up to 5MB) via the public `upload` endpoint and are stored securely in the `widget-attachments` storage bucket
+- PDF and text uploads create ephemeral `knowledge_sources` rows scoped by the internal `widget_sessions.id` UUID; the foreign key cascades those sources when the session is deleted
 
 Important token rules:
 
@@ -1889,7 +1891,7 @@ For premium users, the system can "map" a website to find all public URLs.
 - **Single Page Mode**: Default behavior. Only the primary URL provided is ingested. The UI displays a "Single Page Mode" badge to confirm this.
 - **Selection Mode**: Activated via "Find Pages" (Premium Only). Allows discovery and manual selection of up to 30 specific URLs. The UI displays a "Selection Mode" badge and a list of discovered pages. The system scrapes only these targeted URLs and joins them into a single knowledge source.
 
-### Storage architecture
+### Supported MIME types
 
 - `text/plain`
 - `text/markdown`
@@ -2002,7 +2004,10 @@ If processing fails:
 3. Call RPC `match_agent_knowledge_chunks`
 4. Return the top semantic matches
 
-The RPC resolves eligible sources from direct `agent_knowledge_sources` rows plus ready sources currently inside folders attached through `agent_knowledge_folders`. Duplicate source eligibility is deduped before chunk matching.
+The RPC resolves eligible sources from direct `agent_knowledge_sources` rows plus ready sources
+currently inside folders attached through `agent_knowledge_folders`. Widget runtime calls can also
+pass an internal widget-session UUID to include ephemeral PDF/text uploads for that session.
+Duplicate source eligibility is deduped before chunk matching.
 
 ### Retrieval settings
 
@@ -2081,11 +2086,23 @@ After import, the source behaves like any other workspace knowledge source.
 | `GET /api/agents/[id]/widget` | Legacy moved response pointing callers to `/widgets?agent=...` |
 | `POST /api/agents/[id]/widget` | Legacy moved response pointing callers to `/widgets?agent=...` |
 
+### Agent Library APIs
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/agent-library` | List approved templates for authenticated users |
+| `GET /api/agent-library/submissions` | List templates submitted from the active workspace |
+| `POST /api/agent-library/submit` | Snapshot a saved agent definition and selected knowledge for admin review |
+| `POST /api/agent-library/[id]/import` | Import an approved template into the active workspace |
+| `GET /api/admin/agent-library` | Admin list of all submitted templates |
+| `POST /api/admin/agent-library/[id]/review` | Approve or reject a submitted template |
+| `DELETE /api/admin/agent-library/[id]` | Permanently remove a template and cascade-delete its bundled knowledge snapshots |
+
 ### Composio webhook APIs
 
 | Route | Purpose |
 | --- | --- |
-| `POST /api/composio/webhook` | Verify Composio trigger webhooks, store automation events, and schedule automation processing |
+| `POST /api/composio/webhook` | Verify Composio webhooks, ingest automation trigger events, and handle connected-account expiry events |
 
 ### Billing APIs
 
@@ -2109,6 +2126,12 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/public/connection-auth-links/[token]/start` | Public no-login endpoint that validates a bearer link and starts provider auth |
 | `POST /api/connections/disconnect` | Remove a local connection row, best-effort delete the upstream Composio connected account, and pause/error active automations using that connection |
 | `GET /api/connections/googlecalendar/calendars` | List selectable calendars for one connected Google Calendar account in the builder |
+
+### Health API
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/health` | Public no-store process availability check; does not inspect external dependencies or expose credentials |
 
 ### Workspace APIs
 
@@ -2167,6 +2190,7 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout, refuse completion while a live turn is active, and apply public runtime rate limits backed by the named `rate_limit_windows_scope_window_constraint` upsert path |
 | `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events under public runtime rate limits without surfacing SQL ambiguity errors from the rate-limit RPC |
 | `POST /api/public/widgets/[widgetPublicKey]/leads` | Persist a lead submission from the widget under public runtime rate limits and return a minimal success payload |
+| `POST /api/public/widgets/[widgetPublicKey]/upload` | Upload an image or document; PDF/text files are indexed as session-scoped knowledge using the internal widget-session UUID |
 
 ### Analytics APIs
 
@@ -2194,6 +2218,9 @@ The core environment contract is:
 - `OPENROUTER_MODEL`
 - `OPENROUTER_DATA_COLLECTION`
 - `OPENROUTER_REQUIRE_ZDR`
+- `FIRECRAWL_API_KEY`
+- `RESEND_API_KEY`
+- `EMAIL_FROM_ADDRESS`
 - `COMPOSIO_API_KEY`
 - `COMPOSIO_WEBHOOK_SECRET`
 - `COMPOSIO_TOOLKIT_VERSION_GMAIL`

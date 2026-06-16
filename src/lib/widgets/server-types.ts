@@ -25,8 +25,10 @@ export interface WidgetLimitSelectBuilder<TData> {
   limit: (count: number) => Promise<WidgetQueryResult<TData>>;
 }
 
-export interface WidgetOrderedSelectBuilder<TData> extends WidgetSelectBuilder<TData> {
-  eq: (column: string, value: string) => WidgetOrderedSelectBuilder<TData>;
+export interface WidgetOrderedSelectBuilder<TData>
+  extends WidgetSelectBuilder<TData>,
+    PromiseLike<WidgetQueryResult<TData[]>> {
+  eq: (column: string, value: string) => WidgetOrderedInSelectBuilder<TData>;
   order: (
     column: string,
     options?: { ascending?: boolean },
@@ -38,6 +40,7 @@ export interface WidgetInSelectBuilder<TData> {
 }
 
 export interface WidgetOrderedInSelectBuilder<TData> extends WidgetOrderedSelectBuilder<TData> {
+  eq: (column: string, value: string) => WidgetOrderedInSelectBuilder<TData>;
   in: (column: string, values: string[]) => Promise<WidgetQueryResult<TData[]>>;
 }
 
@@ -51,6 +54,10 @@ export interface WidgetUpdateBuilder<TData> {
   eq: (column: string, value: string) => Promise<WidgetQueryResult<TData>>;
 }
 
+export interface WidgetDeleteBuilder<TData> {
+  eq: (column: string, value: string) => Promise<WidgetQueryResult<TData>>;
+}
+
 export interface WidgetTableQuery {
   select: <TData = unknown>(columns?: string) => WidgetOrderedInSelectBuilder<TData>;
   upsert: (
@@ -61,6 +68,7 @@ export interface WidgetTableQuery {
     values: Record<string, unknown> | Record<string, unknown>[],
   ) => WidgetMutationBuilder<unknown>;
   update: (values: Record<string, unknown>) => WidgetUpdateBuilder<unknown>;
+  delete: () => WidgetDeleteBuilder<unknown>;
 }
 
 export interface WidgetAdminSupabase {

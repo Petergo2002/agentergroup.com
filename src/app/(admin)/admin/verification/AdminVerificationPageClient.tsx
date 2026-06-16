@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Clock, Database, Plug, Search, ShieldCheck, X } from "lucide-react";
+import { Check, Clock, Database, Plug, Search, ShieldCheck, Trash2, X } from "lucide-react";
 import type {
   AgentLibraryTemplateRecord,
   AgentLibraryTemplateSourceRecord,
@@ -92,6 +92,34 @@ export default function AdminVerificationPageClient() {
     }
   };
 
+  const deleteTemplate = async (template: VerificationTemplate) => {
+    const confirmed = window.confirm(
+      `Remove "${template.name}" from the agent library? This also removes its bundled knowledge snapshot.`,
+    );
+
+    if (!confirmed) return;
+
+    setBusyId(template.id);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/agent-library/${template.id}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Failed to remove template.");
+      await loadTemplates();
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Failed to remove template.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="space-y-8 admin-fade-in">
       <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -175,31 +203,42 @@ export default function AdminVerificationPageClient() {
                   </p>
                 </div>
 
-                {template.status === "pending" ? (
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      onClick={() => void reviewTemplate(template, "reject")}
-                      disabled={busyId === template.id}
-                      className="flex h-10 items-center gap-2 rounded-full border border-outline px-4 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface disabled:opacity-50"
-                    >
-                      <X className="h-4 w-4" />
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => void reviewTemplate(template, "approve")}
-                      disabled={busyId === template.id}
-                      className="flex h-10 items-center gap-2 rounded-full bg-on-surface px-4 text-xs font-semibold text-surface transition-opacity hover:opacity-90 disabled:opacity-50"
-                    >
-                      <Check className="h-4 w-4" />
-                      Approve
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 rounded-full bg-surface-container-low px-4 py-2 text-xs font-semibold text-on-surface-variant">
-                    <ShieldCheck className="h-4 w-4" />
-                    {template.status}
-                  </div>
-                )}
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {template.status === "pending" ? (
+                    <>
+                      <button
+                        onClick={() => void reviewTemplate(template, "reject")}
+                        disabled={busyId === template.id}
+                        className="flex h-10 items-center gap-2 rounded-full border border-outline px-4 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface disabled:opacity-50"
+                      >
+                        <X className="h-4 w-4" />
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => void reviewTemplate(template, "approve")}
+                        disabled={busyId === template.id}
+                        className="flex h-10 items-center gap-2 rounded-full bg-on-surface px-4 text-xs font-semibold text-surface transition-opacity hover:opacity-90 disabled:opacity-50"
+                      >
+                        <Check className="h-4 w-4" />
+                        Approve
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex h-10 items-center gap-2 rounded-full bg-surface-container-low px-4 text-xs font-semibold text-on-surface-variant">
+                      <ShieldCheck className="h-4 w-4" />
+                      {template.status}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => void deleteTemplate(template)}
+                    disabled={busyId === template.id}
+                    className="flex h-10 items-center gap-2 rounded-full border border-red-500/20 px-4 text-xs font-semibold text-error transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                    title="Remove from library"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remove
+                  </button>
+                </div>
               </div>
 
               <div className="grid gap-4 p-6 lg:grid-cols-[minmax(0,1fr)_22rem]">

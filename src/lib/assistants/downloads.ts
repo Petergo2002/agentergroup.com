@@ -67,7 +67,7 @@ function getRecordValue(
   keys: readonly string[],
 ) {
   for (const key of keys) {
-    const value = pickString(record[key]);
+    const value = pickString(Reflect.get(record, key));
     if (value) {
       return value;
     }

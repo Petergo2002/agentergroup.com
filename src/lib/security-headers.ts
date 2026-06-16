@@ -1,6 +1,9 @@
-function resolveOrigin(value: string | undefined, fallback: string) {
+function resolveOrigin(value: string | undefined, fallback = "") {
+  const originValue = value ?? fallback;
+  if (!originValue) return "";
+
   try {
-    return new URL(value ?? fallback).origin;
+    return new URL(originValue).origin;
   } catch {
     return fallback;
   }
@@ -21,10 +24,11 @@ export function buildAppContentSecurityPolicy({
     process.env.NEXT_PUBLIC_WIDGET_APP_URL ?? process.env.WIDGET_APP_URL,
     "http://localhost:5173",
   );
-  const supabaseOrigin = resolveOrigin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    "https://rklntfzmqayziqesjoih.supabase.co",
-  );
+  const supabaseOrigin = resolveOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const supabaseConnectTokens = supabaseOrigin
+    ? [supabaseOrigin, `wss://${new URL(supabaseOrigin).host}`]
+    : [];
+  const supabaseFrameTokens = supabaseOrigin ? [supabaseOrigin] : [];
   const scriptSrcTokens = ["'self'"];
 
   if (process.env.NODE_ENV === "development") {
@@ -44,10 +48,15 @@ export function buildAppContentSecurityPolicy({
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com data:`,
     "img-src 'self' data: blob: https:",
-    `connect-src 'self' ${widgetAppOrigin} ${supabaseOrigin} wss://${new URL(
-      supabaseOrigin,
-    ).host}`,
-    `frame-src 'self' ${widgetAppOrigin} ${supabaseOrigin} https://docs.google.com`,
+    `connect-src ${["'self'", widgetAppOrigin, ...supabaseConnectTokens].join(
+      " ",
+    )}`,
+    `frame-src ${[
+      "'self'",
+      widgetAppOrigin,
+      ...supabaseFrameTokens,
+      "https://docs.google.com",
+    ].join(" ")}`,
   ].join("; ");
 }
 
@@ -70,6 +79,11 @@ export function getAppSecurityHeaders({
     {
       key: "Referrer-Policy",
       value: "strict-origin-when-cross-origin",
+    },
+    {
+      key: "Permissions-Policy",
+      value:
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()",
     },
   ];
 

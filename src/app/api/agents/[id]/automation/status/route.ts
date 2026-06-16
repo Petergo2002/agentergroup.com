@@ -86,7 +86,7 @@ export async function POST(
       try {
         await disableComposioTrigger(automationRecord.composio_trigger_id);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to disable Composio trigger.";
+        const message = error instanceof Error ? error.message : "Failed to disable provider trigger.";
 
         await supabase
           .from("agent_automations")
@@ -137,11 +137,11 @@ export async function POST(
   }
 
   if (!hasComposioEnv()) {
-    return NextResponse.json({ error: "COMPOSIO_API_KEY is missing." }, { status: 500 });
+    return NextResponse.json({ error: "Connection provider is not configured." }, { status: 500 });
   }
 
   if (!hasComposioWebhookSecret()) {
-    return NextResponse.json({ error: "COMPOSIO_WEBHOOK_SECRET is missing." }, { status: 500 });
+    return NextResponse.json({ error: "Connection webhook is not configured." }, { status: 500 });
   }
 
   if (!automationRecord.connection_id) {

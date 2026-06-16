@@ -36,12 +36,11 @@ function readJsonRecord(value: unknown) {
 
 function stableJsonString(value: Record<string, unknown>) {
   return JSON.stringify(
-    Object.keys(value)
-      .sort()
-      .reduce<Record<string, unknown>>((result, key) => {
-        result[key] = value[key];
-        return result;
-      }, {}),
+    Object.fromEntries(
+      Object.entries(value).sort(([leftKey], [rightKey]) =>
+        leftKey.localeCompare(rightKey),
+      ),
+    ),
   );
 }
 
@@ -239,8 +238,8 @@ export async function PUT(
       .then(() => null)
       .catch((error) =>
         error instanceof Error
-          ? `Failed to replace existing Composio trigger: ${error.message}`
-          : "Failed to replace existing Composio trigger.",
+          ? `Failed to replace existing provider trigger: ${error.message}`
+          : "Failed to replace existing provider trigger.",
       );
 
     if (deleteError) {
@@ -342,7 +341,7 @@ export async function DELETE(
     try {
       await deleteComposioTrigger(automationRecord.composio_trigger_id);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to delete Composio trigger.";
+      const message = error instanceof Error ? error.message : "Failed to delete provider trigger.";
       return NextResponse.json({ error: message }, { status: 500 });
     }
   }

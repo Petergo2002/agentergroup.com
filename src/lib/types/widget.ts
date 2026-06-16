@@ -120,8 +120,13 @@ export interface WidgetLeadRecord {
   widget_agent_id: string | null;
   agent_id: string | null;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   message: string | null;
   created_at: string;
+}
+
+export interface WidgetLeadListItem extends WidgetLeadRecord {
+  widget_name: string;
+  agent_name: string | null;
 }

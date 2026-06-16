@@ -32,11 +32,18 @@ function collectErrorText(
     }
   }
 
-  const record = value as Record<string, unknown>;
-  for (const key of ["message", "slug", "code", "suggested_fix"]) {
-    collectErrorText(record[key], fragments, seen);
-  }
-
+  const record = value as {
+    cause?: unknown;
+    code?: unknown;
+    error?: unknown;
+    message?: unknown;
+    slug?: unknown;
+    suggested_fix?: unknown;
+  };
+  collectErrorText(record.message, fragments, seen);
+  collectErrorText(record.slug, fragments, seen);
+  collectErrorText(record.code, fragments, seen);
+  collectErrorText(record.suggested_fix, fragments, seen);
   collectErrorText(record.error, fragments, seen);
   collectErrorText(record.cause, fragments, seen);
 }

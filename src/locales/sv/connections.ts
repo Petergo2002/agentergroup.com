@@ -12,6 +12,7 @@ export const connections = {
   startFlowError: "Det gick inte att starta anslutningsflödet.",
   disconnectError: "Det gick inte att koppla från kontot.",
   lastSync: "Senaste synk {value}",
+  statusReason: "Anslutning: {value}",
   noSyncYet: "Ingen synk ännu",
   connectedAccount: "Anslutet konto",
   replacementHint: "Endast ett konto kan vara anslutet för denna integration i ett workspace.",

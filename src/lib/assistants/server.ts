@@ -139,7 +139,8 @@ export async function listWorkspaceAssistants(
     .from("chat_threads")
     .select("id, agent_id")
     .in("agent_id", assistantIds)
-    .eq("source", "assistant");
+    .eq("source", "assistant")
+    .eq("created_by", args.actorUserId);
 
   throwOnError(threadsResult.error, "Failed to load assistant threads.");
 
@@ -209,6 +210,7 @@ export async function listWorkspaceAssistants(
 export async function loadAssistantThreads(
   admin: AdminSupabaseLike,
   assistant: Pick<AgentRecord, "id" | "workspace_id">,
+  actorUserId: string,
 ) {
   const threadsResult = await admin
     .from("chat_threads")
@@ -216,6 +218,7 @@ export async function loadAssistantThreads(
     .eq("agent_id", assistant.id)
     .eq("workspace_id", assistant.workspace_id)
     .eq("source", "assistant")
+    .eq("created_by", actorUserId)
     .order("updated_at", { ascending: false });
 
   throwOnError(threadsResult.error, "Failed to load assistant threads.");
@@ -279,6 +282,7 @@ export async function loadAssistantThread(
     threadId: string;
     assistantId: string;
     workspaceId: string;
+    actorUserId: string;
   },
 ) {
   const result = await admin
@@ -288,6 +292,7 @@ export async function loadAssistantThread(
     .eq("agent_id", args.assistantId)
     .eq("workspace_id", args.workspaceId)
     .eq("source", "assistant")
+    .eq("created_by", args.actorUserId)
     .maybeSingle();
 
   throwOnError(result.error, "Failed to load assistant thread.");

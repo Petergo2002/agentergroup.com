@@ -82,6 +82,7 @@ export async function POST(
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+  const runtimeAdmin = createAdminClient();
 
   const { data: agent } = await supabase
     .from("agents")
@@ -184,7 +185,7 @@ export async function POST(
 
       try {
         try {
-          await consumeWorkspaceMessageUsage(createAdminClient(), agent.workspace_id);
+          await consumeWorkspaceMessageUsage(runtimeAdmin, agent.workspace_id);
         } catch (usageError) {
           if (usageError instanceof MessageLimitExceededError) {
             send({
@@ -199,7 +200,7 @@ export async function POST(
           throw usageError;
         }
 
-        const { data: run, error: runError } = await supabase
+        const { data: run, error: runError } = await runtimeAdmin
           .from("runs")
           .insert({
             workspace_id: agent.workspace_id,
@@ -224,7 +225,7 @@ export async function POST(
           runId: run.id,
         });
 
-        await createAuditLog(supabase, {
+        await createAuditLog(runtimeAdmin as never, {
           workspaceId: agent.workspace_id,
           agentId: agent.id,
           runId: run.id,
@@ -238,7 +239,7 @@ export async function POST(
           },
         });
 
-        const persistUserStep = await createRunStep(supabase, {
+        const persistUserStep = await createRunStep(runtimeAdmin as never, {
           runId: run.id,
           workspaceId: agent.workspace_id,
           agentId: agent.id,
@@ -248,7 +249,7 @@ export async function POST(
           detail: "Persisting the incoming user message before runtime execution.",
         });
 
-        const { error: userMessageError } = await supabase.from("messages").insert({
+        const { error: userMessageError } = await runtimeAdmin.from("messages").insert({
           thread_id: threadId,
           workspace_id: agent.workspace_id,
           role: "user",
@@ -258,7 +259,7 @@ export async function POST(
 
         if (userMessageError) {
           await completeRunStep(
-            supabase,
+            runtimeAdmin as never,
             persistUserStep.id,
             "failed",
             userMessageError.message,
@@ -268,14 +269,14 @@ export async function POST(
         }
 
         await completeRunStep(
-          supabase,
+          runtimeAdmin as never,
           persistUserStep.id,
           "succeeded",
           "User message recorded.",
           { messageLength: input.length },
         );
 
-        const historyStep = await createRunStep(supabase, {
+        const historyStep = await createRunStep(runtimeAdmin as never, {
           runId: run.id,
           workspaceId: agent.workspace_id,
           agentId: agent.id,
@@ -285,7 +286,7 @@ export async function POST(
           detail: "Loading existing preview thread history.",
         });
 
-        const { data: history, error: historyError } = await supabase
+        const { data: history, error: historyError } = await runtimeAdmin
           .from("messages")
           .select("*")
           .eq("thread_id", threadId)
@@ -296,14 +297,14 @@ export async function POST(
         }
 
         await completeRunStep(
-          supabase,
+          runtimeAdmin as never,
           historyStep.id,
           "succeeded",
           "Conversation history loaded.",
           { historyCount: history?.length ?? 0 },
         );
 
-        const runtimeStep = await createRunStep(supabase, {
+        const runtimeStep = await createRunStep(runtimeAdmin as never, {
           runId: run.id,
           workspaceId: agent.workspace_id,
           agentId: agent.id,
@@ -339,7 +340,7 @@ export async function POST(
         });
 
         await completeRunStep(
-          supabase,
+          runtimeAdmin as never,
           runtimeStep.id,
           "succeeded",
           "Shared runtime completed successfully.",
@@ -360,7 +361,7 @@ export async function POST(
         });
 
         if (result.toolMessages.length > 0) {
-          const { error: toolMessageError } = await supabase.from("messages").insert(
+          const { error: toolMessageError } = await runtimeAdmin.from("messages").insert(
             persistedToolMessages.map((message) => ({
               thread_id: threadId,
               workspace_id: agent.workspace_id,
@@ -378,7 +379,7 @@ export async function POST(
           }
         }
 
-        const persistAssistantStep = await createRunStep(supabase, {
+        const persistAssistantStep = await createRunStep(runtimeAdmin as never, {
           runId: run.id,
           workspaceId: agent.workspace_id,
           agentId: agent.id,
@@ -388,7 +389,7 @@ export async function POST(
           detail: "Saving the final assistant message back to the thread.",
         });
 
-        const { error: assistantMessageError } = await supabase
+        const { error: assistantMessageError } = await runtimeAdmin
           .from("messages")
           .insert({
             thread_id: threadId,
@@ -404,7 +405,7 @@ export async function POST(
         }
 
         await completeRunStep(
-          supabase,
+          runtimeAdmin as never,
           persistAssistantStep.id,
           "succeeded",
           "Assistant message persisted.",
@@ -412,7 +413,7 @@ export async function POST(
         );
 
         await Promise.all([
-          supabase
+          runtimeAdmin
             .from("runs")
             .update({
               status: "succeeded",
@@ -420,13 +421,13 @@ export async function POST(
               completed_at: new Date().toISOString(),
             })
             .eq("id", run.id),
-          supabase
+          runtimeAdmin
             .from("chat_threads")
             .update({
               title: agent.name,
             })
             .eq("id", threadId),
-          createAuditLog(supabase, {
+          createAuditLog(runtimeAdmin as never, {
             workspaceId: agent.workspace_id,
             agentId: agent.id,
             runId: run.id,
@@ -454,7 +455,7 @@ export async function POST(
         if (runId) {
           try {
             await Promise.all([
-              supabase
+              runtimeAdmin
                 .from("runs")
                 .update({
                   status: "failed",
@@ -462,7 +463,7 @@ export async function POST(
                   completed_at: new Date().toISOString(),
                 })
                 .eq("id", runId),
-              createAuditLog(supabase, {
+              createAuditLog(runtimeAdmin as never, {
                 workspaceId: agent.workspace_id,
                 agentId: agent.id,
                 runId,

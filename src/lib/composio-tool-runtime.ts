@@ -10,14 +10,14 @@ export function assertComposioToolCallRuntime({
   userId: string;
 }) {
   if (!hasClient) {
-    throw new Error("COMPOSIO_API_KEY is missing.");
+    throw new Error("Connection provider API key is missing.");
   }
 
   if (!hasSession) {
-    throw new Error(`No Composio session is available for user ${userId}.`);
+    throw new Error(`No connection provider session is available for user ${userId}.`);
   }
 
   if (!hasProvider) {
-    throw new Error("Composio provider is unavailable.");
+    throw new Error("Connection provider is unavailable.");
   }
 }

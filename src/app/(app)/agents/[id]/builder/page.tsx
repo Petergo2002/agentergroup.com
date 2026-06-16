@@ -93,6 +93,7 @@ import type {
   KnowledgeFolderWithSources,
   KnowledgeSourceRecord,
   RunRecord,
+  TextAnnotationBuilderNodeData,
   TriggerBuilderNodeData,
 } from '@/lib/types';
 
@@ -100,7 +101,7 @@ type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
 type ToolNodeKind = 'gmail' | 'outlook' | 'slack' | 'hubspot' | 'shopify' | 'googleads' | 'googlecalendar' | 'cal';
 type ToolNodeData = GmailBuilderNodeData | OutlookBuilderNodeData | SlackBuilderNodeData | HubSpotBuilderNodeData | ShopifyBuilderNodeData | GoogleAdsBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
-type LibraryItemKey = 'trigger' | 'knowledge' | 'tools' | 'endchat' | 'agent';
+type LibraryItemKey = 'trigger' | 'knowledge' | 'tools' | 'endchat' | 'annotation' | 'agent';
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 type BuilderStatusNote =
   | { kind: 'draftInitial' }
@@ -169,6 +170,7 @@ const DEFAULT_POSITIONS: Record<BuilderNodeKind, { x: number; y: number }> = {
   googlecalendar: { x: 610, y: 570 },
   cal: { x: 610, y: 710 },
   endchat: { x: 1210, y: 150 },
+  annotation: { x: 320, y: 360 },
 };
 
 const NODE_LIBRARY: NodeLibraryItem[] = [
@@ -203,6 +205,12 @@ const NODE_LIBRARY: NodeLibraryItem[] = [
     label: 'End Chat',
     icon: 'stop_circle',
     description: 'Define when the backend should close the conversation.',
+  },
+  {
+    key: 'annotation',
+    label: 'Text annotation',
+    icon: 'sticky_note_2',
+    description: 'Add a canvas note that does not affect runtime behavior.',
   },
 ];
 
@@ -284,6 +292,11 @@ function getNodeLibraryText(key: LibraryItemKey, t: Translate) {
         label: t('agentBuilder.nodeLibrary.endChat'),
         description: t('agentBuilder.nodeLibrary.endChatDescription'),
       };
+    case 'annotation':
+      return {
+        label: t('agentBuilder.nodeLibrary.annotation'),
+        description: t('agentBuilder.nodeLibrary.annotationDescription'),
+      };
   }
 }
 
@@ -360,6 +373,12 @@ function getBuilderNodeText(kind: BuilderNodeKind, t: Translate) {
         label: t('agentBuilder.endChatLabel'),
         type: t('agentBuilder.controlType'),
         description: t('agentBuilder.endChatNodeDescription'),
+      };
+    case 'annotation':
+      return {
+        label: t('agentBuilder.annotationLabel'),
+        type: t('agentBuilder.annotationType'),
+        description: t('agentBuilder.annotationDescription'),
       };
   }
 }
@@ -611,6 +630,12 @@ function isTriggerNodeData(data: BuilderNodeData): data is TriggerBuilderNodeDat
   return data.kind === 'trigger';
 }
 
+function isTextAnnotationNodeData(
+  data: BuilderNodeData,
+): data is TextAnnotationBuilderNodeData {
+  return data.kind === 'annotation';
+}
+
 function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
   return (
     value === 'trigger' ||
@@ -624,7 +649,8 @@ function isBuilderNodeKind(value: unknown): value is BuilderNodeKind {
     value === 'googleads' ||
     value === 'googlecalendar' ||
     value === 'cal' ||
-    value === 'endchat'
+    value === 'endchat' ||
+    value === 'annotation'
   );
 }
 
@@ -1065,6 +1091,28 @@ function createEndChatNode(
   };
 }
 
+function createTextAnnotationNode(
+  position = DEFAULT_POSITIONS.annotation,
+  data?: Partial<TextAnnotationBuilderNodeData>,
+  id = `annotation-${crypto.randomUUID()}`,
+): BuilderFlowNode {
+  return {
+    id,
+    type: 'agentNode',
+    position,
+    data: {
+      kind: 'annotation',
+      label: 'Text annotation',
+      type: 'Note',
+      icon: 'sticky_note_2',
+      description: 'Canvas-only documentation note.',
+      status: 'idle',
+      text: '',
+      ...(data ?? {}),
+    },
+  };
+}
+
 function inferNodeKind(node: BuilderFlowNode) {
   const data = (node.data ?? {}) as Record<string, unknown>;
   const rawKind = data.kind;
@@ -1180,6 +1228,7 @@ function normalizeDefinition(
 ): NormalizedBuilderDefinition {
   const rawNodes = (Array.isArray(definition.nodes) ? definition.nodes : []) as BuilderFlowNode[];
   const nodesByKind = new Map<BuilderNodeKind, BuilderFlowNode>();
+  const annotationNodes: BuilderFlowNode[] = [];
   let hasLegacyToolsNode = false;
 
   for (const node of rawNodes) {
@@ -1187,6 +1236,11 @@ function normalizeDefinition(
 
     if (inferredKind === 'legacy-tools') {
       hasLegacyToolsNode = true;
+      continue;
+    }
+
+    if (inferredKind === 'annotation') {
+      annotationNodes.push(node);
       continue;
     }
 
@@ -1504,6 +1558,21 @@ function normalizeDefinition(
     );
   }
 
+  normalizedNodes.push(
+    ...annotationNodes.map((node) =>
+      createTextAnnotationNode(
+        node.position ?? DEFAULT_POSITIONS.annotation,
+        {
+          text:
+            isTextAnnotationNodeData(node.data) && typeof node.data.text === 'string'
+              ? node.data.text
+              : '',
+        },
+        node.id,
+      ),
+    ),
+  );
+
   const requiresToolReview =
     hasLegacyToolsNode &&
     TOOL_NODE_KINDS.some(
@@ -1552,6 +1621,8 @@ function enrichNodeForDisplay(
 
   if (node.data.kind === 'knowledge') {
     const sourceCount = node.data.sourceIds.length;
+    const folderCount = (node.data.folderIds ?? []).length;
+    const attachedCount = sourceCount + folderCount;
 
     return {
       ...node,
@@ -1560,10 +1631,10 @@ function enrichNodeForDisplay(
         ...localizedText,
         confidenceLabel: t('agentBuilder.confidence'),
         badgeText:
-          sourceCount > 0
-            ? t('agentBuilder.attachedBadge', { count: sourceCount })
+          attachedCount > 0
+            ? t('agentBuilder.attachedBadge', { count: attachedCount })
             : t('agentBuilder.noSourcesBadge'),
-        badgeTone: sourceCount > 0 ? 'success' : 'warning',
+        badgeTone: attachedCount > 0 ? 'success' : 'warning',
       },
     };
   }
@@ -1615,6 +1686,18 @@ function enrichNodeForDisplay(
         confidenceLabel: t('agentBuilder.confidence'),
         badgeText: `${timeoutLabel} • ${suggestionLabel}`,
         badgeTone: 'success',
+      },
+    };
+  }
+
+  if (isTextAnnotationNodeData(node.data)) {
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        ...localizedText,
+        description: node.data.text.trim() || localizedText.description,
+        confidenceLabel: t('agentBuilder.confidence'),
       },
     };
   }
@@ -2957,19 +3040,13 @@ export default function AgentBuilderPage() {
   const syncSelectedConnections = async (nextNodes: BuilderFlowNode[]) => {
     const selectedConnectionIds = getSelectedConnectionIdsFromNodes(nextNodes, connections);
 
-    await supabase.from('agent_connections').delete().eq('agent_id', agentId);
+    const { error } = await supabase.rpc('replace_agent_connections', {
+      p_agent_id: agentId,
+      p_connection_ids: selectedConnectionIds,
+    });
 
-    if (selectedConnectionIds.length > 0) {
-      const { error } = await supabase.from('agent_connections').insert(
-        selectedConnectionIds.map((connectionId) => ({
-          agent_id: agentId,
-          connection_id: connectionId,
-        })),
-      );
-
-      if (error) {
-        throw error;
-      }
+    if (error) {
+      throw error;
     }
   };
 
@@ -3645,6 +3722,19 @@ export default function AgentBuilderPage() {
     setSelectedNodeId(node.id);
   };
 
+  const handleAddAnnotationNode = () => {
+    saveToHistory();
+    const annotationCount = nodes.filter(
+      (node) => node.data.kind === 'annotation',
+    ).length;
+    const node = createTextAnnotationNode({
+      x: DEFAULT_POSITIONS.annotation.x + annotationCount * 24,
+      y: DEFAULT_POSITIONS.annotation.y + annotationCount * 24,
+    });
+    setNodes((currentNodes) => [...currentNodes, node]);
+    setSelectedNodeId(node.id);
+  };
+
   const handleAddToolNode = (kind: ToolNodeKind) => {
     if (nodes.some((node) => node.data.kind === kind)) {
       showToast(
@@ -3868,6 +3958,12 @@ export default function AgentBuilderPage() {
   const removeOptionalNode = (kind: BuilderNodeKind) => {
     saveToHistory();
     setNodes((currentNodes) => currentNodes.filter((node) => node.data.kind !== kind));
+    setSelectedNodeId(null);
+  };
+
+  const removeNodeById = (nodeId: string) => {
+    saveToHistory();
+    setNodes((currentNodes) => currentNodes.filter((node) => node.id !== nodeId));
     setSelectedNodeId(null);
   };
 
@@ -4715,6 +4811,44 @@ export default function AgentBuilderPage() {
               </div>
             </div>
           </div>
+        </div>
+      );
+    }
+
+    if (isTextAnnotationNodeData(selectedNode.data)) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+              {t('agentBuilder.annotationText')}
+            </label>
+            <textarea
+              value={selectedNode.data.text}
+              onChange={(event) =>
+                updateNode(selectedNode.id, (node) => ({
+                  ...node,
+                  data: {
+                    ...node.data,
+                    text: event.target.value,
+                  } as TextAnnotationBuilderNodeData,
+                }))
+              }
+              onKeyDown={stopBuilderFieldKeyDown}
+              rows={8}
+              placeholder={t('agentBuilder.annotationPlaceholder')}
+              className="w-full resize-y rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-medium leading-relaxed text-on-surface shadow-sm outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+            />
+          </div>
+          <p className="text-xs leading-5 text-on-surface-variant/60">
+            {t('agentBuilder.annotationHelp')}
+          </p>
+          <button
+            onClick={() => removeNodeById(selectedNode.id)}
+            className="w-full flex items-center justify-center gap-3 rounded-[1.25rem] bg-error/5 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-error transition-all hover:bg-error hover:text-on-error hover:shadow-lg hover:shadow-error/20 active:scale-[0.98]"
+          >
+            <span className="material-symbols-outlined text-lg">delete</span>
+            {t('agentBuilder.removeNode')}
+          </button>
         </div>
       );
     }
@@ -5712,6 +5846,7 @@ export default function AgentBuilderPage() {
                             else if (item.key === 'agent') handleAddAgentNode();
                             else if (item.key === 'knowledge') handleAddKnowledgeNode();
                             else if (item.key === 'endchat') handleAddEndChatNode();
+                            else if (item.key === 'annotation') handleAddAnnotationNode();
                             else if (item.key === 'tools') setIsToolPickerOpen(true);
                             
                             setIsAddMenuOpen(false);

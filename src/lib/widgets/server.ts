@@ -15,4 +15,6 @@ export { createWidgetPreviewDraft, updateWidgetPreviewDraft, loadWidgetPreviewDr
 
 export { insertWidgetLead } from "./leads";
 
+export { autoCaptureLead } from "./lead-extractor";
+
 export type { WidgetAdminSupabase, WidgetPreviewTokenPayload, WidgetAccessTokenPayload, RuntimeWidgetAgentSelection } from "./server-types";

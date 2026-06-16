@@ -99,32 +99,16 @@ interface StreamChunk {
   choices?: Array<{ delta?: StreamChunkDelta }>;
 }
 
+type MaybeRelation<T> = T | T[] | null;
+
+interface AttachedConnection {
+  toolkit_slug: string;
+  status: string;
+  toolkit_data: Record<string, unknown> | null;
+}
+
 interface AttachedConnectionRow {
-  connection: {
-    toolkit_slug: string;
-    status: string;
-    toolkit_data: Record<string, unknown> | null;
-  } | null;
-}
-
-interface AttachedKnowledgeRow {
-  source: {
-    id: string;
-    name: string;
-    status: string;
-  } | null;
-}
-
-interface AttachedKnowledgeFolderRow {
-  folder: {
-    sources?: Array<{
-      source: {
-        id: string;
-        name: string;
-        status: string;
-      } | null;
-    }>;
-  } | null;
+  connection: MaybeRelation<AttachedConnection>;
 }
 
 export interface AgentRuntimeInput {
@@ -493,6 +477,10 @@ function parseInternalToolArguments(rawArguments: string) {
   }
 }
 
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
 async function loadRuntimeContext(
   supabase: RuntimeSupabaseLike,
   agentId: string,
@@ -510,22 +498,22 @@ async function loadRuntimeContext(
         .eq("agent_id", agentId),
       supabase
         .from("agent_knowledge_sources")
-        .select("source:knowledge_sources(id, name, status)")
+        .select("knowledge_source_id")
         .eq("agent_id", agentId),
       supabase
         .from("agent_knowledge_folders")
-        .select("folder:knowledge_folders(sources:knowledge_folder_sources(source:knowledge_sources(id, name, status)))")
+        .select("knowledge_folder_id")
         .eq("agent_id", agentId),
     ]);
 
   const connectedToolkits = (
     (attachedConnections ?? []) as unknown as AttachedConnectionRow[]
   )
-    .map((item) => item.connection)
+    .map((item) => firstRelation(item.connection))
     .filter(
       (
         connection,
-      ): connection is NonNullable<AttachedConnectionRow["connection"]> =>
+      ): connection is AttachedConnection =>
         Boolean(
           connection?.status === "connected" &&
             getConnectionComposioUserId(connection) === toolUserId,
@@ -533,40 +521,12 @@ async function loadRuntimeContext(
     )
     .map((connection) => connection.toolkit_slug);
 
-  const directKnowledgeSources = (
-    (attachedKnowledgeSources ?? []) as unknown as AttachedKnowledgeRow[]
-  )
-    .map((item) => item.source)
-    .filter(
-      (
-        source,
-      ): source is NonNullable<AttachedKnowledgeRow["source"]> =>
-        Boolean(source?.status === "ready"),
-    );
-  const folderKnowledgeSources = (
-    (attachedKnowledgeFolders ?? []) as unknown as AttachedKnowledgeFolderRow[]
-  ).flatMap((item) =>
-    (item.folder?.sources ?? [])
-      .map((sourceLink) => sourceLink.source)
-      .filter(
-        (
-          source,
-        ): source is NonNullable<AttachedKnowledgeRow["source"]> =>
-          Boolean(source?.status === "ready"),
-      ),
-  );
-  const readyKnowledgeSources = Array.from(
-    new Map(
-      [...directKnowledgeSources, ...folderKnowledgeSources].map((source) => [
-        source.id,
-        source,
-      ]),
-    ).values(),
-  );
+  const knowledgeAttachmentCount =
+    (attachedKnowledgeSources?.length ?? 0) + (attachedKnowledgeFolders?.length ?? 0);
 
   return {
     connectedToolkits,
-    readyKnowledgeSources,
+    knowledgeAttachmentCount,
   };
 }
 
@@ -662,7 +622,7 @@ export async function runAgentChat({
   onToken?: (token: string) => void;
   onStatus?: (status: string) => void;
 }): Promise<AgentRuntimeResult> {
-  const { connectedToolkits, readyKnowledgeSources } = await loadRuntimeContext(
+  const { connectedToolkits, knowledgeAttachmentCount } = await loadRuntimeContext(
     supabase,
     agent.id,
     toolUserId,
@@ -750,7 +710,7 @@ export async function runAgentChat({
   );
   let knowledgeMatches: KnowledgeMatchRecord[] = [];
 
-  const hasGlobalKnowledge = readyKnowledgeSources.length > 0;
+  const hasGlobalKnowledge = knowledgeAttachmentCount > 0;
   const hasSessionKnowledge = Boolean(widgetSessionId);
 
   if (hasGlobalKnowledge || hasSessionKnowledge) {
@@ -1005,7 +965,7 @@ export async function runAgentChat({
           debugEvents.push({
             type: "session_miss",
             ts: Date.now() - startTimeMs,
-            error: "Composio session cache missed. Recreated session successfully.",
+            error: "Connection session cache missed. Recreated session successfully.",
             iterationIndex: iteration
           });
         }
@@ -1014,7 +974,7 @@ export async function runAgentChat({
           debugEvents.push({
             type: "tool_empty_result",
             ts: Date.now() - startTimeMs,
-            error: "Composio returned 0 results for the tool calls. Synthesizing empty results.",
+            error: "Connection provider returned 0 results for the tool calls. Synthesizing empty results.",
             iterationIndex: iteration
           });
 

@@ -29,8 +29,8 @@ export function sortAdminWorkspaces(
   direction: "asc" | "desc",
 ) {
   return [...workspaces].sort((left, right) => {
-    const leftValue = left[sortKey] ?? "";
-    const rightValue = right[sortKey] ?? "";
+    const leftValue = Reflect.get(left, sortKey) ?? "";
+    const rightValue = Reflect.get(right, sortKey) ?? "";
     const comparison =
       typeof leftValue === "number" && typeof rightValue === "number"
         ? leftValue - rightValue

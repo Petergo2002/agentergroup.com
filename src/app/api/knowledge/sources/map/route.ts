@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import Firecrawl from "@mendable/firecrawl-js";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import {
+  normalizeSelectedWebsiteUrls,
+  normalizeWebsiteKnowledgeUrl,
+} from "@/lib/knowledge-website";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -21,19 +25,15 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  let url = String(body.url ?? "").trim();
+  const rawUrl = String(body.url ?? "").trim();
 
-  if (!url) {
+  if (!rawUrl) {
     return NextResponse.json({ error: "URL is required." }, { status: 400 });
   }
 
-  // Prepend https:// if no protocol is provided
-  if (!/^https?:\/\//i.test(url)) {
-    url = `https://${url}`;
-  }
-
+  let websiteUrl: URL;
   try {
-    new URL(url);
+    websiteUrl = normalizeWebsiteKnowledgeUrl(rawUrl);
   } catch {
     return NextResponse.json({ error: "Invalid URL provided." }, { status: 400 });
   }
@@ -46,14 +46,14 @@ export async function POST(request: NextRequest) {
   const firecrawl = new Firecrawl({ apiKey: firecrawlApiKey });
 
   try {
-    console.log(`[Firecrawl Map] Mapping URL: ${url}`);
+    console.log(`[Firecrawl Map] Mapping URL: ${websiteUrl.toString()}`);
     
     if (typeof firecrawl.map !== 'function') {
       console.error(`[Firecrawl Map] firecrawl.map is not a function. Available methods:`, Object.keys(firecrawl));
       throw new Error("Firecrawl SDK error: map method not found.");
     }
 
-    const mapResult = await firecrawl.map(url, {
+    const mapResult = await firecrawl.map(websiteUrl.toString(), {
       includeSubdomains: false,
     });
     const mapResultRecord = mapResult as typeof mapResult & {
@@ -74,11 +74,19 @@ export async function POST(request: NextRequest) {
 
     // Filter out common useless URLs and normalize to strings
     const rawLinks = (mapResult.links ?? []).slice(0, 500);
-    const links = (rawLinks as unknown[]).map((item) => {
+    const candidateLinks = (rawLinks as unknown[]).map((item) => {
       if (typeof item === 'string') return item;
       if (item && typeof item === 'object' && 'url' in item && typeof item.url === 'string') return item.url;
       return null;
     }).filter((u): u is string => u !== null);
+    const sameOriginLinks = candidateLinks.filter((candidate) => {
+      try {
+        return normalizeWebsiteKnowledgeUrl(candidate).origin === websiteUrl.origin;
+      } catch {
+        return false;
+      }
+    });
+    const links = normalizeSelectedWebsiteUrls(websiteUrl, sameOriginLinks, 500);
 
     console.log(`[Firecrawl Map] Found ${links.length} valid links`);
 

@@ -37,7 +37,8 @@ export type BuilderNodeKind =
   | "googleads"
   | "googlecalendar"
   | "cal"
-  | "endchat";
+  | "endchat"
+  | "annotation";
 
 export type BuilderNodeStatus = "active" | "idle" | "error";
 export type BuilderNodeBadgeTone = "default" | "success" | "warning" | "error";

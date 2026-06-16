@@ -152,6 +152,7 @@ export async function loadAgentBuilderBootstrap(
       .from("knowledge_sources")
       .select(BUILDER_KNOWLEDGE_SOURCE_SELECT)
       .eq("workspace_id", context.workspace.id)
+      .is("widget_session_id", null)
       .order("updated_at", { ascending: false }),
     supabase
       .from("agent_knowledge_sources")

@@ -25,6 +25,16 @@ test("app security headers include baseline browser protections", () => {
   assert.ok(headerMap.get("Content-Security-Policy"));
 });
 
+test("app security headers disable unused browser permissions", () => {
+  const headers = getAppSecurityHeaders();
+  const headerMap = new Map(headers.map((entry) => [entry.key, entry.value]));
+  const permissionsPolicy = headerMap.get("Permissions-Policy");
+
+  assert.ok(permissionsPolicy);
+  assert.match(permissionsPolicy, /camera=\(\)/);
+  assert.match(permissionsPolicy, /microphone=\(\)/);
+});
+
 test("app security headers can omit CSP when a request nonce is required", () => {
   const headers = getAppSecurityHeaders({ contentSecurityPolicy: false });
   const headerMap = new Map(headers.map((entry) => [entry.key, entry.value]));
@@ -52,6 +62,23 @@ test("content security policy protects framing while allowing current widget pre
   assert.match(scriptSrc, /'nonce-test-nonce'/);
   assert.doesNotMatch(scriptSrc, /'unsafe-inline'/);
   assert.doesNotMatch(scriptSrc, /'unsafe-eval'/);
+});
+
+test("CSP does not include the legacy Supabase fallback when env is missing", () => {
+  const previousSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  try {
+    const csp = buildAppContentSecurityPolicy();
+
+    assert.doesNotMatch(csp, /rklntfzmqayziqesjoih\.supabase\.co/);
+  } finally {
+    if (previousSupabaseUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = previousSupabaseUrl;
+    }
+  }
 });
 
 test("development CSP allows Next.js inline bootstrap and eval-based debugging", () => {

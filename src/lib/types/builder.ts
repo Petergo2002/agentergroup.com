@@ -125,6 +125,11 @@ export interface EndChatBuilderNodeData extends BaseBuilderNodeData {
   allowAssistantSuggestion: boolean;
 }
 
+export interface TextAnnotationBuilderNodeData extends BaseBuilderNodeData {
+  kind: "annotation";
+  text: string;
+}
+
 export type BuilderNodeData =
   | TriggerBuilderNodeData
   | AgentBuilderNodeData
@@ -137,7 +142,8 @@ export type BuilderNodeData =
   | GoogleAdsBuilderNodeData
   | GoogleCalendarBuilderNodeData
   | CalBuilderNodeData
-  | EndChatBuilderNodeData;
+  | EndChatBuilderNodeData
+  | TextAnnotationBuilderNodeData;
 
 export interface BuilderDefinition {
   nodes: unknown[];

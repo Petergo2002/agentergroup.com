@@ -2,7 +2,7 @@ export const connections = {
   badge: "Integration access",
   title: "Connections",
   description:
-    "Connect Gmail, Outlook, Slack, HubSpot, Shopify, Google Calendar, Cal.com, and Google Drive. Each workspace supports one connected account per integration, so connecting a new account for the same integration replaces the current one. Chat integrations power live agent actions, while Drive is reserved for knowledge imports.",
+    "Connect tools like Gmail, Slack, and Drive to enable agent actions and knowledge imports. Limit one account per integration.",
   syncStatus: "Sync Status",
   completeAuthFlow: "Complete the auth flow, then press Sync Status.",
   replaceFlowWarning:
@@ -12,6 +12,7 @@ export const connections = {
   startFlowError: "Failed to start the connection flow.",
   disconnectError: "Failed to disconnect the account.",
   lastSync: "Last sync {value}",
+  statusReason: "Connection: {value}",
   noSyncYet: "No sync yet",
   connectedAccount: "Connected account",
   replacementHint: "Only one account can be connected for this integration in a workspace.",

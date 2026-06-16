@@ -80,6 +80,7 @@ export interface DashboardLatestActivityResponse {
     | "latestSnippet"
     | "lastActivityAt"
   > | null;
+  newLeadCount: number;
 }
 
 export interface DashboardSummaryResponse {
@@ -114,7 +115,7 @@ export interface DashboardConversationDetailResponse {
   lead: {
     id: string;
     name: string;
-    email: string;
+    email: string | null;
     phone: string | null;
     message: string | null;
     createdAt: string;

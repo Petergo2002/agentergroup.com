@@ -21,6 +21,8 @@ import {
   assertWorkspaceBillingAdmin,
   type BillingAuthorizationClient,
 } from '@/lib/billing-authorization';
+import { getOrCreateWorkspaceStripeCustomer } from '@/lib/billing-customer';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(req: Request) {
   try {
@@ -50,7 +52,8 @@ export async function POST(req: Request) {
     );
 
     // Fetch the workspace subscription row so we can look up or create a Stripe customer
-    const { data: subscription, error: subError } = await supabase
+    const admin = createAdminClient();
+    const { data: subscription, error: subError } = await admin
       .from('workspace_subscriptions')
       .select('stripe_customer_id, plan_tier')
       .eq('workspace_id', workspaceId)
@@ -68,31 +71,12 @@ export async function POST(req: Request) {
     const stripe = getStripe();
     const stripePriceIds = getStripePriceIds();
 
-    // Find or create a Stripe Customer for this workspace
-    let stripeCustomerId = subscription.stripe_customer_id;
-
-    if (!stripeCustomerId) {
-      // Fetch the user's profile to get their email
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('email, full_name')
-        .eq('id', user.id)
-        .single();
-
-      const customer = await stripe.customers.create({
-        email: profile?.email ?? user.email ?? undefined,
-        name: profile?.full_name ?? undefined,
-        metadata: { workspace_id: workspaceId, user_id: user.id },
-      });
-
-      stripeCustomerId = customer.id;
-
-      // Store the customer ID immediately so future requests reuse it
-      await supabase
-        .from('workspace_subscriptions')
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq('workspace_id', workspaceId);
-    }
+    const stripeCustomerId = await getOrCreateWorkspaceStripeCustomer({
+      stripe,
+      workspaceId,
+      user,
+      existingCustomerId: subscription.stripe_customer_id,
+    });
 
     const appUrl = getAppUrl();
 

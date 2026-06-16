@@ -14,8 +14,12 @@ const MAX_OCCURRED_AT_LENGTH = 128;
 const MAX_VISIBILITY_STATE_LENGTH = 64;
 const MAX_METADATA_KEYS = 10;
 const MAX_METADATA_VALUE_LENGTH = 512;
+const MAX_WIDGET_ATTACHMENTS_PER_MESSAGE = 5;
+const BLOCKED_OBJECT_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const WIDGET_EVENT_TYPES = [
   "widget_open",
@@ -47,7 +51,13 @@ export interface WidgetChatBody {
   widgetAgentId: string | null;
   pageUrl: string | null;
   referrer: string | null;
-  attachments?: { url: string; name: string; type: string; size: number }[];
+  attachments?: {
+    id: string;
+    url: string;
+    name: string;
+    type: string;
+    size: number;
+  }[];
 }
 
 export interface WidgetLeadBody {
@@ -205,6 +215,10 @@ function normalizeMetadata(
       return invalid("metadata keys must be non-empty strings.");
     }
 
+    if (BLOCKED_OBJECT_KEYS.has(trimmedKey)) {
+      return invalid("metadata keys cannot use reserved object property names.");
+    }
+
     const valueResult = normalizeMetadataValue(trimmedKey, entryValue);
 
     if (!valueResult.valid) {
@@ -325,18 +339,43 @@ export function validateWidgetChatBody(input: unknown): ValidationResult<WidgetC
     return sessionIdResult;
   }
 
-  let attachments: { url: string; name: string; type: string; size: number }[] | undefined;
+  let attachments:
+    | { id: string; url: string; name: string; type: string; size: number }[]
+    | undefined;
   if (record.attachments !== undefined) {
     if (!Array.isArray(record.attachments)) {
       return invalid("attachments must be an array.");
     }
+    if (record.attachments.length > MAX_WIDGET_ATTACHMENTS_PER_MESSAGE) {
+      return invalid(
+        `A maximum of ${MAX_WIDGET_ATTACHMENTS_PER_MESSAGE} attachments can be sent per message.`,
+      );
+    }
+
     const parsedAttachments = [];
+    const attachmentIds = new Set<string>();
+
     for (const attachment of record.attachments) {
       const attRecord = asRecord(attachment);
-      if (!attRecord || typeof attRecord.url !== "string" || typeof attRecord.name !== "string" || typeof attRecord.type !== "string" || typeof attRecord.size !== "number") {
-        return invalid("Each attachment must have url (string), name (string), type (string), and size (number).");
+      if (
+        !attRecord ||
+        typeof attRecord.id !== "string" ||
+        !UUID_PATTERN.test(attRecord.id) ||
+        typeof attRecord.url !== "string" ||
+        typeof attRecord.name !== "string" ||
+        typeof attRecord.type !== "string" ||
+        typeof attRecord.size !== "number"
+      ) {
+        return invalid(
+          "Each attachment must include a valid server-issued id, url, name, type, and size.",
+        );
       }
+      if (attachmentIds.has(attRecord.id)) {
+        return invalid("Duplicate attachment ids are not allowed.");
+      }
+      attachmentIds.add(attRecord.id);
       parsedAttachments.push({
+        id: attRecord.id,
         url: attRecord.url,
         name: attRecord.name,
         type: attRecord.type,

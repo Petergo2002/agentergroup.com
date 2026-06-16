@@ -15,6 +15,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Building2,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { useAppContext } from "@/components/app/AppContext";
@@ -39,6 +41,7 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   analyticsHasNewActivity?: boolean;
   analyticsActivitySummary?: AnalyticsActivitySummary | null;
+  newLeadCount?: number;
 }
 
 interface SidebarNavItem {
@@ -48,6 +51,7 @@ interface SidebarNavItem {
   beta?: boolean;
   hasAttention?: boolean;
   attentionSummary?: AnalyticsActivitySummary | null;
+  badgeCount?: number;
 }
 
 export function Sidebar({
@@ -57,6 +61,7 @@ export function Sidebar({
   onToggleCollapse,
   analyticsHasNewActivity = false,
   analyticsActivitySummary = null,
+  newLeadCount = 0,
 }: SidebarProps) {
   const pathname = usePathname();
   const { membership, workspace, subscription } = useAppContext();
@@ -83,6 +88,12 @@ export function Sidebar({
           icon: BarChart3,
           hasAttention: analyticsHasNewActivity,
           attentionSummary: analyticsActivitySummary,
+        },
+        {
+          name: t("nav.leads"),
+          href: "/leads",
+          icon: Users,
+          badgeCount: newLeadCount,
         },
       ],
     },
@@ -117,7 +128,7 @@ export function Sidebar({
             }`
       }`}
     >
-      <div className={`px-4 pt-8 pb-6 flex flex-col items-center transition-all duration-300 ${isCollapsed && !mobile ? 'gap-6' : 'gap-5'}`}>
+      <div className={`px-4 pt-6 pb-4 flex flex-col items-center transition-all duration-300 ${isCollapsed && !mobile ? 'gap-6' : 'gap-5'}`}>
         <Link href="/dashboard" className="group relative flex flex-col items-center shrink-0">
           <div className="flex items-center justify-center shrink-0">
             <Image
@@ -165,11 +176,11 @@ export function Sidebar({
         </div>
       </div>
       
-      <nav className={`mt-1 flex-1 space-y-6 font-label transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-4'} overflow-y-auto overflow-x-hidden`}>
+      <nav className={`mt-2 flex-1 space-y-5 font-label transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-3'} overflow-y-auto overflow-x-hidden`}>
         {navGroups.map((group, groupIndex) => (
           <div key={groupIndex} className="space-y-1.5 relative">
             {(!isCollapsed || mobile) && (
-              <h3 className="px-4 mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/50">
+              <h3 className="px-3 mb-1.5 text-[11px] font-semibold tracking-wider text-on-surface-variant/60">
                 {group.title}
               </h3>
             )}
@@ -181,6 +192,9 @@ export function Sidebar({
               const isActive = pathname?.startsWith(item.href);
               const Icon = item.icon;
               const hasAttention = Boolean(item.hasAttention && !isActive);
+              const badgeCount = Math.max(0, item.badgeCount ?? 0);
+              const hasBadge = badgeCount > 0;
+              const badgeLabel = badgeCount > 99 ? "99+" : String(badgeCount);
               const attentionAgent =
                 item.attentionSummary?.agentName || t("common.unknownAgent");
               const attentionWidget =
@@ -200,7 +214,7 @@ export function Sidebar({
                           hasAttention
                             ? ` (${t("nav.newAnalyticsActivity")}: ${attentionAgent}, ${attentionWidget})`
                             : ""
-                        }`
+                        }${hasBadge ? ` (${t("nav.newLeads", { count: badgeCount })})` : ""}`
                       : undefined
                   }
                   title={
@@ -209,22 +223,19 @@ export function Sidebar({
                           hasAttention
                             ? ` (${t("nav.newAnalyticsActivity")}: ${attentionAgent}, ${attentionWidget})`
                             : ""
-                        }`
+                        }${hasBadge ? ` (${t("nav.newLeads", { count: badgeCount })})` : ""}`
                       : undefined
                   }
-                  className={`group relative flex items-center gap-3 rounded-xl py-3 transition-all duration-200 ${
-                    isCollapsed && !mobile ? 'justify-center px-0' : 'px-4'
+                  className={`group relative flex items-center gap-3 rounded-lg py-2.5 transition-all duration-200 ${
+                    isCollapsed && !mobile ? 'justify-center px-0 mx-1' : 'px-3 mx-0'
                   } ${
                     isActive 
-                      ? "bg-surface-container-high text-on-surface shadow-sm ring-1 ring-primary/20" 
-                      : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                      ? "bg-primary/[0.08] text-primary"
+                      : "text-on-surface-variant hover:bg-on-surface/[0.04] hover:text-on-surface"
                   }`}
                 >
-                  {isActive && (
-                    <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-full bg-primary ${isCollapsed && !mobile ? 'hidden' : ''}`} />
-                  )}
                   <Icon
-                    className={`h-[1.125rem] w-[1.125rem] shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-primary" : "text-on-surface-variant/70 group-hover:text-primary"}`}
+                    className={`h-[1.125rem] w-[1.125rem] shrink-0 transition-colors duration-200 ${isActive ? "text-primary" : "text-on-surface-variant/70 group-hover:text-on-surface"}`}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
                   {hasAttention && isCollapsed && !mobile ? (
@@ -233,9 +244,17 @@ export function Sidebar({
                       aria-hidden="true"
                     />
                   ) : null}
+                  {hasBadge && isCollapsed && !mobile ? (
+                    <span
+                      className="absolute right-0.5 top-0 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[8px] font-extrabold leading-none text-on-primary ring-2 ring-surface-container-low"
+                      aria-label={t("nav.newLeads", { count: badgeCount })}
+                    >
+                      {badgeLabel}
+                    </span>
+                  ) : null}
                   {(!isCollapsed || mobile) && (
                     <span className="min-w-0 flex-1 overflow-hidden transition-all duration-300">
-                      <span className={`block truncate text-sm tracking-tight ${isActive ? "font-bold" : "font-medium"}`}>
+                      <span className={`block truncate text-sm tracking-tight ${isActive ? "font-semibold" : "font-medium"}`}>
                         {item.name}
                       </span>
                       {hasAttention ? (
@@ -254,6 +273,14 @@ export function Sidebar({
                       className="ml-2 h-2.5 w-2.5 shrink-0 rounded-full bg-orange-500 shadow-[0_0_0_4px_color-mix(in_srgb,var(--color-orange-500)_14%,transparent)] ring-1 ring-orange-300/80"
                       aria-hidden="true"
                     />
+                  ) : null}
+                  {hasBadge && (!isCollapsed || mobile) ? (
+                    <span
+                      className="ml-2 inline-flex min-w-6 items-center justify-center rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-bold text-primary ring-1 ring-primary/15"
+                      aria-label={t("nav.newLeads", { count: badgeCount })}
+                    >
+                      {badgeLabel}
+                    </span>
                   ) : null}
                   {hasAttention ? (
                     <span className="sr-only">{t("nav.newAnalyticsActivity")}</span>
@@ -303,12 +330,12 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className={`mt-auto p-4 space-y-3 transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-4'}`}>
+      <div className={`mt-auto pb-4 pt-2 space-y-2 transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-3'}`}>
         
         {/* Message Usage Bar */}
         {subscription && (
           <div className={`relative w-full ${isCollapsed && !mobile ? 'flex justify-center' : ''}`}>
-            <div className={`group relative rounded-xl border border-outline-variant/10 bg-surface-container-high/40 transition-all ${isCollapsed && !mobile ? 'flex h-12 w-12 flex-col items-center justify-center p-0' : 'p-3 w-full'}`}>
+            <div className={`group relative rounded-xl border border-outline-variant/10 bg-surface-container-high/40 transition-all ${isCollapsed && !mobile ? 'flex h-12 w-12 flex-col items-center justify-center p-0' : 'p-2.5 w-full'}`}>
               {isCollapsed && !mobile ? (
                 <>
                   <div className="flex items-center justify-center flex-1">
@@ -377,13 +404,22 @@ export function Sidebar({
         )}
 
         {membership.role !== 'owner' && (!isCollapsed || mobile) && (
-          <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/8 ring-1 ring-amber-500/15 px-3 py-2.5">
-            <span className="material-symbols-outlined text-base text-amber-500">domain</span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">
-                {t("nav.guestWorkspace") || "Guest Workspace"}
-              </p>
-              <p className="truncate text-[11px] font-medium text-on-surface-variant mt-0.5">
+          <div className="group relative flex items-center gap-2.5 rounded-xl border border-primary/10 bg-primary/[0.02] px-2.5 py-2 transition-all duration-300 hover:border-primary/25 hover:bg-primary/[0.06]">
+            {/* Ambient glowing background spotlight matching brand orange */}
+            <div className="pointer-events-none absolute -inset-px rounded-xl bg-gradient-to-r from-primary/0 via-primary/[0.04] to-primary/0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+            <div className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/15">
+              <Building2 className="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-[6deg]" />
+            </div>
+
+            <div className="relative z-10 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="h-1 w-1 rounded-full bg-primary ring-2 ring-primary/20 animate-pulse" />
+                <p className="truncate text-[8px] font-extrabold uppercase tracking-[0.15em] text-primary/90">
+                  {t("nav.guestWorkspace") || "Guest Workspace"}
+                </p>
+              </div>
+              <p className="truncate text-[11px] font-bold text-on-surface-variant transition-colors mt-0.5 group-hover:text-on-surface">
                 {workspace.name}
               </p>
             </div>

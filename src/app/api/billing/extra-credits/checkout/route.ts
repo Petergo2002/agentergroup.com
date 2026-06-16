@@ -10,6 +10,8 @@ import {
   getStripe,
   getStripeExtraCredits500PriceId,
 } from "@/lib/stripe";
+import { getOrCreateWorkspaceStripeCustomer } from "@/lib/billing-customer";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -37,7 +39,8 @@ export async function POST(req: Request) {
       user.id,
     );
 
-    const { data: subscription, error: subscriptionError } = await supabase
+    const admin = createAdminClient();
+    const { data: subscription, error: subscriptionError } = await admin
       .from("workspace_subscriptions")
       .select("stripe_customer_id, plan_tier")
       .eq("workspace_id", workspaceId)
@@ -57,30 +60,14 @@ export async function POST(req: Request) {
       );
     }
 
-    let stripeCustomerId = subscription.stripe_customer_id;
     const stripe = getStripe();
     const extraCreditsPriceId = getStripeExtraCredits500PriceId();
-
-    if (!stripeCustomerId) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("email, full_name")
-        .eq("id", user.id)
-        .single();
-
-      const customer = await stripe.customers.create({
-        email: profile?.email ?? user.email ?? undefined,
-        name: profile?.full_name ?? undefined,
-        metadata: { workspace_id: workspaceId, user_id: user.id },
-      });
-
-      stripeCustomerId = customer.id;
-
-      await supabase
-        .from("workspace_subscriptions")
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq("workspace_id", workspaceId);
-    }
+    const stripeCustomerId = await getOrCreateWorkspaceStripeCustomer({
+      stripe,
+      workspaceId,
+      user,
+      existingCustomerId: subscription.stripe_customer_id,
+    });
 
     const appUrl = getAppUrl();
     const metadata = {

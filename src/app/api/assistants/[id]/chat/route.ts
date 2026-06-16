@@ -137,6 +137,7 @@ export async function POST(
         threadId: providedThreadId,
         assistantId: assistant.id,
         workspaceId: assistant.workspace_id,
+        actorUserId: user.id,
       })
     : await createAssistantThread(admin as never, {
         workspaceId: assistant.workspace_id,

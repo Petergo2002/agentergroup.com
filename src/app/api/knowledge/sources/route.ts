@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { after, NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import {
   KNOWLEDGE_BUCKET,
@@ -8,6 +9,11 @@ import {
   inferKnowledgeMimeType,
   isSupportedKnowledgeMimeType,
 } from "@/lib/knowledge";
+import {
+  MAX_WEBSITE_KNOWLEDGE_PAGES,
+  normalizeSelectedWebsiteUrls,
+  normalizeWebsiteKnowledgeUrl,
+} from "@/lib/knowledge-website";
 import type { KnowledgeSourceRecord, KnowledgeSourceType } from "@/lib/types";
 
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
@@ -22,6 +28,56 @@ function buildStorageLimitError(storageLimitBytes: number) {
   return `Storage limit exceeded. Your current plan allows ${
     storageLimitBytes / 1024 / 1024
   }MB total knowledge base storage.`;
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object") {
+    const message = Reflect.get(error, "message");
+    if (typeof message === "string") {
+      return message;
+    }
+  }
+
+  return "";
+}
+
+function isKnowledgeStorageLimitError(error: unknown) {
+  return getErrorMessage(error).includes("KNOWLEDGE_STORAGE_LIMIT_EXCEEDED");
+}
+
+async function reserveKnowledgeStorage(
+  workspaceId: string,
+  sourceId: string,
+  sizeBytes: number,
+) {
+  const admin = createAdminClient();
+  const { error } = await admin.rpc("reserve_knowledge_source_storage", {
+    p_workspace_id: workspaceId,
+    p_source_id: sourceId,
+    p_size_bytes: sizeBytes,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function deleteKnowledgeSource(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sourceId: string,
+) {
+  const { error } = await supabase
+    .from("knowledge_sources")
+    .delete()
+    .eq("id", sourceId);
+
+  if (error) {
+    console.error("Failed to clean up knowledge source after error.", error);
+  }
 }
 
 async function linkSourceToFolder(
@@ -126,6 +182,7 @@ export async function GET() {
     .from("knowledge_sources")
     .select(KNOWLEDGE_SOURCE_LIST_SELECT)
     .eq("workspace_id", context.workspace.id)
+    .is("widget_session_id", null)
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -168,7 +225,8 @@ export async function POST(request: NextRequest) {
   const { data: usageData, error: usageError } = await supabase
     .from("knowledge_sources")
     .select("file_size_bytes")
-    .eq("workspace_id", context.workspace.id);
+    .eq("workspace_id", context.workspace.id)
+    .is("widget_session_id", null);
 
   if (usageError) {
     return NextResponse.json({ error: usageError.message }, { status: 500 });
@@ -206,7 +264,7 @@ export async function POST(request: NextRequest) {
         description,
         source_type: "text",
         raw_text: rawText,
-        file_size_bytes: newSizeBytes,
+        file_size_bytes: 0,
         status: "pending",
       })
       .select()
@@ -220,8 +278,33 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      await reserveKnowledgeStorage(
+        context.workspace.id,
+        source.id,
+        newSizeBytes,
+      );
+      source.file_size_bytes = newSizeBytes;
+    } catch (reserveError) {
+      await deleteKnowledgeSource(supabase, source.id);
+
+      if (!isKnowledgeStorageLimitError(reserveError)) {
+        console.error("Failed to reserve knowledge storage.", reserveError);
+        return NextResponse.json(
+          { error: "Failed to reserve knowledge storage." },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json(
+        { error: buildStorageLimitError(storageLimit) },
+        { status: 402 },
+      );
+    }
+
+    try {
       await linkSourceToFolder(supabase, context.workspace.id, source.id, body.folderId);
     } catch (folderError) {
+      await deleteKnowledgeSource(supabase, source.id);
       return NextResponse.json(
         {
           error:
@@ -264,19 +347,15 @@ export async function POST(request: NextRequest) {
   }
 
   if (sourceType === "website") {
-    let url = String(body.url ?? "").trim();
+    const rawUrl = String(body.url ?? "").trim();
 
-    if (!url) {
+    if (!rawUrl) {
       return NextResponse.json({ error: "url is required for website sources." }, { status: 400 });
     }
 
-    // Prepend https:// if no protocol is provided
-    if (!/^https?:\/\//i.test(url)) {
-      url = `https://${url}`;
-    }
-
+    let websiteUrl: URL;
     try {
-      new URL(url);
+      websiteUrl = normalizeWebsiteKnowledgeUrl(rawUrl);
     } catch {
       return NextResponse.json({ error: "Invalid URL provided." }, { status: 400 });
     }
@@ -287,9 +366,33 @@ export async function POST(request: NextRequest) {
     }
 
     const isPremium = context.subscription?.plan_tier === "premium";
-    const requestedLimit = Math.min(Math.max(Number(body.limit ?? 1), 1), 30);
+    const requestedLimit = Math.min(
+      Math.max(Number(body.limit ?? 1), 1),
+      MAX_WEBSITE_KNOWLEDGE_PAGES,
+    );
     const crawlLimit = isPremium ? requestedLimit : 1;
-    const selectedUrls = Array.isArray(body.urls) ? (body.urls as unknown[]).filter((u): u is string => typeof u === "string").slice(0, 30) : [];
+    let selectedUrls: string[];
+
+    try {
+      selectedUrls = normalizeSelectedWebsiteUrls(websiteUrl, body.urls);
+    } catch (selectedUrlError) {
+      return NextResponse.json(
+        {
+          error:
+            selectedUrlError instanceof Error
+              ? selectedUrlError.message
+              : "Selected URLs are invalid.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!isPremium && selectedUrls.length > 0) {
+      return NextResponse.json(
+        { error: "Selecting multiple website pages is a Premium feature." },
+        { status: 403 },
+      );
+    }
 
     // Create the source immediately without waiting for Firecrawl
     const { data: source, error } = await supabase
@@ -304,10 +407,9 @@ export async function POST(request: NextRequest) {
         file_size_bytes: 0,
         status: "pending",
         metadata: { 
-          sourceUrl: url,
+          sourceUrl: websiteUrl.toString(),
           crawlLimit,
           selectedUrls,
-          isPremium 
         },
       })
       .select()
@@ -323,6 +425,7 @@ export async function POST(request: NextRequest) {
     try {
       await linkSourceToFolder(supabase, context.workspace.id, source.id, body.folderId);
     } catch (folderError) {
+      await deleteKnowledgeSource(supabase, source.id);
       return NextResponse.json(
         {
           error:
@@ -384,7 +487,7 @@ export async function POST(request: NextRequest) {
       storage_bucket: KNOWLEDGE_BUCKET,
       storage_path: "",
       mime_type: mimeType,
-      file_size_bytes: fileSizeBytes,
+      file_size_bytes: 0,
     })
     .select()
     .single();
@@ -393,6 +496,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: error?.message ?? "Failed to create knowledge source." },
       { status: 500 },
+    );
+  }
+
+  try {
+    await reserveKnowledgeStorage(
+      context.workspace.id,
+      source.id,
+      fileSizeBytes,
+    );
+    source.file_size_bytes = fileSizeBytes;
+  } catch (reserveError) {
+    await deleteKnowledgeSource(supabase, source.id);
+
+    if (!isKnowledgeStorageLimitError(reserveError)) {
+      console.error("Failed to reserve knowledge storage.", reserveError);
+      return NextResponse.json(
+        { error: "Failed to reserve knowledge storage." },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      { error: buildStorageLimitError(storageLimit) },
+      { status: 402 },
     );
   }
 
@@ -407,6 +534,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (updateError || !updatedSource) {
+    await deleteKnowledgeSource(supabase, source.id);
     return NextResponse.json(
       { error: updateError?.message ?? "Failed to reserve upload path." },
       { status: 500 },
@@ -416,6 +544,7 @@ export async function POST(request: NextRequest) {
   try {
     await linkSourceToFolder(supabase, context.workspace.id, updatedSource.id, body.folderId);
   } catch (folderError) {
+    await deleteKnowledgeSource(supabase, updatedSource.id);
     return NextResponse.json(
       {
         error:

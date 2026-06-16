@@ -28,6 +28,7 @@ import {
 } from "@/lib/validation/widget-schemas";
 import {
   acquireWidgetSessionTurnLock,
+  autoCaptureLead,
   buildDraftWidgetRuntimeAgents,
   buildWidgetRuntimeCorsHeaders,
   buildStoredWidgetRuntimeAgents,
@@ -95,6 +96,156 @@ function buildRateLimitedResponse(
 
 const SESSION_BUSY_ERROR =
   "Another reply is already being generated for this chat. Please wait for the current response to finish.";
+const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+interface RequestedWidgetAttachment {
+  id: string;
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
+async function resolveWidgetAttachments(
+  supabase: WidgetAdminSupabase,
+  input: {
+    widgetId: string;
+    widgetSessionId: string;
+    attachments: Array<Pick<RequestedWidgetAttachment, "id">> | undefined;
+  },
+) {
+  if (!input.attachments || input.attachments.length === 0) {
+    return undefined;
+  }
+
+  const attachmentIds = input.attachments.map((attachment) => attachment.id);
+  const { data, error } = await supabase
+    .from("widget_attachments")
+    .select<{
+      id: string;
+      widget_id: string;
+      widget_session_id: string;
+      storage_bucket: string;
+      storage_path: string;
+      original_name: string;
+      mime_type: string;
+      file_size_bytes: number;
+    }>(
+      "id, widget_id, widget_session_id, storage_bucket, storage_path, original_name, mime_type, file_size_bytes",
+    )
+    .eq("widget_id", input.widgetId)
+    .eq("widget_session_id", input.widgetSessionId)
+    .in("id", attachmentIds);
+
+  if (error) {
+    throw new Error("Failed to validate attachments.");
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    widget_id: string;
+    widget_session_id: string;
+    storage_bucket: string;
+    storage_path: string;
+    original_name: string;
+    mime_type: string;
+    file_size_bytes: number;
+  }>;
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+
+  if (rowById.size !== attachmentIds.length) {
+    throw new Error("One or more attachments do not belong to this chat.");
+  }
+
+  return Promise.all(
+    attachmentIds.map(async (attachmentId) => {
+      const row = rowById.get(attachmentId);
+      if (!row) {
+        throw new Error("Attachment not found.");
+      }
+
+      const { data: signedUrlData, error: signedUrlError } =
+        await supabase.storage
+          .from(row.storage_bucket)
+          .createSignedUrl(
+            row.storage_path,
+            ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+          );
+
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        throw new Error("Failed to create a secure attachment URL.");
+      }
+
+      return {
+        id: row.id,
+        url: signedUrlData.signedUrl,
+        name: row.original_name,
+        type: row.mime_type,
+        size: row.file_size_bytes,
+      };
+    }),
+  );
+}
+
+async function refreshWidgetHistoryAttachments(
+  supabase: WidgetAdminSupabase,
+  input: {
+    widgetId: string;
+    widgetSessionId: string;
+    history: Awaited<ReturnType<typeof loadOrderedWidgetSessionHistory>>;
+  },
+) {
+  return Promise.all(
+    input.history.map(async (message) => {
+      const rawAttachments = message.metadata?.attachments;
+
+      if (!Array.isArray(rawAttachments)) {
+        return message;
+      }
+
+      const attachmentIds = rawAttachments.flatMap((attachment) => {
+        if (
+          !attachment ||
+          typeof attachment !== "object" ||
+          !("id" in attachment) ||
+          typeof attachment.id !== "string"
+        ) {
+          return [];
+        }
+
+        return [{ id: attachment.id }];
+      });
+
+      if (attachmentIds.length === 0) {
+        return message;
+      }
+
+      try {
+        const attachments = await resolveWidgetAttachments(supabase, {
+          widgetId: input.widgetId,
+          widgetSessionId: input.widgetSessionId,
+          attachments: attachmentIds,
+        });
+
+        return {
+          ...message,
+          metadata: {
+            ...message.metadata,
+            attachments,
+          },
+        };
+      } catch {
+        return {
+          ...message,
+          metadata: {
+            ...message.metadata,
+            attachments: [],
+          },
+        };
+      }
+    }),
+  );
+}
 
 function resolveSelectedWidgetAgent(args: {
   widgetAgents: RuntimeWidgetAgentSelection[];
@@ -300,33 +451,13 @@ export async function POST(
       }
     }
 
-    // Preview-token chat skips the public volumetric limiter, but it still
-    // invokes OpenRouter and must spend workspace message credits.
-    try {
-      await consumeWorkspaceMessageUsage(
-        supabase,
-        loaded.widget.workspace_id,
-      );
-    } catch (usageError) {
-      if (!(usageError instanceof MessageLimitExceededError)) {
-        throw usageError;
-      }
-
-      return buildErrorResponse(
-        request,
-        usageError.status,
-        usageError.message,
-        usageError.code,
-      );
-    }
-
     const {
       sessionId,
       message,
       widgetAgentId: requestedWidgetAgentId,
       pageUrl,
       referrer,
-      attachments,
+      attachments: requestedAttachments,
     } = bodyValidation.value;
 
     const existingSession = await loadWidgetSession(
@@ -391,6 +522,44 @@ export async function POST(
       activeWidgetAgentId: selected!.persistedWidgetAgentId,
       activeAgentId: selected!.agent.id,
     });
+    let attachments: Awaited<ReturnType<typeof resolveWidgetAttachments>>;
+
+    try {
+      attachments = await resolveWidgetAttachments(supabase, {
+        widgetId: loaded.widget.id,
+        widgetSessionId: widgetSession.id,
+        attachments: requestedAttachments,
+      });
+    } catch (attachmentError) {
+      return buildErrorResponse(
+        request,
+        400,
+        attachmentError instanceof Error
+          ? attachmentError.message
+          : "Attachments are invalid.",
+        "INVALID_ATTACHMENT",
+      );
+    }
+
+    // Preview-token chat skips the public volumetric limiter, but it still
+    // invokes OpenRouter and must spend workspace message credits.
+    try {
+      await consumeWorkspaceMessageUsage(
+        supabase,
+        loaded.widget.workspace_id,
+      );
+    } catch (usageError) {
+      if (!(usageError instanceof MessageLimitExceededError)) {
+        throw usageError;
+      }
+
+      return buildErrorResponse(
+        request,
+        usageError.status,
+        usageError.message,
+        usageError.code,
+      );
+    }
 
     turnRequestId = crypto.randomUUID();
     turnLockWidgetId = loaded.widget.id;
@@ -447,6 +616,30 @@ export async function POST(
       loadOrderedWidgetSessionHistory(supabase, widgetSession.id),
       getPublishedAgentVersion(supabase, selectedVersionId),
     ]);
+
+    try {
+      await autoCaptureLead(supabase, {
+        widgetId: loaded.widget.id,
+        widgetSessionId: widgetSession.id,
+        widgetAgentId: selected!.persistedWidgetAgentId,
+        agentId: selected!.agent.id,
+        messages: history.map((item) => ({
+          role: item.role,
+          content: item.content,
+        })),
+      });
+    } catch (leadCaptureError) {
+      console.error("Failed to auto-capture widget lead.", leadCaptureError);
+    }
+
+    const historyWithSecureAttachments = await refreshWidgetHistoryAttachments(
+      supabase,
+      {
+        widgetId: loaded.widget.id,
+        widgetSessionId: widgetSession.id,
+        history,
+      },
+    );
     const runtimeAgent = getWidgetRuntimeAgent(selected!.agent, publishedVersion);
     const previewRuntimeAgent = preview.runtimeConfig?.agents.find(
       (agentConfig) => agentConfig.agentId === selected!.agent.id,
@@ -491,7 +684,7 @@ export async function POST(
             supabase: supabase as never,
             agent: runtimeAgent,
             input: message,
-            history: history.map((item) => ({
+            history: historyWithSecureAttachments.map((item) => ({
               role:
                 item.role === "assistant"
                   ? "assistant"

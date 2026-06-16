@@ -89,16 +89,16 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
       {/* Switcher Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`group flex items-center gap-3 rounded-md bg-surface-container/50 ring-1 ring-transparent transition-all duration-150 active:scale-[0.98] hover:bg-surface-container-high hover:ring-outline-variant/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-          isOpen ? 'bg-surface-container-high ring-outline-variant/50' : ''
-        } ${isMinimized ? 'h-12 w-12 justify-center p-0' : 'w-full p-3'}`}
+        className={`group flex items-center gap-2.5 rounded-xl border border-transparent transition-all duration-200 active:scale-[0.98] hover:bg-on-surface/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+          isOpen ? 'bg-on-surface/[0.04]' : ''
+        } ${isMinimized ? 'h-12 w-12 justify-center p-0' : 'w-full px-2 py-2'}`}
         aria-expanded={isOpen}
         aria-haspopup="true"
         disabled={isSwitching}
       >
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-surface-container-high text-xs font-bold text-on-surface-variant transition-colors group-hover:bg-primary/10 group-hover:text-primary ${isMinimized ? 'h-9 w-9 text-[10px]' : 'h-10 w-10'}`}>
+        <div className={`flex shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-tr from-primary via-primary/95 to-orange-400 text-xs font-bold text-white shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:shadow-primary/10 ${isMinimized ? 'h-9 w-9 text-[10px]' : 'h-8 w-8'}`}>
           {isSwitching ? (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
           ) : (
             initials
           )}
@@ -107,14 +107,14 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
         {!isMinimized && (
           <>
             <div className="min-w-0 flex-1 text-left">
-              <p className="truncate text-xs font-bold text-on-surface">
+              <p className="truncate text-[13px] font-semibold text-on-surface">
                 {userEmail ?? t('nav.workspace')}
               </p>
-              <div className="mt-1 inline-flex rounded-md bg-surface-container-high px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
+              <div className="mt-0.5 inline-flex rounded-md bg-surface-container-high px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
                 {t(`roles.${membership.role}Lower`) || membership.role}
               </div>
             </div>
-            <ChevronsUpDown className="h-4 w-4 shrink-0 text-on-surface-variant" />
+            <ChevronsUpDown className={`h-4 w-4 shrink-0 text-on-surface-variant transition-transform duration-200 ${isOpen ? 'rotate-180 text-primary' : 'rotate-0 group-hover:text-on-surface'}`} />
           </>
         )}
       </button>
@@ -129,12 +129,12 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
       {/* Dropdown Menu */}
       {isOpen && (
         <div
-          className={`absolute bottom-full z-50 mb-2 w-[280px] overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-2 shadow-lg ${
-            isMinimized ? 'left-full ml-4 bottom-0' : 'left-0'
+          className={`absolute bottom-full z-50 mb-2 w-[280px] overflow-hidden rounded-2xl glass-panel shadow-premium p-2 animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-200 ease-out origin-bottom-left ${
+            isMinimized ? 'left-full ml-4 bottom-0 origin-bottom-left' : 'left-0'
           }`}
         >
-          <div className="px-3 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <div className="px-2 pb-1.5 pt-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant/60">
               {t('nav.switchWorkspace') || 'Switch Workspace'}
             </p>
           </div>
@@ -149,36 +149,37 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
                   key={ws.id}
                   onClick={() => handleSwitchWorkspace(ws.id)}
                   disabled={isActive || isSwitching}
-                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  className={`group/ws-item flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-on-surface hover:bg-on-surface/5'
+                      ? 'bg-primary/[0.08] text-primary'
+                      : 'text-on-surface-variant hover:bg-on-surface/[0.04] hover:text-on-surface'
                   }`}
                 >
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${isActive ? 'bg-primary/20' : 'bg-surface-container-high'}`}>
-                    <Building2 className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-on-surface-variant'}`} />
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${isActive ? 'bg-primary/10' : 'bg-surface-container-high group-hover/ws-item:bg-surface-container-highest'}`}>
+                    <Building2 className={`h-3.5 w-3.5 transition-transform duration-200 ${isActive ? 'text-primary' : 'text-on-surface-variant group-hover/ws-item:text-on-surface'}`} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{ws.name}</p>
+                    <p className={`truncate text-[13px] transition-all duration-200 ${isActive ? 'font-semibold' : 'font-medium'}`}>{ws.name}</p>
                   </div>
-                  {isActive && <Check className="h-4 w-4 shrink-0" />}
+                  {isActive && <Check className="h-4 w-4 shrink-0 text-primary animate-in zoom-in-75 duration-300" />}
                 </button>
               );
             })}
           </div>
 
-          <div className="my-2 h-px w-full bg-outline-variant/10" />
+          <div className="my-1 h-px w-full bg-outline-variant/10" />
 
+          {/* Settings Section */}
           <Link
             href="/settings"
             onClick={() => {
               setIsOpen(false);
               onNavigate?.();
             }}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-all duration-150 active:scale-[0.98] hover:bg-on-surface/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="group/settings flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] font-medium text-on-surface-variant transition-all duration-200 active:scale-[0.98] hover:bg-on-surface/[0.04] hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
-            <Settings className="h-4 w-4 text-on-surface-variant" />
-            {t('nav.settings') || 'Settings'}
+            <Settings className="h-4 w-4 text-on-surface-variant transition-transform duration-300 group-hover/settings:rotate-45 group-hover/settings:text-on-surface" />
+            <span>{t('nav.settings') || 'Settings'}</span>
           </Link>
 
           {/* Create New Workspace */}
@@ -193,15 +194,15 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
             }}
             disabled={!hasWorkspaceCapacity && subscription?.plan_tier === 'premium'}
             title={!hasWorkspaceCapacity ? createWorkspaceLimitLabel : undefined}
-            className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+            className={`group/create flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] font-medium transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               hasWorkspaceCapacity
-                ? 'text-on-surface hover:bg-on-surface/5'
+                ? 'text-on-surface-variant hover:bg-on-surface/[0.04] hover:text-on-surface'
                 : subscription?.plan_tier === 'premium'
                   ? 'cursor-not-allowed text-on-surface-variant/50'
-                  : 'text-primary hover:bg-primary/10'
+                  : 'text-primary hover:bg-primary/10 hover:text-primary'
             }`}
           >
-            <Plus className={`h-4 w-4 ${hasWorkspaceCapacity ? 'text-on-surface-variant' : 'text-current'}`} />
+            <Plus className={`h-4 w-4 transition-transform duration-300 ${hasWorkspaceCapacity ? 'text-on-surface-variant group-hover/create:rotate-90 group-hover/create:text-on-surface' : 'text-current group-hover/create:rotate-90'}`} />
             <span className="min-w-0 flex-1">
               <span className="block truncate">
                 {hasWorkspaceCapacity
@@ -218,13 +219,14 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
             </span>
           </button>
 
+          {/* Sign Out */}
           <form action="/auth/logout" method="post" className="w-full">
             <button
               type="submit"
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-all duration-150 active:scale-[0.98] hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="group/logout flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] font-medium text-on-surface-variant transition-all duration-200 active:scale-[0.98] hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <LogOut className="h-4 w-4 text-on-surface-variant" />
-              {t('nav.signOut') || 'Sign out'}
+              <LogOut className="h-4 w-4 text-on-surface-variant transition-colors duration-200 group-hover/logout:text-error" />
+              <span className="transition-colors duration-200">{t('nav.signOut') || 'Sign out'}</span>
             </button>
           </form>
         </div>

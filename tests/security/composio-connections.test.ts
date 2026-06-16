@@ -92,7 +92,7 @@ test("Composio tool-call setup failures throw instead of returning empty results
         hasProvider: true,
         userId: "workspace:one",
       }),
-    /COMPOSIO_API_KEY is missing/,
+    /provider API key is missing/,
   );
 
   assert.throws(
@@ -103,7 +103,7 @@ test("Composio tool-call setup failures throw instead of returning empty results
         hasProvider: true,
         userId: "workspace:one",
       }),
-    /No Composio session is available/,
+    /No connection provider session is available/,
   );
 
   assert.throws(
@@ -114,6 +114,6 @@ test("Composio tool-call setup failures throw instead of returning empty results
         hasProvider: false,
         userId: "workspace:one",
       }),
-    /Composio provider is unavailable/,
+    /Connection provider is unavailable/,
   );
 });

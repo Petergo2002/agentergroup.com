@@ -1,6 +1,6 @@
 # Automation Agents
 
-Last updated: 2026-05-04
+Last updated: 2026-06-07
 
 ## Purpose
 
@@ -162,6 +162,12 @@ Composio Gmail trigger
   -> update agent_automations.last_event_at or last_error
 ```
 
+The webhook route handles Composio connected-account expiry events separately. An event with
+`type = 'composio.connected_account.expired'` marks matching local connection rows
+`disconnected`, records the upstream status reason, moves active/provisioning automations that
+use the connection to `error`, and pauses their agents. These expiry events are not inserted into
+`automation_events`.
+
 Automation v1 still uses `after()` processing. Durable retry queues/workers are intentionally deferred.
 
 ## Tool Execution
@@ -188,6 +194,7 @@ Current supported action toolkits:
 - Slack
 - HubSpot
 - Shopify
+- Google Ads
 - Google Calendar
 - Cal.com
 
@@ -297,6 +304,13 @@ Cascade deletes remove automation rows/events.
 
 This prevents a disconnected account from leaving a still-active provider trigger behind.
 
+### Composio Expiry Webhook
+
+`POST /api/composio/webhook` also handles the exact
+`composio.connected_account.expired` lifecycle event. It updates the matching local
+`connections` row and pauses/errors affected automations without waiting for an operator to click
+disconnect. Other lifecycle event names are not currently handled by this branch.
+
 ## Status Rules
 
 Normal agent status changes do not control Automation activation.
@@ -360,6 +374,7 @@ Use this checklist when changing automation behavior:
 - [ ] Archive disables provider trigger.
 - [ ] Delete deletes provider trigger.
 - [ ] Disconnecting a used Gmail account pauses/errors the automation and disables provider trigger.
+- [ ] A Composio connected-account expiry webhook marks the connection disconnected and pauses/errors affected automations.
 - [ ] Normal `/api/agents/[id]/status` cannot activate an Automation.
 - [ ] `npm run lint`
 - [ ] `npm run build`

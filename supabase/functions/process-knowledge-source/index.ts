@@ -45,6 +45,20 @@ const supabaseAdminKey =
 const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
 const model = new Supabase.ai.Session("gte-small");
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
+const MAX_WEBSITE_KNOWLEDGE_PAGES = 30;
+
+interface KnowledgeSourceRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  source_type: string;
+  status: string;
+  raw_text: string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  mime_type: string | null;
+  metadata: Record<string, unknown> | null;
+}
 
 function buildStorageLimitError(storageLimitBytes: number) {
   return `Storage limit exceeded. Your current plan allows ${
@@ -52,21 +66,56 @@ function buildStorageLimitError(storageLimitBytes: number) {
   }MB total knowledge base storage.`;
 }
 
-function isEphemeralWidgetUploadSource(source: Record<string, unknown> | null) {
-  if (!source) {
-    return false;
+function normalizeWebsiteUrl(value: string) {
+  const withProtocol = /^https?:\/\//i.test(value.trim())
+    ? value.trim()
+    : `https://${value.trim()}`;
+  const url = new URL(withProtocol);
+
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new Error("Website URL must use HTTP or HTTPS.");
   }
 
-  const metadata =
-    source.metadata && typeof source.metadata === "object"
-      ? (source.metadata as Record<string, unknown>)
-      : null;
+  if (url.username || url.password) {
+    throw new Error("Website URL cannot include credentials.");
+  }
 
-  return (
-    metadata?.ephemeral === true &&
-    typeof source.widget_session_id === "string" &&
-    source.widget_session_id.length > 0
-  );
+  url.hash = "";
+  return url;
+}
+
+function normalizeSelectedUrls(baseUrl: URL, values: unknown) {
+  if (!Array.isArray(values)) {
+    return [] as string[];
+  }
+
+  const selectedUrls: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of values) {
+    if (typeof value !== "string" || !value.trim()) {
+      continue;
+    }
+
+    const candidate = normalizeWebsiteUrl(value);
+    if (candidate.origin !== baseUrl.origin) {
+      throw new Error("Selected URLs must belong to the website origin.");
+    }
+
+    const normalized = candidate.toString();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      selectedUrls.push(normalized);
+    }
+
+    if (selectedUrls.length > MAX_WEBSITE_KNOWLEDGE_PAGES) {
+      throw new Error(
+        `A maximum of ${MAX_WEBSITE_KNOWLEDGE_PAGES} website pages can be processed at once.`,
+      );
+    }
+  }
+
+  return selectedUrls;
 }
 
 function extractBearerToken(value: string | null) {
@@ -135,24 +184,21 @@ Deno.serve(async (request) => {
   const isInternalRequest = requestKeys.some((key) => configuredSecretKeys.has(key));
   console.log(`[Process] Starting job for source: ${sourceId}`);
 
-  const { data: source, error: sourceError } = await adminClient
-    .from("knowledge_sources")
-    .select("*")
-    .eq("id", sourceId)
-    .single();
-
-  if (sourceError || !source) {
-    console.error(`[Process] Source ${sourceId} not found:`, sourceError);
-    return json({ error: "Knowledge source not found." }, 404);
-  }
-
-  const allowUnauthenticatedEphemeral = isEphemeralWidgetUploadSource(
-    source as Record<string, unknown>,
-  );
+  let source: KnowledgeSourceRow | null = null;
 
   if (isInternalRequest) {
-    // Server-to-server call authenticated by a current Supabase secret key or
-    // the legacy service-role key.
+    const sourceResult = await adminClient
+      .from("knowledge_sources")
+      .select("*")
+      .eq("id", sourceId)
+      .maybeSingle();
+
+    if (sourceResult.error) {
+      console.error(`[Process] Failed to load source ${sourceId}:`, sourceResult.error);
+      return json({ error: "Knowledge source could not be loaded." }, 500);
+    }
+
+    source = sourceResult.data as KnowledgeSourceRow | null;
   } else if (authHeader) {
     const userClient = createClient(supabaseUrl, supabasePublishableKey, {
       global: { headers: { Authorization: authHeader } },
@@ -166,9 +212,26 @@ Deno.serve(async (request) => {
       console.error("[Process] Unauthorized access attempt:", userError);
       return json({ error: "Unauthorized" }, 401);
     }
-  } else if (!allowUnauthenticatedEphemeral) {
+
+    const sourceResult = await userClient
+      .from("knowledge_sources")
+      .select("*")
+      .eq("id", sourceId)
+      .maybeSingle();
+
+    if (sourceResult.error) {
+      console.error(`[Process] User-scoped source lookup failed for ${sourceId}:`, sourceResult.error);
+      return json({ error: "Knowledge source could not be loaded." }, 500);
+    }
+
+    source = sourceResult.data as KnowledgeSourceRow | null;
+  } else {
     console.error("[Process] Missing Authorization header");
     return json({ error: "Missing Authorization header." }, 401);
+  }
+
+  if (!source) {
+    return json({ error: "Knowledge source not found." }, 404);
   }
 
   await adminClient
@@ -188,24 +251,44 @@ Deno.serve(async (request) => {
 
       const firecrawl = new Firecrawl({ apiKey: firecrawlApiKey });
       const metadata = source.metadata || {};
-      const url = metadata.sourceUrl;
-      const crawlLimit = metadata.crawlLimit || 1;
-      const selectedUrls = Array.isArray(metadata.selectedUrls)
-        ? (metadata.selectedUrls as unknown[]).filter((value: unknown): value is string =>
-            typeof value === "string" && value.trim().length > 0
+      const rawUrl = typeof metadata.sourceUrl === "string"
+        ? metadata.sourceUrl
+        : "";
+
+      if (!rawUrl) throw new Error("Missing sourceUrl in website metadata.");
+
+      const targetUrl = normalizeWebsiteUrl(rawUrl);
+      const selectedUrls = normalizeSelectedUrls(targetUrl, metadata.selectedUrls);
+      const requestedCrawlLimit = Number(metadata.crawlLimit ?? 1);
+      const subscriptionResult = await adminClient
+        .from("workspace_subscriptions")
+        .select("plan_tier, storage_limit_bytes")
+        .eq("workspace_id", source.workspace_id)
+        .maybeSingle();
+
+      if (subscriptionResult.error) {
+        throw new Error(`Failed to load workspace subscription: ${subscriptionResult.error.message}`);
+      }
+
+      const isPremium = subscriptionResult.data?.plan_tier === "premium";
+      const crawlLimit = isPremium
+        ? Math.min(
+            Math.max(
+              Number.isFinite(requestedCrawlLimit)
+                ? Math.floor(requestedCrawlLimit)
+                : 1,
+              1,
+            ),
+            MAX_WEBSITE_KNOWLEDGE_PAGES,
           )
-        : [];
-      const isPremium = metadata.isPremium || false;
+        : 1;
 
-      if (!url) throw new Error("Missing sourceUrl in website metadata.");
-
-      let targetUrl = url;
-      if (!/^https?:\/\//i.test(targetUrl)) targetUrl = `https://${targetUrl}`;
+      if (!isPremium && selectedUrls.length > 0) {
+        throw new Error("Selecting multiple website pages requires a Premium plan.");
+      }
 
       let scrapedText = "";
 
-      // Priority 1: User picked specific pages via the /map tool
-      // (The /map endpoint is already premium-gated so selectedUrls are always trusted)
       if (selectedUrls.length > 0) {
         console.log(`[Process] Scraping ${selectedUrls.length} selected URLs in batches...`);
         const validResults: string[] = [];
@@ -214,21 +297,18 @@ Deno.serve(async (request) => {
         for (let index = 0; index < selectedUrls.length; index += batchSize) {
           const batch = selectedUrls.slice(index, index + batchSize);
           const scrapePromises: Array<Promise<string | null>> = batch.map(async (u: string) => {
-            let scrapeUrl = u;
-            if (!/^https?:\/\//i.test(scrapeUrl)) scrapeUrl = `https://${scrapeUrl}`;
-
-            console.log(`[Process] Scraping individual URL: ${scrapeUrl}`);
+            console.log(`[Process] Scraping individual URL: ${u}`);
             try {
-              const res = await firecrawl.scrape(scrapeUrl, { formats: ["markdown"] });
+              const res = await firecrawl.scrape(u, { formats: ["markdown"] });
               if (res.markdown) {
-                console.log(`[Process] Successfully scraped ${scrapeUrl} (${res.markdown.length} chars)`);
+                console.log(`[Process] Successfully scraped ${u} (${res.markdown.length} chars)`);
                 return res.markdown;
               } else {
-                console.warn(`[Process] No markdown returned for ${scrapeUrl}`);
+                console.warn(`[Process] No markdown returned for ${u}`);
                 return null;
               }
             } catch (err) {
-              console.error(`[Process] Scrape error for ${scrapeUrl}:`, err);
+              console.error(`[Process] Scrape error for ${u}:`, err);
               return null;
             }
           });
@@ -241,9 +321,9 @@ Deno.serve(async (request) => {
         scrapedText = validResults.join("\n\n---\n\n");
 
       } else if (crawlLimit > 1 && isPremium) {
-        console.log(`[Process] Crawling website: ${targetUrl} (Limit: ${crawlLimit})`);
+        console.log(`[Process] Crawling website: ${targetUrl.toString()} (Limit: ${crawlLimit})`);
         // firecrawl.crawl() polls until done and returns a CrawlJob ({ status, data[], total, completed })
-        const crawlResult = await firecrawl.crawl(targetUrl, {
+        const crawlResult = await firecrawl.crawl(targetUrl.toString(), {
           limit: crawlLimit,
           scrapeOptions: { formats: ["markdown"] },
         });
@@ -261,11 +341,11 @@ Deno.serve(async (request) => {
           .join("\n\n---\n\n");
         console.log(`[Process] Crawl finished. Status: ${crawlResult.status}, pages: ${pages.length}/${crawlResult.total ?? '?'}.`);
       } else {
-        console.log(`[Process] Scraping single page: ${targetUrl}`);
-        const scrapeResult = await firecrawl.scrape(targetUrl, { formats: ["markdown"] });
+        console.log(`[Process] Scraping single page: ${targetUrl.toString()}`);
+        const scrapeResult = await firecrawl.scrape(targetUrl.toString(), { formats: ["markdown"] });
         if (!scrapeResult.markdown) {
           console.error(`[Process] Single scrape failed:`, scrapeResult);
-          throw new Error(`Failed to extract markdown from ${targetUrl}.`);
+          throw new Error(`Failed to extract markdown from ${targetUrl.toString()}.`);
         }
         scrapedText = scrapeResult.markdown;
         console.log(`[Process] Single scrape successful (${scrapedText.length} chars)`);
@@ -276,35 +356,34 @@ Deno.serve(async (request) => {
       }
 
       const newSizeBytes = new TextEncoder().encode(scrapedText).length;
-      const subscriptionResult = await adminClient
-        .from("workspace_subscriptions")
-        .select("storage_limit_bytes")
-        .eq("workspace_id", source.workspace_id)
-        .maybeSingle();
-
-      if (subscriptionResult.error) {
-        throw new Error(`Failed to load workspace subscription: ${subscriptionResult.error.message}`);
-      }
-
-      const usageResult = await adminClient
-        .from("knowledge_sources")
-        .select("file_size_bytes")
-        .eq("workspace_id", source.workspace_id)
-        .neq("id", source.id);
-
-      if (usageResult.error) {
-        throw new Error(`Failed to load knowledge storage usage: ${usageResult.error.message}`);
-      }
-
-      const currentTotalBytes = (usageResult.data ?? []).reduce(
-        (total, row) => total + (row.file_size_bytes ?? 0),
-        0,
-      );
       const storageLimitBytes =
         subscriptionResult.data?.storage_limit_bytes ??
         DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES;
 
-      if (currentTotalBytes + newSizeBytes > storageLimitBytes) {
+      const reservationResult = await adminClient.rpc(
+        "reserve_knowledge_source_storage",
+        {
+          p_workspace_id: source.workspace_id,
+          p_source_id: source.id,
+          p_size_bytes: newSizeBytes,
+        },
+      );
+
+      if (reservationResult.error) {
+        if (
+          reservationResult.error.message.includes(
+            "KNOWLEDGE_STORAGE_LIMIT_EXCEEDED",
+          )
+        ) {
+          throw new Error(buildStorageLimitError(storageLimitBytes));
+        }
+
+        throw new Error(
+          `Failed to reserve knowledge storage: ${reservationResult.error.message}`,
+        );
+      }
+
+      if (newSizeBytes > storageLimitBytes) {
         throw new Error(buildStorageLimitError(storageLimitBytes));
       }
 
@@ -314,7 +393,6 @@ Deno.serve(async (request) => {
         .from("knowledge_sources")
         .update({
           raw_text: scrapedText,
-          file_size_bytes: newSizeBytes,
         })
         .eq("id", source.id);
 

@@ -35,14 +35,16 @@ Signed widget-builder preview traffic is different from customer-facing hosted/e
 
 ## Browser and API protections
 
-- the dashboard app sends baseline browser protections through CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`
+- the dashboard app sends baseline browser protections through CSP, HSTS, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`
+- dashboard CSP allows Supabase origins only when `NEXT_PUBLIC_SUPABASE_URL` is configured; it must not fall back to a hardcoded project hostname
 - widget bootstrap/runtime CORS no longer emits `Access-Control-Allow-Origin: *` together with credentials
 - public widget and related runtime APIs return client-safe error messages and codes; internal details stay in server logs
 - public lead submission responses are intentionally minimized to `ok`, `leadId`, and `createdAt`
 
-## Follow-up work
+## Related operations
 
-These items are intentionally not part of the current launch-hardening batch:
+Operational items that sit outside widget embed security are tracked in the runbook:
 
-- self-service password reset
-- documented backup/restore operator runbook
+- backup and restore checks
+- deploy verification
+- separate widget-runtime deployment checks

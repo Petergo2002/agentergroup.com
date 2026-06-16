@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createAuditLog } from "@/lib/runtime/observability";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeAllowedOrigins } from "@/lib/widgets";
 import {
@@ -250,6 +251,39 @@ export async function DELETE(
       { error: "Confirmation name did not match the widget name." },
       { status: 400 },
     );
+  }
+
+  const admin = createAdminClient();
+  const { data: attachmentRows, error: attachmentLookupError } = await admin
+    .from("widget_attachments")
+    .select("storage_bucket, storage_path")
+    .eq("widget_id", id);
+
+  if (attachmentLookupError) {
+    return NextResponse.json(
+      { error: "Failed to load widget attachments for deletion." },
+      { status: 500 },
+    );
+  }
+
+  const pathsByBucket = new Map<string, string[]>();
+  for (const attachment of (attachmentRows ?? []) as Array<{
+    storage_bucket: string;
+    storage_path: string;
+  }>) {
+    const paths = pathsByBucket.get(attachment.storage_bucket) ?? [];
+    paths.push(attachment.storage_path);
+    pathsByBucket.set(attachment.storage_bucket, paths);
+  }
+
+  for (const [bucket, paths] of pathsByBucket) {
+    const { error: storageError } = await admin.storage.from(bucket).remove(paths);
+    if (storageError) {
+      return NextResponse.json(
+        { error: "Failed to delete widget attachment files." },
+        { status: 500 },
+      );
+    }
   }
 
   const deleteResult = await supabase

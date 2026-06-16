@@ -77,6 +77,7 @@ export type {
   WidgetSessionRecord,
   WidgetSessionMessageRecord,
   WidgetLeadRecord,
+  WidgetLeadListItem,
 } from "./types/widget";
 
 export type {
@@ -165,6 +166,7 @@ export type {
   GoogleCalendarBuilderNodeData,
   CalBuilderNodeData,
   EndChatBuilderNodeData,
+  TextAnnotationBuilderNodeData,
   BuilderNodeData,
   BuilderDefinition,
 } from "./types/builder";

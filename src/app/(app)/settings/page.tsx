@@ -627,7 +627,9 @@ export default function SettingsPage() {
                             privacyLookupResult.leadMatches.map((lead) => (
                               <div key={lead.id} className="rounded-xl border border-outline-variant/10 bg-surface-container px-3 py-3">
                                 <p className="font-medium text-on-surface">{lead.name}</p>
-                                <p className="mt-1 break-all">{lead.email}</p>
+                                <p className="mt-1 break-all">
+                                  {lead.email ?? lead.phone ?? "—"}
+                                </p>
                                 <p className="mt-1 text-xs uppercase tracking-[0.16em]">
                                   {lead.widgetName ?? t('common.unknownWidget')}
                                 </p>
