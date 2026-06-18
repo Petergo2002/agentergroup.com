@@ -94,6 +94,13 @@ test("V3 platform events are routed from the verified raw webhook envelope", () 
   assert.match(webhookRouteSource, /async function markDisabledTrigger/);
 });
 
+test("trigger webhooks can be matched from raw V3 trigger metadata", () => {
+  assert.match(webhookRouteSource, /const rawEventMetadata =/);
+  assert.match(webhookRouteSource, /rawEventMetadata\.trigger_id/);
+  assert.match(webhookRouteSource, /rawEventData\.trigger_nano_id/);
+  assert.match(webhookRouteSource, /Ignoring trigger webhook without active automation/);
+});
+
 test("the internal admin toggle states that it does not activate Gmail triggers", () => {
   assert.match(
     adminToggleSource,

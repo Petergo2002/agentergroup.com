@@ -255,8 +255,25 @@ export async function POST(request: NextRequest) {
   const rawEventRecord = isRecord(verified.rawPayload)
     ? verified.rawPayload
     : null;
+  const rawEventMetadataValue = rawEventRecord
+    ? Reflect.get(rawEventRecord, "metadata")
+    : null;
+  const rawEventDataValue = rawEventRecord
+    ? Reflect.get(rawEventRecord, "data")
+    : null;
+  const rawEventMetadata =
+    isRecord(rawEventMetadataValue)
+      ? rawEventMetadataValue
+      : {};
+  const rawEventData =
+    isRecord(rawEventDataValue)
+      ? rawEventDataValue
+      : {};
   const eventType = rawEventRecord
     ? pickString(Reflect.get(rawEventRecord, "type"))
+    : null;
+  const rawEventId = rawEventRecord
+    ? pickString(Reflect.get(rawEventRecord, "id"))
     : null;
 
   if (eventType === COMPOSIO_CONNECTION_EXPIRED_EVENT && rawEventRecord) {
@@ -292,7 +309,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, status: "ignored" });
   }
 
-  const triggerSlug = triggerPayload.triggerSlug;
+  const triggerSlug =
+    pickString(triggerPayload.triggerSlug, rawEventMetadata.trigger_slug, rawEventMetadata.triggerSlug) ??
+    "UNKNOWN";
   const rawPayload = triggerPayload.payload ?? triggerPayload.originalPayload ?? {};
   const payload = isRecord(rawPayload) ? rawPayload : { value: rawPayload };
   const metadata: Record<string, unknown> = isRecord(triggerPayload.metadata)
@@ -303,20 +322,50 @@ export async function POST(request: NextRequest) {
     metadata.uuid,
     triggerPayload.id,
     triggerPayload.uuid,
+    rawEventMetadata.trigger_id,
+    rawEventMetadata.triggerId,
+    rawEventMetadata.id,
+    rawEventMetadata.uuid,
+    rawEventData.trigger_id,
+    rawEventData.triggerId,
+    rawEventData.trigger_nano_id,
+    rawEventData.triggerNanoId,
   ].filter((value): value is string => Boolean(value));
 
   if (triggerIdCandidates.length === 0) {
+    console.warn("[Composio] Ignoring trigger webhook without trigger id.", {
+      eventType,
+      triggerSlug,
+      webhookVersion: verified.version,
+      eventId: rawEventId,
+    });
     return NextResponse.json({ ok: true, status: "ignored" });
   }
 
   const supabase = createAdminClient();
-  const { data: automation } = await supabase
+  const { data: automation, error: automationError } = await supabase
     .from("agent_automations")
     .select("*")
     .in("composio_trigger_id", triggerIdCandidates)
     .maybeSingle();
 
+  if (automationError) {
+    console.error("[Composio] Failed to look up trigger automation.", {
+      message: automationError.message,
+      triggerIdCandidates,
+      triggerSlug,
+    });
+    return NextResponse.json({ error: automationError.message }, { status: 500 });
+  }
+
   if (!automation || automation.status !== "active") {
+    console.warn("[Composio] Ignoring trigger webhook without active automation.", {
+      triggerIdCandidates,
+      triggerSlug,
+      automationStatus: automation?.status ?? null,
+      webhookVersion: verified.version,
+      eventId: rawEventId,
+    });
     return NextResponse.json({ ok: true, status: "ignored" });
   }
 
