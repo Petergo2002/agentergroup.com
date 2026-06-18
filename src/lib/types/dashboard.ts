@@ -1,5 +1,6 @@
 import type { AgentRecord } from "./agent";
 import type { DebugTrace } from "./debug";
+import type { LeadConversationSummary } from "./widget";
 
 export type DashboardAnalyticsRange = "7d" | "30d" | "90d";
 
@@ -125,6 +126,7 @@ export interface DashboardConversationDetailResponse {
     email: string | null;
     phone: string | null;
   } | null;
+  aiSummary: LeadConversationSummary | null;
   transcript: Array<{
     id: string;
     role: "user" | "assistant";

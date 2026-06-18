@@ -74,15 +74,17 @@ export interface WidgetPreviewOverride {
   >;
 }
 
+export interface WidgetAttachment {
+  id: string;
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
 export interface Message {
   role: "user" | "agent";
   content: string;
   isStreaming?: boolean;
-  attachments?: {
-    id: string;
-    url: string;
-    name: string;
-    type: string;
-    size: number;
-  }[];
+  attachments?: WidgetAttachment[];
 }

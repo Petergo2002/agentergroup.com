@@ -48,12 +48,15 @@ import {
 import { resolveEmbeddedParentOrigin } from "./lib/origin";
 import {
   applyStreamFailureToMessages,
+  getWidgetStreamCompletionError,
+  parseWidgetStreamEvent,
   resolveStreamedAgentContent,
   shouldRevealInterimStreamContent,
 } from "./lib/streaming";
 import { deriveWidgetPalette, hexToRgb } from "./theme";
 import type {
   Message,
+  WidgetAttachment,
   WidgetBootstrapResponse,
   WidgetConfig,
   WidgetEndChatReason,
@@ -101,7 +104,7 @@ export default function Widget({
   const [isStreaming, setIsStreaming] = useState(false);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [pendingAttachments, setPendingAttachments] = useState<{ url: string; name: string; type: string; size: number }[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<WidgetAttachment[]>([]);
   const [hasStarted, setHasStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"home" | "messages">("home");
@@ -890,35 +893,35 @@ export default function Widget({
       };
 
       const processEventData = (data: string) => {
-        if (data === "[DONE]") {
-          streamDone = true;
-          return;
-        }
-        try {
-          const parsed = JSON.parse(data);
-          if (typeof parsed?.error === "string") {
-            streamError = new Error(parsed.error);
+        const event = parseWidgetStreamEvent(data);
+        switch (event.type) {
+          case "done":
+            streamDone = true;
+            return;
+          case "error": {
+            const nextStreamError = new Error(event.message) as Error & {
+              code?: string;
+            };
+            nextStreamError.code = event.code;
+            streamError = nextStreamError;
             streamDone = true;
             return;
           }
-          if (parsed?.sessionCompleted === true) {
+          case "session-completed":
             streamCompleted = true;
-            streamEndReason =
-              parsed.endReason === "assistant_suggestion" ||
-              parsed.endReason === "inactivity_timeout"
-                ? parsed.endReason
-                : null;
+            streamEndReason = event.endReason;
             markConversationCompleted(streamEndReason);
-          }
-          if (typeof parsed?.delta === "string") {
-            fullText += parsed.delta;
+            return;
+          case "delta":
+            fullText += event.content;
             scheduleRenderedFlush();
-          } else if (typeof parsed?.content === "string") {
-            fullText = parsed.content;
+            return;
+          case "content":
+            fullText = event.content;
             scheduleRenderedFlush();
-          }
-        } catch {
-          // Ignore malformed stream payloads.
+            return;
+          case "noop":
+            return;
         }
       };
 
@@ -960,11 +963,16 @@ export default function Widget({
         throw streamError;
       }
 
+      const completionError = getWidgetStreamCompletionError({
+        receivedDoneEvent: streamDone,
+        content: fullText,
+      });
+      if (completionError) {
+        throw new Error(completionError);
+      }
+
       flushRendered(true);
-      updateAssistantMessage(
-        fullText || "Sorry, something went wrong. Please try again.",
-        false,
-      );
+      updateAssistantMessage(fullText, false);
       setIsStreaming(false);
 
       if (

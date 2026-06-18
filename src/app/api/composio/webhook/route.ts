@@ -34,6 +34,10 @@ function readNestedString(value: unknown, path: string[]) {
   return pickString(current);
 }
 
+const COMPOSIO_TRIGGER_MESSAGE_EVENT = "composio.trigger.message";
+const COMPOSIO_CONNECTION_EXPIRED_EVENT = "composio.connected_account.expired";
+const COMPOSIO_TRIGGER_DISABLED_EVENT = "composio.trigger.disabled";
+
 async function markExpiredConnectedAccount(
   supabase: ReturnType<typeof createAdminClient>,
   eventPayload: Record<string, unknown>,
@@ -163,6 +167,58 @@ async function markExpiredConnectedAccount(
   return { status: "accepted", updated: connectionRows.length };
 }
 
+async function markDisabledTrigger(
+  supabase: ReturnType<typeof createAdminClient>,
+  eventPayload: Record<string, unknown>,
+) {
+  const data = isRecord(eventPayload.data) ? eventPayload.data : {};
+  const triggerId = pickString(data.id, data.trigger_id, data.triggerId);
+  const disabledReason =
+    pickString(data.disabled_reason, data.disabledReason) ?? "unknown reason";
+
+  if (!triggerId) {
+    console.warn("[Composio] Ignoring disabled-trigger webhook without trigger id.");
+    return { status: "ignored", reason: "missing_trigger_id" };
+  }
+
+  const { data: automation, error } = await supabase
+    .from("agent_automations")
+    .select("id, agent_id")
+    .eq("composio_trigger_id", triggerId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!automation) {
+    console.warn("[Composio] Disabled-trigger webhook did not match a local automation.", {
+      triggerId,
+      disabledReason,
+    });
+    return { status: "ignored", reason: "automation_not_found" };
+  }
+
+  const message = `Composio disabled the trigger: ${disabledReason}`;
+  const [automationUpdate, agentUpdate] = await Promise.all([
+    supabase
+      .from("agent_automations")
+      .update({ status: "error", last_error: message })
+      .eq("id", automation.id),
+    supabase.from("agents").update({ status: "paused" }).eq("id", automation.agent_id),
+  ]);
+
+  if (automationUpdate.error) {
+    throw new Error(automationUpdate.error.message);
+  }
+
+  if (agentUpdate.error) {
+    throw new Error(agentUpdate.error.message);
+  }
+
+  return { status: "accepted", updated: 1 };
+}
+
 function buildExternalEventId(triggerId: string, rawBody: string, payload: Record<string, unknown>) {
   const payloadEventId = pickString(
     payload.id,
@@ -196,25 +252,44 @@ export async function POST(request: NextRequest) {
   }
 
   const triggerPayload = verified.payload;
-  const eventRecord = isRecord(triggerPayload)
-    ? (triggerPayload as Record<string, unknown>)
+  const rawEventRecord = isRecord(verified.rawPayload)
+    ? verified.rawPayload
     : null;
-  const eventType = eventRecord ? pickString(eventRecord.type) : null;
+  const eventType = rawEventRecord
+    ? pickString(Reflect.get(rawEventRecord, "type"))
+    : null;
 
-  if (eventType === "composio.connected_account.expired" && eventRecord) {
+  if (eventType === COMPOSIO_CONNECTION_EXPIRED_EVENT && rawEventRecord) {
     try {
       const result = await markExpiredConnectedAccount(
         createAdminClient(),
-        eventRecord,
+        rawEventRecord,
       );
       return NextResponse.json({ ok: true, ...result });
     } catch (error) {
       console.error("Composio expiry webhook processing failed", error);
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Failed to process expiry webhook." },
+        { error: "Failed to process expiry webhook." },
         { status: 500 },
       );
     }
+  }
+
+  if (eventType === COMPOSIO_TRIGGER_DISABLED_EVENT && rawEventRecord) {
+    try {
+      const result = await markDisabledTrigger(createAdminClient(), rawEventRecord);
+      return NextResponse.json({ ok: true, ...result });
+    } catch (error) {
+      console.error("Composio disabled-trigger webhook processing failed", error);
+      return NextResponse.json(
+        { error: "Failed to process disabled-trigger webhook." },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (eventType && eventType !== COMPOSIO_TRIGGER_MESSAGE_EVENT) {
+    return NextResponse.json({ ok: true, status: "ignored" });
   }
 
   const triggerSlug = triggerPayload.triggerSlug;

@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import {
+  serializeLeadConversationSummary,
+  type LeadConversationSummaryRow,
+} from "@/lib/leads/conversation-summary";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { WidgetLeadListItem } from "@/lib/types";
@@ -22,6 +26,11 @@ interface LeadQueryRow {
   created_at: string;
   widgets: { name: string; workspace_id: string } | Array<{ name: string; workspace_id: string }>;
   agents: { name: string } | Array<{ name: string }> | null;
+}
+
+interface ConversationMessageCountRow {
+  widget_session_id: string;
+  message_count: number;
 }
 
 /**
@@ -118,10 +127,60 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
-    const leads = ((data ?? []) as unknown as LeadQueryRow[]).map(
+    const leadRows = (data ?? []) as unknown as LeadQueryRow[];
+    const leadIds = leadRows.map((row) => row.id);
+    const sessionIds = leadRows.flatMap((row) =>
+      row.widget_session_id ? [row.widget_session_id] : [],
+    );
+    const [summaryResult, messageCountResult] = await Promise.all([
+      leadIds.length > 0
+        ? admin
+            .from("lead_conversation_summaries")
+            .select(
+              "lead_id, workspace_id, widget_session_id, status, summary, model, source_hash, source_message_count, source_last_message_at, generated_at, error_message, updated_at",
+            )
+            .eq("workspace_id", context.workspace.id)
+            .in("lead_id", leadIds)
+        : Promise.resolve({ data: [], error: null }),
+      sessionIds.length > 0
+        ? admin
+            .from("dashboard_conversation_summaries")
+            .select("widget_session_id, message_count")
+            .eq("workspace_id", context.workspace.id)
+            .in("widget_session_id", sessionIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (summaryResult.error) {
+      throw summaryResult.error;
+    }
+
+    if (messageCountResult.error) {
+      throw messageCountResult.error;
+    }
+
+    const summaryByLeadId = new Map(
+      ((summaryResult.data ?? []) as LeadConversationSummaryRow[]).map((summary) => [
+        summary.lead_id,
+        summary,
+      ]),
+    );
+    const messageCountBySessionId = new Map(
+      ((messageCountResult.data ?? []) as ConversationMessageCountRow[]).map(
+        (conversation) => [conversation.widget_session_id, conversation.message_count],
+      ),
+    );
+
+    const leads = leadRows.map(
       (row): WidgetLeadListItem => {
         const widget = firstRelation(row.widgets);
         const agent = firstRelation(row.agents);
+        const summary = summaryByLeadId.get(row.id) ?? null;
+        const currentMessageCount = row.widget_session_id
+          ? messageCountBySessionId.get(row.widget_session_id) ??
+            summary?.source_message_count ??
+            0
+          : 0;
 
         return {
           id: row.id,
@@ -136,6 +195,9 @@ export async function GET(request: NextRequest) {
           created_at: row.created_at,
           widget_name: widget?.name ?? "Unknown widget",
           agent_name: agent?.name ?? null,
+          ai_summary: summary
+            ? serializeLeadConversationSummary(summary, currentMessageCount)
+            : null,
         };
       },
     );

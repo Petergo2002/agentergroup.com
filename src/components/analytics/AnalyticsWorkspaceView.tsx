@@ -11,6 +11,7 @@ import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
 import { useToast } from "@/components/ui/ToastProvider";
+import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
 import { jsonFetcher } from "@/lib/json-fetcher";
 import { formatRelativeDate } from "@/lib/utils";
 import type {
@@ -19,6 +20,7 @@ import type {
   DashboardAnalyticsResponse,
   DashboardConversationDetailResponse,
   DebugTrace,
+  LeadConversationSummary,
 } from "@/lib/types";
 import {
   Activity,
@@ -371,10 +373,15 @@ function ConversationDetail({
   detail,
   isLoading,
   onClose,
+  onSummaryChange,
 }: {
   detail: DashboardConversationDetailResponse | null;
   isLoading: boolean;
   onClose?: () => void;
+  onSummaryChange?: (
+    widgetSessionId: string,
+    summary: LeadConversationSummary,
+  ) => void;
 }) {
   const { t, language } = useLanguage();
   const identityDisplay = detail
@@ -487,6 +494,21 @@ function ConversationDetail({
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-12 pb-48 space-y-12 hide-scrollbar">
+          {detail.lead ? (
+            <div className="mx-auto w-full max-w-4xl">
+              <LeadAiSummaryCard
+                leadId={detail.lead.id}
+                summary={detail.aiSummary}
+                onSummaryChange={(summary) =>
+                  onSummaryChange?.(
+                    detail.conversation.widgetSessionId,
+                    summary,
+                  )
+                }
+              />
+            </div>
+          ) : null}
+
           {detail.transcript.length === 0 ? (
             <div className="flex flex-col items-center py-20 text-on-surface-variant/40">
               <span className="material-symbols-outlined text-4xl mb-4">forum</span>
@@ -849,6 +871,34 @@ export function AnalyticsWorkspaceView() {
     }
   };
 
+  const handleSummaryChange = (
+    widgetSessionId: string,
+    summary: LeadConversationSummary,
+  ) => {
+    setState((current) => {
+      const selectedConversation =
+        current.selectedConversation?.conversation.widgetSessionId ===
+        widgetSessionId
+          ? { ...current.selectedConversation, aiSummary: summary }
+          : current.selectedConversation;
+      const cachedConversation = current.detailCache[widgetSessionId];
+
+      return {
+        ...current,
+        selectedConversation,
+        detailCache: cachedConversation
+          ? {
+              ...current.detailCache,
+              [widgetSessionId]: {
+                ...cachedConversation,
+                aiSummary: summary,
+              },
+            }
+          : current.detailCache,
+      };
+    });
+  };
+
   return (
     <div className="flex h-screen w-full flex-col bg-surface overflow-hidden">
       {/* Header Strip: Operational Metrics */}
@@ -899,6 +949,7 @@ export function AnalyticsWorkspaceView() {
           <ConversationDetail
             detail={state.selectedConversation}
             isLoading={state.isDetailLoading}
+            onSummaryChange={handleSummaryChange}
           />
           
         </section>
@@ -912,6 +963,7 @@ export function AnalyticsWorkspaceView() {
               detail={state.selectedConversation}
               isLoading={state.isDetailLoading}
               onClose={() => setIsMobileDetailOpen(false)}
+              onSummaryChange={handleSummaryChange}
             />
           </div>
         </div>

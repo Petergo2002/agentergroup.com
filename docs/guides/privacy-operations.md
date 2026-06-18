@@ -1,6 +1,6 @@
 # Privacy Operations
 
-Last updated: 2026-05-04
+Last updated: 2026-06-18
 
 ## Purpose
 
@@ -57,6 +57,9 @@ Default v1 retention:
   - deleted automatically when parent session is deleted
 - `widget_leads`
   - delete after 180 days based on `created_at`
+- `lead_conversation_summaries`
+  - deleted automatically when the parent lead or widget session is deleted
+  - stores model-derived lead details and therefore follows the same privacy handling as the source lead and transcript
 - widget session/activity metadata
   - retained through `widget_sessions`, since there is no separate widget events table
 - automation events and automation runs

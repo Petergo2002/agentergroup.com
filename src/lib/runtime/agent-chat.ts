@@ -96,7 +96,10 @@ interface StreamChunkDelta {
 interface StreamChunk {
   id?: string;
   model?: string;
-  choices?: Array<{ delta?: StreamChunkDelta }>;
+  choices?: Array<{
+    delta?: StreamChunkDelta;
+    finish_reason?: string | null;
+  }>;
 }
 
 type MaybeRelation<T> = T | T[] | null;
@@ -799,8 +802,8 @@ export async function runAgentChat({
     }) as AsyncGenerator<StreamChunk, void, unknown>;
 
     finalCompletion = { choices: [{ message: { role: "assistant", content: "", tool_calls: [] } }] };
-    let hasToolCalls = false;
     let iterationContent = "";
+    let iterationFinishReason: string | null = null;
     const accumulatedToolCalls = new Map<number, { id: string; type: "function"; function: { name: string; arguments: string } }>();
 
     for await (const chunk of stream) {
@@ -808,7 +811,11 @@ export async function runAgentChat({
       if (chunk.model) finalCompletion.model = chunk.model;
       if (chunk.id) finalCompletion.id = chunk.id;
       
-      const delta = chunk.choices?.[0]?.delta;
+      const choice = chunk.choices?.[0];
+      const delta = choice?.delta;
+      if (typeof choice?.finish_reason === "string") {
+        iterationFinishReason = choice.finish_reason;
+      }
       if (!delta) continue;
 
       if (delta.content) {
@@ -818,7 +825,6 @@ export async function runAgentChat({
       }
 
       if (delta.tool_calls) {
-        hasToolCalls = true;
         for (const pt of delta.tool_calls) {
           if (!accumulatedToolCalls.has(pt.index)) {
             accumulatedToolCalls.set(pt.index, {
@@ -839,6 +845,10 @@ export async function runAgentChat({
       }
     }
 
+    if (iterationFinishReason === "error") {
+      throw new Error("The model stream ended with an error.");
+    }
+
     const toolCallsArray = Array.from(accumulatedToolCalls.values());
     const assistantMessage: Record<string, unknown> = {
       role: "assistant",
@@ -851,7 +861,7 @@ export async function runAgentChat({
 
     (finalCompletion as { choices: Array<{ message: unknown }> }).choices[0].message = assistantMessage;
 
-    if (!hasToolCalls || toolDefinitions.length === 0) {
+    if (toolCallsArray.length === 0 || toolDefinitions.length === 0) {
       finalAssistantMessage = assistantMessage as Record<string, unknown>;
       break;
     }
@@ -1064,19 +1074,25 @@ export async function runAgentChat({
     }) as AsyncGenerator<StreamChunk, void, unknown>;
 
     finalCompletion = { choices: [{ message: { role: "assistant", content: "" } }] };
-    assistantContent = "";
+    let recoveryContent = "";
     
     for await (const chunk of recoveryStream) {
       const delta = chunk.choices?.[0]?.delta;
       if (delta?.content) {
-        assistantContent += delta.content;
+        recoveryContent += delta.content;
+        if (onToken) onToken(delta.content);
       }
     }
+    assistantContent += recoveryContent;
     (finalCompletion as Record<string, unknown>)["choices"] = [{ message: { role: "assistant", content: assistantContent } }];
     finalAssistantMessage = { role: "assistant", content: assistantContent };
   }
 
-  assistantContent ||= EMPTY_ASSISTANT_RESPONSE_FALLBACK;
+  if (!assistantContent.trim()) {
+    assistantContent = EMPTY_ASSISTANT_RESPONSE_FALLBACK;
+    finalAssistantMessage = { role: "assistant", content: assistantContent };
+    if (onToken) onToken(assistantContent);
+  }
 
   const durationMs = Date.now() - startTimeMs;
   let iterationsUsed = 0;

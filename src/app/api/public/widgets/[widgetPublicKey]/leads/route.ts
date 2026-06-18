@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { generateLeadConversationSummary } from "@/lib/leads/conversation-summary";
 import {
   buildPublicWidgetRateLimitContext,
   buildRateLimitErrorPayload,
@@ -299,6 +300,19 @@ export async function POST(
       email,
       phone,
       message,
+    });
+
+    after(async () => {
+      try {
+        await generateLeadConversationSummary(createAdminClient(), {
+          leadId: lead.id,
+        });
+      } catch (error) {
+        console.error("Background lead summary generation failed.", {
+          leadId: lead.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     });
 
     return NextResponse.json(

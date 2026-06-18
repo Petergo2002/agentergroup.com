@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildConversationDetailForViewer } from "@/lib/debug-trace-security";
+import {
+  serializeLeadConversationSummary,
+  type LeadConversationSummaryRow,
+} from "@/lib/leads/conversation-summary";
 import type {
   DashboardAnalyticsAppliedFilters,
   DashboardAnalyticsConversationListItem,
@@ -1121,6 +1125,21 @@ export async function getDashboardConversationDetail(
     throw new Error(leadData.error.message);
   }
 
+  const summaryResult = leadData.data
+    ? await supabase
+        .from("lead_conversation_summaries")
+        .select(
+          "lead_id, workspace_id, widget_session_id, status, summary, model, source_hash, source_message_count, source_last_message_at, generated_at, error_message, updated_at",
+        )
+        .eq("lead_id", leadData.data.id)
+        .eq("workspace_id", input.workspaceId)
+        .maybeSingle()
+    : { data: null, error: null };
+
+  if (summaryResult.error) {
+    throw new Error(summaryResult.error.message);
+  }
+
   const widgetAgent =
     (session.active_widget_agent_id
       ? widgetAgents.find((item) => item.id === session.active_widget_agent_id) ?? null
@@ -1150,6 +1169,10 @@ export async function getDashboardConversationDetail(
   }
 
   const resolvedIdentitySummary = buildDisplayIdentitySummary(inferredIdentitySummary);
+  const currentMessageCount = transcriptRows.filter(
+    (message) => message.role === "user" || message.role === "assistant",
+  ).length;
+  const summaryRow = (summaryResult.data ?? null) as LeadConversationSummaryRow | null;
   const leadSummary = leadData.data
     ? {
         name: leadData.data.name,
@@ -1186,6 +1209,9 @@ export async function getDashboardConversationDetail(
         }
       : null,
     identitySummary: buildDisplayIdentitySummary(leadSummary ?? resolvedIdentitySummary),
+    aiSummary: summaryRow
+      ? serializeLeadConversationSummary(summaryRow, currentMessageCount)
+      : null,
     transcript: buildTranscriptWithDebugTrace(
       transcriptRows,
     ),

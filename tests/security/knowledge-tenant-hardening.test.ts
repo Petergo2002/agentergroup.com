@@ -14,6 +14,10 @@ const hardeningMigration = readFileSync(
   "supabase/migrations/20260611203002_production_hardening_security_billing_uploads.sql",
   "utf8",
 );
+const connectionHelperFixMigration = readFileSync(
+  "supabase/migrations/20260617210341_fix_replace_agent_connections_helper.sql",
+  "utf8",
+);
 const knowledgeSourcesRoute = readFileSync(
   "src/app/api/knowledge/sources/route.ts",
   "utf8",
@@ -118,5 +122,13 @@ test("builder connection replacement is delegated to one transactional RPC", () 
   assert.match(
     hardeningMigration,
     /delete from public\.agent_connections[\s\S]*?insert into public\.agent_connections/,
+  );
+  assert.match(
+    connectionHelperFixMigration,
+    /if not private\.can_edit_agent\(p_agent_id\)/,
+  );
+  assert.doesNotMatch(
+    connectionHelperFixMigration,
+    /if not public\.can_edit_agent\(p_agent_id\)/,
   );
 });

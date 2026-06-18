@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import type {
   Message,
   WidgetAgentConfig,
+  WidgetAttachment,
   WidgetConfig,
   WidgetEndChatReason,
 } from "../types";
@@ -21,7 +22,7 @@ export interface MessagesTabProps {
   endReason: WidgetEndChatReason | null;
   onStartNewChat: () => void;
   sendMessage: (text?: string) => Promise<void>;
-  pendingAttachments?: { url: string; name: string; type: string; size: number }[];
+  pendingAttachments?: WidgetAttachment[];
   isUploadingAttachment?: boolean;
   onAttachFile?: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   uploadError?: string | null;

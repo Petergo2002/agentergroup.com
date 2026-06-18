@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canEditAgentRecord, getMembershipRoleForWorkspace } from "@/lib/agents/access";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { AUTOMATION_GMAIL_TRIGGER_SLUG } from "@/lib/agents/defaults";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
@@ -178,6 +179,18 @@ export async function PUT(
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
   }
 
+  const membershipRole = getMembershipRoleForWorkspace(
+    context.workspaces,
+    agent.workspace_id,
+  );
+
+  if (!canEditAgentRecord(agent, user.id, membershipRole)) {
+    return NextResponse.json(
+      { error: "You do not have permission to change this automation." },
+      { status: 403 },
+    );
+  }
+
   const body = await request.json().catch(() => ({}));
   const name = readString(body.name) ?? agent.name;
   const description = typeof body.description === "string" ? body.description : agent.description;
@@ -219,19 +232,25 @@ export async function PUT(
     return NextResponse.json({ error: currentAutomationResult.error.message }, { status: 500 });
   }
 
-  const nextAutomationStatus =
-    currentAutomationResult.data?.status === "active"
-      ? "paused"
-      : currentAutomationResult.data?.status ?? "draft";
   const currentAutomation = currentAutomationResult.data as AgentAutomationRecord | null;
-  const shouldReplaceProviderTrigger = Boolean(
-    currentAutomation?.composio_trigger_id &&
+  const providerBindingChanged = Boolean(
+    currentAutomation &&
       (
         currentAutomation.connection_id !== connectionId ||
         currentAutomation.trigger_slug !== triggerSlug ||
         stableJsonString(currentAutomation.trigger_config) !== stableJsonString(triggerConfig)
       ),
   );
+  const shouldReplaceProviderTrigger = Boolean(
+    currentAutomation?.composio_trigger_id && providerBindingChanged,
+  );
+  const shouldPauseActiveAutomation = Boolean(
+    currentAutomation?.status === "active" &&
+      (providerBindingChanged || !currentAutomation.composio_trigger_id),
+  );
+  const nextAutomationStatus = shouldPauseActiveAutomation
+    ? "paused"
+    : currentAutomation?.status ?? "draft";
 
   if (shouldReplaceProviderTrigger && currentAutomation?.composio_trigger_id) {
     const deleteError = await deleteComposioTrigger(currentAutomation.composio_trigger_id)
@@ -256,6 +275,7 @@ export async function PUT(
         model,
         instructions,
         timezone,
+        ...(shouldPauseActiveAutomation ? { status: "paused" } : {}),
       })
       .eq("id", agentId),
     definition
@@ -285,16 +305,25 @@ export async function PUT(
     ),
   ]);
 
-  if (agentResult.error) {
-    return NextResponse.json({ error: agentResult.error.message }, { status: 500 });
-  }
+  const persistenceError =
+    agentResult.error ?? draftResult.error ?? automationResult.error;
 
-  if (draftResult.error) {
-    return NextResponse.json({ error: draftResult.error.message }, { status: 500 });
-  }
+  if (persistenceError) {
+    if (shouldReplaceProviderTrigger) {
+      await Promise.all([
+        supabase
+          .from("agent_automations")
+          .update({
+            composio_trigger_id: null,
+            status: "error",
+            last_error: persistenceError.message,
+          })
+          .eq("id", currentAutomation?.id ?? ""),
+        supabase.from("agents").update({ status: "paused" }).eq("id", agentId),
+      ]);
+    }
 
-  if (automationResult.error) {
-    return NextResponse.json({ error: automationResult.error.message }, { status: 500 });
+    return NextResponse.json({ error: persistenceError.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
@@ -319,6 +348,18 @@ export async function DELETE(
 
   if (!agent) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  }
+
+  const membershipRole = getMembershipRoleForWorkspace(
+    context.workspaces,
+    agent.workspace_id,
+  );
+
+  if (!canEditAgentRecord(agent, user.id, membershipRole)) {
+    return NextResponse.json(
+      { error: "You do not have permission to change this automation." },
+      { status: 403 },
+    );
   }
 
   const { data: automation, error: automationError } = await supabase

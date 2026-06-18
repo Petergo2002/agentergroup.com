@@ -1,6 +1,6 @@
 # Production Readiness And Manual Steps
 
-Last updated: 2026-06-11
+Last updated: 2026-06-18
 
 This document covers the launch-hardening changes that require coordinated
 database, Edge Function, dashboard, and widget deployment. It is not evidence
@@ -32,6 +32,8 @@ Apply these local migrations in order:
 3. `20260611203129_secure_widget_attachments.sql`
 4. `20260611203154_stripe_webhook_reliability.sql`
 5. `20260612175729_allow_phone_only_widget_leads.sql`
+6. `20260617210341_fix_replace_agent_connections_helper.sql`
+7. `20260618120959_lead_conversation_ai_summaries.sql`
 
 The linked production migration history was not identical to the local
 directory during the June 11 review. Before applying anything:
@@ -44,6 +46,11 @@ supabase db push --linked --dry-run
 Resolve migration-history drift before `supabase db push --linked`. Do not mark
 local migrations as applied unless their SQL is already present and verified in
 production.
+
+The linked project was verified on June 18 with migrations
+`20260617210341` and `20260618120959` applied. The lead-summary table has RLS,
+an authenticated workspace-member read policy, no anonymous grants, and
+service-role-only writes.
 
 After migration, verify:
 
@@ -146,6 +153,9 @@ Before self-service launch, run a local or staging test with two real Supabase
 users in different workspaces and verify cross-tenant knowledge, threads,
 messages, audit records, and attachments are inaccessible.
 
+The root app must remain on React/React DOM `19.2.4` or a later reviewed patch.
+Version `19.2.3` has incomplete React Server Components security fixes.
+
 ## Deployment Checklist
 
 1. Confirm a current Supabase backup and tested restore path.
@@ -170,5 +180,6 @@ messages, audit records, and attachments are inaccessible.
 - The root dependency audit currently reports an upstream moderate PostCSS advisory
   from Next.js. Do not use npm's proposed forced downgrade; update to a fixed,
   supported Next.js release when available and rerun the full release gate.
-- Production RLS and migration changes remain unapplied until an owner-approved
-  deployment.
+- Earlier migration-history drift still needs reconciliation before using a
+  broad linked `supabase db push`; the two June 17–18 migrations listed above
+  are already applied and verified on the linked project.

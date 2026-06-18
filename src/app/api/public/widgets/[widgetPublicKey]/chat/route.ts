@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import {
   buildPersistedAssistantMetadata,
@@ -8,6 +8,7 @@ import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import { extractCalSelectionFromDefinition } from "@/lib/cal";
+import { generateLeadConversationSummary } from "@/lib/leads/conversation-summary";
 import {
   consumeWorkspaceMessageUsage,
   MessageLimitExceededError,
@@ -58,6 +59,51 @@ function isAbortError(error: unknown) {
     (error instanceof DOMException && error.name === "AbortError") ||
     (error instanceof Error && error.name === "AbortError")
   );
+}
+
+function getErrorLogFields(error: unknown) {
+  if (!(error instanceof Error)) {
+    return { error: String(error) };
+  }
+
+  const errorRecord = error as Error & {
+    code?: unknown;
+    status?: unknown;
+    retryAfterSeconds?: unknown;
+  };
+  return {
+    errorName: error.name,
+    error: error.message,
+    ...(typeof errorRecord.code === "string" ||
+    typeof errorRecord.code === "number"
+      ? { errorCode: errorRecord.code }
+      : {}),
+    ...(typeof errorRecord.status === "number"
+      ? { upstreamStatus: errorRecord.status }
+      : {}),
+    ...(typeof errorRecord.retryAfterSeconds === "number"
+      ? { retryAfterSeconds: errorRecord.retryAfterSeconds }
+      : {}),
+  };
+}
+
+function logWidgetChatEvent(
+  level: "info" | "error",
+  event: string,
+  fields: Record<string, unknown>,
+) {
+  const entry = JSON.stringify({
+    level,
+    event,
+    route: "/api/public/widgets/[widgetPublicKey]/chat",
+    ...fields,
+  });
+
+  if (level === "error") {
+    console.error(entry);
+  } else {
+    console.info(entry);
+  }
 }
 
 function buildErrorResponse(
@@ -354,6 +400,8 @@ export async function POST(
   const { widgetPublicKey } = await params;
   const supabase = createAdminClient() as unknown as WidgetAdminSupabase;
   const runtimeOrigin = resolveWidgetRuntimeRequestOrigin(request);
+  const chatRequestId = crypto.randomUUID();
+  const requestStartedAt = Date.now();
   let turnRequestId: string | null = null;
   let turnLockHeld = false;
   let turnLockWidgetId: string | null = null;
@@ -561,7 +609,7 @@ export async function POST(
       );
     }
 
-    turnRequestId = crypto.randomUUID();
+    turnRequestId = chatRequestId;
     turnLockWidgetId = loaded.widget.id;
     turnLockSessionId = sessionId;
     const turnLock = await acquireWidgetSessionTurnLock(supabase, {
@@ -775,6 +823,20 @@ export async function POST(
             );
           }
 
+          logWidgetChatEvent("info", "widget_chat_completed", {
+            requestId: chatRequestId,
+            widgetId: loaded.widget.id,
+            agentId: selected!.agent.id,
+            durationMs: Date.now() - requestStartedAt,
+            assistantCharacters: result.assistantContent.length,
+            toolMessageCount: result.toolMessages.length,
+            knowledgeMatchCount: result.knowledgeMatches.length,
+            runtimeHadError: result.debugTrace?.hadError ?? false,
+            ...(result.debugTrace?.errorSummary
+              ? { runtimeErrorSummary: result.debugTrace.errorSummary }
+              : {}),
+          });
+
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } catch (error) {
           if (streamAbortController.signal.aborted || isAbortError(error)) {
@@ -786,11 +848,19 @@ export async function POST(
             error,
             "Something went wrong while generating a reply.",
           );
+          logWidgetChatEvent("error", "widget_chat_stream_failed", {
+            requestId: chatRequestId,
+            widgetId: loaded.widget.id,
+            agentId: selected!.agent.id,
+            durationMs: Date.now() - requestStartedAt,
+            ...getErrorLogFields(error),
+          });
           controller.enqueue(
             new TextEncoder().encode(
               sseChunk({
                 error: safeError.error,
                 code: safeError.code,
+                requestId: chatRequestId,
                 terminal: true,
               }),
             ),
@@ -813,6 +883,19 @@ export async function POST(
       },
     });
 
+    after(async () => {
+      try {
+        await generateLeadConversationSummary(createAdminClient(), {
+          widgetSessionId: widgetSession.id,
+        });
+      } catch (error) {
+        console.error("Background lead summary generation failed.", {
+          widgetSessionId: widgetSession.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+
     return new Response(stream, {
       headers: {
         ...buildWidgetRuntimeCorsHeaders(request),
@@ -831,6 +914,11 @@ export async function POST(
       error,
       "Failed to run widget chat.",
     );
+    logWidgetChatEvent("error", "widget_chat_request_failed", {
+      requestId: chatRequestId,
+      durationMs: Date.now() - requestStartedAt,
+      ...getErrorLogFields(error),
+    });
     return buildErrorResponse(
       request,
       500,

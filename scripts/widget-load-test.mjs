@@ -271,6 +271,7 @@ async function runChatTurn({
   let assistantContent = "";
   let streamError = null;
   let done = false;
+  let receivedDoneEvent = false;
 
   while (!done) {
     const { done: streamDone, value } = await reader.read();
@@ -289,6 +290,7 @@ async function runChatTurn({
         if (!line.startsWith("data: ")) continue;
         const data = line.slice(6).trim();
         if (data === "[DONE]") {
+          receivedDoneEvent = true;
           done = true;
           break;
         }
@@ -313,7 +315,9 @@ async function runChatTurn({
             break;
           }
         } catch {
-          // Ignore malformed stream payloads during load tests.
+          streamError = "The chat stream contained malformed data.";
+          done = true;
+          break;
         }
       }
 
@@ -323,6 +327,12 @@ async function runChatTurn({
 
       separatorIndex = buffer.indexOf("\n\n");
     }
+  }
+
+  if (!streamError && !receivedDoneEvent) {
+    streamError = "The chat stream ended before the [DONE] event.";
+  } else if (!streamError && assistantContent.trim().length === 0) {
+    streamError = "The chat stream completed without assistant content.";
   }
 
   return {

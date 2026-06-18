@@ -59,7 +59,8 @@ export function AdminAutomationsToggle({
             Automations (Beta)
           </p>
           <p className="text-sm text-on-surface">
-            Allow this workspace to create and use automation trigger agents.
+            Allow this workspace to create automation agents. Gmail triggers are activated
+            separately inside each automation builder.
           </p>
           <div
             className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${

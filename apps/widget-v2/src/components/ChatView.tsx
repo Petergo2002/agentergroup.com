@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef } from "react";
 import type {
   Message,
   WidgetAgentConfig,
+  WidgetAttachment,
   WidgetConfig,
   WidgetEndChatReason,
 } from "../types";
@@ -253,7 +254,7 @@ interface ChatViewProps {
   endReason: WidgetEndChatReason | null;
   onStartNewChat: () => void;
   sendMessage: (text?: string) => Promise<void>;
-  pendingAttachments?: { url: string; name: string; type: string; size: number }[];
+  pendingAttachments?: WidgetAttachment[];
   isUploadingAttachment?: boolean;
   onAttachFile?: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   uploadError?: string | null;

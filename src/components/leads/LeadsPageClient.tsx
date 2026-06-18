@@ -15,9 +15,10 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
 import { formatLocaleDateTime } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/json-fetcher";
-import type { WidgetLeadListItem } from "@/lib/types";
+import type { LeadConversationSummary, WidgetLeadListItem } from "@/lib/types";
 import { formatRelativeDate } from "@/lib/utils";
 
 interface LeadsPageClientProps {
@@ -28,6 +29,10 @@ interface LeadsPageClientProps {
 interface LeadDetailPanelProps {
   lead: WidgetLeadListItem;
   onClose: () => void;
+  onSummaryChange: (
+    leadId: string,
+    summary: LeadConversationSummary,
+  ) => void;
 }
 
 /**
@@ -106,7 +111,7 @@ function LeadsEmptyState({ hasSearch }: { hasSearch: boolean }) {
 /**
  * Shows the complete lead record in a responsive, keyboard-dismissable slide-over.
  */
-function LeadDetailPanel({ lead, onClose }: LeadDetailPanelProps) {
+function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProps) {
   const { language, t } = useLanguage();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -179,6 +184,13 @@ function LeadDetailPanel({ lead, onClose }: LeadDetailPanelProps) {
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6 sm:px-8">
+          <LeadAiSummaryCard
+            leadId={lead.id}
+            summary={lead.ai_summary}
+            canRegenerate={Boolean(lead.widget_session_id)}
+            onSummaryChange={(summary) => onSummaryChange(lead.id, summary)}
+          />
+
           <section className="space-y-3">
             {lead.email ? (
               <a
@@ -292,6 +304,24 @@ export default function LeadsPageClient({
    */
   const handleRowClick = (lead: WidgetLeadListItem) => {
     setSelectedLead(lead);
+  };
+
+  const handleSummaryChange = (
+    leadId: string,
+    summary: LeadConversationSummary,
+  ) => {
+    setSelectedLead((current) =>
+      current && current.id === leadId
+        ? { ...current, ai_summary: summary }
+        : current,
+    );
+    void mutate(
+      (current) =>
+        current?.map((lead) =>
+          lead.id === leadId ? { ...lead, ai_summary: summary } : lead,
+        ),
+      { revalidate: false },
+    );
   };
 
   return (
@@ -465,7 +495,11 @@ export default function LeadsPageClient({
       )}
 
       {selectedLead ? (
-        <LeadDetailPanel lead={selectedLead} onClose={() => setSelectedLead(null)} />
+        <LeadDetailPanel
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+          onSummaryChange={handleSummaryChange}
+        />
       ) : null}
     </div>
   );

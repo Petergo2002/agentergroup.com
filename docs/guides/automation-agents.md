@@ -71,6 +71,11 @@ When the trigger provider is Composio, saving also upserts `agent_automations` t
 
 An Automation can stay saved as a draft without a selected trigger account.
 
+Saving an active automation with an unchanged trigger account/config keeps the provider trigger
+active. Changing the trigger account or config pauses the automation, removes the old provider
+trigger, and requires explicit reactivation. This prevents autosave from silently desynchronizing
+the local and Composio states.
+
 ### Activate Trigger
 
 Activation happens only through:
@@ -89,6 +94,7 @@ Activation validates:
 - the agent is `surface = 'automation'`
 - the user can edit the agent
 - the agent is not archived
+- the workspace automation feature is enabled by an admin
 - `COMPOSIO_API_KEY` exists
 - `COMPOSIO_WEBHOOK_SECRET` exists
 - an `agent_automations` row exists
@@ -167,6 +173,9 @@ The webhook route handles Composio connected-account expiry events separately. A
 `disconnected`, records the upstream status reason, moves active/provisioning automations that
 use the connection to `error`, and pauses their agents. These expiry events are not inserted into
 `automation_events`.
+
+The route also handles `composio.trigger.disabled` by moving the matching automation to `error`
+and pausing its agent. The Composio webhook subscription must opt into that event type.
 
 Automation v1 still uses `after()` processing. Durable retry queues/workers are intentionally deferred.
 
@@ -328,6 +337,11 @@ Required for live automations:
 - `COMPOSIO_API_KEY`
 - `COMPOSIO_WEBHOOK_SECRET`
 
+The Composio project must have a V3 webhook subscription pointing to
+`https://<production-domain>/api/composio/webhook`. Enable at least
+`composio.trigger.message` and `composio.connected_account.expired`; also enable
+`composio.trigger.disabled` so provider-side polling failures are reflected in the dashboard.
+
 The builder readiness panel exposes both provider and webhook readiness so activation blockers are visible before the user attempts activation.
 
 ## Future Trigger Expansion
@@ -375,6 +389,7 @@ Use this checklist when changing automation behavior:
 - [ ] Delete deletes provider trigger.
 - [ ] Disconnecting a used Gmail account pauses/errors the automation and disables provider trigger.
 - [ ] A Composio connected-account expiry webhook marks the connection disconnected and pauses/errors affected automations.
+- [ ] A Composio auto-disabled-trigger webhook pauses/errors the affected automation.
 - [ ] Normal `/api/agents/[id]/status` cannot activate an Automation.
 - [ ] `npm run lint`
 - [ ] `npm run build`

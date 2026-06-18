@@ -78,6 +78,10 @@ export type {
   WidgetSessionMessageRecord,
   WidgetLeadRecord,
   WidgetLeadListItem,
+  LeadConversationSummary,
+  LeadConversationSummaryContent,
+  LeadIntentLevel,
+  LeadRecommendedAction,
 } from "./types/widget";
 
 export type {

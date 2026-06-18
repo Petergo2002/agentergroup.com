@@ -14,6 +14,7 @@ Practical instructions for common tasks:
 - **[Supabase Runtime Keys](./architecture/core.md#supabase-edge-functions)** - Current `sb_secret_...` admin-key setup and Edge Function auth expectations.
 - **[Adding Integrations](./guides/adding-integrations.md)** - Guide for extending toolkits.
 - **[Composio Integration](./guides/composio-integrations.md)** - Details on tool execution, connected-account sync, and lifecycle webhooks.
+- **[Lead Conversation Summaries](./guides/lead-conversation-summaries.md)** - AI summary generation, persistence, regeneration, security, and operational behavior.
 - **[Widget Realtime Voice](./guides/widget-realtime-voice.md)** - Product decision and future implementation direction for Gemini Live voice mode in the public widget.
 - **[Widget Security](./guides/widget-embed-security.md)** - Security protocols for public embeds.
 - **[Privacy Operations](./guides/privacy-operations.md)** - GDPR and data processing details.
@@ -28,4 +29,4 @@ Public-facing legal and auth pages:
 - `/invite/accept` — Public workspace invite acceptance page (unauthenticated-friendly; moved from the `(app)` route group)
 
 ---
-*Last updated: June 11, 2026.*
+*Last updated: June 18, 2026.*

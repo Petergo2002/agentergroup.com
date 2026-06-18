@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { canEditAgentRecord, getMembershipRoleForWorkspace } from "@/lib/agents/access";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import {
+  AUTOMATIONS_DISABLED_CODE,
+  AUTOMATIONS_DISABLED_MESSAGE,
+  hasAutomationsEnabled,
+} from "@/lib/assistants/feature-flags";
+import {
   createComposioTrigger,
   deleteComposioTrigger,
   disableComposioTrigger,
@@ -97,13 +102,10 @@ export async function POST(
       }
     }
 
-    const [automationUpdate, agentUpdate] = await Promise.all([
-      supabase
-        .from("agent_automations")
-        .update({ status: "paused", last_error: null })
-        .eq("id", automationRecord.id),
-      supabase.from("agents").update({ status: "paused" }).eq("id", agentId),
-    ]);
+    const automationUpdate = await supabase
+      .from("agent_automations")
+      .update({ status: "paused", last_error: null })
+      .eq("id", automationRecord.id);
 
     if (automationUpdate.error) {
       if (automationRecord.composio_trigger_id) {
@@ -115,12 +117,30 @@ export async function POST(
       return NextResponse.json({ error: automationUpdate.error.message }, { status: 500 });
     }
 
+    const agentUpdate = await supabase
+      .from("agents")
+      .update({ status: "paused" })
+      .eq("id", agentId);
+
     if (agentUpdate.error) {
+      let providerRestored = !automationRecord.composio_trigger_id;
+
       if (automationRecord.composio_trigger_id) {
-        await enableComposioTrigger(automationRecord.composio_trigger_id).catch((error) => {
+        await enableComposioTrigger(automationRecord.composio_trigger_id).then(() => {
+          providerRestored = true;
+        }).catch((error) => {
           console.error("Failed to re-enable Composio trigger after pause persistence error", error);
         });
       }
+
+      await supabase
+        .from("agent_automations")
+        .update(
+          providerRestored
+            ? { status: automationRecord.status, last_error: agentUpdate.error.message }
+            : { status: "error", last_error: agentUpdate.error.message },
+        )
+        .eq("id", automationRecord.id);
 
       return NextResponse.json({ error: agentUpdate.error.message }, { status: 500 });
     }
@@ -134,6 +154,16 @@ export async function POST(
     }).catch(() => undefined);
 
     return NextResponse.json({ ok: true, status: "paused" });
+  }
+
+  if (!hasAutomationsEnabled(context.workspace)) {
+    return NextResponse.json(
+      {
+        error: AUTOMATIONS_DISABLED_MESSAGE,
+        code: AUTOMATIONS_DISABLED_CODE,
+      },
+      { status: 403 },
+    );
   }
 
   if (!hasComposioEnv()) {

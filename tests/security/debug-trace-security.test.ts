@@ -141,6 +141,7 @@ test("analytics conversation detail strips debug traces for non-admin viewers", 
       email: null,
       phone: null,
     },
+    aiSummary: null,
   };
 
   assert.equal(canViewDebugTrace("owner"), true);

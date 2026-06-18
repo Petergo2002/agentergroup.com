@@ -1,6 +1,6 @@
 # Composio Integrations — Implementation Guide
 
-Last updated: 2026-06-07
+Last updated: 2026-06-18
 
 This document is the mandatory reference for building and debugging Composio tool integrations
 in this codebase. Read this before writing any new integration. All lessons here were earned
@@ -65,6 +65,7 @@ Connection starts are owned by `createConnectionRequest()` in `src/lib/composio.
 Default behavior:
 
 - most supported toolkits create a `use_composio_managed_auth` auth config on demand
+- Gmail defaults to toolkit version `20260323_00`; override it with `COMPOSIO_TOOLKIT_VERSION_GMAIL` only after validating tool and trigger compatibility
 - a real configured auth config id can be supplied through `COMPOSIO_AUTH_CONFIG_<TOOLKIT>` or `COMPOSIO_<TOOLKIT>_AUTH_CONFIG_ID`
 - auth config ids are injected into a Composio tool-router session only for the explicit connection-start request, not for every `/connections` page load
 - placeholder values such as `*_replace_me` and `ac_...` are ignored
@@ -91,6 +92,8 @@ Current v1 trigger support:
 The same webhook route separately handles
 `composio.connected_account.expired`. Expiry events update matching local connection state and
 pause/error active or provisioning automations; they are not inserted into `automation_events`.
+It also handles the opt-in `composio.trigger.disabled` event and pauses/errors the matching
+automation when Composio disables an unhealthy trigger.
 
 Trigger creation/enabling/disabling/deletion is owned by:
 

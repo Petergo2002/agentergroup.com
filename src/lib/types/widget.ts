@@ -126,7 +126,47 @@ export interface WidgetLeadRecord {
   created_at: string;
 }
 
+export type LeadIntentLevel = "hot" | "warm" | "cold";
+
+export type LeadRecommendedAction =
+  | "call_customer"
+  | "send_quote"
+  | "book_meeting"
+  | "ask_missing_information"
+  | "follow_up_later";
+
+export interface LeadConversationSummaryContent {
+  customerNeed: string | null;
+  details: {
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+    serviceOrProduct: string | null;
+    location: string | null;
+    preferredTime: string | null;
+    budget: string | null;
+    urgency: string | null;
+    specialRequirements: string | null;
+  };
+  intentLevel: LeadIntentLevel;
+  intentReason: string;
+  recommendedAction: LeadRecommendedAction;
+  recommendedActionReason: string;
+  missingInformation: string[];
+}
+
+export interface LeadConversationSummary {
+  status: "generating" | "ready" | "insufficient" | "failed";
+  content: LeadConversationSummaryContent | null;
+  model: string | null;
+  generated_at: string | null;
+  source_message_count: number;
+  is_stale: boolean;
+  error_message: string | null;
+}
+
 export interface WidgetLeadListItem extends WidgetLeadRecord {
   widget_name: string;
   agent_name: string | null;
+  ai_summary: LeadConversationSummary | null;
 }

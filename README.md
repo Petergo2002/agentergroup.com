@@ -69,11 +69,7 @@ Root app variables:
 | `COMPOSIO_TOOLKIT_VERSION_SHOPIFY` | No | Shopify toolkit version override |
 | `COMPOSIO_TOOLKIT_VERSION_GOOGLEADS` | No | Google Ads toolkit version override |
 | `COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF` | No | Internal assistant PDF toolkit version override |
-| `COMPOSIO_GMAIL_AUTH_CONFIG_ID` | No | Existing Gmail auth-config override; managed auth is used when empty |
-| `COMPOSIO_GMAIL_CLIENT_ID` | No | Gmail custom OAuth client id |
-| `COMPOSIO_GMAIL_CLIENT_SECRET` | No | Gmail custom OAuth client secret |
-| `COMPOSIO_GMAIL_OAUTH_REDIRECT_URI` | No | Gmail custom OAuth callback |
-| `COMPOSIO_GMAIL_SCOPES` | No | Gmail custom OAuth scopes |
+| `COMPOSIO_GMAIL_AUTH_CONFIG_ID` | No | Existing Gmail auth-config override; managed auth is used when empty. Create custom Gmail OAuth configs in Composio rather than supplying raw Google credentials to this app. |
 | `COMPOSIO_SHOPIFY_AUTH_CONFIG_ID` | No | Existing Shopify auth-config id |
 | `COMPOSIO_SHOPIFY_CLIENT_ID` | Required without Shopify auth config | Shopify custom OAuth client id |
 | `COMPOSIO_SHOPIFY_CLIENT_SECRET` | Required without Shopify auth config | Shopify custom OAuth client secret |
@@ -212,6 +208,7 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - Embedded widget abuse controls trust only edge-supplied client IP headers (`x-vercel-forwarded-for` and `cf-connecting-ip`); requests without them fall back to the shared `"unknown"` rate-limit bucket.
 - Public widget/API failures now return stable client-safe errors while detailed exceptions stay in server logs.
 - Public lead submissions now return only `ok`, `leadId`, and `createdAt`.
+- Widget leads can have a persisted AI conversation summary. Generation runs after the response lifecycle, consumes one workspace message credit per attempt, and can be regenerated from Leads or Analytics when the transcript changes. See `docs/guides/lead-conversation-summaries.md`.
 - The dashboard app now sends baseline browser protections through CSP, HSTS, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
 - Dashboard CSP allows Supabase only when `NEXT_PUBLIC_SUPABASE_URL` is configured; it must not fall back to a hardcoded project hostname.
 - Public widget rate limits are enforced through a Supabase RPC backed by a named uniqueness constraint on `rate_limit_windows`; do not switch that upsert back to a bare column-list conflict target or Postgres can reintroduce ambiguous `window_started_at` errors.
