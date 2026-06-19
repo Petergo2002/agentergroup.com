@@ -27,6 +27,29 @@ test("automation event processing records ignored, processed, and failed states"
   assert.match(source, /\.update\(\{ last_error: message \}\)/);
 });
 
+test("automation event processing catches failures that happen before run creation", () => {
+  const eventStart = source.indexOf("const event = claimResult.data");
+  const tryStart = source.indexOf("try {", eventStart);
+  const automationLookup = source.indexOf('from("agent_automations")', eventStart);
+  const runInsert = source.indexOf('from("runs")', eventStart);
+  const catchStart = source.indexOf("} catch (error)", eventStart);
+  const catchBlock = source.slice(catchStart);
+
+  assert.ok(tryStart > eventStart);
+  assert.ok(automationLookup > tryStart);
+  assert.ok(runInsert > automationLookup);
+  assert.match(catchBlock, /from\("automation_events"\)[\s\S]*status: "failed"/);
+  assert.match(catchBlock, /automation\s+\? supabase[\s\S]*last_error: message/);
+});
+
+test("automation event processing checks lifecycle persistence errors", () => {
+  assert.match(source, /if \(eventLinkUpdate\.error\)/);
+  assert.match(source, /if \(runUpdate\.error\)/);
+  assert.match(source, /if \(eventUpdate\.error\)/);
+  assert.match(source, /if \(automationUpdate\.error\)/);
+  assert.match(source, /Automation failure state persistence failed/);
+});
+
 test("automation event processing consumes quota before running the agent runtime", () => {
   const quotaIndex = source.indexOf("await consumeWorkspaceMessageUsage");
   const runtimeIndex = source.indexOf("await runAgentChat", quotaIndex);

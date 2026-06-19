@@ -121,6 +121,7 @@ interface ConnectionSyncRow {
 }
 
 const GMAIL_SEND_EMAIL_TOOL = "GMAIL_SEND_EMAIL";
+const GMAIL_REPLY_TO_THREAD_TOOL = "GMAIL_REPLY_TO_THREAD";
 const OUTLOOK_SEND_EMAIL_TOOL = "OUTLOOK_SEND_EMAIL";
 const GOOGLE_CALENDAR_CREATE_EVENT_TOOL = "GOOGLECALENDAR_CREATE_EVENT";
 const GOOGLE_CALENDAR_QUICK_ADD_TOOL = "GOOGLECALENDAR_QUICK_ADD";
@@ -1508,6 +1509,7 @@ function applyEmailRecipientPolicyToCompletion(
     if (
       toolCall.type !== "function" ||
       (toolCall.function.name !== GMAIL_SEND_EMAIL_TOOL &&
+        toolCall.function.name !== GMAIL_REPLY_TO_THREAD_TOOL &&
         toolCall.function.name !== OUTLOOK_SEND_EMAIL_TOOL)
     ) {
       return toolCall;
@@ -1571,6 +1573,7 @@ function sanitizeEmailToolMessages(
   return messages.map((message) =>
     ("name" in message &&
       (message.name === GMAIL_SEND_EMAIL_TOOL ||
+        message.name === GMAIL_REPLY_TO_THREAD_TOOL ||
         message.name === OUTLOOK_SEND_EMAIL_TOOL))
       ? {
           ...message,

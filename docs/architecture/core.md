@@ -1027,9 +1027,14 @@ Current builder/runtime policy:
   - one hidden fixed internal email
 - when a fixed internal email is configured, runtime enforces that recipient server-side and does not trust the model-selected recipient
 
-Live tool capability is locked to:
+Default live tool capability is:
 
 - `GMAIL_SEND_EMAIL`
+- `GMAIL_REPLY_TO_THREAD`
+
+`GMAIL_REPLY_TO_THREAD` requires `thread_id` and `recipient_email`. Fixed-recipient notification
+nodes do not expose thread replies because mixing a source thread with a hidden fixed recipient is
+not a safe reply model.
 
 #### Outlook
 
@@ -1635,7 +1640,7 @@ This is intentionally narrow. Unsupported marketplace-style integrations are not
 
 - Gmail
   - `GMAIL_NEW_GMAIL_MESSAGE`
-  - consumed through `/api/composio/webhook`
+  - consumed through `https://dashboard.agentergroup.com/api/composio/webhook`
   - activates `surface = 'automation'` agents through `agent_automations`
   - stores incoming events in `automation_events`
   - runs the shared agent runtime with configured tools and knowledge
@@ -1644,6 +1649,7 @@ This is intentionally narrow. Unsupported marketplace-style integrations are not
 
 - Gmail
   - `GMAIL_SEND_EMAIL`
+  - `GMAIL_REPLY_TO_THREAD`
 - Microsoft Outlook
   - `OUTLOOK_SEND_EMAIL`
 - Slack

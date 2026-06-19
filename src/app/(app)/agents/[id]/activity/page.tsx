@@ -11,20 +11,38 @@ import type {
   AgentAutomationRecord,
   AgentRecord,
   AutomationEventRecord,
+  BuilderDefinition,
   ConnectionRecord,
   RunRecord,
+  RunStepRecord,
 } from '@/lib/types';
 
 interface AutomationActivityResponse {
   agent: AgentRecord;
+  definition: BuilderDefinition | null;
   automation: AgentAutomationRecord | null;
   connections: ConnectionRecord[];
   runs: RunRecord[];
+  steps: RunStepRecord[];
   events: AutomationEventRecord[];
   environment: {
     hasComposio: boolean;
     hasWebhookSecret: boolean;
+    configuredAppUrl: string;
+    appUrlMatchesRequestOrigin: boolean;
+    expectedWebhookUrl: string;
   };
+}
+
+interface ToolActivityItem {
+  key: string;
+  name: string;
+  status: 'succeeded' | 'failed';
+  detail: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
 function summarizeRun(run: RunRecord) {
@@ -38,6 +56,36 @@ function summarizeRun(run: RunRecord) {
   }
 
   return 'No output summary yet.';
+}
+
+function getRunToolActivity(run: RunRecord): ToolActivityItem[] {
+  const toolMessages = run.output?.toolMessages;
+  if (!Array.isArray(toolMessages)) {
+    return [];
+  }
+
+  return toolMessages.flatMap((message, index) => {
+    if (!isRecord(message)) {
+      return [];
+    }
+
+    const name =
+      typeof message.name === 'string' && message.name.trim()
+        ? message.name.trim()
+        : 'External tool';
+    const content =
+      typeof message.content === 'string' ? message.content.trim() : '';
+    const failed = /^error executing tool:/i.test(content);
+
+    return [{
+      key: `${run.id}:${index}:${name}`,
+      name,
+      status: failed ? 'failed' : 'succeeded',
+      detail: failed
+        ? content.replace(/\s+/g, ' ').slice(0, 240)
+        : 'Tool returned successfully.',
+    } satisfies ToolActivityItem];
+  });
 }
 
 function statusClasses(status: string) {
@@ -59,9 +107,11 @@ export default function AgentActivityPage() {
   const { showToast } = useToast();
   const agentId = params.id;
   const [agent, setAgent] = useState<AgentRecord | null>(null);
+  const [definition, setDefinition] = useState<BuilderDefinition | null>(null);
   const [automation, setAutomation] = useState<AgentAutomationRecord | null>(null);
   const [connections, setConnections] = useState<ConnectionRecord[]>([]);
   const [runs, setRuns] = useState<RunRecord[]>([]);
+  const [steps, setSteps] = useState<RunStepRecord[]>([]);
   const [events, setEvents] = useState<AutomationEventRecord[]>([]);
   const [environment, setEnvironment] =
     useState<AutomationActivityResponse['environment'] | null>(null);
@@ -73,6 +123,43 @@ export default function AgentActivityPage() {
         ? connections.find((connection) => connection.id === automation.connection_id) ?? null
         : null,
     [automation?.connection_id, connections],
+  );
+
+  const enabledGmailTools = useMemo(() => {
+    const gmailNode = definition?.nodes?.find((node) => {
+      if (!isRecord(node) || !isRecord(node.data)) {
+        return false;
+      }
+
+      return node.data.kind === 'gmail';
+    });
+    const enabledTools =
+      isRecord(gmailNode) && isRecord(gmailNode.data)
+        ? gmailNode.data.enabledTools
+        : null;
+
+    return Array.isArray(enabledTools)
+      ? enabledTools.filter((value): value is string => typeof value === 'string')
+      : [];
+  }, [definition]);
+
+  const gmailReplyEnabled = enabledGmailTools.includes('GMAIL_REPLY_TO_THREAD');
+
+  const runStepsByRunId = useMemo(() => {
+    const grouped = new Map<string, RunStepRecord[]>();
+
+    for (const step of steps) {
+      const current = grouped.get(step.run_id) ?? [];
+      current.push(step);
+      grouped.set(step.run_id, current);
+    }
+
+    return grouped;
+  }, [steps]);
+
+  const runsById = useMemo(
+    () => new Map(runs.map((run) => [run.id, run])),
+    [runs],
   );
 
   const loadActivity = useCallback(async () => {
@@ -95,9 +182,11 @@ export default function AgentActivityPage() {
     }
 
     setAgent(data.agent);
+    setDefinition(data.definition ?? null);
     setAutomation(data.automation);
     setConnections(data.connections ?? []);
     setRuns(data.runs ?? []);
+    setSteps(data.steps ?? []);
     setEvents(data.events ?? []);
     setEnvironment(data.environment ?? null);
   }, [agentId, router]);
@@ -188,7 +277,16 @@ export default function AgentActivityPage() {
                 },
                 {
                   label: 'Webhook',
-                  value: environment?.hasWebhookSecret ? 'Configured' : 'Missing',
+                  value:
+                    environment?.hasComposio &&
+                    environment.hasWebhookSecret &&
+                    environment.appUrlMatchesRequestOrigin
+                      ? 'Ready'
+                      : !environment?.hasComposio
+                        ? 'Missing API key'
+                        : !environment.hasWebhookSecret
+                          ? 'Missing signing secret'
+                          : 'App URL mismatch',
                 },
               ].map((item) => (
                 <div
@@ -202,6 +300,47 @@ export default function AgentActivityPage() {
                 </div>
               ))}
             </section>
+
+            <section className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/45">
+                Expected Composio webhook endpoint
+              </p>
+              <p className="mt-3 break-all font-mono text-xs font-bold text-on-surface-variant">
+                {environment?.expectedWebhookUrl ?? 'Unavailable'}
+              </p>
+            </section>
+
+            {environment && (
+              !environment.hasComposio ||
+              !environment.hasWebhookSecret ||
+              !environment.appUrlMatchesRequestOrigin
+            ) ? (
+              <section className="rounded-[1.5rem] border border-error/15 bg-error/5 p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-error">
+                  Webhook readiness problem
+                </p>
+                <p className="mt-3 text-sm font-bold leading-6 text-error">
+                  {!environment.hasComposio
+                    ? 'COMPOSIO_API_KEY is missing from this deployment.'
+                    : !environment.hasWebhookSecret
+                      ? 'COMPOSIO_WEBHOOK_SECRET is missing from this deployment.'
+                      : `NEXT_PUBLIC_APP_URL is set to ${environment.configuredAppUrl}, but this app is running at ${new URL(environment.expectedWebhookUrl).origin}.`}
+                </p>
+              </section>
+            ) : null}
+
+            {automation && !gmailReplyEnabled ? (
+              <section className="rounded-[1.5rem] border border-warning/15 bg-warning/5 p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-warning">
+                  Gmail thread replies disabled
+                </p>
+                <p className="mt-3 text-sm font-bold leading-6 text-on-surface-variant">
+                  This Gmail node can send new emails, but it cannot reply inside the original thread.
+                  Enable <span className="font-mono">GMAIL_REPLY_TO_THREAD</span> in the Gmail node to use
+                  the trigger payload&apos;s thread id for true replies.
+                </p>
+              </section>
+            ) : null}
 
             {automation?.last_error ? (
               <section className="rounded-[1.5rem] border border-error/15 bg-error/5 p-5">
@@ -226,24 +365,79 @@ export default function AgentActivityPage() {
                     No automation runs yet.
                   </div>
                 ) : (
-                  runs.map((run) => (
-                    <article
-                      key={run.id}
-                      className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <span className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.15em] ${statusClasses(run.status)}`}>
-                          {run.status}
-                        </span>
-                        <span className="text-[10px] font-bold text-on-surface-variant/55">
-                          {formatLocaleDateTime(run.created_at, language)}
-                        </span>
-                      </div>
-                      <p className="mt-4 text-sm font-medium leading-6 text-on-surface-variant">
-                        {summarizeRun(run)}
-                      </p>
-                    </article>
-                  ))
+                  runs.map((run) => {
+                    const runSteps = runStepsByRunId.get(run.id) ?? [];
+                    const toolActivity = getRunToolActivity(run);
+
+                    return (
+                      <article
+                        key={run.id}
+                        className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <span className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.15em] ${statusClasses(run.status)}`}>
+                            {run.status}
+                          </span>
+                          <span className="text-[10px] font-bold text-on-surface-variant/55">
+                            {formatLocaleDateTime(run.created_at, language)}
+                          </span>
+                        </div>
+                        <p className="mt-4 whitespace-pre-wrap text-sm font-medium leading-6 text-on-surface-variant">
+                          {summarizeRun(run)}
+                        </p>
+
+                        {toolActivity.length > 0 ? (
+                          <div className="mt-5 border-t border-outline-variant/10 pt-4">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">
+                              Tool actions
+                            </p>
+                            <div className="mt-3 space-y-2">
+                              {toolActivity.map((tool) => (
+                                <div key={tool.key} className="rounded-xl bg-surface-container-low p-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="truncate font-mono text-[11px] font-bold text-on-surface">
+                                      {tool.name}
+                                    </span>
+                                    <span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wider ${statusClasses(tool.status)}`}>
+                                      {tool.status}
+                                    </span>
+                                  </div>
+                                  <p className="mt-2 text-[11px] font-medium leading-5 text-on-surface-variant">
+                                    {tool.detail}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {runSteps.length > 0 ? (
+                          <div className="mt-5 border-t border-outline-variant/10 pt-4">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">
+                              Run steps
+                            </p>
+                            <div className="mt-3 space-y-2">
+                              {runSteps.map((step) => (
+                                <div key={step.id} className="flex items-start justify-between gap-4 rounded-xl bg-surface-container-low p-3">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-xs font-bold text-on-surface">{step.title}</p>
+                                    {step.detail ? (
+                                      <p className="mt-1 text-[11px] font-medium leading-5 text-on-surface-variant">
+                                        {step.detail}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                  <span className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wider ${statusClasses(step.status)}`}>
+                                    {step.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })
                 )}
               </div>
 
@@ -260,29 +454,39 @@ export default function AgentActivityPage() {
                     No trigger events received yet.
                   </div>
                 ) : (
-                  events.map((event) => (
-                    <article
-                      key={event.id}
-                      className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-black text-on-surface">
-                            {event.trigger_slug}
-                          </p>
-                          <p className="mt-1 truncate text-[11px] font-medium text-on-surface-variant/55">
-                            {event.external_event_id}
-                          </p>
+                  events.map((event) => {
+                    const linkedRun = event.run_id ? runsById.get(event.run_id) ?? null : null;
+
+                    return (
+                      <article
+                        key={event.id}
+                        className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-on-surface">
+                              {event.trigger_slug}
+                            </p>
+                            <p className="mt-1 truncate text-[11px] font-medium text-on-surface-variant/55">
+                              {event.external_event_id}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.15em] ${statusClasses(event.status)}`}>
+                            {event.status}
+                          </span>
                         </div>
-                        <span className={`shrink-0 rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.15em] ${statusClasses(event.status)}`}>
-                          {event.status}
-                        </span>
-                      </div>
-                      <p className="mt-4 text-[10px] font-bold text-on-surface-variant/55">
-                        {formatLocaleDateTime(event.created_at, language)}
-                      </p>
-                    </article>
-                  ))
+                        <div className="mt-4 space-y-1 text-[10px] font-bold text-on-surface-variant/55">
+                          <p>{formatLocaleDateTime(event.created_at, language)}</p>
+                          <p>
+                            Run: {linkedRun?.status ?? (event.run_id ? 'Not in recent runs' : 'Not started')}
+                          </p>
+                          {linkedRun?.error_message ? (
+                            <p className="text-error">{linkedRun.error_message}</p>
+                          ) : null}
+                        </div>
+                      </article>
+                    );
+                  })
                 )}
               </div>
             </section>

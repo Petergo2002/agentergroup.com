@@ -12,7 +12,10 @@ import {
   buildDefaultGmailRecipientPolicy,
   normalizeGmailRecipientEmail,
 } from "@/lib/gmail";
-import { getSupportedIntegration } from "@/lib/integrations";
+import {
+  getRecommendedChatToolsForToolkit,
+  getSupportedIntegration,
+} from "@/lib/integrations";
 import {
   buildKnowledgeContext,
   getKnowledgeCitationSummary,
@@ -162,6 +165,7 @@ const OMITTED_ASSISTANT_HISTORY_MESSAGES = new Set([
   "This is rarely an acceptable response and a retry should be issued.",
 ]);
 const INTERNAL_END_CHAT_TOOL_NAME = "suggest_end_chat";
+const GMAIL_REPLY_TO_THREAD_TOOL = "GMAIL_REPLY_TO_THREAD";
 const INTERNAL_ASSISTANT_TOOLKIT_PROMPT =
   "If the user asks for a downloadable PDF, a printable version, or wants content exported as a PDF, use the available PDF tool to generate it. After the tool finishes, briefly tell the user the PDF is ready to download.";
 const AUTOMATION_EXECUTION_PROMPT =
@@ -452,6 +456,25 @@ function buildToolGuidance(
   return guidance.join(" ");
 }
 
+function applyEmailToolRestrictions(
+  enabledToolsByToolkit: EnabledToolSelection | null | undefined,
+  gmailRecipientPolicy: GmailRecipientPolicy,
+) {
+  if (gmailRecipientPolicy.mode !== "specific_email") {
+    return enabledToolsByToolkit;
+  }
+
+  const gmailTools =
+    enabledToolsByToolkit?.gmail ?? getRecommendedChatToolsForToolkit("gmail");
+
+  return {
+    ...(enabledToolsByToolkit ?? {}),
+    gmail: gmailTools.filter(
+      (toolName) => toolName !== GMAIL_REPLY_TO_THREAD_TOOL,
+    ),
+  };
+}
+
 function buildEndChatGuidance(policy: EndChatPolicy) {
   if (!policy.enabled || !policy.allowAssistantSuggestion) {
     return null;
@@ -633,6 +656,10 @@ export async function runAgentChat({
   const effectiveEndChatPolicy = endChatPolicy ?? buildDisabledEndChatPolicy();
   const effectiveGmailRecipientPolicy: GmailRecipientPolicy =
     gmailRecipientPolicy ?? buildDefaultGmailRecipientPolicy();
+  const runtimeEnabledToolsByToolkit = applyEmailToolRestrictions(
+    enabledToolsByToolkit,
+    effectiveGmailRecipientPolicy,
+  );
   const enabledToolkits = connectedToolkits.filter((toolkitSlug) => {
     if (toolkitSlug !== "gmail" && toolkitSlug !== "outlook") {
       return true;
@@ -678,6 +705,21 @@ export async function runAgentChat({
 
   if (audience === "automation") {
     systemInstructionBlocks.push(AUTOMATION_EXECUTION_PROMPT);
+
+    const configuredGmailTools = runtimeEnabledToolsByToolkit?.gmail;
+    const gmailReplyAvailable =
+      enabledToolkits.includes("gmail") &&
+      (Array.isArray(configuredGmailTools)
+        ? configuredGmailTools.includes(GMAIL_REPLY_TO_THREAD_TOOL)
+        : getRecommendedChatToolsForToolkit("gmail").includes(
+            GMAIL_REPLY_TO_THREAD_TOOL,
+          ));
+
+    if (gmailReplyAvailable) {
+      systemInstructionBlocks.push(
+        "For a Gmail new-message trigger, when the instructions clearly require responding to the sender and the payload includes both sender and thread_id, prefer GMAIL_REPLY_TO_THREAD so the response stays in the original conversation. Use the payload sender as recipient_email. Do not reply when the sender, thread id, or required intent is unclear.",
+      );
+    }
   }
 
   const toolGuidance = buildToolGuidance(
@@ -709,7 +751,7 @@ export async function runAgentChat({
   const toolsPromise = getWrappedTools(
     toolUserId,
     enabledToolkits,
-    enabledToolsByToolkit,
+    runtimeEnabledToolsByToolkit,
   );
   let knowledgeMatches: KnowledgeMatchRecord[] = [];
 

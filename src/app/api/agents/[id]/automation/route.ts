@@ -8,7 +8,7 @@ import {
   getComposioTriggerType,
   syncConnectedAccountsToDatabase,
 } from "@/lib/composio";
-import { hasComposioEnv, hasComposioWebhookSecret } from "@/lib/env";
+import { getAppUrl, hasComposioEnv, hasComposioWebhookSecret } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import type { AgentAutomationRecord, BuilderDefinition, ConnectionRecord } from "@/lib/types";
 
@@ -20,6 +20,8 @@ const CONNECTION_SELECT =
   "id, workspace_id, provider, toolkit_slug, display_name, status, external_id, account_label, toolkit_data, created_by, last_synced_at, created_at, updated_at";
 const RUN_SELECT =
   "id, workspace_id, agent_id, thread_id, status, model, input, output, error_message, started_at, completed_at, created_at";
+const RUN_STEP_SELECT =
+  "id, run_id, workspace_id, agent_id, step_key, step_type, title, detail, status, payload, started_at, completed_at, created_at";
 const AUTOMATION_EVENT_SELECT =
   "id, workspace_id, agent_id, automation_id, run_id, external_event_id, trigger_slug, payload, status, created_at, updated_at";
 
@@ -73,7 +75,7 @@ async function loadAutomationHostAgent(
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id: agentId } = await params;
@@ -95,7 +97,7 @@ export async function GET(
 
   await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id);
 
-  const [draftResult, automationResult, connectionsResult, runsResult, eventsResult] = await Promise.all([
+  const [draftResult, automationResult, connectionsResult, runsResult, runStepsResult, eventsResult] = await Promise.all([
     supabase
       .from("agent_drafts")
       .select("id, agent_id, workspace_id, definition, version, updated_by, created_at, updated_at")
@@ -119,6 +121,12 @@ export async function GET(
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
+      .from("run_steps")
+      .select(RUN_STEP_SELECT)
+      .eq("agent_id", agentId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
       .from("automation_events")
       .select(AUTOMATION_EVENT_SELECT)
       .eq("agent_id", agentId)
@@ -130,6 +138,7 @@ export async function GET(
   if (automationResult.error) throw automationResult.error;
   if (connectionsResult.error) throw connectionsResult.error;
   if (runsResult.error) throw runsResult.error;
+  if (runStepsResult.error) throw runStepsResult.error;
   if (eventsResult.error) throw eventsResult.error;
 
   let triggerType: unknown = null;
@@ -144,6 +153,7 @@ export async function GET(
     automation: (automationResult.data ?? null) as AgentAutomationRecord | null,
     connections: (connectionsResult.data ?? []) as ConnectionRecord[],
     runs: runsResult.data ?? [],
+    steps: runStepsResult.data ?? [],
     events: eventsResult.data ?? [],
     triggerType,
     defaults: {
@@ -154,6 +164,13 @@ export async function GET(
     environment: {
       hasComposio: hasComposioEnv(),
       hasWebhookSecret: hasComposioWebhookSecret(),
+      configuredAppUrl: getAppUrl().replace(/\/$/, ""),
+      appUrlMatchesRequestOrigin:
+        getAppUrl().replace(/\/$/, "") === request.nextUrl.origin,
+      expectedWebhookUrl: new URL(
+        "/api/composio/webhook",
+        request.nextUrl.origin,
+      ).toString(),
     },
   });
 }

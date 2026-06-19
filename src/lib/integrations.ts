@@ -33,7 +33,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegration[] = [
     category: "Communication",
     connectionPurpose: "Used by agents to send emails during the current conversation.",
     surface: "chat",
-    recommendedChatTools: ["GMAIL_SEND_EMAIL"],
+    recommendedChatTools: ["GMAIL_SEND_EMAIL", "GMAIL_REPLY_TO_THREAD"],
     allowedKnowledgeTools: [],
   },
   {

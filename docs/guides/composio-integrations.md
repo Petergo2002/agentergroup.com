@@ -78,7 +78,7 @@ Automation triggers use a different path:
 
 ```text
 Composio trigger
-  -> POST /api/composio/webhook
+  -> POST https://dashboard.agentergroup.com/api/composio/webhook
   -> verifyWebhook(...) with COMPOSIO_WEBHOOK_SECRET
   -> lookup agent_automations by composio_trigger_id
   -> insert automation_events
@@ -88,6 +88,15 @@ Composio trigger
 Current v1 trigger support:
 
 - `GMAIL_NEW_GMAIL_MESSAGE`
+
+The webhook subscription must target the dashboard deployment directly. The apex/marketing domain
+does not host Next.js application API routes and must not be used for webhook delivery.
+The production dashboard deployment must also set
+`NEXT_PUBLIC_APP_URL=https://dashboard.agentergroup.com`.
+
+Gmail action nodes support both new sends (`GMAIL_SEND_EMAIL`) and true thread replies
+(`GMAIL_REPLY_TO_THREAD`). Existing nodes preserve their saved action allow-list, so the reply tool
+must be enabled explicitly on older automations.
 
 The same webhook route separately handles
 `composio.connected_account.expired`. Expiry events update matching local connection state and

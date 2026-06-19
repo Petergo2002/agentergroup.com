@@ -38,10 +38,14 @@ async function markEventIgnored(
   supabase: ReturnType<typeof createAdminClient>,
   eventId: string,
 ) {
-  await supabase
+  const result = await supabase
     .from("automation_events")
     .update({ status: "ignored" })
     .eq("id", eventId);
+
+  if (result.error) {
+    throw result.error;
+  }
 }
 
 export async function processAutomationEvent(eventId: string) {
@@ -64,66 +68,67 @@ export async function processAutomationEvent(eventId: string) {
   }
 
   const event = claimResult.data as AutomationEventRecord;
-  const automationResult = await supabase
-    .from("agent_automations")
-    .select("*")
-    .eq("id", event.automation_id)
-    .maybeSingle();
-
-  if (automationResult.error) {
-    throw automationResult.error;
-  }
-
-  const automation = automationResult.data as AgentAutomationRecord | null;
-
-  if (!automation || automation.status !== "active") {
-    await markEventIgnored(supabase, event.id);
-    return { ok: true, status: "ignored" as const };
-  }
-
-  const agentResult = await supabase
-    .from("agents")
-    .select("*")
-    .eq("id", automation.agent_id)
-    .eq("workspace_id", automation.workspace_id)
-    .maybeSingle();
-
-  if (agentResult.error) {
-    throw agentResult.error;
-  }
-
-  const agent = agentResult.data as AgentRecord | null;
-
-  if (
-    !agent ||
-    agent.archived_at ||
-    agent.status !== "active" ||
-    (agent.surface !== "widget" && agent.surface !== "automation")
-  ) {
-    await markEventIgnored(supabase, event.id);
-    return { ok: true, status: "ignored" as const };
-  }
-
-  const payload = readEventPayload(event);
-  const draftResult = await supabase
-    .from("agent_drafts")
-    .select("definition")
-    .eq("agent_id", agent.id)
-    .maybeSingle();
-
-  if (draftResult.error) {
-    throw draftResult.error;
-  }
-
-  const definition = (draftResult.data?.definition ?? null) as BuilderDefinition | null;
-  const gmailRecipientPolicy = extractGmailRecipientPolicyFromDefinition(definition);
-  const googleCalendarSelection = extractGoogleCalendarSelectionFromDefinition(definition);
-  const calSelection = extractCalSelectionFromDefinition(definition);
-  const enabledToolsByToolkit = extractEnabledToolsFromDefinition(definition);
+  let automation: AgentAutomationRecord | null = null;
   let runId: string | null = null;
   let runtimeStepId: string | null = null;
 
   try {
+    const automationResult = await supabase
+      .from("agent_automations")
+      .select("*")
+      .eq("id", event.automation_id)
+      .maybeSingle();
+
+    if (automationResult.error) {
+      throw automationResult.error;
+    }
+
+    automation = automationResult.data as AgentAutomationRecord | null;
+
+    if (!automation || automation.status !== "active") {
+      await markEventIgnored(supabase, event.id);
+      return { ok: true, status: "ignored" as const };
+    }
+
+    const agentResult = await supabase
+      .from("agents")
+      .select("*")
+      .eq("id", automation.agent_id)
+      .eq("workspace_id", automation.workspace_id)
+      .maybeSingle();
+
+    if (agentResult.error) {
+      throw agentResult.error;
+    }
+
+    const agent = agentResult.data as AgentRecord | null;
+
+    if (
+      !agent ||
+      agent.archived_at ||
+      agent.status !== "active" ||
+      (agent.surface !== "widget" && agent.surface !== "automation")
+    ) {
+      await markEventIgnored(supabase, event.id);
+      return { ok: true, status: "ignored" as const };
+    }
+
+    const payload = readEventPayload(event);
+    const draftResult = await supabase
+      .from("agent_drafts")
+      .select("definition")
+      .eq("agent_id", agent.id)
+      .maybeSingle();
+
+    if (draftResult.error) {
+      throw draftResult.error;
+    }
+
+    const definition = (draftResult.data?.definition ?? null) as BuilderDefinition | null;
+    const gmailRecipientPolicy = extractGmailRecipientPolicyFromDefinition(definition);
+    const googleCalendarSelection = extractGoogleCalendarSelectionFromDefinition(definition);
+    const calSelection = extractCalSelectionFromDefinition(definition);
+    const enabledToolsByToolkit = extractEnabledToolsFromDefinition(definition);
     const runInsert = await supabase
       .from("runs")
       .insert({
@@ -151,10 +156,14 @@ export async function processAutomationEvent(eventId: string) {
     const createdRunId = runInsert.data.id;
     runId = createdRunId;
 
-    await supabase
+    const eventLinkUpdate = await supabase
       .from("automation_events")
       .update({ run_id: createdRunId })
       .eq("id", event.id);
+
+    if (eventLinkUpdate.error) {
+      throw eventLinkUpdate.error;
+    }
 
     const runtimeStep = await createRunStep(supabase, {
       runId: createdRunId,
@@ -201,7 +210,7 @@ export async function processAutomationEvent(eventId: string) {
       },
     );
 
-    await supabase
+    const runUpdate = await supabase
       .from("runs")
       .update({
         status: "succeeded",
@@ -217,7 +226,11 @@ export async function processAutomationEvent(eventId: string) {
       })
       .eq("id", runId);
 
-    await Promise.all([
+    if (runUpdate.error) {
+      throw runUpdate.error;
+    }
+
+    const [eventUpdate, automationUpdate] = await Promise.all([
       supabase
         .from("automation_events")
         .update({ status: "processed" })
@@ -227,6 +240,14 @@ export async function processAutomationEvent(eventId: string) {
         .update({ last_event_at: new Date().toISOString(), last_error: null })
         .eq("id", automation.id),
     ]);
+
+    if (eventUpdate.error) {
+      throw eventUpdate.error;
+    }
+
+    if (automationUpdate.error) {
+      throw automationUpdate.error;
+    }
 
     return { ok: true, status: "processed" as const };
   } catch (error) {
@@ -241,7 +262,7 @@ export async function processAutomationEvent(eventId: string) {
       ).catch(() => undefined);
     }
 
-    await Promise.all([
+    const failureUpdates = await Promise.all([
       runId
         ? supabase
             .from("runs")
@@ -256,11 +277,25 @@ export async function processAutomationEvent(eventId: string) {
         .from("automation_events")
         .update({ status: "failed" })
         .eq("id", event.id),
-      supabase
-        .from("agent_automations")
-        .update({ last_error: message })
-        .eq("id", automation.id),
+      automation
+        ? supabase
+            .from("agent_automations")
+            .update({ last_error: message })
+            .eq("id", automation.id)
+        : Promise.resolve({ error: null }),
     ]);
+
+    const failurePersistenceErrors = failureUpdates
+      .map((result) => result.error?.message)
+      .filter((value): value is string => Boolean(value));
+
+    if (failurePersistenceErrors.length > 0) {
+      console.error("Automation failure state persistence failed", {
+        eventId: event.id,
+        automationId: automation?.id ?? event.automation_id,
+        errors: failurePersistenceErrors,
+      });
+    }
 
     throw error;
   }

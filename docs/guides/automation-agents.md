@@ -336,11 +336,19 @@ Required for live automations:
 
 - `COMPOSIO_API_KEY`
 - `COMPOSIO_WEBHOOK_SECRET`
+- `NEXT_PUBLIC_APP_URL=https://dashboard.agentergroup.com` in production
 
-The Composio project must have a V3 webhook subscription pointing to
-`https://<production-domain>/api/composio/webhook`. Enable at least
+The production Composio project must have a V3 webhook subscription pointing directly to
+`https://dashboard.agentergroup.com/api/composio/webhook`. Do not use the marketing domain
+(`agentergroup.com`) because it redirects to a separate static deployment that does not host app
+API routes. Enable at least
 `composio.trigger.message` and `composio.connected_account.expired`; also enable
 `composio.trigger.disabled` so provider-side polling failures are reflected in the dashboard.
+
+New Gmail action nodes enable both `GMAIL_SEND_EMAIL` and `GMAIL_REPLY_TO_THREAD`. Existing saved
+nodes keep their explicit action selection; enable `GMAIL_REPLY_TO_THREAD` manually when the
+automation must respond inside the source message thread. The reply action requires the trigger
+payload's `thread_id` and the sender email as `recipient_email`.
 
 The builder readiness panel exposes both provider and webhook readiness so activation blockers are visible before the user attempts activation.
 
