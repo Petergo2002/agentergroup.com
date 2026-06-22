@@ -949,7 +949,7 @@ Current canvas rules:
 - fixed `Trigger`
 - fixed core `Agent`
 - optional singleton `Knowledge`
-- optional singleton `End Chat`
+- optional singleton `End Chat` for conversational surfaces only
 - optional singleton `Gmail`
 - optional singleton `Microsoft Outlook`
 - optional singleton `Google Calendar`
@@ -1176,6 +1176,26 @@ External Trigger -> Agent Core
                    -> Knowledge (optional)
                    -> Connected Tools (optional)
 ```
+
+On the Automation surface, product labels describe the same configuration model as:
+
+```text
+External Trigger -> Automation Logic
+                   -> Knowledge (optional)
+                   -> Available Actions (optional)
+```
+
+Automation does not create a chat thread. Each trigger produces an `automation_events` record and,
+when processed, a linked `runs` record. The shared agent runtime is reused for model, knowledge, and
+tool execution, but the executor adapts its result into a versioned operational result containing a
+decision, reason, verified actions, missing information, and a run summary. Activity renders that
+event-to-result timeline rather than a conversation transcript.
+
+`runs.status` describes runtime completion; `runs.output.automationResult.decision` describes the
+business outcome. Tool evidence overrides model claims when deriving that decision. Version 1
+results store bounded summaries, reasons, missing-information items, normalized tool outcomes, and
+safe provider identifiers. Failed tool details are extracted from error fields and sanitized before
+persistence. Activity reconstructs the same view for legacy runs without `automationResult`.
 
 Top-level product language should stay provider-neutral:
 

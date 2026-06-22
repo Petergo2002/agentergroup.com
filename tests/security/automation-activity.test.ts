@@ -22,13 +22,29 @@ test("automation activity API returns recent run steps and the expected webhook 
   assert.match(automationRouteSource, /appUrlMatchesRequestOrigin/);
 });
 
-test("automation activity displays tool outcomes, run steps, and readiness failures", () => {
-  assert.match(activityPageSource, /Tool actions/);
-  assert.match(activityPageSource, /Run steps/);
+test("automation activity displays an operational event timeline and readiness failures", () => {
+  assert.match(activityPageSource, /Trigger received/);
+  assert.match(activityPageSource, /Decision/);
+  assert.match(activityPageSource, /Actions/);
+  assert.match(activityPageSource, /Run summary/);
+  assert.match(activityPageSource, /No external action was attempted/);
+  assert.match(activityPageSource, /Technical details/);
   assert.match(activityPageSource, /Webhook readiness problem/);
   assert.match(activityPageSource, /expectedWebhookUrl/);
-  assert.match(activityPageSource, /App URL mismatch/);
-  assert.match(activityPageSource, /linkedRun\?\.error_message/);
+  assert.match(activityPageSource, /run\?\.error_message/);
+  assert.match(activityPageSource, /readAutomationRunResult/);
+});
+
+test("automation builder removes chat-only controls and uses automation language", () => {
+  const builderSource = readFileSync(
+    "src/app/(app)/agents/[id]/builder/page.tsx",
+    "utf8",
+  );
+
+  assert.match(builderSource, /item\.key !== 'endchat'/);
+  assert.match(builderSource, /automationInstructionsHelp/);
+  assert.match(builderSource, /agent\?\.surface === 'automation'\s*\? \[\]/);
+  assert.match(builderSource, /automationAgentDescription/);
 });
 
 test("new Gmail nodes include reply-to-thread and fixed recipients cannot use it", () => {

@@ -1,5 +1,10 @@
 import { extractCalSelectionFromDefinition } from "@/lib/cal";
+import { buildAutomationRunResult } from "@/lib/automation/result";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
+import {
+  buildPersistedAssistantMetadata,
+  buildPersistedRunOutput,
+} from "@/lib/debug-trace-security";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import { consumeWorkspaceMessageUsage } from "@/lib/message-usage";
@@ -73,17 +78,17 @@ export async function processAutomationEvent(eventId: string) {
   let runtimeStepId: string | null = null;
 
   try {
-    const automationResult = await supabase
+    const automationLookupResult = await supabase
       .from("agent_automations")
       .select("*")
       .eq("id", event.automation_id)
       .maybeSingle();
 
-    if (automationResult.error) {
-      throw automationResult.error;
+    if (automationLookupResult.error) {
+      throw automationLookupResult.error;
     }
 
-    automation = automationResult.data as AgentAutomationRecord | null;
+    automation = automationLookupResult.data as AgentAutomationRecord | null;
 
     if (!automation || automation.status !== "active") {
       await markEventIgnored(supabase, event.id);
@@ -107,7 +112,7 @@ export async function processAutomationEvent(eventId: string) {
       !agent ||
       agent.archived_at ||
       agent.status !== "active" ||
-      (agent.surface !== "widget" && agent.surface !== "automation")
+      agent.surface !== "automation"
     ) {
       await markEventIgnored(supabase, event.id);
       return { ok: true, status: "ignored" as const };
@@ -196,6 +201,17 @@ export async function processAutomationEvent(eventId: string) {
       gmailRecipientPolicy,
       enabledToolsByToolkit,
     });
+    const automationResult = buildAutomationRunResult({
+      assistantContent: result.assistantContent,
+      toolMessages: result.toolMessages,
+      runtimeHadError: result.debugTrace?.hadError,
+      runtimeErrorSummary: result.debugTrace?.errorSummary ?? null,
+    });
+    const persistedRuntimeOutput = buildPersistedRunOutput({
+      finalCompletion: result.finalCompletion,
+      toolMessages: result.toolMessages,
+      knowledgeMatches: result.knowledgeMatches,
+    });
 
     await completeRunStep(
       supabase,
@@ -215,11 +231,12 @@ export async function processAutomationEvent(eventId: string) {
       .update({
         status: "succeeded",
         output: {
-          assistantContent: result.assistantContent,
-          assistantMetadata: result.assistantMetadata,
-          finalCompletion: result.finalCompletion,
-          toolMessages: result.toolMessages,
-          knowledgeMatches: result.knowledgeMatches,
+          automationResult,
+          assistantContent: automationResult.summary,
+          assistantMetadata: buildPersistedAssistantMetadata(result.assistantMetadata),
+          finalCompletion: persistedRuntimeOutput.finalCompletion,
+          toolMessages: persistedRuntimeOutput.toolMessages,
+          knowledgeMatches: persistedRuntimeOutput.knowledgeMatches,
           connectedToolkits: result.connectedToolkits,
         },
         completed_at: new Date().toISOString(),

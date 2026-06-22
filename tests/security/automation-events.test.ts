@@ -23,7 +23,7 @@ test("automation event processing records ignored, processed, and failed states"
   assert.match(source, /return \{ ok: true, status: "processed" as const \}/);
 
   assert.match(source, /\.update\(\{ status: "failed" \}\)/);
-  assert.match(source, /status: "failed",\s+error_message: message/s);
+  assert.match(source, /status: "failed",[\s\S]+error_message: message/);
   assert.match(source, /\.update\(\{ last_error: message \}\)/);
 });
 
@@ -60,4 +60,12 @@ test("automation event processing consumes quota before running the agent runtim
     quotaIndex < runtimeIndex,
     "automation executor must consume quota before invoking the model runtime",
   );
+});
+
+test("automation runs persist a dedicated operational result without trusting model claims", () => {
+  assert.match(source, /buildAutomationRunResult/);
+  assert.match(source, /automationResult,/);
+  assert.match(source, /assistantContent: automationResult\.summary/);
+  assert.match(source, /buildPersistedRunOutput/);
+  assert.match(source, /agent\.surface !== "automation"/);
 });

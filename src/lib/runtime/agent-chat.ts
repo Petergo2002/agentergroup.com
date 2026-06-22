@@ -169,7 +169,9 @@ const GMAIL_REPLY_TO_THREAD_TOOL = "GMAIL_REPLY_TO_THREAD";
 const INTERNAL_ASSISTANT_TOOLKIT_PROMPT =
   "If the user asks for a downloadable PDF, a printable version, or wants content exported as a PDF, use the available PDF tool to generate it. After the tool finishes, briefly tell the user the PDF is ready to download.";
 const AUTOMATION_EXECUTION_PROMPT =
-  "AUTOMATION MODE: The user message is an incoming external trigger event, not a live chat message. Use configured tools only when the agent instructions and trigger payload clearly require an action. If required details are missing, do not guess; summarize what is missing instead. Never claim an external action happened unless a tool call succeeded. After any tool work, return a concise operational summary of what happened, what you did, and any remaining issue.";
+  "AUTOMATION MODE: This is a background automation run. The user message contains an external trigger event; it is not a live conversation and your final response is an internal operator report, never a reply to the sender. Inspect the event, follow the saved instructions, and use configured tools only when the instructions and payload clearly require an action. If required details are missing, do not guess and do not ask the sender a conversational follow-up unless the saved instructions explicitly require a messaging action. Never claim an external action happened unless its tool call succeeded. Do not repeat the raw email body or unnecessary personal data in the report; summarize only the context needed to understand the decision. After all tool work, return only valid JSON with this exact shape: {\"decision\":\"action_taken|no_action|needs_input|action_failed\",\"summary\":\"concise operator-facing run summary\",\"reason\":\"why this decision was made\",\"missingInformation\":[\"item\"]}. Use an empty array when nothing is missing. Do not wrap the JSON in markdown.";
+const AUTOMATION_RECOVERY_PROMPT =
+  "Finish this background automation run without calling more tools. Return only valid JSON with this exact shape: {\"decision\":\"action_taken|no_action|needs_input|action_failed\",\"summary\":\"concise operator-facing run summary\",\"reason\":\"why this decision was made\",\"missingInformation\":[\"item\"]}. Report only actions proven by successful tool results. Do not address the sender, ask a conversational follow-up, mention internal retries, or wrap the JSON in markdown.";
 const INTERNAL_CREATE_PDF_TOOL_NAME = "create_pdf_from_text";
 const INTERNAL_END_CHAT_TOOL_DEFINITION = {
   type: "function",
@@ -1107,8 +1109,9 @@ export async function runAgentChat({
         ...conversationMessages,
         {
           role: "system",
-          content:
-            "Respond directly to the user in concise natural language based on the conversation and any completed tool work. If information is missing, ask the single best follow-up question. Do not call tools. Never mention internal processing, retries, empty responses, JSON, or code.",
+          content: audience === "automation"
+            ? AUTOMATION_RECOVERY_PROMPT
+            : "Respond directly to the user in concise natural language based on the conversation and any completed tool work. If information is missing, ask the single best follow-up question. Do not call tools. Never mention internal processing, retries, empty responses, JSON, or code.",
         },
       ],
       stream: true,
@@ -1131,7 +1134,14 @@ export async function runAgentChat({
   }
 
   if (!assistantContent.trim()) {
-    assistantContent = EMPTY_ASSISTANT_RESPONSE_FALLBACK;
+    assistantContent = audience === "automation"
+      ? JSON.stringify({
+          decision: "action_failed",
+          summary: "The automation finished without a usable run summary.",
+          reason: "The model returned an empty final result.",
+          missingInformation: [],
+        })
+      : EMPTY_ASSISTANT_RESPONSE_FALLBACK;
     finalAssistantMessage = { role: "assistant", content: assistantContent };
     if (onToken) onToken(assistantContent);
   }

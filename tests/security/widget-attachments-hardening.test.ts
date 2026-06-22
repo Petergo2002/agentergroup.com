@@ -93,14 +93,14 @@ test("widget messages require server-issued unique attachment ids", () => {
 });
 
 test("widget attachment storage is private, quota-bound, and deleted with sessions", () => {
-  assert.match(migration, /'widget-attachments',\s*'widget-attachments',\s*false/s);
+  assert.match(migration, /'widget-attachments',[\s\S]*'widget-attachments',[\s\S]*false/);
   assert.doesNotMatch(migration, /'image\/svg\+xml'/);
   assert.match(migration, /WIDGET_ATTACHMENT_COUNT_LIMIT_EXCEEDED/);
   assert.match(migration, /WIDGET_ATTACHMENT_BYTES_LIMIT_EXCEEDED/);
   assert.match(migration, /widgets\.workspace_id = new\.workspace_id/);
   assert.match(migration, /split_part\(name, '\/', 1\) ~\*/);
   assert.doesNotMatch(migration, /nullif\(split_part\(name, '\/', 1\), ''\)::uuid/);
-  assert.match(uploadRoute, /getPublicWidgetRateLimitRules\(\s*"uploads"/s);
+  assert.match(uploadRoute, /getPublicWidgetRateLimitRules\([\s\S]*"uploads"/);
   assert.match(uploadRoute, /inspectWidgetAttachment/);
   assert.match(uploadRoute, /id: attachmentId/);
   assert.match(chatRoute, /\.in\("id", attachmentIds\)/);

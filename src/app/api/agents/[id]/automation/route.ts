@@ -48,7 +48,7 @@ function stableJsonString(value: Record<string, unknown>) {
 }
 
 function isAutomationHostSurface(surface: string) {
-  return surface === "widget" || surface === "automation";
+  return surface === "automation";
 }
 
 async function loadAutomationHostAgent(
@@ -119,7 +119,7 @@ export async function GET(
       .select(RUN_SELECT)
       .eq("agent_id", agentId)
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(20),
     supabase
       .from("run_steps")
       .select(RUN_STEP_SELECT)

@@ -25,6 +25,7 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 - Public remote downloads are SSRF-hardened. Assistant downloads and Drive imports only allow vetted `http/https` hosts, reject private/loopback destinations, and re-validate redirects.
 - DSAR email lookups use normalized exact matching, not wildcard matching. Session ids used in export filenames are sanitized before being written into headers.
 - Production chat persistence does not store raw debug traces or raw tool payloads. Conversation-detail debug traces are only returned to workspace owners/admins.
+- Automation activity is event-centered rather than conversational. Each run stores a versioned operational decision, summary, missing-information list, and tool outcomes; successful actions require successful tool evidence, and production persistence excludes raw tool payloads.
 
 ## Local Development
 
@@ -150,6 +151,7 @@ npm run widget:load-test -- --help
 | `/agents` | Agent list and lifecycle actions |
 | `/agents/[id]/builder` | Visual agent builder |
 | `/agents/[id]/preview` | Live chat preview for draft agents |
+| `/agents/[id]/activity` | Automation event timeline, operational decisions, action outcomes, and run diagnostics |
 | `/assistants` | Shared internal assistant list for the active workspace |
 | `/assistants/[id]` | Internal assistant chat surface with shared workspace threads |
 | `/widgets` | Widget list and management |

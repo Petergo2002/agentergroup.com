@@ -1,6 +1,6 @@
 # Automation Agents
 
-Last updated: 2026-06-07
+Last updated: 2026-06-22
 
 ## Purpose
 
@@ -15,10 +15,14 @@ Automation v1 uses Composio triggers directly. It does not require Trigger.dev.
 The builder model is:
 
 ```text
-External Trigger -> Agent Core
+External Trigger -> Automation Logic
                    -> Knowledge (optional)
-                   -> Connected Tools (optional)
+                   -> Available Actions (optional)
 ```
+
+These are Automation-specific product labels over the shared agent-core and tool-node
+configuration model. Chat-only controls such as starter prompts and `End Chat` are not shown or
+persisted for Automation agents.
 
 Current v1 trigger support:
 
@@ -48,7 +52,7 @@ This keeps the product ready for future Slack, calendar, CRM, or other external 
 Creating an Automation is allowed without a connected account. It creates a draft automation agent with:
 
 - `External Trigger`
-- `Agent Core`
+- `Automation Logic`
 - Gmail new-message selected as the first supported trigger option
 - no trigger account selected yet
 
@@ -141,12 +145,13 @@ Activity reads the automation endpoint and shows:
 - selected trigger
 - selected account
 - webhook/provider readiness
-- recent `runs`
-- recent `automation_events`
-- run status
-- output summary
-- event status
-- error messages
+- an event-centered activity timeline
+- trigger context without rendering the raw email body
+- the operational decision (`action_taken`, `no_action`, `needs_input`, or `action_failed`)
+- actions attempted and their verified tool outcomes
+- the operator-facing run summary
+- event/runtime status and technical run steps
+- clear error and missing-information states
 
 ## Runtime Flow
 
@@ -163,7 +168,8 @@ Composio Gmail trigger
   -> create runs row
   -> create run_steps row
   -> runAgentChat({ audience: "automation" })
-  -> store assistant output, tool messages, knowledge matches, and connected toolkits
+  -> normalize the model summary and verified tool results into `automationResult`
+  -> store the operational result, redacted tool messages, knowledge matches, and connected toolkits
   -> mark automation_events processed or failed
   -> update agent_automations.last_event_at or last_error
 ```
@@ -217,7 +223,32 @@ Automation mode receives a dedicated system instruction:
 - use configured tools only when instructions and payload clearly require action
 - do not guess missing details
 - do not claim external actions happened unless a tool call succeeded
+- return an operator-facing structured result instead of a conversational reply
 - summarize what happened, what was done, and what remains unresolved
+
+The executor stores a versioned `automationResult` object inside `runs.output`:
+
+- `decision`
+- `summary`
+- `reason`
+- `missingInformation`
+- normalized `actions` with success/failure and safe provider identifiers
+
+The parser accepts the required JSON report and keeps legacy free-form summaries readable. It
+bounds all operator-facing fields and gives verified runtime/tool evidence precedence over the
+model's claimed decision. Failed-action details are extracted only from error fields and redact
+email addresses, credentials, and URLs; unrelated raw tool payload fields are not copied into the
+operational result. Production persistence separately removes raw tool payloads and debug traces.
+
+Activity reads `automationResult` when present. For runs created before version 1 was introduced,
+it derives the same display model from the legacy assistant summary, redacted tool messages, and run
+error state. The endpoint returns the 20 newest events and 20 newest runs, plus the 50 newest run
+steps.
+
+The operational decision is separate from `runs.status`. A runtime can complete successfully while
+the requested external action fails; Activity shows that as a succeeded runtime with an
+`action_failed` operational outcome. Successful actions are derived from tool results, so model text
+alone can never make Activity claim that an email or other external action succeeded.
 
 Email recipient and calendar/event-type constraints are enforced server-side by the existing Composio completion patchers. The model cannot bypass those policies by choosing different tool arguments.
 
@@ -384,15 +415,19 @@ Future Slack/calendar triggers should loosen those constraints in a migration an
 Use this checklist when changing automation behavior:
 
 - [ ] Create Website Chat agent: starts with chat trigger and agent core.
-- [ ] Create Automation agent: starts with external trigger and agent core.
+- [ ] Create Automation agent: starts with external trigger and Automation Logic.
+- [ ] Automation builder omits starter prompts and End Chat.
 - [ ] Automation can save without selected account.
 - [ ] Activation blocks unless the selected Gmail account exists and is connected.
 - [ ] Activation creates or enables the Composio trigger.
 - [ ] Pause disables the Composio trigger and updates local status.
 - [ ] Real Composio webhook verifies and stores `automation_events`.
 - [ ] Executor ignores archived or inactive automation agents.
-- [ ] Executor stores run output and tool messages.
-- [ ] Activity shows recent runs/events and errors.
+- [ ] Executor stores a versioned operational result and production-safe tool output.
+- [ ] Model text cannot claim `action_taken` without a successful tool result.
+- [ ] Failed action details do not copy unrelated raw tool payload fields.
+- [ ] Activity shows the event-centered decision, actions, summary, run steps, and errors.
+- [ ] Activity still renders legacy runs that do not contain `automationResult`.
 - [ ] Archive disables provider trigger.
 - [ ] Delete deletes provider trigger.
 - [ ] Disconnecting a used Gmail account pauses/errors the automation and disables provider trigger.

@@ -123,8 +123,12 @@ export type { AuditLogRecord } from "./audit";
 export type {
   AgentAutomationRecord,
   AgentAutomationStatus,
+  AutomationActionResult,
+  AutomationActionStatus,
+  AutomationDecision,
   AutomationEventRecord,
   AutomationEventStatus,
+  AutomationRunResult,
 } from "./automation";
 
 export type {

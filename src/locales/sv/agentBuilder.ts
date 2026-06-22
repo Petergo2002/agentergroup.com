@@ -16,6 +16,12 @@ export const agentBuilder = {
       "Koppla på workspace-källor som agenten kan hämta från.",
     toolsDescription:
       "Lägg till Gmail, Outlook, Slack, HubSpot, Shopify, Google Ads, Google Calendar eller Cal.com för liveåtgärder i chatten.",
+    automationAgent: "Automationslogik",
+    automationAgentDescription:
+      "Analyserar varje händelse och avgör vilka konfigurerade åtgärder som krävs.",
+    automationTools: "Tillgängliga åtgärder",
+    automationToolsDescription:
+      "Åtgärder som automationen får använda när instruktionerna kräver det.",
     leadsDescription:
       "Fånga strukturerade interna leads från widgetkonversationer.",
     endChatDescription:
@@ -30,6 +36,7 @@ export const agentBuilder = {
   setupReadiness: "Status (Redo)",
   triggerType: "Trigger",
   coreType: "Kärna",
+  automationLogicType: "Beslut",
   knowledgeType: "Kunskap",
   toolType: "Verktyg",
   outputType: "Utdata",
@@ -37,6 +44,8 @@ export const agentBuilder = {
   annotationType: "Anteckning",
   triggerLabel: "Användarmeddelande",
   agentLabel: "Agent",
+  automationInstructionsHelp:
+    "Beskriv vad som ska granskas, när en åtgärd krävs och vad som aldrig får hända. Sluttexten sparas som en körningssammanfattning; externa svar sker endast via en konfigurerad åtgärd.",
   outputLabel: "Assistentsvar",
   endChatLabel: "Avsluta chatt",
   annotationLabel: "Textanteckning",

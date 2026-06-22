@@ -140,8 +140,12 @@ export type { AuditLogRecord } from "./types/audit";
 export type {
   AgentAutomationRecord,
   AgentAutomationStatus,
+  AutomationActionResult,
+  AutomationActionStatus,
+  AutomationDecision,
   AutomationEventRecord,
   AutomationEventStatus,
+  AutomationRunResult,
 } from "./types/automation";
 
 export type {

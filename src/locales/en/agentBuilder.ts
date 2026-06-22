@@ -16,6 +16,12 @@ export const agentBuilder = {
       "Attach workspace sources the agent can retrieve from.",
     toolsDescription:
       "Add Gmail, Outlook, Slack, HubSpot, Shopify, Google Ads, Google Calendar, or Cal.com for live in-chat actions.",
+    automationAgent: "Automation Logic",
+    automationAgentDescription:
+      "Analyzes each event and decides which configured actions are required.",
+    automationTools: "Available Actions",
+    automationToolsDescription:
+      "Actions this automation may use when its instructions require them.",
     leadsDescription:
       "Capture structured internal leads from widget conversations.",
     endChatDescription:
@@ -30,6 +36,7 @@ export const agentBuilder = {
   setupReadiness: "Setup Readiness",
   triggerType: "Trigger",
   coreType: "Core",
+  automationLogicType: "Decision",
   knowledgeType: "Knowledge",
   toolType: "Tool",
   outputType: "Output",
@@ -37,6 +44,8 @@ export const agentBuilder = {
   annotationType: "Note",
   triggerLabel: "User Message",
   agentLabel: "Agent",
+  automationInstructionsHelp:
+    "Describe what to inspect, when action is required, and what must never happen. The final text is stored as a run summary; external replies happen only through a configured action.",
   outputLabel: "Assistant Response",
   endChatLabel: "End Chat",
   annotationLabel: "Text annotation",

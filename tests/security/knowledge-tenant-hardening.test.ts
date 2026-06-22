@@ -79,7 +79,7 @@ test("knowledge processing authorizes user-scoped source access before admin mut
   assert.ok(userSourceLookup > userLookup);
   assert.ok(adminMutation > userSourceLookup);
   assert.match(processSource, /return json\(\{ error: "Missing Authorization header\." \}, 401\)/);
-  assert.doesNotMatch(processSource, /source\.metadata\?\.ephemeral.*isInternalRequest/s);
+  assert.doesNotMatch(processSource, /source\.metadata\?\.ephemeral[\s\S]*isInternalRequest/);
 });
 
 test("runtime RLS is read-only for members and assistant threads are owner-private", () => {

@@ -101,13 +101,16 @@ export function buildInitialDefinition(
         position: { x: 320, y: 150 },
         data: {
           kind: "agent",
-          label: "Agent",
-          type: "Core",
+          label: isAutomation ? "Automation Logic" : "Agent",
+          type: isAutomation ? "Decision" : "Core",
           icon: "smart_toy",
-          description: "Uses the selected model, instructions, and context.",
+          description: isAutomation
+            ? "Analyzes each event and decides which configured actions are required."
+            : "Uses the selected model, instructions, and context.",
           status: "active",
           showConfidence: true,
           confidenceValue: 82,
+          automationMode: isAutomation,
           locked: true,
         },
       },
@@ -125,9 +128,9 @@ export function buildInitialDefinition(
     config: {
       model: OPENROUTER_DEFAULT_AGENT_MODEL,
       instructions: isAutomation
-        ? "You process incoming automation trigger events for this workspace. Summarize the event, identify useful context, and only take actions that are explicitly configured for this agent."
+        ? "Inspect each incoming event, decide whether the event requires action under these instructions, and use only the configured actions needed to complete it. If no action is needed, record that clearly. Never claim an external action succeeded unless its tool call succeeded."
         : preset.instructions,
-      starterPrompts: [...preset.starterPrompts],
+      starterPrompts: isAutomation ? [] : [...preset.starterPrompts],
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       trigger: {
         source: isAutomation ? "gmail_new_message" : "user_message",
@@ -160,9 +163,9 @@ export function buildAgentPayload(
     surface,
     model: OPENROUTER_DEFAULT_AGENT_MODEL,
     instructions: isAutomation
-      ? "You process incoming automation trigger events for this workspace. Summarize the event, identify useful context, and only take actions that are explicitly configured for this agent."
+      ? "Inspect each incoming event, decide whether the event requires action under these instructions, and use only the configured actions needed to complete it. If no action is needed, record that clearly. Never claim an external action succeeded unless its tool call succeeded."
       : preset.instructions,
-    starter_prompts: [...preset.starterPrompts],
+    starter_prompts: isAutomation ? [] : [...preset.starterPrompts],
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 }

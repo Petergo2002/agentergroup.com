@@ -31,6 +31,7 @@ export interface TriggerBuilderNodeData extends BaseBuilderNodeData {
 
 export interface AgentBuilderNodeData extends BaseBuilderNodeData {
   kind: "agent";
+  automationMode?: boolean;
   showConfidence?: boolean;
   confidenceValue?: number;
   confidenceLabel?: string;

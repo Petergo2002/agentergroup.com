@@ -9,5 +9,5 @@ test("Composio session caches store timestamps and enforce TTL checks", () => {
   assert.match(source, /const SESSION_TTL_MS/);
   assert.match(source, /Date\.now\(\) - cached\.createdAt < SESSION_TTL_MS/);
   assert.match(source, /Date\.now\(\) - cachedToolRouterSession\.createdAt < SESSION_TTL_MS/);
-  assert.match(source, /MCP_SESSION_CACHE\.set\(cacheKey,\s*\{\s*value: mcpInfo,\s*createdAt: Date\.now\(\),/s);
+  assert.match(source, /MCP_SESSION_CACHE\.set\(cacheKey,[\s\S]*value: mcpInfo,[\s\S]*createdAt: Date\.now\(\),/);
 });

@@ -265,7 +265,7 @@ function getStarterPromptFields(prompts: string[]) {
   return Array.from({ length: 3 }, (_, index) => prompts[index] ?? '');
 }
 
-function getNodeLibraryText(key: LibraryItemKey, t: Translate) {
+function getNodeLibraryText(key: LibraryItemKey, t: Translate, automationMode = false) {
   switch (key) {
     case 'trigger':
       return {
@@ -274,8 +274,12 @@ function getNodeLibraryText(key: LibraryItemKey, t: Translate) {
       };
     case 'agent':
       return {
-        label: t('agentBuilder.nodeLibrary.agent'),
-        description: t('agentBuilder.nodeLibrary.agentDescription'),
+        label: automationMode
+          ? t('agentBuilder.nodeLibrary.automationAgent')
+          : t('agentBuilder.nodeLibrary.agent'),
+        description: automationMode
+          ? t('agentBuilder.nodeLibrary.automationAgentDescription')
+          : t('agentBuilder.nodeLibrary.agentDescription'),
       };
     case 'knowledge':
       return {
@@ -284,8 +288,12 @@ function getNodeLibraryText(key: LibraryItemKey, t: Translate) {
       };
     case 'tools':
       return {
-        label: t('agentBuilder.nodeLibrary.tools'),
-        description: t('agentBuilder.nodeLibrary.toolsDescription'),
+        label: automationMode
+          ? t('agentBuilder.nodeLibrary.automationTools')
+          : t('agentBuilder.nodeLibrary.tools'),
+        description: automationMode
+          ? t('agentBuilder.nodeLibrary.automationToolsDescription')
+          : t('agentBuilder.nodeLibrary.toolsDescription'),
       };
     case 'endchat':
       return {
@@ -300,7 +308,7 @@ function getNodeLibraryText(key: LibraryItemKey, t: Translate) {
   }
 }
 
-function getBuilderNodeText(kind: BuilderNodeKind, t: Translate) {
+function getBuilderNodeText(kind: BuilderNodeKind, t: Translate, automationMode = false) {
   switch (kind) {
     case 'trigger':
       return {
@@ -310,9 +318,15 @@ function getBuilderNodeText(kind: BuilderNodeKind, t: Translate) {
       };
     case 'agent':
       return {
-        label: t('agentBuilder.agentLabel'),
-        type: t('agentBuilder.coreType'),
-        description: t('agentBuilder.coreDescription'),
+        label: automationMode
+          ? t('agentBuilder.nodeLibrary.automationAgent')
+          : t('agentBuilder.agentLabel'),
+        type: automationMode
+          ? t('agentBuilder.automationLogicType')
+          : t('agentBuilder.coreType'),
+        description: automationMode
+          ? t('agentBuilder.nodeLibrary.automationAgentDescription')
+          : t('agentBuilder.coreDescription'),
       };
     case 'knowledge':
       return {
@@ -505,7 +519,11 @@ function ActionDescriptionButton() {
 
 const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<BuilderFlowNode>) {
   const { t } = useLanguage();
-  const nodeText = getBuilderNodeText(data.kind, t);
+  const nodeText = getBuilderNodeText(
+    data.kind,
+    t,
+    data.kind === 'agent' && data.automationMode === true,
+  );
   
   const label = nodeText?.label || data.label;
   const type = nodeText?.type || data.type || 'Blueprint Node';
@@ -1364,6 +1382,7 @@ function normalizeDefinition(
       {
         ...((defaultAgentNode?.data as Partial<BuilderNodeData> | undefined) ?? {}),
         ...((agentNode?.data as Partial<BuilderNodeData> | undefined) ?? {}),
+        automationMode: surface === 'automation',
         locked: true,
       } as Partial<BuilderNodeData>,
     ),
@@ -1544,7 +1563,7 @@ function normalizeDefinition(
     );
   }
 
-  if (endChatNode && isEndChatNodeData(endChatNode.data)) {
+  if (surface !== 'automation' && endChatNode && isEndChatNodeData(endChatNode.data)) {
     normalizedNodes.push(
       createEndChatNode(
         endChatNode.position ?? DEFAULT_POSITIONS.endchat,
@@ -1595,7 +1614,11 @@ function enrichNodeForDisplay(
   connections: ConnectionRecord[],
   t: Translate,
 ): BuilderFlowNode {
-  const localizedText = getBuilderNodeText(node.data.kind, t);
+  const localizedText = getBuilderNodeText(
+    node.data.kind,
+    t,
+    node.data.kind === 'agent' && node.data.automationMode === true,
+  );
 
   if (isTriggerNodeData(node.data)) {
     const sourceText = getTriggerSourceText(node.data.triggerSource ?? 'user_message', t);
@@ -2910,12 +2933,14 @@ export default function AgentBuilderPage() {
 
   const nodeLibraryItems = useMemo(
     () =>
-      NODE_LIBRARY.map((item) => ({
-        ...item,
-        ...getNodeLibraryText(item.key, t),
-        disabled: item.key === 'tools' && !subscription?.integrations_enabled,
-      })),
-    [subscription?.integrations_enabled, t],
+      NODE_LIBRARY
+        .filter((item) => agent?.surface !== 'automation' || item.key !== 'endchat')
+        .map((item) => ({
+          ...item,
+          ...getNodeLibraryText(item.key, t, agent?.surface === 'automation'),
+          disabled: item.key === 'tools' && !subscription?.integrations_enabled,
+        })),
+    [agent?.surface, subscription?.integrations_enabled, t],
   );
   const hasKnowledgeNode = useMemo(
     () => nodes.some((node) => node.data.kind === 'knowledge'),
@@ -2981,7 +3006,7 @@ export default function AgentBuilderPage() {
       if (instructions.trim().length > 50) {
         score += 40;
       }
-      if (hasStarterPrompt) {
+      if (agent?.surface === 'automation' || hasStarterPrompt) {
         score += 10;
       }
       if (hasConfiguredKnowledge || hasConfiguredTools) {
@@ -3005,6 +3030,7 @@ export default function AgentBuilderPage() {
     instructions,
     name,
     nodes,
+    agent?.surface,
     starterPromptFields,
     t,
   ]);
@@ -3124,9 +3150,11 @@ export default function AgentBuilderPage() {
     setModel(definition.config?.model ?? loadedAgent.model);
     setTimezone(definition.config?.timezone ?? loadedAgent.timezone ?? 'UTC');
     setStarterPromptFields(
-      getStarterPromptFields(
-        definition.config?.starterPrompts ?? loadedAgent.starter_prompts,
-      ),
+      loadedAgent.surface === 'automation'
+        ? getStarterPromptFields([])
+        : getStarterPromptFields(
+            definition.config?.starterPrompts ?? loadedAgent.starter_prompts,
+          ),
     );
     setDraftVersion(payload.draft?.version ?? 1);
     setNodes(hydratedNodes);
@@ -3364,6 +3392,26 @@ export default function AgentBuilderPage() {
 
     setEdges(buildEdges(nodes));
   }, [nodes, setEdges]);
+
+  useEffect(() => {
+    if (agent?.surface !== 'automation') {
+      return;
+    }
+
+    setNodes((currentNodes) => {
+      if (!currentNodes.some((node) => node.data.kind === 'endchat')) {
+        return currentNodes;
+      }
+
+      return currentNodes.filter((node) => node.data.kind !== 'endchat');
+    });
+    setSelectedNodeId((currentId) => {
+      const selectedIsEndChat = nodes.some(
+        (node) => node.id === currentId && node.data.kind === 'endchat',
+      );
+      return selectedIsEndChat ? null : currentId;
+    });
+  }, [agent?.surface, nodes, setNodes]);
 
   useEffect(() => {
     calendarOptionsStatusRef.current = calendarOptionsStatusByConnectionId;
@@ -3989,9 +4037,11 @@ export default function AgentBuilderPage() {
       config: {
         model,
         instructions,
-        starterPrompts: starterPromptFields
-          .map((item) => item.trim())
-          .filter(Boolean),
+        starterPrompts: agent?.surface === 'automation'
+          ? []
+          : starterPromptFields
+              .map((item) => item.trim())
+              .filter(Boolean),
         timezone,
         trigger: {
           source: triggerData?.triggerSource ?? 'user_message',
@@ -4738,7 +4788,9 @@ export default function AgentBuilderPage() {
               <div className="mt-3 flex items-start gap-2 px-1">
                 <span className="material-symbols-outlined text-sm text-primary/60 mt-0.5">info</span>
                 <p className="text-[11px] leading-relaxed text-on-surface-variant/60 font-medium">
-                  {t('agentBuilder.operationalInstructionsHelp')}
+                  {agent?.surface === 'automation'
+                    ? t('agentBuilder.automationInstructionsHelp')
+                    : t('agentBuilder.operationalInstructionsHelp')}
                 </p>
               </div>
 
@@ -4781,7 +4833,7 @@ export default function AgentBuilderPage() {
               </div>
             </div>
 
-            <div>
+            {agent?.surface !== 'automation' ? <div>
               <label className="mb-3 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
                 {t('agentBuilder.conversationStarters')}
               </label>
@@ -4809,7 +4861,7 @@ export default function AgentBuilderPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> : null}
           </div>
         </div>
       );

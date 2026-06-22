@@ -1,5 +1,29 @@
 export type AgentAutomationStatus = "draft" | "provisioning" | "active" | "paused" | "error";
 export type AutomationEventStatus = "received" | "processing" | "processed" | "ignored" | "failed";
+export type AutomationDecision =
+  | "action_taken"
+  | "no_action"
+  | "needs_input"
+  | "action_failed";
+export type AutomationActionStatus = "succeeded" | "failed";
+
+export interface AutomationActionResult {
+  toolName: string;
+  label: string;
+  status: AutomationActionStatus;
+  detail: string;
+  threadId: string | null;
+  messageId: string | null;
+}
+
+export interface AutomationRunResult {
+  version: 1;
+  decision: AutomationDecision;
+  summary: string;
+  reason: string;
+  missingInformation: string[];
+  actions: AutomationActionResult[];
+}
 
 export interface AgentAutomationRecord {
   id: string;

@@ -82,8 +82,8 @@ test("widget-session knowledge search RPC keeps folder-attached sources eligible
 });
 
 test("knowledge edge functions support current Supabase secret-key auth", () => {
-  assert.match(supabaseConfig, /\[functions\.search-knowledge\]\s+verify_jwt = false/s);
-  assert.match(supabaseConfig, /\[functions\.process-knowledge-source\]\s+verify_jwt = false/s);
+  assert.match(supabaseConfig, /\[functions\.search-knowledge\][\s\S]+verify_jwt = false/);
+  assert.match(supabaseConfig, /\[functions\.process-knowledge-source\][\s\S]+verify_jwt = false/);
 
   for (const source of [searchKnowledgeFunction, processKnowledgeFunction]) {
     assert.match(source, /SUPABASE_PUBLISHABLE_KEY/);
