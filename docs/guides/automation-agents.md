@@ -8,7 +8,9 @@ This document is the implementation-level source of truth for Automation agents.
 
 Automation agents are normal agents with `surface = 'automation'`. They start from an external trigger event instead of a live chat message, then run the shared agent runtime with the saved instructions, selected knowledge sources, and selected tool nodes.
 
-Automation v1 uses Composio triggers directly. It does not require Trigger.dev.
+Automation v1 uses Composio for provider authentication, Gmail polling, and action execution. The
+application still owns webhook ingestion, idempotency, run state, and operator-visible logs. It
+does not require Trigger.dev.
 
 ## Product Model
 
@@ -106,7 +108,9 @@ Activation validates:
 
 If there is no provider trigger yet, activation creates one through Composio and stores `composio_trigger_id`.
 
-If a provider trigger already exists, activation enables it.
+If a provider trigger already exists, activation verifies that it still exists in Composio before
+enabling it. A missing provider trigger is recreated instead of leaving an apparently active local
+binding that can never emit events.
 
 Successful activation sets:
 
@@ -162,12 +166,13 @@ Composio Gmail trigger
   -> POST /api/composio/webhook
   -> verify webhook signature with COMPOSIO_WEBHOOK_SECRET
   -> find active agent_automations row by composio_trigger_id
-  -> insert automation_events row
+  -> normalize the provider payload into bounded trigger context
+  -> insert an idempotent automation_events row
   -> after(() => processAutomationEvent(eventId))
   -> claim event as processing
   -> create runs row
-  -> create run_steps row
-  -> runAgentChat({ audience: "automation" })
+  -> create context, runtime, decision, and action run_steps rows
+  -> runAgentChat({ audience: "automation", history: [normalized trigger context] })
   -> normalize the model summary and verified tool results into `automationResult`
   -> store the operational result, redacted tool messages, knowledge matches, and connected toolkits
   -> mark automation_events processed or failed
@@ -183,7 +188,15 @@ use the connection to `error`, and pauses their agents. These expiry events are 
 The route also handles `composio.trigger.disabled` by moving the matching automation to `error`
 and pausing its agent. The Composio webhook subscription must opt into that event type.
 
-Automation v1 still uses `after()` processing. Durable retry queues/workers are intentionally deferred.
+The Gmail adapter keeps message/thread IDs, sender, recipients, subject, readable body, timestamp,
+labels, and attachment metadata. It discards the raw MIME tree and bounds user-controlled strings
+before persistence and model execution.
+
+Automation v1 still uses `after()` processing. This is acceptable for the first MVP but is not a
+durable queue: an instance failure after the webhook response can leave an event unprocessed. The
+next reliability step is a small database-backed worker over `automation_events` with leases,
+attempt counts, exponential backoff, and dead-letter/error state. Keep Composio as the trigger and
+tool provider; do not add a second competing trigger source.
 
 ## Tool Execution
 
@@ -376,6 +389,10 @@ API routes. Enable at least
 `composio.trigger.message` and `composio.connected_account.expired`; also enable
 `composio.trigger.disabled` so provider-side polling failures are reflected in the dashboard.
 
+Gmail managed-auth triggers are polling based. The application requests a 15-minute interval and
+clamps lower saved values to 15. The Activity page reads provider health and exposes active,
+missing, and stale polling states; webhook readiness alone is not enough to call a trigger healthy.
+
 New Gmail action nodes enable both `GMAIL_SEND_EMAIL` and `GMAIL_REPLY_TO_THREAD`. Existing saved
 nodes keep their explicit action selection; enable `GMAIL_REPLY_TO_THREAD` manually when the
 automation must respond inside the source message thread. The reply action requires the trigger
@@ -422,6 +439,9 @@ Use this checklist when changing automation behavior:
 - [ ] Activation creates or enables the Composio trigger.
 - [ ] Pause disables the Composio trigger and updates local status.
 - [ ] Real Composio webhook verifies and stores `automation_events`.
+- [ ] Stored Gmail event payload excludes the raw MIME `payload` tree.
+- [ ] Runtime history contains the normalized trigger context as a user message.
+- [ ] Provider trigger health is visible and a missing provider trigger is recreated on activation.
 - [ ] Executor ignores archived or inactive automation agents.
 - [ ] Executor stores a versioned operational result and production-safe tool output.
 - [ ] Model text cannot claim `action_taken` without a successful tool result.

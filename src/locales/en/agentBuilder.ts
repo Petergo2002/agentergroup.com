@@ -38,7 +38,7 @@ export const agentBuilder = {
   coreType: "Core",
   automationLogicType: "Decision",
   knowledgeType: "Knowledge",
-  toolType: "Tool",
+  toolType: "Action",
   outputType: "Output",
   controlType: "Control",
   annotationType: "Note",
@@ -115,9 +115,14 @@ export const agentBuilder = {
   automationReadiness: "Automation readiness",
   activationReady: "Ready to activate",
   activationBlocked: "Needs setup",
+  automationActive: "Trigger is active",
   webhookConfigured: "Webhook configured",
   webhookMissing: "Webhook secret missing",
   providerTrigger: "Provider trigger",
+  providerPolling: "Gmail polling",
+  providerPollingHealthy: "Healthy",
+  providerPollingAttention: "Needs attention",
+  providerPollingInactive: "Inactive",
   noProviderTrigger: "No provider trigger yet",
   selectedTrigger: "Selected trigger",
   selectedAccount: "Selected account",
@@ -131,7 +136,7 @@ export const agentBuilder = {
   triggerActivated: "Trigger activated.",
   triggerPaused: "Trigger paused.",
   composioTriggerHelp:
-    "External triggers are used for third-party app events. Gmail is the first supported automation trigger; Slack, calendar, and other triggers can fit this same setup later.",
+    "Composio checks this inbox about every 15 minutes and starts a run for each new message.",
   triggerSources: {
     chatMessage: "Chat message",
     chatMessageDescription:
@@ -142,7 +147,7 @@ export const agentBuilder = {
   },
   coreDescription:
     "Controls the model, instructions, and live response behavior.",
-  gmailDescription: "Send emails during the current conversation.",
+  gmailDescription: "Read, draft, and reply to Gmail messages when needed.",
   outlookDescription: "Send emails during the current conversation via Outlook.",
   slackDescription: "Send messages and search workspace context in Slack.",
   hubspotDescription: "Create, search, and update CRM records in HubSpot.",

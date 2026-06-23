@@ -12,6 +12,12 @@ export const SUPPORTED_TOOLKITS = SUPPORTED_INTEGRATIONS.map((integration) => ({
 }));
 
 export const AUTOMATION_GMAIL_TRIGGER_SLUG = "GMAIL_NEW_GMAIL_MESSAGE";
+export const AUTOMATION_GMAIL_TRIGGER_CONFIG = {
+  interval: 15,
+  labelIds: "INBOX",
+  query: "",
+  userId: "me",
+} as const;
 
 const TEMPLATE_PRESETS = {
   support: {
@@ -92,7 +98,7 @@ export function buildInitialDefinition(
           toolkitSlug: isAutomation ? "gmail" : null,
           triggerSlug: isAutomation ? AUTOMATION_GMAIL_TRIGGER_SLUG : null,
           connectionId: null,
-          triggerConfig: {},
+          triggerConfig: isAutomation ? { ...AUTOMATION_GMAIL_TRIGGER_CONFIG } : {},
         },
       },
       {
@@ -137,7 +143,7 @@ export function buildInitialDefinition(
         provider: isAutomation ? "composio" : "internal",
         toolkitSlug: isAutomation ? "gmail" : null,
         triggerSlug: isAutomation ? AUTOMATION_GMAIL_TRIGGER_SLUG : null,
-        triggerConfig: {},
+        triggerConfig: isAutomation ? { ...AUTOMATION_GMAIL_TRIGGER_CONFIG } : {},
         connectionId: null,
       },
     },

@@ -18,6 +18,7 @@ import type {
   AutomationEventRecord,
   AutomationRunResult,
   BuilderDefinition,
+  ComposioTriggerHealth,
   ConnectionRecord,
   RunRecord,
   RunStepRecord,
@@ -31,6 +32,8 @@ interface AutomationActivityResponse {
   runs: RunRecord[];
   steps: RunStepRecord[];
   events: AutomationEventRecord[];
+  providerTriggerHealth: ComposioTriggerHealth | null;
+  providerTriggerHealthError: string | null;
   environment: {
     hasComposio: boolean;
     hasWebhookSecret: boolean;
@@ -203,6 +206,10 @@ export default function AgentActivityPage() {
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [steps, setSteps] = useState<RunStepRecord[]>([]);
   const [events, setEvents] = useState<AutomationEventRecord[]>([]);
+  const [providerTriggerHealth, setProviderTriggerHealth] =
+    useState<ComposioTriggerHealth | null>(null);
+  const [providerTriggerHealthError, setProviderTriggerHealthError] =
+    useState<string | null>(null);
   const [environment, setEnvironment] =
     useState<AutomationActivityResponse['environment'] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -245,6 +252,15 @@ export default function AgentActivityPage() {
       environment.hasWebhookSecret &&
       environment.appUrlMatchesRequestOrigin,
   );
+  const providerPollingStale = Boolean(
+    automation?.status === 'active' &&
+      providerTriggerHealth?.lastSyncedAt &&
+      Date.now() - new Date(providerTriggerHealth.lastSyncedAt).getTime() > 45 * 60 * 1_000,
+  );
+  const providerTriggerReady = Boolean(
+    automation?.status !== 'active' ||
+      (providerTriggerHealth?.found && providerTriggerHealth.active && !providerPollingStale),
+  );
 
   const loadActivity = useCallback(async () => {
     const response = await fetch(`/api/agents/${agentId}/automation`, {
@@ -271,6 +287,8 @@ export default function AgentActivityPage() {
     setRuns(data.runs ?? []);
     setSteps(data.steps ?? []);
     setEvents(data.events ?? []);
+    setProviderTriggerHealth(data.providerTriggerHealth ?? null);
+    setProviderTriggerHealthError(data.providerTriggerHealthError ?? null);
     setEnvironment(data.environment ?? null);
   }, [agentId, router]);
 
@@ -370,6 +388,11 @@ export default function AgentActivityPage() {
                     <span className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.15em] ${webhookReady ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
                       Webhook {webhookReady ? 'ready' : 'not ready'}
                     </span>
+                    {automation?.status === 'active' ? (
+                      <span className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.15em] ${providerTriggerReady ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
+                        Gmail polling {providerTriggerReady ? 'healthy' : 'needs attention'}
+                      </span>
+                    ) : null}
                   </div>
                   <h2 className="mt-3 text-lg font-bold text-on-surface">Gmail new message automation</h2>
                   <p className="mt-1 text-sm font-medium text-on-surface-variant/65">
@@ -411,6 +434,26 @@ export default function AgentActivityPage() {
                     </p>
                     <p className="mt-2 break-all font-mono text-[11px] font-semibold text-error/70">
                       Expected endpoint: {environment?.expectedWebhookUrl ?? 'Unavailable'}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {automation?.status === 'active' && !providerTriggerReady ? (
+              <section className="rounded-[1.5rem] border border-error/15 bg-error/5 p-5">
+                <div className="flex gap-3">
+                  <span className="material-symbols-outlined mt-0.5 text-error">sync_problem</span>
+                  <div>
+                    <p className="text-sm font-bold text-error">Gmail trigger health problem</p>
+                    <p className="mt-1 text-sm font-medium leading-6 text-error/80">
+                      {providerTriggerHealthError
+                        ? providerTriggerHealthError
+                        : !providerTriggerHealth?.found
+                          ? 'The stored trigger ID no longer exists in Composio. Pause and reactivate this automation to recreate it.'
+                          : !providerTriggerHealth.active
+                            ? 'Composio has disabled this Gmail trigger. Pause and reactivate it after checking the Gmail connection.'
+                            : `Composio has not reported a Gmail poll in more than 45 minutes. Last poll: ${providerTriggerHealth.lastSyncedAt ? formatLocaleDateTime(providerTriggerHealth.lastSyncedAt, language) : 'unknown'}.`}
                     </p>
                   </div>
                 </div>

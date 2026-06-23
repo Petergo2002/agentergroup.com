@@ -101,6 +101,15 @@ test("trigger webhooks can be matched from raw V3 trigger metadata", () => {
   assert.match(webhookRouteSource, /Ignoring trigger webhook without active automation/);
 });
 
+test("Gmail trigger activation enforces the managed-auth polling minimum", () => {
+  const composioSource = readFileSync("src/lib/composio.ts", "utf8");
+  const defaultsSource = readFileSync("src/lib/agents/defaults.ts", "utf8");
+
+  assert.match(defaultsSource, /AUTOMATION_GMAIL_TRIGGER_CONFIG[\s\S]*interval: 15/);
+  assert.match(composioSource, /Math\.max\([\s\S]*AUTOMATION_GMAIL_TRIGGER_CONFIG\.interval/);
+  assert.match(statusRouteSource, /getComposioTriggerHealth/);
+});
+
 test("the internal admin toggle states that it does not activate Gmail triggers", () => {
   assert.match(
     adminToggleSource,

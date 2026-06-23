@@ -62,6 +62,18 @@ test("automation event processing consumes quota before running the agent runtim
   );
 });
 
+test("automation runtime receives the normalized trigger event as a user message", () => {
+  assert.match(source, /normalizeAutomationTriggerPayload/);
+  assert.match(source, /const automationInput = buildAutomationInput/);
+  assert.match(source, /history: \[\{ role: "user", content: automationInput \}\]/);
+});
+
+test("automation runs record context, decision, and action steps", () => {
+  assert.match(source, /stepKey: "automation\.context"/);
+  assert.match(source, /stepKey: "automation\.decision"/);
+  assert.match(source, /stepKey: `automation\.action\.\$\{index \+ 1\}`/);
+});
+
 test("automation runs persist a dedicated operational result without trusting model claims", () => {
   assert.match(source, /buildAutomationRunResult/);
   assert.match(source, /automationResult,/);

@@ -38,7 +38,7 @@ export const agentBuilder = {
   coreType: "Kärna",
   automationLogicType: "Beslut",
   knowledgeType: "Kunskap",
-  toolType: "Verktyg",
+  toolType: "Åtgärd",
   outputType: "Utdata",
   controlType: "Kontroll",
   annotationType: "Anteckning",
@@ -116,9 +116,14 @@ export const agentBuilder = {
   automationReadiness: "Automationsstatus",
   activationReady: "Redo att aktiveras",
   activationBlocked: "Behöver konfigureras",
+  automationActive: "Triggern är aktiv",
   webhookConfigured: "Webhook konfigurerad",
   webhookMissing: "Webhook-secret saknas",
   providerTrigger: "Provider-trigger",
+  providerPolling: "Gmail-pollning",
+  providerPollingHealthy: "Fungerar",
+  providerPollingAttention: "Behöver åtgärdas",
+  providerPollingInactive: "Inaktiv",
   noProviderTrigger: "Ingen provider-trigger än",
   selectedTrigger: "Vald trigger",
   selectedAccount: "Valt konto",
@@ -132,7 +137,7 @@ export const agentBuilder = {
   triggerActivated: "Trigger aktiverad.",
   triggerPaused: "Trigger pausad.",
   composioTriggerHelp:
-    "Externa triggers används för apphändelser utanför systemet. Gmail är den första automations-triggern; Slack, kalender och andra triggers kan passa in i samma upplägg senare.",
+    "Composio kontrollerar inkorgen ungefär var 15:e minut och startar en körning för varje nytt meddelande.",
   triggerSources: {
     chatMessage: "Chattmeddelande",
     chatMessageDescription:
@@ -143,7 +148,7 @@ export const agentBuilder = {
   },
   coreDescription:
     "Styr modell, instruktioner och livebeteende i svaren.",
-  gmailDescription: "Skicka e-post under den aktuella konversationen.",
+  gmailDescription: "Läs, skapa utkast och svara på Gmail-meddelanden vid behov.",
   outlookDescription: "Skicka e-post under den aktuella konversationen via Outlook.",
   slackDescription: "Skicka meddelanden och sök workspace-kontext i Slack.",
   hubspotDescription: "Skapa, sök och uppdatera CRM-poster i HubSpot.",

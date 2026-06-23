@@ -25,6 +25,17 @@ export interface AutomationRunResult {
   actions: AutomationActionResult[];
 }
 
+export interface ComposioTriggerHealth {
+  found: boolean;
+  active: boolean;
+  triggerId: string;
+  triggerName: string | null;
+  connectedAccountId: string | null;
+  lastSyncedAt: string | null;
+  updatedAt: string | null;
+  disabledAt: string | null;
+}
+
 export interface AgentAutomationRecord {
   id: string;
   workspace_id: string;

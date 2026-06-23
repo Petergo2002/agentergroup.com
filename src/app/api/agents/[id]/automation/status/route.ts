@@ -11,6 +11,7 @@ import {
   deleteComposioTrigger,
   disableComposioTrigger,
   enableComposioTrigger,
+  getComposioTriggerHealth,
 } from "@/lib/composio";
 import { hasComposioEnv, hasComposioWebhookSecret } from "@/lib/env";
 import { createAuditLog } from "@/lib/runtime/observability";
@@ -206,9 +207,17 @@ export async function POST(
     let composioTriggerId = automationRecord.composio_trigger_id;
 
     if (composioTriggerId) {
-      await enableComposioTrigger(composioTriggerId);
-      providerActivated = true;
-    } else {
+      const providerTrigger = await getComposioTriggerHealth(composioTriggerId);
+
+      if (providerTrigger.found) {
+        await enableComposioTrigger(composioTriggerId);
+        providerActivated = true;
+      } else {
+        composioTriggerId = null;
+      }
+    }
+
+    if (!composioTriggerId) {
       const trigger = await createComposioTrigger({
         workspaceId: context.workspace.id,
         connection,
@@ -220,21 +229,23 @@ export async function POST(
       providerActivated = true;
     }
 
-    const [automationUpdate, agentUpdate] = await Promise.all([
-      supabase
-        .from("agent_automations")
-        .update({
-          status: "active",
-          composio_trigger_id: composioTriggerId,
-          last_error: null,
-        })
-        .eq("id", automationRecord.id),
-      supabase.from("agents").update({ status: "active" }).eq("id", agentId),
-    ]);
+    const automationUpdate = await supabase
+      .from("agent_automations")
+      .update({
+        status: "active",
+        composio_trigger_id: composioTriggerId,
+        last_error: null,
+      })
+      .eq("id", automationRecord.id);
 
     if (automationUpdate.error) {
       throw automationUpdate.error;
     }
+
+    const agentUpdate = await supabase
+      .from("agents")
+      .update({ status: "active" })
+      .eq("id", agentId);
 
     if (agentUpdate.error) {
       throw agentUpdate.error;

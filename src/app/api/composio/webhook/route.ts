@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { after, NextRequest, NextResponse } from "next/server";
 import { processAutomationEvent } from "@/lib/automation/executor";
+import { normalizeAutomationTriggerPayload } from "@/lib/automation/payload";
 import { verifyComposioWebhook } from "@/lib/composio";
 import { hasComposioEnv, hasComposioWebhookSecret } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -313,7 +314,10 @@ export async function POST(request: NextRequest) {
     pickString(triggerPayload.triggerSlug, rawEventMetadata.trigger_slug, rawEventMetadata.triggerSlug) ??
     "UNKNOWN";
   const rawPayload = triggerPayload.payload ?? triggerPayload.originalPayload ?? {};
-  const payload = isRecord(rawPayload) ? rawPayload : { value: rawPayload };
+  const payload = normalizeAutomationTriggerPayload(
+    triggerSlug,
+    isRecord(rawPayload) ? rawPayload : { value: rawPayload },
+  );
   const metadata: Record<string, unknown> = isRecord(triggerPayload.metadata)
     ? triggerPayload.metadata
     : {};

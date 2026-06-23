@@ -129,6 +129,7 @@ export type {
   AutomationEventRecord,
   AutomationEventStatus,
   AutomationRunResult,
+  ComposioTriggerHealth,
 } from "./automation";
 
 export type {

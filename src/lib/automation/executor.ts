@@ -1,5 +1,6 @@
 import { extractCalSelectionFromDefinition } from "@/lib/cal";
 import { buildAutomationRunResult } from "@/lib/automation/result";
+import { normalizeAutomationTriggerPayload } from "@/lib/automation/payload";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import {
   buildPersistedAssistantMetadata,
@@ -118,7 +119,10 @@ export async function processAutomationEvent(eventId: string) {
       return { ok: true, status: "ignored" as const };
     }
 
-    const payload = readEventPayload(event);
+    const payload = normalizeAutomationTriggerPayload(
+      event.trigger_slug,
+      readEventPayload(event),
+    );
     const draftResult = await supabase
       .from("agent_drafts")
       .select("definition")
@@ -170,6 +174,32 @@ export async function processAutomationEvent(eventId: string) {
       throw eventLinkUpdate.error;
     }
 
+    const contextStep = await createRunStep(supabase, {
+      runId: createdRunId,
+      workspaceId: agent.workspace_id,
+      agentId: agent.id,
+      stepKey: "automation.context",
+      stepType: "context",
+      title: "Read trigger context",
+      detail: "Preparing a bounded Gmail event context for the automation.",
+      payload: {
+        triggerSlug: event.trigger_slug,
+        externalEventId: event.external_event_id,
+        contextFields: Object.keys(payload),
+      },
+    });
+
+    await completeRunStep(
+      supabase,
+      contextStep.id,
+      "succeeded",
+      "Trigger context prepared.",
+      {
+        triggerSlug: event.trigger_slug,
+        contextFields: Object.keys(payload),
+      },
+    );
+
     const runtimeStep = await createRunStep(supabase, {
       runId: createdRunId,
       workspaceId: agent.workspace_id,
@@ -188,11 +218,12 @@ export async function processAutomationEvent(eventId: string) {
 
     await consumeWorkspaceMessageUsage(supabase, agent.workspace_id);
 
+    const automationInput = buildAutomationInput(event.trigger_slug, payload);
     const result = await runAgentChat({
       supabase: supabase as never,
       agent,
-      input: buildAutomationInput(event.trigger_slug, payload),
-      history: [],
+      input: automationInput,
+      history: [{ role: "user", content: automationInput }],
       toolUserId: buildWorkspaceComposioUserId(agent.workspace_id),
       audience: "automation",
       calendarTimezone: googleCalendarSelection.timezone,
@@ -212,6 +243,66 @@ export async function processAutomationEvent(eventId: string) {
       toolMessages: result.toolMessages,
       knowledgeMatches: result.knowledgeMatches,
     });
+
+    const decisionStep = await createRunStep(supabase, {
+      runId: createdRunId,
+      workspaceId: agent.workspace_id,
+      agentId: agent.id,
+      stepKey: "automation.decision",
+      stepType: "decision",
+      title: "Record automation decision",
+      detail: automationResult.summary,
+      payload: {
+        decision: automationResult.decision,
+        reason: automationResult.reason,
+        missingInformation: automationResult.missingInformation,
+        actionCount: automationResult.actions.length,
+      },
+    });
+
+    await completeRunStep(
+      supabase,
+      decisionStep.id,
+      automationResult.decision === "action_failed" ? "failed" : "succeeded",
+      automationResult.summary,
+      {
+        decision: automationResult.decision,
+        reason: automationResult.reason,
+        missingInformation: automationResult.missingInformation,
+        actionCount: automationResult.actions.length,
+      },
+    );
+
+    await Promise.all(
+      automationResult.actions.map(async (action, index) => {
+        const actionStep = await createRunStep(supabase, {
+          runId: createdRunId,
+          workspaceId: agent.workspace_id,
+          agentId: agent.id,
+          stepKey: `automation.action.${index + 1}`,
+          stepType: "action",
+          title: action.label,
+          detail: action.detail,
+          payload: {
+            toolName: action.toolName,
+            threadId: action.threadId,
+            messageId: action.messageId,
+          },
+        });
+
+        await completeRunStep(
+          supabase,
+          actionStep.id,
+          action.status,
+          action.detail,
+          {
+            toolName: action.toolName,
+            threadId: action.threadId,
+            messageId: action.messageId,
+          },
+        );
+      }),
+    );
 
     await completeRunStep(
       supabase,

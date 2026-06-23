@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canEditAgentRecord, getMembershipRoleForWorkspace } from "@/lib/agents/access";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { AUTOMATION_GMAIL_TRIGGER_SLUG } from "@/lib/agents/defaults";
+import {
+  AUTOMATION_GMAIL_TRIGGER_CONFIG,
+  AUTOMATION_GMAIL_TRIGGER_SLUG,
+} from "@/lib/agents/defaults";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import {
   deleteComposioTrigger,
-  getComposioTriggerType,
+  getComposioTriggerHealth,
   syncConnectedAccountsToDatabase,
 } from "@/lib/composio";
 import { getAppUrl, hasComposioEnv, hasComposioWebhookSecret } from "@/lib/env";
@@ -141,24 +144,33 @@ export async function GET(
   if (runStepsResult.error) throw runStepsResult.error;
   if (eventsResult.error) throw eventsResult.error;
 
-  let triggerType: unknown = null;
+  const automationRecord = (automationResult.data ?? null) as AgentAutomationRecord | null;
+  let providerTriggerHealth: unknown = null;
+  let providerTriggerHealthError: string | null = null;
 
-  if (hasComposioEnv()) {
-    triggerType = await getComposioTriggerType(AUTOMATION_GMAIL_TRIGGER_SLUG).catch(() => null);
+  if (hasComposioEnv() && automationRecord?.composio_trigger_id) {
+    try {
+      providerTriggerHealth = await getComposioTriggerHealth(
+        automationRecord.composio_trigger_id,
+      );
+    } catch {
+      providerTriggerHealthError = "Unable to verify the Composio trigger health.";
+    }
   }
 
   return NextResponse.json({
     agent,
     definition: (draftResult.data?.definition ?? null) as BuilderDefinition | null,
-    automation: (automationResult.data ?? null) as AgentAutomationRecord | null,
+    automation: automationRecord,
     connections: (connectionsResult.data ?? []) as ConnectionRecord[],
     runs: runsResult.data ?? [],
     steps: runStepsResult.data ?? [],
     events: eventsResult.data ?? [],
-    triggerType,
+    providerTriggerHealth,
+    providerTriggerHealthError,
     defaults: {
       triggerSlug: AUTOMATION_GMAIL_TRIGGER_SLUG,
-      triggerConfig: {},
+      triggerConfig: { ...AUTOMATION_GMAIL_TRIGGER_CONFIG },
       composioUserId: buildWorkspaceComposioUserId(context.workspace.id),
     },
     environment: {
@@ -216,7 +228,17 @@ export async function PUT(
   const timezone = readString(body.timezone) ?? agent.timezone ?? "UTC";
   const connectionId = readString(body.connectionId);
   const triggerSlug = readString(body.triggerSlug) ?? AUTOMATION_GMAIL_TRIGGER_SLUG;
-  const triggerConfig = readJsonRecord(body.triggerConfig);
+  const requestedTriggerConfig = readJsonRecord(body.triggerConfig);
+  const triggerConfig = {
+    ...AUTOMATION_GMAIL_TRIGGER_CONFIG,
+    ...requestedTriggerConfig,
+    interval: Math.max(
+      AUTOMATION_GMAIL_TRIGGER_CONFIG.interval,
+      typeof requestedTriggerConfig.interval === "number"
+        ? requestedTriggerConfig.interval
+        : AUTOMATION_GMAIL_TRIGGER_CONFIG.interval,
+    ),
+  };
   const definition = isRecord(body.definition)
     ? (body.definition as unknown as BuilderDefinition)
     : null;

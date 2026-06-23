@@ -223,6 +223,7 @@ export async function loadAgentBuilderBootstrap(
   ).map((folder) => toKnowledgeFolderWithSources(folder));
 
   const draftDefinition = (draftResult.data?.definition ?? null) as BuilderDefinition | null;
+  const automation = (automationResult.data ?? null) as AgentAutomationRecord | null;
 
   return {
     agent: agentResult.data as AgentRecord,
@@ -237,7 +238,7 @@ export async function loadAgentBuilderBootstrap(
     attachedKnowledgeFolders,
     availableKnowledgeFolders,
     automation: {
-      automation: (automationResult.data ?? null) as AgentAutomationRecord | null,
+      automation,
       events: (eventsResult.data ?? []) as AutomationEventRecord[],
       runs: (runsResult.data ?? []) as RunRecord[],
       environment:

@@ -15,6 +15,10 @@ import {
 } from "@/lib/composio-errors";
 import { getComposioWebhookSecret, hasComposioEnv } from "@/lib/env";
 import { normalizeGmailRecipientEmail } from "@/lib/gmail";
+import {
+  AUTOMATION_GMAIL_TRIGGER_CONFIG,
+  AUTOMATION_GMAIL_TRIGGER_SLUG,
+} from "@/lib/agents/defaults";
 import { extractGoogleCalendarListItems } from "@/lib/google-calendar";
 import type {
   CalSelection,
@@ -862,14 +866,81 @@ export async function createComposioTrigger({
     throw new Error("The selected connection is missing a Composio connected account id.");
   }
 
+  const normalizedTriggerConfig =
+    triggerSlug === AUTOMATION_GMAIL_TRIGGER_SLUG
+      ? {
+          ...AUTOMATION_GMAIL_TRIGGER_CONFIG,
+          ...triggerConfig,
+          interval: Math.max(
+            AUTOMATION_GMAIL_TRIGGER_CONFIG.interval,
+            typeof triggerConfig.interval === "number"
+              ? triggerConfig.interval
+              : AUTOMATION_GMAIL_TRIGGER_CONFIG.interval,
+          ),
+        }
+      : triggerConfig;
+
   return composio.triggers.create(
     buildWorkspaceComposioUserId(workspaceId),
     triggerSlug,
     {
       connectedAccountId,
-      triggerConfig,
+      triggerConfig: normalizedTriggerConfig,
     },
   );
+}
+
+export async function getComposioTriggerHealth(triggerId: string) {
+  const composio = createComposioClient();
+
+  if (!composio) {
+    throw new Error("COMPOSIO_API_KEY is missing.");
+  }
+
+  const response = await composio.triggers.listActive({
+    triggerIds: [triggerId],
+    showDisabled: true,
+    limit: 10,
+  });
+  const trigger = response.items.find(
+    (item) => item.id === triggerId || item.uuid === triggerId,
+  );
+
+  if (!trigger) {
+    return {
+      found: false,
+      active: false,
+      triggerId,
+      triggerName: null,
+      connectedAccountId: null,
+      lastSyncedAt: null,
+      updatedAt: null,
+      disabledAt: null,
+    };
+  }
+
+  const rawLastSyncedAt = trigger.state.last_synced_at;
+  const lastSyncedDate =
+    typeof rawLastSyncedAt === "number" && Number.isFinite(rawLastSyncedAt)
+      ? new Date(rawLastSyncedAt * 1_000)
+      : typeof rawLastSyncedAt === "string" && rawLastSyncedAt.trim()
+        ? new Date(rawLastSyncedAt)
+        : null;
+  const lastSyncedAt =
+    lastSyncedDate && Number.isFinite(lastSyncedDate.getTime())
+      ? lastSyncedDate.toISOString()
+      : null;
+
+  return {
+    found: true,
+    active: trigger.disabledAt === null,
+    triggerId: trigger.id,
+    triggerName: trigger.triggerName,
+    connectedAccountId: trigger.connectedAccountId,
+    lastSyncedAt,
+    updatedAt: trigger.updatedAt,
+    disabledAt: trigger.disabledAt,
+  };
 }
 
 export async function enableComposioTrigger(triggerId: string) {

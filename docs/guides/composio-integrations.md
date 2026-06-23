@@ -1,6 +1,6 @@
 # Composio Integrations — Implementation Guide
 
-Last updated: 2026-06-18
+Last updated: 2026-06-22
 
 This document is the mandatory reference for building and debugging Composio tool integrations
 in this codebase. Read this before writing any new integration. All lessons here were earned
@@ -89,6 +89,11 @@ Current v1 trigger support:
 
 - `GMAIL_NEW_GMAIL_MESSAGE`
 
+Gmail managed-auth triggers poll rather than receive push notifications. Request a 15-minute
+interval; values below that are unsupported for managed auth and are clamped by
+`createComposioTrigger()`. The local binding endpoint also returns live provider health so the UI
+can distinguish "webhook configured" from "provider trigger active and polling".
+
 The webhook subscription must target the dashboard deployment directly. The apex/marketing domain
 does not host Next.js application API routes and must not be used for webhook delivery.
 The production dashboard deployment must also set
@@ -109,6 +114,31 @@ Trigger creation/enabling/disabling/deletion is owned by:
 - `src/app/api/agents/[id]/automation/status/route.ts`
 - `src/app/api/agents/[id]/automation/route.ts`
 - `src/lib/composio.ts`
+
+### Trigger diagnostics
+
+Trace failures in this order; each boundary has different evidence:
+
+1. **Provider trigger:** confirm the stored `composio_trigger_id` exists, is active, has a current
+   `last_synced_at`, and references the expected connected account.
+2. **Webhook subscription:** confirm the active V3 subscription targets the dashboard API route and
+   includes `composio.trigger.message`, `composio.trigger.disabled`, and account-expiry events.
+3. **Delivery log:** inspect the HTTP status for the exact trigger event. A provider event with a
+   non-2xx delivery never reached application ingestion.
+4. **Ingestion:** find the external event ID in `automation_events`. Absence after a successful 2xx
+   delivery indicates signature, event-shape, or local-binding lookup failure.
+5. **Execution:** inspect the event status, linked `runs` row, and ordered `run_steps`. Context,
+   runtime, decision, and action steps identify whether failure happened before model execution or
+   during a specific tool call.
+
+Do not store or send the full Gmail MIME payload to the model. The webhook adapter reduces it to
+bounded message/thread IDs, sender/recipient fields, subject, readable body, labels, timestamp, and
+attachment metadata.
+
+Composio should remain the provider integration layer, not the durable workflow engine. The app
+owns event idempotency and audit state. Add a database-backed worker over `automation_events` when
+durable retries are required; introduce Trigger.dev only if long-running workflows, scheduled
+waits, or richer orchestration justify the additional vendor and duplicated run state.
 
 ### External connection auth links
 

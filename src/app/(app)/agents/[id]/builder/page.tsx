@@ -42,7 +42,11 @@ import { useToast } from '@/components/ui/ToastProvider';
 import { AgentModelPicker } from '@/components/agents/AgentModelPicker';
 import { canEditAgentRecord } from '@/lib/agents/access';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
-import { AUTOMATION_GMAIL_TRIGGER_SLUG, buildInitialDefinition } from '@/lib/agents/defaults';
+import {
+  AUTOMATION_GMAIL_TRIGGER_CONFIG,
+  AUTOMATION_GMAIL_TRIGGER_SLUG,
+  buildInitialDefinition,
+} from '@/lib/agents/defaults';
 import {
   getSingleToolConnection,
   resolveToolNodeConnection,
@@ -75,6 +79,7 @@ import type {
   AgentAutomationRecord,
   AgentVersionRecord,
   AutomationEventRecord,
+  ComposioTriggerHealth,
   BuilderDefinition,
   BuilderNodeData,
   BuilderNodeKind,
@@ -525,9 +530,9 @@ const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<BuilderF
     data.kind === 'agent' && data.automationMode === true,
   );
   
-  const label = nodeText?.label || data.label;
-  const type = nodeText?.type || data.type || 'Blueprint Node';
-  const description = nodeText?.description || data.description;
+  const label = data.label || nodeText?.label;
+  const type = data.type || nodeText?.type || 'Blueprint Node';
+  const description = data.description || nodeText?.description;
 
   const badgeToneClass = {
     default: 'bg-background text-on-surface-variant',
@@ -535,90 +540,63 @@ const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<BuilderF
     warning: 'bg-surface-container-high text-on-surface',
     error: 'bg-error-container text-on-error-container',
   }[data.badgeTone ?? 'default'];
-  const confidenceLabel =
-    'confidenceLabel' in data && typeof data.confidenceLabel === 'string'
-      ? data.confidenceLabel
-      : 'Confidence';
+  const iconTone =
+    data.kind === 'trigger'
+      ? 'bg-warning/10 text-warning'
+      : data.kind === 'agent'
+        ? 'bg-primary/10 text-primary'
+        : 'bg-surface-container-high text-on-surface-variant';
 
   return (
     <div
-      className={`group/node min-w-[280px] rounded-[2.5rem] border border-outline-variant/20 bg-surface dark:bg-surface-bright shadow-premium transition-all duration-300 ease-out ring-1 ring-inset ring-outline-variant/5 ${
-        selected ? 'ring-4 ring-primary/20 border-primary/30 shadow-primary/10' : 'hover:border-outline-variant/40 hover:shadow-2xl'
+      className={`group/node w-[244px] rounded-2xl border bg-surface shadow-sm transition-all duration-200 ${
+        selected
+          ? 'border-primary/45 ring-4 ring-primary/10 shadow-lg'
+          : 'border-outline-variant/20 hover:border-outline-variant/40 hover:shadow-md'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
         isConnectable={false}
-        className="!h-3.5 !w-3.5 !-left-[8px] !border-[3px] !border-surface dark:!border-surface-bright !bg-primary !transition-transform duration-300 group-hover/node:scale-125"
+        className="!-left-[6px] !h-3 !w-3 !border-[3px] !border-surface !bg-primary"
       />
-      <div
-        className={`flex items-center justify-between rounded-t-[2.5rem] px-5 py-3.5 border-b border-outline-variant/10 ${
-          selected
-            ? 'bg-primary/[0.05] dark:bg-primary/[0.08]'
-            : 'bg-surface-container-low dark:bg-surface-container/50'
-        }`}
-      >
-        <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary/70">
+      <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-3.5">
+        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">
           {type}
         </span>
-        <div className="flex items-center gap-1.5">
-          {selected && (
-            <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          )}
-          <span className="material-symbols-outlined text-sm text-on-surface-variant/30">
-            {selected ? 'tune' : 'drag_indicator'}
-          </span>
-        </div>
-      </div>
-      <div className="space-y-4 p-5">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 shadow-inner ring-1 ring-inset ring-primary/20">
-            {(data as { simpleIcon?: string }).simpleIcon ? (
-              <SimpleIcon 
-                iconKey={(data as { simpleIcon?: string }).simpleIcon} 
-                color={(data as { simpleIconColor?: string }).simpleIconColor}
-                size={24} 
-                className="text-primary"
-              />
-            ) : (
-              <span className="material-symbols-outlined text-xl text-primary">{data.icon || 'smart_toy'}</span>
-            )}
-          </div>
-          <div className="min-w-0 flex-1 pt-0.5">
-            <p className="text-sm font-bold text-on-surface tracking-tight">{label}</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70 italic line-clamp-2">{description}</p>
-          </div>
-        </div>
         {data.badgeText ? (
-          <div className="flex justify-start">
-            <span
-              className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${badgeToneClass}`}
-            >
-              {data.badgeText}
-            </span>
-          </div>
+          <span
+            className={`max-w-[118px] truncate rounded-full px-2 py-0.5 text-[9px] font-semibold ${badgeToneClass}`}
+          >
+            {data.badgeText}
+          </span>
         ) : null}
-        {data.kind === 'agent' && data.showConfidence ? (
-          <div className="space-y-2">
-            <div className="h-1.5 overflow-hidden rounded-full bg-surface-container">
-              <div
-                className="h-full bg-primary"
-                style={{ width: `${data.confidenceValue ?? 80}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/60">
-              <span>{confidenceLabel}</span>
-              <span>{data.confidenceValue ?? 80}%</span>
-            </div>
-          </div>
-        ) : null}
+      </div>
+      <div className="flex items-center gap-3 px-4 pb-4">
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconTone}`}>
+          {(data as { simpleIcon?: string }).simpleIcon ? (
+            <SimpleIcon
+              iconKey={(data as { simpleIcon?: string }).simpleIcon}
+              color={(data as { simpleIconColor?: string }).simpleIconColor}
+              size={18}
+            />
+          ) : (
+            <span className="material-symbols-outlined text-lg">{data.icon || 'smart_toy'}</span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold tracking-tight text-on-surface">{label}</p>
+          <p className="mt-0.5 line-clamp-1 text-[10px] leading-4 text-on-surface-variant/60">
+            {description}
+          </p>
+        </div>
       </div>
       <Handle
         type="source"
         position={Position.Right}
         isConnectable={false}
-        className="!h-3.5 !w-3.5 !-right-[8px] !border-[3px] !border-surface dark:!border-surface-bright !bg-primary !transition-transform duration-300 group-hover/node:scale-125"
+        className="!-right-[6px] !h-3 !w-3 !border-[3px] !border-surface !bg-primary"
       />
     </div>
   );
@@ -626,7 +604,7 @@ const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<BuilderF
 
 AgentNode.displayName = 'AgentNode';
 
-// nodeTypes is now memoized inside AgentBuilderPage to prevent Fast Refresh warnings
+const BUILDER_NODE_TYPES = { agentNode: AgentNode };
 
 function isToolNodeKind(kind: BuilderNodeKind): kind is ToolNodeKind {
   return kind === 'gmail' || kind === 'outlook' || kind === 'slack' || kind === 'hubspot' || kind === 'shopify' || kind === 'googleads' || kind === 'googlecalendar' || kind === 'cal';
@@ -2719,7 +2697,6 @@ function PromptEditor({
 }
 
 export default function AgentBuilderPage() {
-  const nodeTypes = useMemo(() => ({ agentNode: AgentNode }), []);
   const [supabase] = useState(() => createClient());
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -2733,6 +2710,21 @@ export default function AgentBuilderPage() {
     error: builderBootstrapError,
     mutate: mutateBuilderBootstrap,
   } = useSWR<AgentBuilderBootstrapResponse>(builderBootstrapUrl, jsonFetcher);
+  const automationHealthUrl =
+    builderBootstrap?.agent.surface === 'automation'
+      ? `/api/agents/${agentId}/automation`
+      : null;
+  const {
+    data: automationHealthPayload,
+    mutate: mutateAutomationHealth,
+  } = useSWR<{
+    providerTriggerHealth: ComposioTriggerHealth | null;
+    providerTriggerHealthError: string | null;
+  }>(
+    automationHealthUrl,
+    jsonFetcher,
+    { refreshInterval: 60_000 },
+  );
   const hydratedAgentIdRef = useRef<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<BuilderFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<BuilderFlowEdge>([]);
@@ -2749,6 +2741,8 @@ export default function AgentBuilderPage() {
   const [automationRecord, setAutomationRecord] = useState<AgentAutomationRecord | null>(null);
   const [automationEvents, setAutomationEvents] = useState<AutomationEventRecord[]>([]);
   const [automationRuns, setAutomationRuns] = useState<RunRecord[]>([]);
+  const [automationProviderHealth, setAutomationProviderHealth] =
+    useState<ComposioTriggerHealth | null>(null);
   const [automationEnvironment, setAutomationEnvironment] =
     useState<AutomationEnvironmentStatus | null>(null);
   const [calendarOptionsByConnectionId, setCalendarOptionsByConnectionId] = useState<
@@ -3059,6 +3053,15 @@ export default function AgentBuilderPage() {
       automationEnvironment?.hasComposio &&
       automationEnvironment?.hasWebhookSecret,
   );
+  const automationProviderPollingStale = Boolean(
+    automationProviderHealth?.lastSyncedAt &&
+      Date.now() - new Date(automationProviderHealth.lastSyncedAt).getTime() > 45 * 60 * 1_000,
+  );
+  const automationProviderHealthy = Boolean(
+    automationProviderHealth?.found &&
+      automationProviderHealth.active &&
+      !automationProviderPollingStale,
+  );
   const canEditCurrentAgent = agent
     ? canEditAgentRecord(agent, user.id, membership.role)
     : true;
@@ -3183,8 +3186,15 @@ export default function AgentBuilderPage() {
 
   useEffect(() => {
     hydratedAgentIdRef.current = null;
+    setAutomationProviderHealth(null);
     setIsLoading(true);
   }, [agentId]);
+
+  useEffect(() => {
+    if (automationHealthPayload) {
+      setAutomationProviderHealth(automationHealthPayload.providerTriggerHealth ?? null);
+    }
+  }, [automationHealthPayload]);
 
   useEffect(() => {
     if (!builderBootstrap || hydratedAgentIdRef.current === agentId) {
@@ -4336,6 +4346,7 @@ export default function AgentBuilderPage() {
       }
 
       await reloadBuilder();
+      await mutateAutomationHealth();
       router.refresh();
       showToast(
         action === 'activate'
@@ -4486,31 +4497,45 @@ export default function AgentBuilderPage() {
       const externalTriggersEnabled = hasAutomationsEnabled(workspace);
       const selectedSource =
         externalTriggersEnabled ? triggerNode.data.triggerSource ?? 'user_message' : 'user_message';
-      const triggerSourceOptions = getAvailableTriggerSources(externalTriggersEnabled);
+      const triggerSourceOptions: BuilderTriggerSource[] =
+        agent?.surface === 'automation'
+          ? ['gmail_new_message']
+          : getAvailableTriggerSources(externalTriggersEnabled);
 
       return (
         <div className="space-y-7">
-          <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">
-              {t('agentBuilder.triggerSetupTitle')}
-            </p>
-            <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-              {t('agentBuilder.triggerSetupDescription')}
-            </p>
-            <div className="mt-4 rounded-[1rem] bg-surface-container-low px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant/50">
-                {t('agentBuilder.agentSurface')}
+          {agent?.surface === 'automation' ? (
+            <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-4">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-on-surface-variant/45">
+                {t('agentBuilder.selectedTrigger')}
               </p>
-              <p className="mt-1 text-sm font-black text-on-surface">
-                {selectedSource === 'user_message'
-                  ? t('agentBuilder.surfaceWidget')
-                  : t('agents.automation')}
-              </p>
+              <div className="mt-3 flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/10 text-warning">
+                  <span className="material-symbols-outlined text-lg">mail</span>
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-on-surface">
+                    {getTriggerSourceText('gmail_new_message', t).label}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-4 text-on-surface-variant/60">
+                    {t('agentBuilder.composioTriggerHelp')}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">
+                  {t('agentBuilder.triggerSetupTitle')}
+                </p>
+                <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+                  {t('agentBuilder.triggerSetupDescription')}
+                </p>
+              </div>
 
-          <div className="space-y-3">
-            {triggerSourceOptions.map((source) => {
+              <div className="space-y-3">
+                {triggerSourceOptions.map((source) => {
               const sourceText = getTriggerSourceText(source, t);
               const isSelected = selectedSource === source;
               const isExternal = source === 'gmail_new_message';
@@ -4545,7 +4570,9 @@ export default function AgentBuilderPage() {
                           isExternal && isTriggerNodeData(node.data)
                             ? node.data.connectionId ?? getSingleConnection(connections, 'gmail')?.id ?? null
                             : null,
-                        triggerConfig: {},
+                        triggerConfig: isExternal
+                          ? { ...AUTOMATION_GMAIL_TRIGGER_CONFIG }
+                          : {},
                       } as TriggerBuilderNodeData,
                     }));
                   }}
@@ -4587,8 +4614,10 @@ export default function AgentBuilderPage() {
                   </div>
                 </button>
               );
-            })}
-          </div>
+                })}
+              </div>
+            </>
+          )}
 
           {selectedSource === 'gmail_new_message' ? (
             <div className="space-y-3 rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5">
@@ -4598,9 +4627,6 @@ export default function AgentBuilderPage() {
                 isConnecting={connectingToolKind === 'gmail'}
                 onConnect={() => void handleConnectToolNode('gmail')}
               />
-              <p className="text-[11px] leading-relaxed text-on-surface-variant/60">
-                {t('agentBuilder.composioTriggerHelp')}
-              </p>
             </div>
           ) : null}
 
@@ -4612,9 +4638,11 @@ export default function AgentBuilderPage() {
                     {t('agentBuilder.automationReadiness')}
                   </p>
                   <p className="mt-1 text-xs font-bold text-on-surface-variant/60">
-                    {automationCanActivate
-                      ? t('agentBuilder.activationReady')
-                      : t('agentBuilder.activationBlocked')}
+                    {automationRecord?.status === 'active'
+                      ? t('agentBuilder.automationActive')
+                      : automationCanActivate
+                        ? t('agentBuilder.activationReady')
+                        : t('agentBuilder.activationBlocked')}
                   </p>
                 </div>
                 <span
@@ -4642,20 +4670,18 @@ export default function AgentBuilderPage() {
                       t('agentBuilder.noTriggerAccount'),
                   },
                   {
-                    label: t('agentBuilder.triggerProviderComposio'),
-                    value: automationEnvironment?.hasComposio
-                      ? 'Configured'
-                      : 'COMPOSIO_API_KEY missing',
-                  },
-                  {
                     label: t('agentBuilder.webhookConfigured'),
                     value: automationEnvironment?.hasWebhookSecret
                       ? t('agentBuilder.webhookConfigured')
                       : t('agentBuilder.webhookMissing'),
                   },
                   {
-                    label: t('agentBuilder.providerTrigger'),
-                    value: automationRecord?.composio_trigger_id ?? t('agentBuilder.noProviderTrigger'),
+                    label: t('agentBuilder.providerPolling'),
+                    value: automationRecord?.status !== 'active'
+                      ? t('agentBuilder.providerPollingInactive')
+                      : automationProviderHealthy
+                        ? t('agentBuilder.providerPollingHealthy')
+                        : t('agentBuilder.providerPollingAttention'),
                   },
                   {
                     label: t('agentBuilder.lastAutomationEvent'),
@@ -5662,22 +5688,21 @@ export default function AgentBuilderPage() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <header className="shrink-0 flex h-20 items-center justify-between border-b border-outline-variant/10 bg-surface/70 px-8 backdrop-blur-xl">
-        <div className="flex items-center gap-8">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-outline-variant/10 bg-surface/90 px-5 backdrop-blur-xl lg:px-7">
+        <div className="flex min-w-0 items-center gap-4">
           <Link
             href="/dashboard"
-            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-outline-variant/15 bg-surface-container-low text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-95"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container-low text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-95"
           >
             <span className="material-symbols-outlined text-xl">arrow_back</span>
           </Link>
           
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/60">
-                {t('agentBuilder.blueprint')}
-              </span>
-              <span className="text-on-surface-variant/20 text-[10px]">/</span>
-              <h1 className="font-headline text-xl font-bold tracking-tight text-on-surface">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/45">
+                {agent?.surface === 'automation' ? t('agents.automation') : t('agentBuilder.blueprint')}
+              </p>
+              <h1 className="truncate text-sm font-semibold tracking-tight text-on-surface sm:max-w-56">
                 {name || agent?.name || t('agentBuilder.agentTitleFallback')}
               </h1>
             </div>
@@ -5688,25 +5713,7 @@ export default function AgentBuilderPage() {
           </div>
         </div>
 
-        <div className="hidden items-center gap-6 lg:flex">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">
-                {t('agentBuilder.nodes')}
-              </span>
-              <span className="text-sm font-headline font-bold text-on-surface">{nodes.length}</span>
-            </div>
-            <div className="h-4 w-[1px] bg-outline-variant/20" />
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">
-                {t('agentBuilder.connections')}
-              </span>
-              <span className="text-sm font-headline font-bold text-on-surface">{edges.length}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
           <div className="hidden flex-col items-end xl:flex">
             <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 line-clamp-1">
               {t('agentBuilder.lastUpdate')}
@@ -5760,15 +5767,17 @@ export default function AgentBuilderPage() {
                   : t('agentBuilder.saved')}
             </button>
 
-            <button
-              onClick={() => void submitToAgentLibrary()}
-              disabled={isSaving || isSubmittingLibrary || !canEditCurrentAgent}
-              className="h-10 rounded-full border border-outline-variant/15 bg-surface-container-low px-5 text-xs font-bold text-on-surface-variant shadow-sm transition-all hover:bg-surface-container hover:text-on-surface active:scale-95 disabled:opacity-50"
-            >
-              {isSubmittingLibrary
-                ? t('agentBuilder.submittingLibrary')
-                : t('agentBuilder.publishToLibrary')}
-            </button>
+            {agent?.surface !== 'automation' ? (
+              <button
+                onClick={() => void submitToAgentLibrary()}
+                disabled={isSaving || isSubmittingLibrary || !canEditCurrentAgent}
+                className="h-9 rounded-xl border border-outline-variant/15 bg-surface-container-low px-4 text-xs font-bold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-95 disabled:opacity-50"
+              >
+                {isSubmittingLibrary
+                  ? t('agentBuilder.submittingLibrary')
+                  : t('agentBuilder.publishToLibrary')}
+              </button>
+            ) : null}
 
             {agent?.surface === 'widget' ? (
               <button
@@ -5820,7 +5829,7 @@ export default function AgentBuilderPage() {
       <div
         className={`relative grid min-h-0 flex-1 overflow-hidden ${
           selectedNode
-            ? 'xl:grid-cols-[minmax(0,1fr)_28rem]'
+            ? 'xl:grid-cols-[minmax(0,1fr)_24rem]'
             : 'xl:grid-cols-[minmax(0,1fr)]'
         }`}
       >
@@ -5833,7 +5842,7 @@ export default function AgentBuilderPage() {
             <ReactFlow
               nodes={displayNodes}
               edges={edges}
-              nodeTypes={nodeTypes}
+              nodeTypes={BUILDER_NODE_TYPES}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
@@ -5842,7 +5851,7 @@ export default function AgentBuilderPage() {
               onInit={setFlowInstance}
               fitView
               proOptions={{ hideAttribution: true }}
-              className="bg-background"
+              className="bg-surface-container-lowest"
             >
               {displayNodes.length === 0 ? (
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6">
@@ -5859,7 +5868,7 @@ export default function AgentBuilderPage() {
                   </div>
                 </div>
               ) : null}
-              <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
+              <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
               <Controls className="!bottom-4 !left-4 !top-auto !right-auto" />
             
             </ReactFlow>
@@ -6017,7 +6026,7 @@ export default function AgentBuilderPage() {
             </div>
 
             {/* ── Body ── */}
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-6">
               {renderInspectorBody()}
             </div>
           </aside>
