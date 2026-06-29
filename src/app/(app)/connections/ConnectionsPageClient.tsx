@@ -263,46 +263,49 @@ export default function ConnectionsPageClient({
   }, [connections]);
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-            {t('connections.badge')}
-          </p>
-          <h1 className="mt-3 font-headline text-[2.15rem] font-bold tracking-tight text-on-surface sm:text-[2.45rem]">
-            {t('connections.title')}
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
-            {t('connections.description')}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {canManageAuthLinks ? (
+    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/8 px-2.5 py-1 text-primary">
+              <Network className="h-3.5 w-3.5" strokeWidth={2.2} />
+              <span className="text-xs font-semibold">{t('connections.badge')}</span>
+            </div>
+            <h1 className="mt-3 text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
+              {t('connections.title')}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
+              {t('connections.description')}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {canManageAuthLinks ? (
+              <button
+                type="button"
+                onClick={() => setIsAuthLinksOpen(true)}
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 text-sm font-semibold text-on-surface transition-colors hover:border-primary/25 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <Link2 className="h-4 w-4" />
+                {t('connections.authLinksTitle')}
+                <span className="rounded-full bg-surface-container px-2 py-0.5 text-[11px] font-bold text-on-surface-variant">
+                  {authLinks.length}
+                </span>
+              </button>
+            ) : null}
             <button
-              type="button"
-              onClick={() => setIsAuthLinksOpen(true)}
-              className="inline-flex items-center gap-2 rounded-full border border-outline-variant/20 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:border-primary/35 hover:bg-primary-container hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              onClick={() => {
+                setIsSyncing(true);
+                void load(true);
+              }}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <Link2 className="h-4 w-4" />
-              {t('connections.authLinksTitle')}
-              <span className="rounded-full bg-surface-container px-2 py-0.5 text-[11px] font-bold text-on-surface-variant">
-                {authLinks.length}
-              </span>
+              {isSyncing ? t('common.syncing') : t('connections.syncStatus')}
             </button>
-          ) : null}
-          <button
-            onClick={() => {
-              setIsSyncing(true);
-              void load(true);
-            }}
-            className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90"
-          >
-            {isSyncing ? t('common.syncing') : t('connections.syncStatus')}
-          </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
           [t('common.connected'), String(stats.connected)],
           [t('common.pending'), String(stats.pending)],
@@ -310,22 +313,22 @@ export default function ConnectionsPageClient({
         ].map(([label, value]) => (
           <div
             key={label}
-            className="rounded-[1.6rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]"
+            className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm"
           >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant/55">
+            <p className="text-sm font-medium text-on-surface-variant/70">
               {label}
             </p>
-            <p className="mt-4 font-headline text-4xl font-bold text-on-surface">{value}</p>
+            <p className="mt-3 text-3xl font-bold tabular-nums text-on-surface">{value}</p>
           </div>
         ))}
-      </div>
+      </section>
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {isLoading
           ? Array.from({ length: 6 }).map((_, index) => (
               <div
                 key={index}
-                className="h-56 animate-pulse rounded-[2rem] bg-surface-container-low"
+                className="h-56 animate-pulse rounded-2xl border border-outline-variant/10 bg-surface-container-low"
               />
             ))
           : toolkits.map((toolkit) => {
@@ -334,9 +337,9 @@ export default function ConnectionsPageClient({
               return (
                 <div
                   key={toolkit.slug}
-                  className="rounded-[1.65rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_22px_60px_rgba(15,23,42,0.09)]"
+                  className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low/45"
                 >
-                  <div className="mb-8 flex items-start justify-between gap-3">
+                  <div className="mb-5 flex items-start justify-between gap-3">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
                       toolkit.status === 'connected'
                         ? 'bg-success/10 text-success'
@@ -352,7 +355,7 @@ export default function ConnectionsPageClient({
                         resolveToolkitIcon(toolkit.icon)
                       )}
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
                       toolkit.status === 'connected'
                         ? 'bg-success/10 text-success border border-success/20'
                         : 'bg-background text-on-surface-variant'
@@ -360,13 +363,13 @@ export default function ConnectionsPageClient({
                       {toolkit.status}
                     </span>
                   </div>
-                  <p className="font-headline text-xl font-bold text-on-surface">
+                  <p className="text-base font-semibold tracking-normal text-on-surface">
                     {toolkit.displayName}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-on-surface-variant">
                     {toolkit.description}
                   </p>
-                  <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.2em] text-primary/70">
+                  <p className="mt-4 text-xs font-semibold text-primary/80">
                     {toolkit.category} · {toolkit.surface}
                   </p>
                   {statusReason && toolkit.status !== 'connected' ? (
@@ -374,19 +377,19 @@ export default function ConnectionsPageClient({
                       {t('connections.statusReason', { value: statusReason })}
                     </p>
                   ) : null}
-                  <div className="mt-8 flex items-center justify-between gap-3 border-t border-outline-variant/10 pt-4">
+                  <div className="mt-6 flex flex-col gap-3 border-t border-outline-variant/10 pt-4">
                     <div className="text-xs text-on-surface-variant">
                       {toolkit.connection?.last_synced_at
                         ? t('connections.lastSync', { value: formatDateTime(toolkit.connection.last_synced_at) })
                         : t('connections.noSyncYet')}
                     </div>
-                    <div className="flex flex-wrap items-center justify-end gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {canManageAuthLinks ? (
                         <button
                           type="button"
                           onClick={() => handleCreateAuthLink(toolkit.slug)}
                           disabled={creatingAuthLinkSlug === toolkit.slug}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:border-primary/35 hover:bg-primary-container hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-outline-variant/15 px-3 text-xs font-semibold text-on-surface-variant transition-colors hover:border-primary/25 hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <Link2 className="h-3.5 w-3.5" />
                           {creatingAuthLinkSlug === toolkit.slug
@@ -398,7 +401,7 @@ export default function ConnectionsPageClient({
                         <button
                           onClick={() => handleDisconnect(toolkit.connection!.id)}
                           disabled={disconnectingConnectionId === toolkit.connection.id}
-                          className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:border-error/30 hover:bg-error-container hover:text-error focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-error disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-outline-variant/15 disabled:hover:bg-transparent disabled:hover:text-on-surface-variant"
+                          className="h-9 rounded-xl border border-outline-variant/15 px-3 text-xs font-semibold text-on-surface-variant transition-colors hover:border-error/30 hover:bg-error-container hover:text-error disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-outline-variant/15 disabled:hover:bg-transparent disabled:hover:text-on-surface-variant"
                         >
                           {disconnectingConnectionId === toolkit.connection.id
                             ? t('connections.disconnecting')
@@ -407,7 +410,7 @@ export default function ConnectionsPageClient({
                       ) : null}
                       <button
                         onClick={() => handleConnect(toolkit)}
-                        className="rounded-full border border-outline-variant/15 px-4 py-2 text-xs font-semibold text-on-surface transition-colors hover:border-primary/35 hover:bg-primary hover:text-on-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        className="h-9 rounded-xl bg-on-surface px-3 text-xs font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       >
                         {toolkit.status === 'connected' ? t('connections.replaceAccount') : t('connections.connect')}
                       </button>
@@ -470,7 +473,7 @@ export default function ConnectionsPageClient({
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="rounded-full border border-outline-variant/20 bg-surface-container px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                        <span className="rounded-full border border-outline-variant/20 bg-surface-container px-2.5 py-1 text-xs font-semibold text-on-surface-variant">
                           {authLink.status}
                         </span>
                         {authLink.status === 'pending' ? (
@@ -505,7 +508,7 @@ export default function ConnectionsPageClient({
           <div className="w-full max-w-lg rounded-[1.65rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_28px_90px_rgba(15,23,42,0.24)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                <p className="text-xs font-semibold text-primary">
                   {generatedAuthLink.toolkitName}
                 </p>
                 <h2
@@ -528,7 +531,7 @@ export default function ConnectionsPageClient({
               {t('connections.authLinkWarning')}
             </p>
 
-            <label className="mt-5 block text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant/70">
+            <label className="mt-5 block text-sm font-medium text-on-surface-variant">
               {t('connections.authLinkCopyLabel')}
             </label>
             <div className="mt-2 flex gap-2">

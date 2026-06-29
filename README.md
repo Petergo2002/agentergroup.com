@@ -25,7 +25,7 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 - Public remote downloads are SSRF-hardened. Assistant downloads and Drive imports only allow vetted `http/https` hosts, reject private/loopback destinations, and re-validate redirects.
 - DSAR email lookups use normalized exact matching, not wildcard matching. Session ids used in export filenames are sanitized before being written into headers.
 - Production chat persistence does not store raw debug traces or raw tool payloads. Conversation-detail debug traces are only returned to workspace owners/admins.
-- Automation activity is event-centered rather than conversational. Each run stores a versioned operational decision, summary, missing-information list, and tool outcomes; successful actions require successful tool evidence, and production persistence excludes raw tool payloads.
+- Automation activity is event-centered rather than conversational. Each run stores a versioned operational decision, generated-message preview, summary, missing-information list, and tool outcomes; successful actions require successful tool evidence, and production persistence excludes raw tool payloads.
 
 ## Local Development
 
@@ -156,7 +156,7 @@ npm run widget:load-test -- --help
 | `/assistants/[id]` | Internal assistant chat surface with shared workspace threads |
 | `/widgets` | Widget list and management |
 | `/widgets/[id]` | Widget configuration, agents, appearance, and deployment state |
-| `/analytics` | Widget conversation analytics and transcript detail |
+| `/analytics` | Widget conversation analytics, transcript detail, and automation performance reporting |
 | `/connections` | Connected app authorization and status |
 | `/settings` | Workspace profile, compliance links, and admin settings |
 
@@ -211,6 +211,7 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - Public widget/API failures now return stable client-safe errors while detailed exceptions stay in server logs.
 - Public lead submissions now return only `ok`, `leadId`, and `createdAt`.
 - Widget leads can have a persisted AI conversation summary. Generation runs after the response lifecycle, consumes one workspace message credit per attempt, and can be regenerated from Leads or Analytics when the transcript changes. See `docs/guides/lead-conversation-summaries.md`.
+- Analytics includes an Automation view with event totals, processed/failed trends, and recent failures that link back to Activity. Automation analytics excludes raw provider payloads and raw email bodies.
 - The dashboard app now sends baseline browser protections through CSP, HSTS, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
 - Dashboard CSP allows Supabase only when `NEXT_PUBLIC_SUPABASE_URL` is configured; it must not fall back to a hardcoded project hostname.
 - Public widget rate limits are enforced through a Supabase RPC backed by a named uniqueness constraint on `rate_limit_windows`; do not switch that upsert back to a bare column-list conflict target or Postgres can reintroduce ambiguous `window_started_at` errors.

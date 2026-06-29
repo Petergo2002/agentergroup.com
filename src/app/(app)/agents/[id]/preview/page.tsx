@@ -755,7 +755,7 @@ export default function AgentPreviewPage() {
         </div>
 
         {/* Activity Sidebar */}
-        <aside className="w-88 shrink-0 overflow-y-auto bg-surface-container-lowest/50 p-6 space-y-6 hide-scrollbar">
+        <aside id="activity" className="w-88 shrink-0 overflow-y-auto bg-surface-container-lowest/50 p-6 space-y-6 hide-scrollbar">
           {/* Agent Summary Card */}
           <section className="p-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm hover:shadow-md transition-all">
             <div className="flex items-center justify-between mb-4">

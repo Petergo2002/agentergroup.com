@@ -3,6 +3,13 @@ import type { DebugTrace } from "./debug";
 import type { LeadConversationSummary } from "./widget";
 
 export type DashboardAnalyticsRange = "7d" | "30d" | "90d";
+export type DashboardAutomationStatusFilter =
+  | "all"
+  | "received"
+  | "processing"
+  | "processed"
+  | "ignored"
+  | "failed";
 
 export interface DashboardAnalyticsOverview {
   conversations: number;
@@ -14,10 +21,62 @@ export interface DashboardAnalyticsOverview {
   failures: number;
 }
 
+export interface DashboardAutomationAgentSummary {
+  agentId: string;
+  agentName: string;
+  status: string;
+  totalEvents: number;
+  processedEvents: number;
+  failedEvents: number;
+  actionTaken: number;
+  noAction: number;
+  needsInput: number;
+  actionFailed: number;
+  lastEventAt: string | null;
+  activityHref: string;
+}
+
+export interface DashboardAutomationFailureSummary {
+  eventId: string;
+  runId: string | null;
+  agentId: string;
+  agentName: string;
+  triggerLabel: string;
+  eventStatus: string;
+  runStatus: string | null;
+  decision: string | null;
+  summary: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  activityHref: string;
+}
+
+export interface DashboardAutomationTrendPoint {
+  date: string;
+  totalEvents: number;
+  processedEvents: number;
+  failedEvents: number;
+}
+
+export interface DashboardAutomationAnalytics {
+  totalEvents: number;
+  processedEvents: number;
+  failedEvents: number;
+  actionTaken: number;
+  noAction: number;
+  needsInput: number;
+  actionFailed: number;
+  successRate: number;
+  trend: DashboardAutomationTrendPoint[];
+  agents: DashboardAutomationAgentSummary[];
+  recentFailures: DashboardAutomationFailureSummary[];
+}
+
 export interface DashboardAnalyticsAppliedFilters {
   range: DashboardAnalyticsRange;
   widgetId: string | null;
   agentId: string | null;
+  automationStatus: DashboardAutomationStatusFilter;
   search: string;
   sessionStatus: "all" | "active" | "completed";
 }
@@ -57,9 +116,10 @@ export interface DashboardAnalyticsConversationListItem {
 
 export interface DashboardAnalyticsResponse {
   overview: DashboardAnalyticsOverview;
+  automation: DashboardAutomationAnalytics;
   filters: {
     widgets: Array<{ id: string; name: string }>;
-    agents: Array<{ id: string; name: string }>;
+    agents: Array<{ id: string; name: string; surface: string }>;
     applied: DashboardAnalyticsAppliedFilters;
   };
   conversations: DashboardAnalyticsConversationListItem[];

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquare, ArrowRight, User } from "lucide-react";
+import { ArrowRight, MessageSquare, User } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { formatRelativeDate } from "@/lib/utils";
 
@@ -23,38 +23,41 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
   const { language, t } = useLanguage();
 
   return (
-    <div className="rounded-[2rem] bg-surface-container-low/30 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.06)] ring-1 ring-outline-variant/10">
-      <div className="flex items-center justify-between mb-8">
+    <section className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-primary/5 text-primary mb-3">
-            <span className="text-[9px] font-bold uppercase tracking-widest">{t("dashboard.liveActivity")}</span>
-          </div>
-          <h2 className="font-headline text-2xl font-bold text-on-surface">{t("dashboard.recentConversations")}</h2>
+          <p className="text-xs font-semibold text-primary">{t("dashboard.liveActivity")}</p>
+          <h2 className="mt-1 text-lg font-semibold tracking-normal text-on-surface">
+            {t("dashboard.recentConversations")}
+          </h2>
         </div>
         <Link
           href="/analytics"
-          className="group flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-all"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface transition-colors hover:border-primary/25 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {t("dashboard.viewAllAnalytics")}
-          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+          <ArrowRight className="h-4 w-4" strokeWidth={2} />
         </Link>
       </div>
 
-      <div className="space-y-3.5">
+      <div className="space-y-3">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className="h-24 animate-pulse rounded-2xl bg-surface-container-low/60"
+              className="h-[88px] animate-pulse rounded-xl border border-outline-variant/10 bg-surface-container-low"
             />
           ))
         ) : conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border border-dashed border-outline-variant/20 bg-surface-container-low/20">
-            <div className="h-12 w-12 rounded-full bg-surface-container flex items-center justify-center mb-4">
-              <MessageSquare className="h-5 w-5 text-on-surface-variant/40" />
+          <div className="rounded-xl border border-dashed border-outline-variant/25 bg-surface-container-low/35 px-5 py-10 text-center">
+            <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface-variant ring-1 ring-outline-variant/15">
+              <MessageSquare className="h-5 w-5" strokeWidth={2} />
             </div>
-            <p className="text-sm font-bold text-on-surface-variant/60 uppercase tracking-widest">
+            <h3 className="text-sm font-semibold tracking-normal text-on-surface">
               {t("dashboard.noConversationsDetected")}
+            </h3>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-on-surface-variant/70">
+              {t("dashboard.noConversationsDescription")}
             </p>
           </div>
         ) : (
@@ -62,39 +65,35 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
             <Link
               key={convo.widgetSessionId}
               href="/analytics"
-              className="group relative block rounded-2xl bg-surface-container-lowest/65 p-5 transition-all duration-300 hover:bg-surface-container hover:-translate-y-0.5 hover:shadow-premium hover:ring-1 hover:ring-primary/10"
+              className="group grid gap-4 rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-4 transition-colors hover:border-primary/25 hover:bg-surface-container-low/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:grid-cols-[minmax(0,1fr)_auto]"
             >
-              <div className="flex items-start justify-between gap-6">
-                <div className="flex gap-4 min-w-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container group-hover:bg-primary/5 group-hover:text-primary transition-colors">
-                    <User className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="truncate text-sm font-bold text-on-surface uppercase tracking-tight">
-                        {convo.widgetName}
-                      </p>
-                      <span className="h-1 w-1 rounded-full bg-outline-variant/40" />
-                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/60">
-                        {convo.agentLabel || convo.agentName || t("common.unknownAgent")}
-                      </p>
-                    </div>
-                    <p className="line-clamp-1 text-[13px] leading-relaxed text-on-surface-variant/80 italic">
-                      &ldquo;{convo.latestSnippet || t("dashboard.noRecentActivity")}&rdquo;
-                    </p>
-                  </div>
+              <div className="flex min-w-0 gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+                  <User className="h-5 w-5" strokeWidth={2} />
                 </div>
-                <div className="shrink-0 flex flex-col items-end">
-                  <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/50">
-                    {formatRelativeDate(convo.lastActivityAt, language)}
-                  </span>
-                  <div className="mt-2 h-1.5 w-1.5 rounded-full bg-success ring-4 ring-success/10 animate-pulse" />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="truncate text-sm font-semibold tracking-normal text-on-surface">
+                      {convo.widgetName}
+                    </h3>
+                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs font-medium text-on-surface-variant">
+                      {convo.agentLabel || convo.agentName || t("common.unknownAgent")}
+                    </span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm leading-6 text-on-surface-variant/75">
+                    {convo.latestSnippet || t("dashboard.noRecentActivity")}
+                  </p>
                 </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-on-surface-variant sm:justify-end">
+                <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
+                <span>{formatRelativeDate(convo.lastActivityAt, language)}</span>
+                <ArrowRight className="h-4 w-4 opacity-55 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
               </div>
             </Link>
           ))
         )}
       </div>
-    </div>
+    </section>
   );
 }

@@ -533,6 +533,44 @@ const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<BuilderF
   const label = data.label || nodeText?.label;
   const type = data.type || nodeText?.type || 'Blueprint Node';
   const description = data.description || nodeText?.description;
+  const noteText =
+    data.kind === 'annotation' && typeof data.text === 'string'
+      ? data.text.trim()
+      : '';
+
+  if (data.kind === 'annotation') {
+    return (
+      <div
+        className={`group/node min-h-[168px] w-[288px] rotate-[-1deg] rounded-[10px] border bg-amber-50 px-5 py-4 text-slate-950 shadow-[0_18px_34px_rgba(15,23,42,0.10)] transition-all duration-200 dark:bg-[#2b2413] dark:text-amber-50 ${
+          selected
+            ? 'border-primary/55 ring-4 ring-primary/12 shadow-[0_22px_44px_rgba(15,23,42,0.14)]'
+            : 'border-amber-200 hover:border-amber-300 hover:shadow-[0_22px_40px_rgba(15,23,42,0.13)] dark:border-amber-500/25 dark:hover:border-amber-400/45'
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">
+              sticky_note_2
+            </span>
+            <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-200">
+              {type}
+            </span>
+          </div>
+          <span className="h-2 w-2 shrink-0 rounded-full bg-primary/80 shadow-[0_0_0_4px_rgba(var(--primary-rgb),0.12)]" />
+        </div>
+
+        <p className="mt-4 line-clamp-6 whitespace-pre-wrap break-words text-[15px] font-semibold leading-6">
+          {noteText || t('agentBuilder.annotationNodeEmpty')}
+        </p>
+
+        {!noteText ? (
+          <p className="mt-3 text-xs font-medium text-amber-700/65 dark:text-amber-100/55">
+            {t('agentBuilder.annotationNodeHint')}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   const badgeToneClass = {
     default: 'bg-background text-on-surface-variant',
@@ -4914,7 +4952,7 @@ export default function AgentBuilderPage() {
               onKeyDown={stopBuilderFieldKeyDown}
               rows={8}
               placeholder={t('agentBuilder.annotationPlaceholder')}
-              className="w-full resize-y rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-medium leading-relaxed text-on-surface shadow-sm outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+              className="min-h-56 w-full resize-y rounded-[10px] border border-amber-200 bg-amber-50 px-5 py-4 text-[15px] font-semibold leading-6 text-slate-950 shadow-[0_16px_34px_rgba(15,23,42,0.08)] outline-none transition-all placeholder:text-amber-700/55 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 dark:border-amber-500/25 dark:bg-[#2b2413] dark:text-amber-50 dark:placeholder:text-amber-100/45"
             />
           </div>
           <p className="text-xs leading-5 text-on-surface-variant/60">

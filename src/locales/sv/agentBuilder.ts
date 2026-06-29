@@ -164,6 +164,8 @@ export const agentBuilder = {
   annotationDescription: "Dokumentationsanteckning som bara visas på canvasen.",
   annotationText: "Anteckningstext",
   annotationPlaceholder: "Lägg till kontext för kollegor som arbetar med agenten...",
+  annotationNodeEmpty: "Lägg till en anteckning...",
+  annotationNodeHint: "Välj anteckningen för att skriva kontext på canvasen.",
   annotationHelp:
     "Anteckningar sparas med utkastet men ignoreras av runtime och kantgenerering.",
   semanticSourcesDescription:

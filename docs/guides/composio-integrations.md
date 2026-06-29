@@ -1,6 +1,6 @@
 # Composio Integrations — Implementation Guide
 
-Last updated: 2026-06-22
+Last updated: 2026-06-24
 
 This document is the mandatory reference for building and debugging Composio tool integrations
 in this codebase. Read this before writing any new integration. All lessons here were earned
@@ -501,7 +501,7 @@ Before shipping any new integration, verify each item:
 | `src/app/(app)/agents/[id]/builder/page.tsx` | Builder UI — event type dropdown state and fetch effect |
 | `src/app/api/agents/[id]/automation/route.ts` | Automation trigger binding save/delete endpoint |
 | `src/app/api/agents/[id]/automation/status/route.ts` | Automation trigger activate/pause endpoint |
-| `src/app/api/composio/webhook/route.ts` | Composio trigger event ingestion plus connected-account expiry handling |
+| `src/app/api/composio/webhook/route.ts` | Composio trigger event ingestion plus connected-account expiry and disabled-trigger handling |
 | `src/lib/automation/executor.ts` | Automation event processor that runs the shared agent runtime |
 
 ---

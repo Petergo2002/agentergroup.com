@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Search, Plus, Filter, Activity, Library } from "lucide-react";
-import { AppIcon } from "@/components/icons/AppIcon";
 import { canEditAgentRecord } from "@/lib/agents/access";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { useModals } from "@/components/ui/ModalProvider";
@@ -155,63 +154,55 @@ export default function AgentsPageClient({
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-6 py-12 lg:px-12 space-y-12 animate-in fade-in duration-1000">
-      
-      {/* ─── Header ─────────────────────────────────────────────── */}
-      <header className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between mb-8">
-        <div className="max-w-xl">
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-primary/5 text-primary mb-5">
-            <Activity className="h-3.5 w-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em]">{t('agents.agentLibrary')}</span>
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-4 py-5 sm:px-6 lg:px-10 lg:py-7">
+      <header className="rounded-2xl border border-outline/70 bg-surface-container-lowest px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-7 lg:px-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/15 bg-secondary-container px-2.5 py-1 text-primary">
+              <Activity className="h-3.5 w-3.5" strokeWidth={2} />
+              <span className="text-xs font-semibold leading-5">{t('agents.agentLibrary')}</span>
+            </div>
+            <h1 className="mt-3 text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
+              {t('agents.headline')}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
+              {t('agents.description')}
+            </p>
           </div>
-          <h1 className="font-headline text-[2.75rem] font-bold leading-[1.05] text-on-surface tracking-tight">
-            {t('agents.headline')}
-          </h1>
-          <p className="mt-5 text-[14px] font-medium leading-relaxed text-on-surface-variant/70 max-w-md">
-            {t('agents.description')}
-          </p>
-        </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <button
-            onClick={() => setIsLibraryOpen(true)}
-            className="group relative flex h-14 items-center justify-between rounded-full border border-outline-variant/15 bg-surface-container-low pl-6 pr-2 text-sm font-bold text-on-surface shadow-sm transition-all hover:bg-surface-container hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-3">
-              <Library className="h-5 w-5 text-primary" />
-              <span className="uppercase tracking-[0.15em] pr-4">{t('agents.library')}</span>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high transition-colors group-hover:bg-primary/10">
-              <AppIcon name="arrow_forward" className="h-4 w-4 text-primary" />
-            </div>
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={() => setIsLibraryOpen(true)}
+              className="inline-flex h-11 min-w-32 items-center justify-center gap-2 rounded-lg border border-outline bg-surface-container-lowest px-4 text-sm font-semibold text-on-surface shadow-[0_1px_1px_rgba(15,23,42,0.03)] transition-colors hover:border-on-surface/15 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <Library className="h-[18px] w-[18px] text-primary" />
+              {t('agents.library')}
+            </button>
 
-          <button
-            onClick={() => openCreateAgent()}
-            className="signature-gradient group relative flex h-14 items-center justify-between rounded-full pl-6 pr-2 text-sm font-bold shadow-xl shadow-black/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-3">
-              <Plus className="h-5 w-5" />
-              <span className="uppercase tracking-[0.15em] pr-4">{t('agents.createAgent')}</span>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/5 backdrop-blur-sm transition-colors group-hover:bg-black/10">
-              <AppIcon name="arrow_forward" className="h-4 w-4 text-black" />
-            </div>
-          </button>
+            <button
+              type="button"
+              onClick={() => openCreateAgent()}
+              className="inline-flex h-11 min-w-36 items-center justify-center gap-2 rounded-lg bg-on-surface px-4 text-sm font-semibold text-background shadow-[0_8px_18px_rgba(15,23,42,0.12)] transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]"
+            >
+              <Plus className="h-[18px] w-[18px]" />
+              {t('agents.createAgent')}
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* ─── Filters & Search ──────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-2 rounded-[2.25rem] bg-surface-container-low ring-1 ring-outline-variant/15 backdrop-blur-sm shadow-sm">
-        <div className="flex items-center gap-1.5 p-1 w-full md:w-auto">
+      <section className="flex flex-col gap-3 rounded-xl border border-outline/70 bg-surface-container-lowest p-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)] md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full items-center gap-1 overflow-x-auto p-0.5 md:w-auto">
           {(["all", "active", "draft", "archived"] as const).map((tab) => (
             <button
               key={tab}
+              type="button"
               onClick={() => setFilter(tab)}
-              className={`flex-1 md:flex-none rounded-md px-6 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all duration-150 active:scale-[0.98] ${
+              className={`h-10 flex-1 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-colors md:flex-none ${
                 filter === tab
-                  ? "bg-on-surface text-background shadow-lg shadow-on-surface/20"
-                  : "text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-container-high/50"
+                  ? "bg-on-surface text-background"
+                  : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
               }`}
             >
               {t(`agents.filters.${tab}`)}
@@ -219,36 +210,35 @@ export default function AgentsPageClient({
           ))}
         </div>
 
-        <div className="relative w-full md:max-w-xs pr-2">
+        <div className="relative w-full md:max-w-sm">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant/40" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('agents.searchPlaceholder')}
-            className="w-full bg-surface-container-high/30 border border-outline-variant/30 rounded-md py-3 pl-11 pr-4 text-sm font-medium text-on-surface placeholder:text-on-surface-variant/40 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all outline-none shadow-sm"
+            className="h-11 w-full rounded-lg border border-outline/70 bg-surface-container-low pl-11 pr-4 text-sm font-medium text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/45 focus:border-primary/30 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/15"
           />
         </div>
-      </div>
+      </section>
 
-      {/* ─── List ─────────────────────────────────────────────── */}
       {isLoading ? (
         <div className="flex flex-col gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-[68px] animate-pulse rounded-2xl bg-surface-container-low/40" />
+            <div key={i} className="h-[88px] animate-pulse rounded-xl border border-outline/70 bg-surface-container-low" />
           ))}
         </div>
       ) : filteredAgents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-center rounded-[3rem] bg-surface-container-low/10">
-          <div className="h-20 w-20 rounded-full bg-primary/5 flex items-center justify-center mb-6">
-            <Filter className="h-8 w-8 text-primary/30" />
+        <div className="rounded-2xl border border-dashed border-outline bg-surface-container-lowest px-6 py-16 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant ring-1 ring-outline/70">
+            <Filter className="h-5 w-5" />
           </div>
-          <h2 className="text-2xl font-headline font-bold text-on-surface">{t('agents.noAgentsFound')}</h2>
-          <p className="mt-3 text-[14px] text-on-surface-variant/60 max-w-sm">
+          <h2 className="text-base font-semibold tracking-normal text-on-surface">{t('agents.noAgentsFound')}</h2>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-on-surface-variant/70">
             {t('agents.noAgentsFoundDescription')}
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-3">
           {pagedAgents.map((agent) => (
             <AgentCard
               key={agent.id}
@@ -265,9 +255,8 @@ export default function AgentsPageClient({
         </div>
       )}
 
-      {/* ─── Footer ────────────────────────────────────────────── */}
-      <footer className="flex items-center justify-between pt-8 border-t border-outline-variant/10">
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/40">
+      <footer className="flex flex-col gap-4 border-t border-outline-variant/10 pt-2 sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-sm font-medium text-on-surface-variant/70">
           {t("agents.showingSummary", {
             shown: pagedAgents.length,
             total: filteredAgents.length,
@@ -279,11 +268,12 @@ export default function AgentsPageClient({
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <button
                 key={page}
+                type="button"
                 onClick={() => setCurrentPage(page)}
-                className={`h-9 w-9 rounded-md flex items-center justify-center text-[12px] font-bold transition-all duration-150 active:scale-[0.98] ${
+                className={`flex h-9 w-9 items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
                   page === safePage
-                    ? "bg-on-surface text-background shadow-md shadow-on-surface/10"
-                    : "text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container"
+                    ? "bg-on-surface text-background"
+                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
                 }`}
               >
                 {page}
@@ -293,7 +283,6 @@ export default function AgentsPageClient({
         )}
       </footer>
 
-      {/* ─── Modals ────────────────────────────────────────────── */}
       <ConfirmDeleteModal
         isOpen={Boolean(agentToDelete)}
         title={t("agents.deleteTitle")}

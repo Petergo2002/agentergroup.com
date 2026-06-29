@@ -23,16 +23,18 @@ test("automation activity API returns recent run steps and the expected webhook 
 });
 
 test("automation activity displays an operational event timeline and readiness failures", () => {
-  assert.match(activityPageSource, /Trigger received/);
+  assert.match(activityPageSource, /Run history/);
+  assert.match(activityPageSource, /Trigger context/);
   assert.match(activityPageSource, /Decision/);
-  assert.match(activityPageSource, /Actions/);
-  assert.match(activityPageSource, /Run summary/);
+  assert.match(activityPageSource, /Generated message/);
+  assert.match(activityPageSource, /Verified actions/);
   assert.match(activityPageSource, /No external action was attempted/);
-  assert.match(activityPageSource, /Technical details/);
+  assert.match(activityPageSource, /Diagnostics/);
   assert.match(activityPageSource, /Webhook readiness problem/);
   assert.match(activityPageSource, /expectedWebhookUrl/);
   assert.match(activityPageSource, /run\?\.error_message/);
   assert.match(activityPageSource, /readAutomationRunResult/);
+  assert.match(activityPageSource, /normalizeAutomationTriggerPayload/);
 });
 
 test("automation builder removes chat-only controls and uses automation language", () => {

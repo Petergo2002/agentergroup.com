@@ -163,6 +163,8 @@ export const agentBuilder = {
   annotationDescription: "Canvas-only documentation note.",
   annotationText: "Note text",
   annotationPlaceholder: "Add context for teammates working on this agent...",
+  annotationNodeEmpty: "Add a note...",
+  annotationNodeHint: "Select this note to write context for the canvas.",
   annotationHelp:
     "Annotations are saved with the draft but are ignored by runtime execution and edge generation.",
   semanticSourcesDescription:

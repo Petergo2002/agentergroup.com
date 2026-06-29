@@ -84,7 +84,12 @@ export type {
 
 export type {
   DashboardAnalyticsRange,
+  DashboardAutomationStatusFilter,
   DashboardAnalyticsOverview,
+  DashboardAutomationAgentSummary,
+  DashboardAutomationFailureSummary,
+  DashboardAutomationTrendPoint,
+  DashboardAutomationAnalytics,
   DashboardAnalyticsAppliedFilters,
   DashboardAnalyticsConversationListItem,
   DashboardAnalyticsResponse,

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { Activity, ExternalLink } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { EntityActionsMenu } from "@/components/ui/EntityActionsMenu";
 import type { AgentRecord } from "@/lib/types";
@@ -51,19 +51,19 @@ function useTypeBadge(agent: AgentRecord, t: (key: string) => string) {
   if (agent.surface === "automation") {
     return {
       label: t("agents.automation"),
-      classes: "bg-orange-500/10 text-orange-400 ring-1 ring-orange-500/20",
+      classes: "bg-orange-50 text-orange-700 ring-1 ring-orange-200/80 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/20",
     };
   }
   if (agent.surface === "assistant") {
     return {
       label: t("agents.internalAssistant"),
-      classes: "bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20",
+      classes: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/80 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20",
     };
   }
   // widget (default)
   return {
     label: t("agents.websiteWidget"),
-    classes: "bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20",
+    classes: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20",
   };
 }
 
@@ -87,6 +87,9 @@ export function AgentCard({
       ? "builder"
       : "preview"
   }`;
+  const activityHref = agent.surface === "automation"
+    ? `/agents/${agent.id}/activity`
+    : `/agents/${agent.id}/preview#activity`;
 
   const toggleDisabled =
     Boolean(agent.archived_at) ||
@@ -98,11 +101,9 @@ export function AgentCard({
       !agent.published_version_id);
 
   return (
-    <div className="group relative flex items-center gap-5 rounded-2xl bg-surface-container-low/55 px-5 py-4 ring-1 ring-outline-variant/10 shadow-sm transition-all hover:bg-surface-container hover:shadow-premium hover:ring-primary/20 animate-in fade-in slide-in-from-bottom-2 duration-400">
-
-      {/* ── Avatar + status dot ─────────────────────────── */}
-      <div className="relative shrink-0">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-container text-primary font-bold text-lg select-none">
+    <article className="group grid grid-cols-1 gap-4 rounded-xl border border-outline/70 bg-surface-container-lowest px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-on-surface/15 hover:bg-surface-container-low/35 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:px-5 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
+      <div className="relative w-11 shrink-0">
+        <div className="flex h-11 w-11 select-none items-center justify-center rounded-lg bg-surface-container text-lg font-bold text-primary ring-1 ring-outline/60">
           {agent.name.charAt(0).toUpperCase()}
         </div>
         <span
@@ -110,76 +111,50 @@ export function AgentCard({
         />
       </div>
 
-      {/* ── Name + type badge (under name) ──────────────── */}
       <div className="min-w-0 flex-1">
-        <h3 className="text-[14px] font-bold text-on-surface truncate leading-tight">
+        <h3 className="truncate text-sm font-semibold tracking-normal text-on-surface">
           {agent.name}
         </h3>
-
-        {/* Type badge — sits directly under the name, small dot + label */}
-        <span
-          className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${typeBadge.classes}`}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80 shrink-0" />
-          {typeBadge.label}
-        </span>
+        <p className="mt-1 line-clamp-2 max-w-3xl text-sm leading-6 text-on-surface-variant/70">
+          {agent.description || t("agents.noInstructions")}
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${typeBadge.classes}`}
+          >
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80" />
+            {typeBadge.label}
+          </span>
+          <span className="rounded-full bg-surface-container px-2.5 py-1 text-xs font-semibold text-on-surface-variant ring-1 ring-outline/50">
+            {stateLabel}
+          </span>
+        </div>
       </div>
 
-      {/* ── Description ────────────────────────────────── */}
-      <p className="hidden md:block self-center w-[260px] lg:w-[340px] shrink-0 text-[12px] leading-relaxed text-on-surface-variant/60 line-clamp-2">
-        {agent.description || t("agents.noInstructions")}
-      </p>
-
-      {/* ── Status label ───────────────────────────────── */}
-      <div className="hidden lg:flex self-center flex-col w-[72px] shrink-0">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/30">
-          {t("common.status")}
+      <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:col-start-2 sm:w-auto sm:justify-start lg:col-start-auto lg:flex-nowrap lg:justify-end">
+        <span className="sr-only">
+          {t("common.status")}: {stateLabel}
         </span>
-        <span className="text-[11px] font-bold text-on-surface-variant/70 mt-0.5">
-          {stateLabel}
-        </span>
-      </div>
-
-      {/* ── Actions ────────────────────────────────────── */}
-      <div className="flex items-center gap-2 shrink-0 ml-auto">
-        {/* On/Off toggle */}
         <button
+          type="button"
           onClick={() => onStatusToggle(agent)}
           disabled={toggleDisabled}
+          aria-pressed={isActive}
           aria-label={isActive ? t("common.off") : t("common.on")}
-          className={`relative h-[26px] w-[52px] shrink-0 rounded-full transition-all duration-300 focus:outline-none disabled:opacity-40 ${
-            isActive ? "bg-primary" : "bg-surface-container-highest"
+          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40 ${
+            isActive ? "bg-on-surface" : "bg-surface-container-high"
           }`}
         >
-          {/* ON / OFF labels inside track */}
-          <div className="absolute inset-0 flex items-center justify-between px-2.5 select-none pointer-events-none">
-            <span
-              className={`text-[9px] font-black tracking-wider transition-opacity duration-300 ${
-                isActive ? "text-white opacity-100" : "opacity-0"
-              }`}
-            >
-              {t("common.on").toUpperCase()}
-            </span>
-            <span
-              className={`text-[9px] font-black tracking-wider transition-opacity duration-300 ${
-                !isActive ? "text-white opacity-100" : "opacity-0"
-              }`}
-            >
-              {t("common.off").toUpperCase()}
-            </span>
-          </div>
-          {/* Thumb */}
           <span
-            className={`absolute top-1 left-1 h-[18px] w-[18px] rounded-full bg-surface-container-lowest shadow-[0_2px_4px_rgba(0,0,0,0.24)] transition-all duration-300 ease-in-out ${
-              isActive ? "translate-x-[26px]" : "translate-x-0"
+            className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-surface-container-lowest shadow-[0_1px_3px_rgba(15,23,42,0.22)] transition-transform ${
+              isActive ? "translate-x-5" : "translate-x-0"
             }`}
           />
         </button>
 
-        {/* Builder / open link — visible on hover */}
         <Link
           href={primaryHref}
-          className="signature-gradient flex h-9 items-center justify-center rounded-xl px-3.5 text-[11px] font-bold opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0 duration-200"
+          className="inline-flex h-9 items-center justify-center rounded-lg border border-outline bg-surface-container-lowest px-3.5 text-sm font-semibold text-on-surface transition-colors hover:border-on-surface/15 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {agent.surface === "automation"
             ? t("agents.builder")
@@ -188,18 +163,24 @@ export function AgentCard({
               : t("common.open")}
         </Link>
 
-        {/* Preview link — hidden for automation */}
+        <Link
+          href={activityHref}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-outline bg-surface-container-lowest px-3.5 text-sm font-semibold text-on-surface transition-colors hover:border-on-surface/15 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Activity className="h-3.5 w-3.5 text-primary" />
+          {t("agents.viewActivity")}
+        </Link>
+
         {agent.surface !== "automation" ? (
           <Link
             href={`/agents/${agent.id}/preview`}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/10 text-on-surface-variant hover:bg-surface-container transition-all opacity-0 group-hover:opacity-100 duration-200"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-outline text-on-surface-variant transition-colors hover:border-on-surface/15 hover:bg-surface-container-low hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             title={t("agents.preview")}
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </Link>
         ) : null}
 
-        {/* Archive / delete overflow menu */}
         <EntityActionsMenu
           onArchiveToggle={() => onArchiveToggle(agent)}
           archiveLabel={agent.archived_at ? t("common.restore") : t("common.archive")}
@@ -208,9 +189,9 @@ export function AgentCard({
           deleteDisabled={
             isBusy || !agent.archived_at || membershipRole !== "owner"
           }
-          buttonClassName="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/10 text-on-surface-variant/40 hover:bg-surface-container hover:text-on-surface transition-all"
+          buttonClassName="flex h-9 w-9 items-center justify-center rounded-lg border border-outline text-on-surface-variant hover:border-on-surface/15 hover:bg-surface-container-low hover:text-on-surface transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         />
       </div>
-    </div>
+    </article>
   );
 }

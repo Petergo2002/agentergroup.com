@@ -10,6 +10,7 @@ Practical instructions for common tasks:
 - **[Agent Builder](./guides/agent-builder.md)** - How the flow-based builder works.
 - **[Agent Library](./guides/agent-builder.md#agent-library)** - How verified agent templates are submitted, reviewed, and imported.
 - **[Automation Agents](./guides/automation-agents.md)** - How external triggers, activation, Activity, and tool execution work.
+- **[Analytics Architecture](./architecture/core.md#analytics-architecture)** - Workspace conversation analytics and automation performance reporting.
 - **[Knowledge Base](./architecture/core.md#knowledge-base-architecture)** - Multi-page website scraping, sitemap mapping, and document ingestion.
 - **[Supabase Runtime Keys](./architecture/core.md#supabase-edge-functions)** - Current `sb_secret_...` admin-key setup and Edge Function auth expectations.
 - **[Adding Integrations](./guides/adding-integrations.md)** - Guide for extending toolkits.
@@ -29,4 +30,4 @@ Public-facing legal and auth pages:
 - `/invite/accept` — Public workspace invite acceptance page (unauthenticated-friendly; moved from the `(app)` route group)
 
 ---
-*Last updated: June 22, 2026.*
+*Last updated: June 24, 2026.*

@@ -67,7 +67,7 @@ function getLeadInitials(name: string) {
  */
 function LeadsTableSkeleton() {
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-outline-variant/15 bg-surface-container-lowest shadow-premium">
+    <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
       <div className="hidden h-14 animate-pulse border-b border-outline-variant/10 bg-surface-container-low md:block" />
       {Array.from({ length: 6 }).map((_, index) => (
         <div
@@ -86,22 +86,18 @@ function LeadsEmptyState({ hasSearch }: { hasSearch: boolean }) {
   const { t } = useLanguage();
 
   return (
-    <section className="relative overflow-hidden rounded-[2.5rem] border border-outline-variant/15 bg-surface-container-lowest px-6 py-24 text-center shadow-premium sm:px-10">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/[0.08] via-transparent to-transparent" />
-      <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
-        <div className="absolute inset-0 animate-ping rounded-full bg-primary/20 duration-1000" />
-        <div className="relative flex h-full w-full items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 to-transparent text-primary shadow-lg shadow-primary/10 backdrop-blur-md">
-          {hasSearch ? (
-            <Search className="h-8 w-8" strokeWidth={1.8} />
-          ) : (
-            <UserCheck className="h-8 w-8" strokeWidth={1.8} />
-          )}
-        </div>
+    <section className="rounded-2xl border border-dashed border-outline-variant/25 bg-surface-container-lowest px-6 py-16 text-center shadow-sm sm:px-10">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant ring-1 ring-outline-variant/15">
+        {hasSearch ? (
+          <Search className="h-5 w-5" strokeWidth={2} />
+        ) : (
+          <UserCheck className="h-5 w-5" strokeWidth={2} />
+        )}
       </div>
-      <h2 className="relative mt-8 font-headline text-2xl font-bold tracking-tight text-on-surface">
+      <h2 className="text-base font-semibold tracking-normal text-on-surface">
         {hasSearch ? t("leads.noSearchResultsTitle") : t("leads.noLeadsTitle")}
       </h2>
-      <p className="relative mx-auto mt-3 max-w-lg text-sm leading-6 text-on-surface-variant/70">
+      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-on-surface-variant/70">
         {hasSearch ? t("leads.noSearchResultsDescription") : t("leads.noLeadsDescription")}
       </p>
     </section>
@@ -150,22 +146,21 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
         role="dialog"
         aria-modal="true"
         aria-labelledby="lead-detail-title"
-        className="absolute inset-y-0 right-0 flex w-full max-w-lg flex-col border-l border-white/10 bg-surface-container-lowest/80 shadow-2xl backdrop-blur-3xl animate-in slide-in-from-right duration-500 ease-out"
+        className="absolute inset-y-0 right-0 flex w-full max-w-lg flex-col border-l border-outline-variant/15 bg-surface-container-lowest shadow-2xl animate-in slide-in-from-right duration-300 ease-out"
       >
-        <div className="relative overflow-hidden border-b border-outline-variant/10 px-5 pb-6 pt-5 sm:px-8 sm:pt-8">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.12] via-transparent to-transparent" />
-          <div className="relative flex items-start justify-between gap-4">
+        <div className="border-b border-outline-variant/10 bg-surface px-5 pb-6 pt-5 sm:px-8 sm:pt-8">
+          <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 text-lg font-bold text-primary ring-1 ring-primary/20 shadow-inner">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-surface-container-low text-base font-semibold text-on-surface ring-1 ring-outline-variant/15">
                 {getLeadInitials(lead.name)}
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80">
+                <p className="text-xs font-semibold text-on-surface-variant/60">
                   {t("leads.detailsTitle")}
                 </p>
                 <h2
                   id="lead-detail-title"
-                  className="mt-1 truncate font-headline text-2xl font-bold tracking-tight text-on-surface"
+                  className="mt-1 truncate text-xl font-semibold tracking-normal text-on-surface"
                 >
                   {lead.name}
                 </h2>
@@ -183,7 +178,7 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
           </div>
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6 sm:px-8">
+        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
           <LeadAiSummaryCard
             leadId={lead.id}
             summary={lead.ai_summary}
@@ -195,7 +190,7 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
             {lead.email ? (
               <a
                 href={`mailto:${lead.email}`}
-                className="flex items-center gap-3 rounded-[1.25rem] border border-white/5 bg-surface-container-low/50 p-4 text-sm text-on-surface shadow-sm backdrop-blur-md transition-all hover:scale-[1.02] hover:bg-primary/[0.04] hover:shadow-md"
+                className="flex items-center gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 text-sm text-on-surface shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-on-surface/[0.04] text-primary">
                   <Mail className="h-4 w-4" />
@@ -206,7 +201,7 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
             {lead.phone ? (
               <a
                 href={`tel:${lead.phone}`}
-                className="flex items-center gap-3 rounded-[1.25rem] border border-white/5 bg-surface-container-low/50 p-4 text-sm text-on-surface shadow-sm backdrop-blur-md transition-all hover:scale-[1.02] hover:bg-primary/[0.04] hover:shadow-md"
+                className="flex items-center gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 text-sm text-on-surface shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-on-surface/[0.04] text-primary">
                   <Phone className="h-4 w-4" />
@@ -216,8 +211,8 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
             ) : null}
           </section>
 
-          <section className="rounded-[1.5rem] border border-white/5 bg-surface-container-low/50 p-5 shadow-inner backdrop-blur-md">
-            <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/60">
+          <section className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+            <h3 className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
               <MessageSquareText className="h-3.5 w-3.5 text-primary" />
               {t("leads.messageLabel")}
             </h3>
@@ -227,16 +222,16 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
           </section>
 
           <section className="grid grid-cols-2 gap-4">
-            <div className="rounded-[1.25rem] border border-white/5 bg-surface-container-low/50 p-5 shadow-sm backdrop-blur-md transition-colors hover:bg-surface-container-low">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/50">
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
+              <p className="text-xs font-medium text-on-surface-variant/65">
                 {t("leads.widgetLabel")}
               </p>
               <p className="mt-2 truncate text-sm font-semibold text-on-surface">
                 {lead.widget_name}
               </p>
             </div>
-            <div className="rounded-[1.25rem] border border-white/5 bg-surface-container-low/50 p-5 shadow-sm backdrop-blur-md transition-colors hover:bg-surface-container-low">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/50">
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
+              <p className="text-xs font-medium text-on-surface-variant/65">
                 {t("leads.agentLabel")}
               </p>
               <p className="mt-2 truncate text-sm font-semibold text-on-surface">
@@ -245,8 +240,8 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
             </div>
           </section>
 
-          <section className="flex items-center justify-between rounded-[1.25rem] border border-white/5 bg-surface-container-low/50 p-5 shadow-sm backdrop-blur-md">
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/55">
+          <section className="flex items-center justify-between rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
+            <h3 className="text-xs font-medium text-on-surface-variant/65">
               {t("leads.capturedLabel")}
             </h3>
             <p className="text-sm font-medium text-on-surface">
@@ -256,12 +251,12 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
         </div>
 
         {lead.widget_session_id ? (
-          <div className="border-t border-outline-variant/10 bg-surface-container-lowest/50 p-5 backdrop-blur-md sm:p-8">
+          <div className="border-t border-outline-variant/10 bg-surface-container-lowest p-5 sm:p-8">
             <Link
               href={`/analytics?session=${encodeURIComponent(lead.widget_session_id)}`}
-              className="group flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-orange-500 px-5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/30 active:scale-[0.98]"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-on-surface px-5 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <MessageSquareText className="h-5 w-5 transition-transform group-hover:scale-110" />
+              <MessageSquareText className="h-4 w-4" />
               {t("leads.openConversation")}
             </Link>
           </div>
@@ -327,30 +322,31 @@ export default function LeadsPageClient({
   return (
     <div
       key={workspaceId}
-      className="mx-auto w-full max-w-[1440px] space-y-8 px-4 py-8 animate-in fade-in duration-500 sm:px-6 lg:px-12 lg:py-12"
+      className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8"
     >
-      <header className="relative overflow-hidden rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest px-6 py-8 shadow-premium sm:px-8 lg:px-10">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.06] via-transparent to-primary/[0.04]" />
-        <div className="pointer-events-none absolute right-0 top-0 h-[300px] w-[300px] -translate-y-1/2 translate-x-1/2 rounded-full bg-primary/10 blur-[80px]" />
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              {displayedWorkspaceName}
+      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/8 px-2.5 py-1 text-primary">
+              <UserCheck className="h-3.5 w-3.5" strokeWidth={2.2} />
+              <span className="text-xs font-semibold">{t("leads.badge")}</span>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <h1 className="font-headline text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">
+              <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
                 {t("leads.title")}
               </h1>
-              <span className="rounded-full border border-primary/15 bg-primary/[0.08] px-3 py-1 text-xs font-bold text-primary">
+              <span className="rounded-full border border-primary/15 bg-primary/[0.08] px-2.5 py-1 text-xs font-semibold text-primary">
                 {t("leads.capturedCount", { count: leads?.length ?? 0 })}
               </span>
             </div>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-on-surface-variant/70">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
               {t("leads.pageDescription")}
             </p>
+            <p className="mt-2 truncate text-xs font-medium text-on-surface-variant/60">
+              {displayedWorkspaceName}
+            </p>
           </div>
-          <div className="flex items-center gap-2 text-xs font-medium text-on-surface-variant/60">
+          <div className="inline-flex h-10 items-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-medium text-on-surface-variant">
             <span
               className={`h-2 w-2 rounded-full ${
                 isValidating ? "animate-pulse bg-primary" : "bg-success"
@@ -378,8 +374,8 @@ export default function LeadsPageClient({
       {isLoading && !leads ? (
         <LeadsTableSkeleton />
       ) : error ? (
-        <section className="rounded-[2rem] border border-error/15 bg-error/[0.04] px-6 py-16 text-center">
-          <h2 className="font-headline text-xl font-bold text-on-surface">
+        <section className="rounded-2xl border border-error/15 bg-error/[0.04] px-6 py-16 text-center">
+          <h2 className="text-base font-semibold tracking-normal text-on-surface">
             {t("leads.loadErrorTitle")}
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-on-surface-variant/70">
@@ -398,7 +394,7 @@ export default function LeadsPageClient({
         <LeadsEmptyState hasSearch={hasSearch} />
       ) : (
         <section className="space-y-4">
-          <div className="hidden gap-4 px-6 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/55 md:grid md:grid-cols-[1.15fr_1.35fr_0.9fr_0.75fr] lg:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.75fr] xl:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.9fr_0.75fr]">
+          <div className="hidden gap-4 px-4 py-2 text-xs font-semibold text-on-surface-variant/65 md:grid md:grid-cols-[1.15fr_1.35fr_0.9fr_0.75fr] lg:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.75fr] xl:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.9fr_0.75fr]">
             <span>{t("leads.nameLabel")}</span>
             <span>{t("leads.emailLabel")}</span>
             <span className="hidden lg:block">{t("leads.phoneLabel")}</span>
@@ -411,9 +407,8 @@ export default function LeadsPageClient({
             {leads.map((lead) => (
               <div
                 key={lead.id}
-                className="group relative overflow-hidden rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-xl hover:shadow-primary/5"
+                className="group relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low/45"
               >
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-primary/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 <button
                   type="button"
                   aria-label={t("leads.openLeadDetails", { name: lead.name })}
@@ -423,7 +418,7 @@ export default function LeadsPageClient({
 
                 <div className="pointer-events-none relative z-10 px-5 py-5 md:grid md:grid-cols-[1.15fr_1.35fr_0.9fr_0.75fr] md:items-center md:gap-4 md:px-6 md:py-4 lg:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.75fr] xl:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.9fr_0.75fr]">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 text-xs font-bold text-primary ring-1 ring-primary/20 shadow-inner transition-transform duration-300 group-hover:scale-110 group-hover:shadow-primary/20">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary ring-1 ring-primary/15">
                       {getLeadInitials(lead.name)}
                     </div>
                     <div className="min-w-0">
@@ -439,7 +434,7 @@ export default function LeadsPageClient({
                       href={`mailto:${lead.email}`}
                       className="pointer-events-auto mt-4 flex min-w-0 items-center gap-2 text-sm text-on-surface-variant transition-colors hover:text-primary md:mt-0"
                     >
-                      <Mail className="h-4 w-4 shrink-0 text-primary/40 transition-colors duration-300 group-hover:text-primary md:hidden lg:block lg:opacity-0 lg:-translate-x-2 lg:group-hover:translate-x-0 lg:group-hover:opacity-100" />
+                      <Mail className="h-4 w-4 shrink-0 text-primary/55 md:hidden lg:block" />
                       <span className="truncate">{lead.email}</span>
                     </a>
                   ) : (
@@ -452,7 +447,7 @@ export default function LeadsPageClient({
                         href={`tel:${lead.phone}`}
                         className="pointer-events-auto flex items-center gap-2 truncate text-sm text-on-surface-variant transition-colors hover:text-primary"
                       >
-                        <Phone className="h-4 w-4 shrink-0 text-primary/40 opacity-0 -translate-x-2 transition-all duration-300 group-hover:translate-x-0 group-hover:text-primary group-hover:opacity-100" />
+                        <Phone className="h-4 w-4 shrink-0 text-primary/55" />
                         {lead.phone}
                       </a>
                     ) : (

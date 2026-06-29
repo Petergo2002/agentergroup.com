@@ -85,14 +85,14 @@ export function SourceTable({
 
   if (sources.length === 0 && folders.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl bg-surface-container-low/50 px-6 py-20 text-center ring-1 ring-inset ring-outline-variant/10">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-container text-on-surface-variant/40">
-          <FileText className="h-8 w-8" />
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant/25 bg-surface-container-lowest px-6 py-16 text-center shadow-sm">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant ring-1 ring-outline-variant/15">
+          <FileText className="h-5 w-5" />
         </div>
-        <h3 className="mt-6 text-lg font-bold text-on-surface">
+        <h3 className="mt-4 text-base font-semibold tracking-normal text-on-surface">
           {emptyTitle ?? t("knowledge.noSourcesFound")}
         </h3>
-        <p className="mt-2 max-w-sm text-sm text-on-surface-variant/70 text-balance">
+        <p className="mt-2 max-w-sm text-sm leading-6 text-on-surface-variant/70 text-balance">
           {emptyDescription ?? t("knowledge.connectDriveStatus")}
         </p>
       </div>
@@ -100,11 +100,11 @@ export function SourceTable({
   }
 
   return (
-    <div className="group/table relative overflow-hidden rounded-2xl bg-surface-container-low shadow-sm ring-1 ring-outline-variant/10">
+    <div className="group/table relative overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
       <div className="overflow-x-auto font-label">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-surface-container/60 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
+            <tr className="bg-surface-container-low text-xs font-semibold text-on-surface-variant/80">
               {selectable ? (
                 <th className="w-12 px-6 py-5">
                   <input
@@ -132,7 +132,7 @@ export function SourceTable({
               return (
                 <tr
                   key={`folder-${folder.id}`}
-                  className="group/row transition-all hover:bg-surface-container-lowest active:bg-surface-container-high/20"
+                  className="group/row transition-colors hover:bg-surface-container-low/60 active:bg-surface-container-high/20"
                 >
                   {selectable ? <td className="px-6 py-4" /> : null}
                   <td className="px-6 py-4">
@@ -146,7 +146,7 @@ export function SourceTable({
                         <Folder className="h-4.5 w-4.5" />
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-on-surface tracking-tight">
+                        <p className="truncate text-sm font-semibold tracking-normal text-on-surface">
                           {folder.name}
                         </p>
                         <p className="mt-0.5 truncate text-[11px] text-on-surface-variant/60">
@@ -156,12 +156,12 @@ export function SourceTable({
                     </button>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
+                    <span className="inline-flex rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
                       {t("knowledge.folderType")}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className="inline-flex rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                    <span className="inline-flex rounded-full bg-surface-container px-2.5 py-1 text-xs font-semibold text-on-surface-variant">
                       {t("knowledge.folderSourceCountShort", { count: folder.sourceIds.length })}
                     </span>
                   </td>
@@ -211,7 +211,7 @@ export function SourceTable({
               return (
                 <tr 
                   key={source.id} 
-                  className="group/row transition-all hover:bg-surface-container-lowest active:bg-surface-container-high/20"
+                  className="group/row transition-colors hover:bg-surface-container-low/60 active:bg-surface-container-high/20"
                 >
                   {selectable ? (
                     <td className="px-6 py-4">
@@ -234,7 +234,7 @@ export function SourceTable({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-on-surface tracking-tight">
+                        <p className="truncate text-sm font-semibold tracking-normal text-on-surface">
                           {source.name}
                         </p>
                         <p className="mt-0.5 truncate text-[11px] text-on-surface-variant/60">
@@ -246,34 +246,34 @@ export function SourceTable({
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex rounded-lg bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                    <span className="inline-flex rounded-lg bg-surface-container px-2.5 py-1 text-xs font-semibold text-on-surface-variant">
                       {source.source_type}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold transition-all">
+                    <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors">
                       {status === "ready" && (
                         <>
                           <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                          <span className="text-success uppercase tracking-wider">{t("statuses.knowledge.ready")}</span>
+                          <span className="text-success">{t("statuses.knowledge.ready")}</span>
                         </>
                       )}
                       {status === "processing" && (
                         <>
                           <Clock className="h-3.5 w-3.5 text-primary animate-pulse" />
-                          <span className="text-primary uppercase tracking-wider">{t("statuses.knowledge.syncing")}</span>
+                          <span className="text-primary">{t("statuses.knowledge.syncing")}</span>
                         </>
                       )}
                       {status === "pending" && (
                         <>
                           <Clock className="h-3.5 w-3.5 text-on-surface-variant animate-pulse" />
-                          <span className="text-on-surface-variant uppercase tracking-wider">{t("statuses.knowledge.pending")}</span>
+                          <span className="text-on-surface-variant">{t("statuses.knowledge.pending")}</span>
                         </>
                       )}
                       {status === "failed" && (
                         <>
                           <AlertCircle className="h-3.5 w-3.5 text-error" />
-                          <span className="text-error uppercase tracking-wider">{t("statuses.knowledge.failed")}</span>
+                          <span className="text-error">{t("statuses.knowledge.failed")}</span>
                         </>
                       )}
                     </div>

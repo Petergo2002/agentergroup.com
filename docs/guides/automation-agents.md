@@ -1,6 +1,6 @@
 # Automation Agents
 
-Last updated: 2026-06-22
+Last updated: 2026-06-24
 
 ## Purpose
 
@@ -145,17 +145,33 @@ They do not use chat preview.
 
 Activity reads the automation endpoint and shows:
 
-- automation status
-- selected trigger
-- selected account
-- webhook/provider readiness
-- an event-centered activity timeline
-- trigger context without rendering the raw email body
-- the operational decision (`action_taken`, `no_action`, `needs_input`, or `action_failed`)
-- actions attempted and their verified tool outcomes
-- the operator-facing run summary
-- event/runtime status and technical run steps
-- clear error and missing-information states
+- a compact health/status bar for automation status, trigger/account readiness, and the latest event
+- a primary run/event list for the selected automation agent
+- received time, trigger label, safe trigger context, event status, AI decision, action result, and error state
+- a selected run detail view with trigger context, AI decision and reason, generated message preview, verified actions, final outcome, missing information, and runtime errors
+- collapsed diagnostics for event id, external event id, run id, runtime status, run steps, and provider trigger health
+- clear empty, loading, setup, and error states
+
+Activity is intentionally per-agent and operational. It should answer:
+
+- what happened
+- whether it worked
+- what the operator needs to fix
+
+It should not become the workspace reporting surface. Broad totals, trends, and cross-agent comparisons belong in Analytics.
+
+### Analytics
+
+Analytics is the workspace-level reporting surface for:
+
+- conversation analytics
+- lead and message metrics
+- agent, widget, date-range, and status filters
+- automation event/run summaries
+- success and failure trends
+- recent automation failures that link back to the relevant `/agents/[id]/activity?event=[eventId]` investigation view
+
+Automation Analytics can show totals such as received events, processed events, failed events, no-action decisions, action-taken decisions, needs-input decisions, and recent failures. It must not expose raw provider payloads or raw email bodies. Detailed run steps and provider diagnostics stay in Activity behind the selected run detail.
 
 ## Runtime Flow
 
@@ -245,13 +261,15 @@ The executor stores a versioned `automationResult` object inside `runs.output`:
 - `summary`
 - `reason`
 - `missingInformation`
+- optional `generatedMessage` with bounded message type, recipient, subject, and body preview fields
 - normalized `actions` with success/failure and safe provider identifiers
 
 The parser accepts the required JSON report and keeps legacy free-form summaries readable. It
 bounds all operator-facing fields and gives verified runtime/tool evidence precedence over the
 model's claimed decision. Failed-action details are extracted only from error fields and redact
 email addresses, credentials, and URLs; unrelated raw tool payload fields are not copied into the
-operational result. Production persistence separately removes raw tool payloads and debug traces.
+operational result. Generated-message previews preserve readable line breaks for Activity but stay
+bounded and nullable. Production persistence separately removes raw tool payloads and debug traces.
 
 Activity reads `automationResult` when present. For runs created before version 1 was introduced,
 it derives the same display model from the legacy assistant summary, redacted tool messages, and run
@@ -444,9 +462,11 @@ Use this checklist when changing automation behavior:
 - [ ] Provider trigger health is visible and a missing provider trigger is recreated on activation.
 - [ ] Executor ignores archived or inactive automation agents.
 - [ ] Executor stores a versioned operational result and production-safe tool output.
+- [ ] `automationResult.generatedMessage` stores only bounded preview fields and preserves paragraph breaks.
 - [ ] Model text cannot claim `action_taken` without a successful tool result.
 - [ ] Failed action details do not copy unrelated raw tool payload fields.
-- [ ] Activity shows the event-centered decision, actions, summary, run steps, and errors.
+- [ ] Activity shows the event-centered decision, generated message, actions, summary, run steps, and errors.
+- [ ] Analytics shows automation totals, trends, and recent failures without raw provider payloads or raw email bodies.
 - [ ] Activity still renders legacy runs that do not contain `automationResult`.
 - [ ] Archive disables provider trigger.
 - [ ] Delete deletes provider trigger.

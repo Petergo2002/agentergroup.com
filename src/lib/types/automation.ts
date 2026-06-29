@@ -16,6 +16,13 @@ export interface AutomationActionResult {
   messageId: string | null;
 }
 
+export interface AutomationGeneratedMessage {
+  type: "email" | "reply" | "message";
+  to: string | null;
+  subject: string | null;
+  body: string | null;
+}
+
 export interface AutomationRunResult {
   version: 1;
   decision: AutomationDecision;
@@ -23,6 +30,7 @@ export interface AutomationRunResult {
   reason: string;
   missingInformation: string[];
   actions: AutomationActionResult[];
+  generatedMessage: AutomationGeneratedMessage | null;
 }
 
 export interface ComposioTriggerHealth {

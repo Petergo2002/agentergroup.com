@@ -1,6 +1,6 @@
 # Agent Builder
 
-Last updated: 2026-06-07
+Last updated: 2026-06-24
 
 ## Purpose
 
@@ -33,6 +33,11 @@ The builder is the editing surface for configuring an agent's:
 - published version history
 
 The current builder is intentionally narrow. It is not a general workflow engine.
+It is also not a reporting surface:
+
+- Builder configures the agent and its trigger/tools.
+- Activity shows per-agent automation run history and troubleshooting.
+- Analytics shows workspace-level performance, trends, and reporting.
 
 ## Route and Main Files
 
@@ -198,6 +203,7 @@ Important current behavior:
   - `ai_decides`
   - `specific_email`
 - when Gmail or Outlook uses `specific_email`, the node stores the hidden fixed recipient on the draft definition and runtime enforces it server-side
+- Gmail fixed-recipient mode removes reply-to-thread execution because a hidden fixed recipient cannot safely be combined with an external source thread
 - Slack, HubSpot, Shopify, and Google Ads expose the shared connected-account display and action editor; they do not add per-node settings yet
 - Google Calendar exposes one selected booking calendar and resolves the booking timezone from that calendar
 - Cal.com exposes a scheduling mode: `ai_decides` or `specific_event_type`
@@ -268,6 +274,7 @@ Default recommended actions:
 
 - Gmail:
   - `Send Email`
+  - `Reply To Thread`
 - Microsoft Outlook:
   - `Send Email`
 - Slack:

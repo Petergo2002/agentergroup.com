@@ -41,12 +41,16 @@ export async function POST(
 
   const context = await ensureWorkspaceContext(supabase as never, user);
 
-  const { data: agent } = await supabase
+  const { data: agent, error: agentError } = await supabase
     .from("agents")
     .select("*")
     .eq("id", agentId)
     .eq("workspace_id", context.workspace.id)
     .maybeSingle();
+
+  if (agentError) {
+    return NextResponse.json({ error: agentError.message }, { status: 500 });
+  }
 
   if (!agent || agent.surface !== "automation") {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
@@ -179,13 +183,17 @@ export async function POST(
     return NextResponse.json({ error: "Select a Gmail connection before activating." }, { status: 400 });
   }
 
-  const { data: connection } = await supabase
+  const { data: connection, error: connectionError } = await supabase
     .from("connections")
     .select("id, external_id, toolkit_data, status, toolkit_slug, workspace_id")
     .eq("id", automationRecord.connection_id)
     .eq("workspace_id", context.workspace.id)
     .eq("toolkit_slug", "gmail")
     .maybeSingle();
+
+  if (connectionError) {
+    return NextResponse.json({ error: connectionError.message }, { status: 500 });
+  }
 
   if (!connection || connection.status !== "connected") {
     return NextResponse.json({ error: "Select a connected Gmail account." }, { status: 400 });

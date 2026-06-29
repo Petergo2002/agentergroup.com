@@ -47,6 +47,14 @@ import { formatRelativeDate } from "@/lib/utils";
 
 const ACCEPTED_FILE_TYPES = [...SUPPORTED_KNOWLEDGE_MIME_TYPES, ...SUPPORTED_KNOWLEDGE_EXTENSIONS].join(",");
 
+const formLabelClass = "ml-1 text-sm font-medium text-on-surface-variant";
+const formControlClass =
+  "w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/45 focus:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
+const primaryActionClass =
+  "inline-flex h-11 items-center justify-center rounded-xl bg-on-surface px-5 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 disabled:opacity-50";
+const secondaryActionClass =
+  "inline-flex h-10 items-center justify-center rounded-xl border border-outline-variant/15 px-4 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:opacity-50";
+
 type InputTab = "text" | "file" | "drive" | "website" | null;
 
 export default function KnowledgePageClient({
@@ -792,12 +800,12 @@ export default function KnowledgePageClient({
     value: string | number,
     colorClass: string,
   ) => (
-    <div className="flex flex-col gap-1 px-4 py-2 border-r border-outline-variant/10 last:border-0">
+    <div className="flex min-w-24 flex-col gap-1 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3 shadow-sm">
       <div className="flex items-center gap-1.5">
         <Icon className={`h-[15px] w-[15px] ${colorClass}`} />
-        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">{label}</span>
+        <span className="text-xs font-medium text-on-surface-variant/70">{label}</span>
       </div>
-      <span className="text-sm font-bold text-on-surface">{value}</span>
+      <span className="text-2xl font-bold tabular-nums text-on-surface">{value}</span>
     </div>
   );
 
@@ -810,7 +818,7 @@ export default function KnowledgePageClient({
       <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+            <label className="text-sm font-medium text-on-surface-variant">
               {t("knowledge.targetFolder")}
             </label>
             <p className="mt-1 text-xs text-on-surface-variant/60">
@@ -849,66 +857,67 @@ export default function KnowledgePageClient({
   const moveTargetFolders = folders.filter((folder) => folder.id !== selectedFolder?.id);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-10 font-label">
-      {/* Editorial Header */}
-      <header className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between border-b border-outline-variant/10 pb-10">
-        <div className="max-w-xl">
-          <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-primary-container/10 text-primary-container mb-4">
-            <BookOpenText className="h-[14px] w-[14px]" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">{t("knowledge.badge")}</span>
-          </div>
-          <h1 className="font-headline text-[2.5rem] font-bold leading-[1.1] text-on-surface tracking-tight">
-            {t("knowledge.title")}
-          </h1>
-          <p className="mt-4 text-[13px] font-medium leading-relaxed text-on-surface-variant/80 max-w-lg">
-            {t("knowledge.description")}
-          </p>
-          
-          <div className="mt-8 space-y-2 max-w-[320px]">
-            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/60">
-              <span className="flex items-center gap-1.5">
-                <Database className="h-3 w-3" />
-                Knowledge Storage
-              </span>
-              <span>{storageStats.usedMB} MB / {storageStats.limitMB} MB</span>
+    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/8 px-2.5 py-1 text-primary">
+              <BookOpenText className="h-3.5 w-3.5" strokeWidth={2.2} />
+              <span className="text-xs font-semibold">{t("knowledge.badge")}</span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container">
-              <div 
-                className={`h-full transition-all duration-500 ${storageStats.percent > 90 ? 'bg-error' : 'bg-primary'}`}
-                style={{ width: `${storageStats.percent}%` }}
-              />
+            <h1 className="mt-3 text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
+              {t("knowledge.title")}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
+              {t("knowledge.description")}
+            </p>
+
+            <div className="mt-5 max-w-sm space-y-2">
+              <div className="flex items-center justify-between text-xs font-medium text-on-surface-variant/70">
+                <span className="flex items-center gap-1.5">
+                  <Database className="h-3 w-3" />
+                  Knowledge Storage
+                </span>
+                <span>{storageStats.usedMB} MB / {storageStats.limitMB} MB</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container">
+                <div
+                  className={`h-full transition-all duration-500 ${storageStats.percent > 90 ? "bg-error" : "bg-primary"}`}
+                  style={{ width: `${storageStats.percent}%` }}
+                />
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="flex rounded-2xl bg-surface-container-low/40 p-1 ring-1 ring-outline-variant/5">
-          {renderStatPill(FolderOpen, t("knowledge.total"), stats.total, "text-on-surface-variant")}
-          {renderStatPill(CheckCircle2, t("knowledge.ready"), stats.ready, "text-success")}
-          {renderStatPill(RefreshCw, t("knowledge.syncing"), stats.processing, "text-primary")}
-          {renderStatPill(TriangleAlert, t("knowledge.failed"), stats.failed, "text-error")}
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {renderStatPill(FolderOpen, t("knowledge.total"), stats.total, "text-on-surface-variant")}
+            {renderStatPill(CheckCircle2, t("knowledge.ready"), stats.ready, "text-success")}
+            {renderStatPill(RefreshCw, t("knowledge.syncing"), stats.processing, "text-primary")}
+            {renderStatPill(TriangleAlert, t("knowledge.failed"), stats.failed, "text-error")}
+          </div>
         </div>
       </header>
 
-      {/* Add Knowledge Section */}
       <section className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">
+          <h2 className="text-sm font-semibold text-on-surface">
             {t("knowledge.addKnowledgeSource")}
           </h2>
-          <div className="h-[1px] flex-1 bg-outline-variant/10 ml-4" />
         </div>
 
         {activeTab ? (
-          <div className="rounded-2xl bg-surface-container-low p-8 ring-1 ring-outline-variant/10 admin-fade-in">
+          <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm sm:p-6 lg:p-7">
             <div className="mb-6 flex items-center justify-between border-b border-outline-variant/10 pb-4">
               <div className="flex items-center gap-3">
-                <button 
+                <button
+                  type="button"
                   onClick={() => setActiveTab(null)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-surface-container transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                  aria-label="Back"
                 >
-                  <AppIcon name="arrow_back" className="h-5 w-5" />
+                  <AppIcon name="arrow_back" className="h-4.5 w-4.5" />
                 </button>
-                <h3 className="font-headline text-lg font-bold text-on-surface">
+                <h3 className="text-lg font-semibold text-on-surface">
                   {activeTab === "text" && t("knowledge.writeNewKnowledgeSource")}
                   {activeTab === "file" && t("knowledge.uploadDocument")}
                   {activeTab === "website" && t("knowledge.scrapeWebsite")}
@@ -919,42 +928,42 @@ export default function KnowledgePageClient({
 
             {activeTab === "text" && (
               <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5 focus-within:text-primary transition-colors">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.sourceName")}</label>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className={formLabelClass}>{t("knowledge.sourceName")}</label>
                     <input
                       value={textName}
                       onChange={(event) => setTextName(event.target.value)}
                       placeholder={t("knowledge.sourceNamePlaceholder")}
-                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                      className={formControlClass}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.descriptionOptional")}</label>
+                    <label className={formLabelClass}>{t("knowledge.descriptionOptional")}</label>
                     <input
                       value={textDescription}
                       onChange={(event) => setTextDescription(event.target.value)}
                       placeholder={t("knowledge.sourceDescriptionPlaceholder")}
-                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                      className={formControlClass}
                     />
                   </div>
                 </div>
                 {renderFolderTargetSelect()}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.content")}</label>
+                  <label className={formLabelClass}>{t("knowledge.content")}</label>
                   <textarea
                     value={rawText}
                     onChange={(event) => setRawText(event.target.value)}
                     rows={12}
                     placeholder={t("knowledge.contentPlaceholder")}
-                    className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-4 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                    className={`${formControlClass} leading-relaxed`}
                   />
                 </div>
                 <div className="flex justify-end pt-2">
                   <button
                     onClick={() => void handleCreateTextSource()}
                     disabled={isCreatingText || !textName || !rawText}
-                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:bg-slate-50 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                    className={primaryActionClass}
                   >
                     {isCreatingText ? t("common.processing") : t("knowledge.finishAndSync")}
                   </button>
@@ -964,42 +973,42 @@ export default function KnowledgePageClient({
 
             {activeTab === "website" && (
               <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5 focus-within:text-primary transition-colors">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.sourceName")}</label>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className={formLabelClass}>{t("knowledge.sourceName")}</label>
                     <input
                       value={websiteName}
                       onChange={(event) => setWebsiteName(event.target.value)}
                       placeholder={t("knowledge.sourceNamePlaceholder")}
-                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                      className={formControlClass}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.descriptionOptional")}</label>
+                    <label className={formLabelClass}>{t("knowledge.descriptionOptional")}</label>
                     <input
                       value={websiteDescription}
                       onChange={(event) => setWebsiteDescription(event.target.value)}
                       placeholder={t("knowledge.sourceDescriptionPlaceholder")}
-                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                      className={formControlClass}
                     />
                   </div>
                 </div>
 
                 {renderFolderTargetSelect()}
 
-                <div className="space-y-1.5 focus-within:text-primary transition-colors">
-                  <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.websiteUrl")}</label>
-                  <div className="flex gap-2">
+                <div className="space-y-1.5">
+                  <label className={formLabelClass}>{t("knowledge.websiteUrl")}</label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <input
                       value={websiteUrl}
                       onChange={(event) => setWebsiteUrl(event.target.value)}
                       placeholder={t("knowledge.urlPlaceholder")}
-                      className="flex-1 rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                      className={formControlClass}
                     />
                     <button
                       onClick={() => void handleFindPages()}
                       disabled={isMappingWebsite || !websiteUrl}
-                      className="bg-primary/10 text-primary px-6 rounded-md text-[10px] font-bold uppercase tracking-widest hover:bg-primary/18 transition-all disabled:opacity-50 flex items-center gap-2"
+                      className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary/10 px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/15 disabled:opacity-50"
                     >
                       {isMappingWebsite ? (
                         <>
@@ -1015,46 +1024,46 @@ export default function KnowledgePageClient({
                     </button>
                   </div>
                   {subscription?.plan_tier !== "premium" && (
-                    <p className="text-[10px] text-primary font-medium ml-1 mt-1 flex items-center gap-1">
+                    <p className="ml-1 mt-2 flex items-center gap-1 text-xs font-medium text-primary">
                       <TriangleAlert className="w-3 h-3" />
                       {t("knowledge.premiumOnly")} - {t("knowledge.sitemapRequiredForMulti")}
                     </p>
                   )}
                   {discoveredUrls.length === 0 && (
-                    <p className="text-[10px] text-on-surface-variant/60 ml-1 mt-2 italic">
+                    <p className="ml-1 mt-2 text-xs text-on-surface-variant/65">
                       {t("knowledge.singlePageDirectHint")}
                     </p>
                   )}
                 </div>
 
                 {discoveredUrls.length > 0 && (
-                  <div className="space-y-3 p-4 bg-surface-container rounded-lg border border-outline-variant/20 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-outline-variant/10">
-                      <Database className="w-3 h-3 text-primary" />
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface">
+                  <div className="space-y-3 rounded-2xl border border-outline-variant/15 bg-surface-container p-4">
+                    <div className="mb-2 flex items-center gap-2 border-b border-outline-variant/10 pb-2">
+                      <Database className="h-3.5 w-3.5 text-primary" />
+                      <p className="text-sm font-semibold text-on-surface">
                         {t("knowledge.multiPageMode")}
                       </p>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-2 flex-1">
-                        <Search className="w-3.5 h-3.5 text-on-surface-variant/40" />
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-1 items-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 py-2">
+                        <Search className="h-3.5 w-3.5 text-on-surface-variant/40" />
                         <input
                           value={pageSearch}
                           onChange={(e) => setPageSearch(e.target.value)}
                           placeholder={t("knowledge.searchPages")}
-                          className="bg-transparent text-xs outline-none flex-1"
+                          className="flex-1 bg-transparent text-sm outline-none"
                         />
                       </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => setSelectedUrls(discoveredUrls.slice(0, 30))}
-                          className="text-[9px] font-bold uppercase tracking-wider text-primary hover:underline"
+                          className="text-xs font-semibold text-primary hover:underline"
                         >
                           {t("knowledge.selectAll")}
                         </button>
                         <button
                           onClick={() => setSelectedUrls([])}
-                          className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/60 hover:underline"
+                          className="text-xs font-semibold text-on-surface-variant/70 hover:text-on-surface"
                         >
                           {t("knowledge.deselectAll")}
                         </button>
@@ -1069,7 +1078,7 @@ export default function KnowledgePageClient({
                           return (
                             <label
                               key={url}
-                              className={`flex items-center gap-3 p-2 rounded-md transition-all cursor-pointer ${
+                              className={`flex cursor-pointer items-center gap-3 rounded-xl p-2.5 transition-colors ${
                                 isSelected 
                                   ? "bg-primary/8 text-primary" 
                                   : "hover:bg-surface-container-highest text-on-surface-variant/80"
@@ -1086,9 +1095,9 @@ export default function KnowledgePageClient({
                                     setSelectedUrls([...selectedUrls, url]);
                                   }
                                 }}
-                                className="w-3.5 h-3.5 rounded border-outline-variant/50 text-primary focus:ring-primary/40 transition-all cursor-pointer"
+                                className="h-3.5 w-3.5 cursor-pointer rounded border-outline-variant/50 text-primary transition-all focus:ring-primary/40"
                               />
-                              <span className="text-[11px] truncate flex-1">{url}</span>
+                              <span className="flex-1 truncate text-xs">{url}</span>
                             </label>
                           );
                         })
@@ -1100,7 +1109,7 @@ export default function KnowledgePageClient({
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
-                      <span className={`text-[9px] font-bold uppercase tracking-widest ${selectedUrls.length >= 30 ? "text-error" : "text-primary"}`}>
+                      <span className={`text-xs font-semibold ${selectedUrls.length >= 30 ? "text-error" : "text-primary"}`}>
                         {selectedUrls.length >= 30 ? t("knowledge.maxPagesReached") : t("knowledge.pagesSelected", { count: selectedUrls.length })}
                       </span>
                     </div>
@@ -1108,9 +1117,9 @@ export default function KnowledgePageClient({
                 )}
 
                 {isScrapingWebsite && (selectedUrls.length > 1) && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 rounded-md border border-primary/10 animate-pulse">
+                  <div className="flex items-center gap-2 rounded-xl border border-primary/10 bg-primary/5 px-4 py-2">
                     <Loader2 className="w-3 h-3 text-primary animate-spin" />
-                    <p className="text-[10px] text-primary font-medium">
+                    <p className="text-xs font-medium text-primary">
                       {t("knowledge.crawlingWait")}
                     </p>
                   </div>
@@ -1120,7 +1129,7 @@ export default function KnowledgePageClient({
                   <button
                     onClick={() => void handleScrapeWebsite()}
                     disabled={isScrapingWebsite || !websiteName || !websiteUrl || (discoveredUrls.length > 0 && selectedUrls.length === 0)}
-                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:bg-slate-50 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                    className={primaryActionClass}
                   >
                     {isScrapingWebsite ? t("knowledge.scraping") : t("knowledge.finishAndSync")}
                   </button>
@@ -1130,28 +1139,28 @@ export default function KnowledgePageClient({
 
             {activeTab === "file" && (
               <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.sourceName")}</label>
+                    <label className={formLabelClass}>{t("knowledge.sourceName")}</label>
                     <input
                       value={fileName}
                       onChange={(event) => setFileName(event.target.value)}
                       placeholder={t("knowledge.fileNamePlaceholder")}
-                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                      className={formControlClass}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest ml-1">{t("knowledge.fileDescription")}</label>
+                    <label className={formLabelClass}>{t("knowledge.fileDescription")}</label>
                     <input
                       value={fileDescription}
                       onChange={(event) => setFileDescription(event.target.value)}
                       placeholder={t("knowledge.fileDescriptionPlaceholder")}
-                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                      className={formControlClass}
                     />
                   </div>
                 </div>
                 {renderFolderTargetSelect()}
-                <label className="flex h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest/50 transition-all hover:bg-surface-container hover:border-primary/20">
+                <label className="flex h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant/35 bg-surface-container-lowest transition-colors hover:border-primary/25 hover:bg-surface-container">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container shadow-sm mb-4">
                     <Upload className="h-5 w-5 text-on-surface-variant" />
                   </div>
@@ -1176,7 +1185,7 @@ export default function KnowledgePageClient({
                   <button
                     onClick={() => void handleUploadFileSource()}
                     disabled={isUploadingFile || !selectedFile || !fileName}
-                    className="signature-gradient h-11 rounded-md px-8 text-xs font-bold shadow-lg shadow-black/25 transition-all duration-150 hover:bg-slate-50 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                    className={primaryActionClass}
                   >
                     {isUploadingFile ? t("common.uploading") : t("knowledge.importDocument")}
                   </button>
@@ -1187,7 +1196,7 @@ export default function KnowledgePageClient({
             {activeTab === "drive" && (
               <div className="space-y-6">
                 {renderFolderTargetSelect()}
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   {driveConnections.length > 1 ? (
                     <select
                       value={selectedDriveConnectionId}
@@ -1195,7 +1204,7 @@ export default function KnowledgePageClient({
                         setSelectedDriveConnectionId(event.target.value);
                         setDriveFiles([]);
                       }}
-                      className="min-w-[220px] rounded-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                      className="h-11 min-w-[220px] rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 text-sm text-on-surface outline-none transition-all focus:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                     >
                       <option value="">{t("knowledge.selectDriveAccount")}</option>
                       {driveConnections.map((connection) => (
@@ -1211,23 +1220,23 @@ export default function KnowledgePageClient({
                       value={driveSearch}
                       onChange={(event) => setDriveSearch(event.target.value)}
                       placeholder={t("knowledge.driveSearchPlaceholder")}
-                      className="w-full rounded-md border border-outline-variant/30 bg-surface-container-lowest pl-11 pr-4 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 transition-all"
+                      className="h-11 w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest pl-11 pr-4 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/45 focus:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                     />
                   </div>
                   <button
                     onClick={() => void loadDriveFiles({ reset: true })}
                     disabled={isLoadingDriveFiles || (driveConnections.length > 1 && !selectedDriveConnectionId)}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant transition-colors hover:text-primary disabled:opacity-50"
                   >
                     <RefreshCw className={`h-4.5 w-4.5 ${isLoadingDriveFiles ? "animate-spin" : ""}`} />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid max-h-[400px] grid-cols-1 gap-2 overflow-y-auto pr-2 custom-scrollbar">
                   {driveFiles.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-10 opacity-40">
-                      <Cloud className="h-8 w-8 mb-3" />
-                      <p className="text-xs font-bold uppercase tracking-widest">{driveStatus}</p>
+                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant/20 bg-surface-container-low px-6 py-10 text-center">
+                      <Cloud className="mb-3 h-8 w-8 text-on-surface-variant/55" />
+                      <p className="text-sm font-medium text-on-surface-variant">{driveStatus}</p>
                     </div>
                   ) : (
                     driveFiles.map((file) => {
@@ -1237,7 +1246,7 @@ export default function KnowledgePageClient({
                       return (
                         <div
                           key={file.id}
-                          className="group/item flex items-center justify-between rounded-xl bg-surface-container-lowest p-3 ring-1 ring-outline-variant/10 transition-all hover:bg-surface-container hover:ring-primary/20 hover:shadow-sm"
+                          className="group/item flex items-center justify-between gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3 transition-colors hover:bg-surface-container"
                         >
                           <div className="flex items-center gap-3 truncate">
                             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
@@ -1249,15 +1258,15 @@ export default function KnowledgePageClient({
                             </div>
                             <div className="truncate">
                               <div className="flex items-center gap-2">
-                                <p className="truncate text-xs font-bold text-on-surface">{file.name}</p>
+                                <p className="truncate text-sm font-semibold text-on-surface">{file.name}</p>
                                 {isPdf && (
-                                  <span className="rounded-md bg-error/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-error">PDF</span>
+                                  <span className="rounded-md bg-error/10 px-1.5 py-0.5 text-[10px] font-semibold text-error">PDF</span>
                                 )}
                                 {isGoogleDoc && (
-                                  <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">DOC</span>
+                                  <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">DOC</span>
                                 )}
                               </div>
-                              <p className="mt-0.5 text-[10px] text-on-surface-variant/50">
+                              <p className="mt-0.5 text-xs text-on-surface-variant/60">
                                 {formatRelativeDate(file.modifiedTime, language)}
                               </p>
                             </div>
@@ -1268,7 +1277,7 @@ export default function KnowledgePageClient({
                               isImportingDriveFileId === file.id ||
                               (driveConnections.length > 1 && !selectedDriveConnectionId)
                             }
-                            className="rounded-full bg-primary/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary/18 hover:text-on-surface disabled:opacity-50"
+                            className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15 disabled:opacity-50"
                           >
                             {isImportingDriveFileId === file.id ? "..." : t("common.import")}
                           </button>
@@ -1290,11 +1299,9 @@ export default function KnowledgePageClient({
         )}
       </section>
 
-      {/* List Section */}
       <section className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            {/* Back arrow — only visible inside a folder */}
             {selectedFolder ? (
               <button
                 onClick={() => {
@@ -1311,8 +1318,7 @@ export default function KnowledgePageClient({
             ) : null}
 
             <div className="space-y-1">
-              {/* Breadcrumb trail */}
-              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/60">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-on-surface-variant/70">
                 {selectedFolder ? (
                   <>
                     <button
@@ -1333,8 +1339,7 @@ export default function KnowledgePageClient({
                   <span>{t("knowledge.activeKnowledgeSources")}</span>
                 )}
               </div>
-              {/* Item count pill */}
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-2.5 py-0.5 text-[9px] font-bold text-on-surface-variant">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-surface-container px-2.5 py-1 text-xs font-semibold text-on-surface-variant">
                 {t("knowledge.totalSuffix", {
                   count: selectedFolder
                     ? selectedFolderSources.length
@@ -1351,7 +1356,7 @@ export default function KnowledgePageClient({
                 value={sourceSearch}
                 onChange={(event) => setSourceSearch(event.target.value)}
                 placeholder={t("knowledge.filterPlaceholder")}
-                className="w-full rounded-md border border-outline-variant/30 bg-surface-container-low py-2 pl-10 pr-9 text-[12px] text-on-surface outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 sm:w-64"
+                className="h-10 w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-2 pl-10 pr-9 text-sm text-on-surface outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 sm:w-64"
               />
               {sourceSearch ? (
                 <button
@@ -1366,7 +1371,7 @@ export default function KnowledgePageClient({
             </div>
             <button
               onClick={openCreateFolderDialog}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-on-surface px-4 text-[11px] font-bold uppercase tracking-[0.14em] text-background transition-opacity hover:opacity-90"
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90"
             >
               <FolderPlus className="h-4 w-4" />
               {t("knowledge.createFolder")}
@@ -1374,25 +1379,21 @@ export default function KnowledgePageClient({
           </div>
         </div>
 
-        {/* Bulk-selection action bar — modern pill-style inline toolbar */}
         {selectedSourceIds.length > 0 ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between admin-fade-in">
-            {/* Selection count badge */}
+          <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2 text-[10px] font-bold text-on-primary">
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2 text-xs font-semibold text-on-primary">
                 {selectedSourceIds.length}
               </span>
-              <span className="text-xs font-bold text-on-surface">
+              <span className="text-sm font-semibold text-on-surface">
                 {t("knowledge.selectedSources", { count: selectedSourceIds.length })}
               </span>
             </div>
 
-            {/* Action pills */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Move-to folder chips */}
               {moveTargetFolders.length > 0 && !isMovingSelectedSources && (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">
+                  <span className="flex items-center gap-1 text-xs font-medium text-on-surface-variant/70">
                     <FolderInput className="h-3 w-3" />
                     {t("knowledge.moveSelectedTo")}
                   </span>
@@ -1401,7 +1402,7 @@ export default function KnowledgePageClient({
                       key={folder.id}
                       onClick={() => void handleMoveSelectedSourcesToFolder(folder.id)}
                       disabled={isMovingSelectedSources}
-                      className="inline-flex h-7 items-center gap-1.5 rounded-full border border-outline-variant/20 bg-surface-container-lowest px-3 text-[11px] font-bold text-on-surface transition-all hover:border-primary/30 hover:bg-primary/8 hover:text-primary disabled:opacity-50"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition-colors hover:border-primary/30 hover:bg-primary/8 hover:text-primary disabled:opacity-50"
                     >
                       <FolderOpen className="h-3 w-3" />
                       {folder.name}
@@ -1417,22 +1418,19 @@ export default function KnowledgePageClient({
                 </span>
               ) : null}
 
-              {/* Remove from current folder */}
               {selectedFolder ? (
                 <button
                   onClick={() => void handleRemoveSelectedFromFolder()}
                   disabled={isMovingSelectedSources}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-error/20 bg-error/5 px-3 text-[11px] font-bold text-error transition-all hover:bg-error/10 disabled:opacity-50"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-error/20 bg-error/5 px-3 text-xs font-semibold text-error transition-colors hover:bg-error/10 disabled:opacity-50"
                 >
                   <FolderMinus className="h-3.5 w-3.5" />
                   {t("knowledge.removeFromFolder")}
                 </button>
               ) : null}
 
-              {/* Divider */}
               <div className="h-5 w-px bg-outline-variant/20" />
 
-              {/* Clear selection */}
               <button
                 onClick={() => setSelectedSourceIds([])}
                 className="flex h-7 w-7 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
@@ -1513,7 +1511,7 @@ export default function KnowledgePageClient({
             </div>
             <div className="mt-6 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+                <label className="text-sm font-medium text-on-surface-variant">
                   {t("knowledge.folderName")}
                 </label>
                 <input
@@ -1525,7 +1523,7 @@ export default function KnowledgePageClient({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">
+                <label className="text-sm font-medium text-on-surface-variant">
                   {t("knowledge.folderDescription")}
                 </label>
                 <input
@@ -1542,14 +1540,14 @@ export default function KnowledgePageClient({
                   setIsFolderDialogOpen(false);
                   resetFolderForm();
                 }}
-                className="h-10 rounded-xl border border-outline-variant/15 px-4 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                className={secondaryActionClass}
               >
                 {t("common.cancel")}
               </button>
               <button
                 onClick={() => void handleSaveFolder()}
                 disabled={isSavingFolder || !folderName.trim()}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-on-surface px-5 text-[11px] font-bold uppercase tracking-[0.14em] text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-on-surface px-5 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 disabled:opacity-50"
               >
                 {isSavingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {editingFolderId ? t("common.save") : t("knowledge.createFolder")}

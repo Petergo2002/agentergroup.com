@@ -125,11 +125,11 @@ export function AppShell({ children, context, user }: AppShellProps) {
   }, [closeMobileSidebar, isSidebarOpen]);
 
   const pathname = usePathname();
-  const isFocusedAgentRoute =
-    /^\/agents\/[^/]+\/(builder|preview)$/.test(pathname) ||
+  const isAnalyticsRoute = pathname.startsWith("/analytics");
+  const isFocusedAppRoute =
+    /^\/agents\/[^/]+\/(builder|preview|activity)$/.test(pathname) ||
     /^\/widgets\/[^/]+\/preview$/.test(pathname) ||
     /^\/assistants\/[^/]+$/.test(pathname);
-  const isAnalyticsRoute = pathname.startsWith("/analytics");
   const latestAnalyticsConversation = latestActivityData?.latestConversation ?? null;
   const newLeadCount = latestActivityData?.newLeadCount ?? 0;
   const latestAnalyticsActivityAt = latestAnalyticsConversation?.lastActivityAt ?? null;
@@ -177,7 +177,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
       >
         <ToastProvider>
           <ModalProvider>
-          {isFocusedAgentRoute ? (
+          {isFocusedAppRoute ? (
             <div className="min-h-screen bg-background">{children}</div>
           ) : (
             <div className="app-shell-gradient flex min-h-screen">

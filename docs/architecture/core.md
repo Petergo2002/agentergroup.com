@@ -1,6 +1,6 @@
 # Agentergroup Architecture
 
-Last updated: 2026-06-07
+Last updated: 2026-06-24
 
 ## Purpose
 
@@ -75,7 +75,7 @@ Browser (Next.js App Router UI)
 ### Frontend and app server
 
 - Next.js 16, with the exact resolved patch version locked in `package-lock.json`
-- React `19.2.3`
+- React `19.2.4`
 - TypeScript
 - Tailwind CSS v4
 - App Router
@@ -114,6 +114,7 @@ Important implementation docs:
 - `src/app/(app)/agents/page.tsx`
 - `src/app/(app)/agents/[id]/builder/page.tsx`
 - `src/app/(app)/agents/[id]/preview/page.tsx`
+- `src/app/(app)/agents/[id]/activity/page.tsx`
 - `src/app/(app)/assistants/page.tsx`
 - `src/app/(app)/assistants/[id]/page.tsx`
 - `src/app/(app)/widgets/page.tsx`
@@ -324,7 +325,7 @@ Additional note:
 - internal assistant usage now lives under `/assistants`
 - widget management now lives under `/widgets`
 - the legacy `/agents/[id]/widget` surface only redirects users into the widgets area
-- analytics lives at `/analytics` as a workspace-level operations surface for widget conversations
+- analytics lives at `/analytics` as a workspace-level operations surface for widget conversations and automation performance
 
 ### Workspace shell behavior
 
@@ -1188,14 +1189,15 @@ External Trigger -> Automation Logic
 Automation does not create a chat thread. Each trigger produces an `automation_events` record and,
 when processed, a linked `runs` record. The shared agent runtime is reused for model, knowledge, and
 tool execution, but the executor adapts its result into a versioned operational result containing a
-decision, reason, verified actions, missing information, and a run summary. Activity renders that
-event-to-result timeline rather than a conversation transcript.
+decision, reason, generated-message preview, verified actions, missing information, and a run
+summary. Activity renders that event-to-result timeline rather than a conversation transcript.
 
 `runs.status` describes runtime completion; `runs.output.automationResult.decision` describes the
 business outcome. Tool evidence overrides model claims when deriving that decision. Version 1
-results store bounded summaries, reasons, missing-information items, normalized tool outcomes, and
-safe provider identifiers. Failed tool details are extracted from error fields and sanitized before
-persistence. Activity reconstructs the same view for legacy runs without `automationResult`.
+results store bounded summaries, reasons, missing-information items, optional generated-message
+previews, normalized tool outcomes, and safe provider identifiers. Failed tool details are extracted
+from error fields and sanitized before persistence. Activity reconstructs the same view for legacy
+runs without `automationResult`.
 
 Top-level product language should stay provider-neutral:
 
@@ -1569,7 +1571,7 @@ Current behavior:
 
 ## Analytics Architecture
 
-Analytics is a workspace-level operations surface focused on widget conversations.
+Analytics is a workspace-level operations surface for customer-facing widget conversations and automation performance.
 
 Main surfaces:
 
@@ -1581,10 +1583,12 @@ Main surfaces:
 
 Current behavior:
 
-- analytics is built from widget session, message, lead, and failure data
-- the primary UI is split between a chat/inbox view and a KPI overview view
-- analytics excludes preview sessions and focuses on customer-facing widget traffic
+- analytics is built from widget session, message, lead, failure, automation event, and run data
+- the primary UI can switch between conversation inbox/detail and automation performance views
+- conversation analytics excludes preview sessions and focuses on customer-facing widget traffic
+- automation analytics exposes event totals, processed/failed trends, per-agent summaries, and recent failures that link to Activity
 - production does not persist raw tool debug payloads into stored assistant/widget traces
+- automation analytics does not expose raw provider payloads or raw email bodies
 - conversation-detail `debugTrace` remains available only to workspace owners and admins
 
 ### Dashboard summary
@@ -2128,7 +2132,7 @@ After import, the source behaves like any other workspace knowledge source.
 
 | Route | Purpose |
 | --- | --- |
-| `POST /api/composio/webhook` | Verify Composio webhooks, ingest automation trigger events, and handle connected-account expiry events |
+| `POST /api/composio/webhook` | Verify Composio webhooks, ingest automation trigger events, and handle connected-account expiry and disabled-trigger lifecycle events |
 
 ### Billing APIs
 
@@ -2222,7 +2226,7 @@ After import, the source behaves like any other workspace knowledge source.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/dashboard/analytics` | Return workspace analytics overview, filters, and paginated conversation inbox data |
+| `GET /api/dashboard/analytics` | Return workspace analytics overview, filters, paginated conversation inbox data, and automation summaries, trends, and failures |
 | `GET /api/dashboard/analytics/conversations/[widgetSessionId]` | Return one widget conversation detail transcript, lead info, and role-gated debug metadata |
 
 ## Environment Variables
@@ -2339,9 +2343,14 @@ It shows:
 - recent automation runs
 - recent trigger events
 - run/event statuses
-- output summaries
+- selected event detail with safe trigger context
+- output summaries, generated-message previews, and verified actions
+- run steps and diagnostics
 - provider trigger/account readiness
 - last automation error
+
+Activity stays per-agent and operational. Workspace-wide totals, trends, and cross-agent comparisons
+belong in Analytics, which links failed automation events back into Activity through the event id.
 
 ## Current Constraints and Intentional Simplifications
 

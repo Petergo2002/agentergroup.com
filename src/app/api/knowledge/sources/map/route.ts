@@ -18,8 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  
-  // Only allow premium users to use the map feature
+
   if (context.subscription?.plan_tier !== "premium") {
     return NextResponse.json({ error: "Sitemap mapping is a premium feature." }, { status: 403 });
   }
@@ -46,10 +45,7 @@ export async function POST(request: NextRequest) {
   const firecrawl = new Firecrawl({ apiKey: firecrawlApiKey });
 
   try {
-    console.log(`[Firecrawl Map] Mapping URL: ${websiteUrl.toString()}`);
-    
-    if (typeof firecrawl.map !== 'function') {
-      console.error(`[Firecrawl Map] firecrawl.map is not a function. Available methods:`, Object.keys(firecrawl));
+    if (typeof firecrawl.map !== "function") {
       throw new Error("Firecrawl SDK error: map method not found.");
     }
 
@@ -61,24 +57,25 @@ export async function POST(request: NextRequest) {
       error?: string;
     };
 
-    // Handle cases where the SDK might return links even if success property is missing
     const hasLinks = Array.isArray(mapResult.links);
     const isSuccessful =
       mapResultRecord.success === true ||
       (mapResultRecord.success === undefined && hasLinks);
 
     if (!isSuccessful) {
-      console.error(`[Firecrawl Map] Error result:`, mapResult);
       throw new Error(mapResultRecord.error || "Failed to map website.");
     }
 
-    // Filter out common useless URLs and normalize to strings
     const rawLinks = (mapResult.links ?? []).slice(0, 500);
-    const candidateLinks = (rawLinks as unknown[]).map((item) => {
-      if (typeof item === 'string') return item;
-      if (item && typeof item === 'object' && 'url' in item && typeof item.url === 'string') return item.url;
-      return null;
-    }).filter((u): u is string => u !== null);
+    const candidateLinks = (rawLinks as unknown[])
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "url" in item && typeof item.url === "string") {
+          return item.url;
+        }
+        return null;
+      })
+      .filter((url): url is string => url !== null);
     const sameOriginLinks = candidateLinks.filter((candidate) => {
       try {
         return normalizeWebsiteKnowledgeUrl(candidate).origin === websiteUrl.origin;
@@ -88,14 +85,14 @@ export async function POST(request: NextRequest) {
     });
     const links = normalizeSelectedWebsiteUrls(websiteUrl, sameOriginLinks, 500);
 
-    console.log(`[Firecrawl Map] Found ${links.length} valid links`);
-
     return NextResponse.json({ links });
   } catch (error) {
-    console.error(`[Firecrawl Map] Caught error:`, error);
+    console.error("[Firecrawl Map] Failed to map website.", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to map website." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

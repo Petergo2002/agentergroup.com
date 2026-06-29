@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import {
   getAnalyticsDateRange,
+  getDashboardAutomationAnalytics,
   getDashboardAnalyticsOverview,
   listDashboardConversations,
 } from "@/lib/dashboard/analytics";
@@ -25,6 +26,18 @@ function parseSessionStatus(value: string | null): "all" | "active" | "completed
   return value === "active" || value === "completed" ? value : "all";
 }
 
+function parseAutomationStatus(
+  value: string | null,
+): DashboardAnalyticsAppliedFilters["automationStatus"] {
+  return value === "received" ||
+    value === "processing" ||
+    value === "processed" ||
+    value === "ignored" ||
+    value === "failed"
+    ? value
+    : "all";
+}
+
 export const revalidate = 30;
 
 export async function GET(request: NextRequest) {
@@ -45,6 +58,7 @@ export async function GET(request: NextRequest) {
       range: parseRange(searchParams.get("range")),
       widgetId: searchParams.get("widgetId")?.trim() || null,
       agentId: searchParams.get("agentId")?.trim() || null,
+      automationStatus: parseAutomationStatus(searchParams.get("automationStatus")),
       search: searchParams.get("search")?.trim() || "",
       sessionStatus: parseSessionStatus(searchParams.get("sessionStatus")),
     };
@@ -57,17 +71,26 @@ export async function GET(request: NextRequest) {
       limit,
     });
     const { startIso } = getAnalyticsDateRange(appliedFilters.range);
-    const overview = await getDashboardAnalyticsOverview(admin, {
-      workspaceId: context.workspace.id,
-      startIso,
-      conversationCount: conversationResult.overview.conversationCount,
-      messageCount: conversationResult.overview.messageCount,
-      leadCount: conversationResult.overview.leadCount,
-      activeWidgetIds: conversationResult.overview.activeWidgetIds,
-    });
+    const [overview, automation] = await Promise.all([
+      getDashboardAnalyticsOverview(admin, {
+        workspaceId: context.workspace.id,
+        startIso,
+        conversationCount: conversationResult.overview.conversationCount,
+        messageCount: conversationResult.overview.messageCount,
+        leadCount: conversationResult.overview.leadCount,
+        activeWidgetIds: conversationResult.overview.activeWidgetIds,
+      }),
+      getDashboardAutomationAnalytics(admin, {
+        workspaceId: context.workspace.id,
+        startIso,
+        agentId: appliedFilters.agentId,
+        automationStatus: appliedFilters.automationStatus,
+      }),
+    ]);
 
     return NextResponse.json({
       overview,
+      automation,
       filters: {
         widgets: conversationResult.widgetOptions,
         agents: conversationResult.agentOptions,

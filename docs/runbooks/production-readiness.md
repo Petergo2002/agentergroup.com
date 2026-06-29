@@ -1,6 +1,6 @@
 # Production Readiness And Manual Steps
 
-Last updated: 2026-06-18
+Last updated: 2026-06-24
 
 This document covers the launch-hardening changes that require coordinated
 database, Edge Function, dashboard, and widget deployment. It is not evidence
@@ -140,7 +140,7 @@ public dashboard/widget origins.
 
 ```bash
 npm run lint
-npx tsc --noEmit --target ES2022 --incremental false
+npx tsc --noEmit
 npm test
 npm run build
 npm run widget:build
@@ -166,9 +166,12 @@ Version `19.2.3` has incomplete React Server Components security fixes.
 6. Deploy the dashboard and widget runtime together.
 7. Verify `/api/health`, authentication, assistant privacy, upload, retention,
    checkout, webhook replay, cancellation, renewal, and unknown-price handling.
-8. Enable Supabase leaked-password protection in Auth settings.
-9. Review `stripe_webhook_events` for `failed` or `requires_review` rows.
-10. Monitor logs and storage growth during the first customer rollout.
+8. Verify the Composio webhook subscription includes `composio.trigger.message`,
+   `composio.connected_account.expired`, and `composio.trigger.disabled`; test one
+   Gmail automation event through Activity and Analytics.
+9. Enable Supabase leaked-password protection in Auth settings.
+10. Review `stripe_webhook_events` for `failed` or `requires_review` rows.
+11. Monitor logs and storage growth during the first customer rollout.
 
 ## Known Remaining Work
 

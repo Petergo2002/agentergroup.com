@@ -1,12 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readAutomationRunResult } from "@/lib/automation/result";
 import { buildConversationDetailForViewer } from "@/lib/debug-trace-security";
 import {
   serializeLeadConversationSummary,
   type LeadConversationSummaryRow,
 } from "@/lib/leads/conversation-summary";
 import type {
+  AutomationEventStatus,
+  AutomationDecision,
   DashboardAnalyticsAppliedFilters,
   DashboardAnalyticsConversationListItem,
+  DashboardAutomationAgentSummary,
+  DashboardAutomationAnalytics,
+  DashboardAutomationFailureSummary,
+  DashboardAutomationTrendPoint,
   DashboardAnalyticsOverview,
   DashboardAnalyticsRange,
   DashboardConversationDetailResponse,
@@ -28,6 +35,8 @@ interface AnalyticsWidgetRow {
 interface AnalyticsAgentRow {
   id: string;
   name: string;
+  surface: string;
+  status?: string;
 }
 
 interface AnalyticsWidgetAgentRow {
@@ -60,6 +69,35 @@ interface AnalyticsTranscriptRow {
   metadata?: Record<string, unknown> | null;
 }
 
+interface AnalyticsAutomationEventRow {
+  id: string;
+  workspace_id: string;
+  agent_id: string;
+  automation_id: string;
+  run_id: string | null;
+  external_event_id: string;
+  trigger_slug: string;
+  status: AutomationEventStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+interface AnalyticsAutomationRunRow {
+  id: string;
+  agent_id: string;
+  status: string;
+  output?: Record<string, unknown> | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+interface AutomationRunInspection {
+  decision: AutomationDecision | null;
+  summary: string | null;
+  failed: boolean;
+}
+
 interface DashboardConversationSummaryRow {
   widget_session_id: string;
   workspace_id: string;
@@ -85,7 +123,7 @@ interface DashboardConversationSummaryRow {
 
 interface DashboardConversationAggregationResult {
   widgetOptions: Array<{ id: string; name: string; status: "draft" | "deployed" }>;
-  agentOptions: Array<{ id: string; name: string }>;
+  agentOptions: Array<{ id: string; name: string; surface: string }>;
   overview: {
     conversationCount: number;
     messageCount: number;
@@ -504,9 +542,9 @@ export async function listWorkspaceAgentsForAnalytics(
 ) {
   const { data, error } = await supabase
     .from("agents")
-    .select("id, name")
+    .select("id, name, surface")
     .eq("workspace_id", workspaceId)
-    .eq("surface", "widget")
+    .in("surface", ["widget", "automation"])
     .is("archived_at", null)
     .order("name", { ascending: true });
 
@@ -773,6 +811,253 @@ export async function listRecentDashboardConversations(
   return rows.sort(compareConversationRows);
 }
 
+function formatAutomationTriggerLabel(triggerSlug: string) {
+  if (triggerSlug === "GMAIL_NEW_GMAIL_MESSAGE") return "Gmail new message";
+  return triggerSlug
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function inspectAutomationRun(run: AnalyticsAutomationRunRow | null): AutomationRunInspection {
+  if (!run) {
+    return {
+      decision: null,
+      summary: null,
+      failed: false,
+    };
+  }
+
+  const result = readAutomationRunResult(run.output?.automationResult);
+  const failed = Boolean(
+    run.status === "failed" ||
+      run.error_message ||
+      result?.decision === "action_failed",
+  );
+
+  return {
+    decision: result?.decision ?? (failed ? "action_failed" : null),
+    summary: result?.summary ?? run.error_message ?? null,
+    failed,
+  };
+}
+
+async function fetchAutomationEventsForAnalytics(
+  supabase: AdminSupabase,
+  input: {
+    workspaceId: string;
+    startIso: string;
+    agentId: string | null;
+    automationStatus: DashboardAnalyticsAppliedFilters["automationStatus"];
+  },
+) {
+  const pageSize = 1000;
+  const rows: AnalyticsAutomationEventRow[] = [];
+
+  for (let offset = 0; ; offset += pageSize) {
+    let query = supabase
+      .from("automation_events")
+      .select("id, workspace_id, agent_id, automation_id, run_id, external_event_id, trigger_slug, status, created_at, updated_at")
+      .eq("workspace_id", input.workspaceId)
+      .gte("created_at", input.startIso)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (input.agentId) {
+      query = query.eq("agent_id", input.agentId);
+    }
+
+    if (input.automationStatus !== "all") {
+      query = query.eq("status", input.automationStatus);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const pageRows = (data ?? []) as AnalyticsAutomationEventRow[];
+    rows.push(...pageRows);
+
+    if (pageRows.length < pageSize) {
+      break;
+    }
+  }
+
+  return rows;
+}
+
+export async function getDashboardAutomationAnalytics(
+  supabase: AdminSupabase,
+  input: {
+    workspaceId: string;
+    startIso: string;
+    agentId: string | null;
+    automationStatus: DashboardAnalyticsAppliedFilters["automationStatus"];
+  },
+): Promise<DashboardAutomationAnalytics> {
+  const events = await fetchAutomationEventsForAnalytics(supabase, input);
+  const runIds = Array.from(
+    new Set(events.map((event) => event.run_id).filter((id): id is string => Boolean(id))),
+  );
+  const agentIds = Array.from(new Set(events.map((event) => event.agent_id)));
+
+  const [runsResult, agentsResult] = await Promise.all([
+    runIds.length > 0
+      ? supabase
+          .from("runs")
+          .select("id, agent_id, status, output, error_message, created_at, completed_at")
+          .in("id", runIds)
+      : Promise.resolve({ data: [], error: null }),
+    agentIds.length > 0
+      ? supabase
+          .from("agents")
+          .select("id, name, surface, status")
+          .eq("workspace_id", input.workspaceId)
+          .in("id", agentIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (runsResult.error) {
+    throw new Error(runsResult.error.message);
+  }
+
+  if (agentsResult.error) {
+    throw new Error(agentsResult.error.message);
+  }
+
+  const runsById = new Map(
+    ((runsResult.data ?? []) as AnalyticsAutomationRunRow[]).map((run) => [run.id, run]),
+  );
+  const agentsById = new Map(
+    ((agentsResult.data ?? []) as AnalyticsAgentRow[]).map((agent) => [agent.id, agent]),
+  );
+  const agentSummaries = new Map<string, DashboardAutomationAgentSummary>();
+  const totals = {
+    totalEvents: events.length,
+    processedEvents: 0,
+    failedEvents: 0,
+    actionTaken: 0,
+    noAction: 0,
+    needsInput: 0,
+    actionFailed: 0,
+  };
+
+  const trendByDate = new Map<string, DashboardAutomationTrendPoint>();
+  const recentFailures: DashboardAutomationFailureSummary[] = [];
+
+  for (const event of events) {
+    const run = event.run_id ? runsById.get(event.run_id) ?? null : null;
+    const runInspection = inspectAutomationRun(run);
+    const decision = runInspection.decision;
+    const agent = agentsById.get(event.agent_id);
+    const agentName = agent?.name ?? "Automation";
+    const summary = agentSummaries.get(event.agent_id) ?? {
+      agentId: event.agent_id,
+      agentName,
+      status: agent?.status ?? "unknown",
+      totalEvents: 0,
+      processedEvents: 0,
+      failedEvents: 0,
+      actionTaken: 0,
+      noAction: 0,
+      needsInput: 0,
+      actionFailed: 0,
+      lastEventAt: null,
+      activityHref: `/agents/${event.agent_id}/activity`,
+    };
+
+    summary.totalEvents += 1;
+    summary.lastEventAt =
+      !summary.lastEventAt || event.created_at > summary.lastEventAt
+        ? event.created_at
+        : summary.lastEventAt;
+
+    if (event.status === "processed") {
+      totals.processedEvents += 1;
+      summary.processedEvents += 1;
+    }
+
+    const failed = event.status === "failed" || runInspection.failed;
+    const trendDate = event.created_at.slice(0, 10);
+    const trendPoint = trendByDate.get(trendDate) ?? {
+      date: trendDate,
+      totalEvents: 0,
+      processedEvents: 0,
+      failedEvents: 0,
+    };
+
+    trendPoint.totalEvents += 1;
+    if (event.status === "processed") {
+      trendPoint.processedEvents += 1;
+    }
+    if (failed) {
+      trendPoint.failedEvents += 1;
+    }
+    trendByDate.set(trendDate, trendPoint);
+
+    if (failed) {
+      totals.failedEvents += 1;
+      summary.failedEvents += 1;
+    }
+
+    if (decision === "action_taken") {
+      totals.actionTaken += 1;
+      summary.actionTaken += 1;
+    } else if (decision === "no_action") {
+      totals.noAction += 1;
+      summary.noAction += 1;
+    } else if (decision === "needs_input") {
+      totals.needsInput += 1;
+      summary.needsInput += 1;
+    } else if (decision === "action_failed") {
+      totals.actionFailed += 1;
+      summary.actionFailed += 1;
+    }
+
+    if (failed && recentFailures.length < 8) {
+      recentFailures.push({
+        eventId: event.id,
+        runId: event.run_id,
+        agentId: event.agent_id,
+        agentName,
+        triggerLabel: formatAutomationTriggerLabel(event.trigger_slug),
+        eventStatus: event.status,
+        runStatus: run?.status ?? null,
+        decision,
+        summary: runInspection.summary,
+        errorMessage: run?.error_message ?? null,
+        createdAt: event.created_at,
+        activityHref: `/agents/${event.agent_id}/activity?event=${event.id}`,
+      });
+    }
+
+    agentSummaries.set(event.agent_id, summary);
+  }
+
+  const successRate = totals.totalEvents > 0
+    ? Math.round((totals.processedEvents / totals.totalEvents) * 100)
+    : 0;
+
+  return {
+    ...totals,
+    successRate,
+    trend: Array.from(trendByDate.values()).sort((left, right) =>
+      left.date.localeCompare(right.date),
+    ),
+    agents: Array.from(agentSummaries.values()).sort((left, right) => {
+      if (left.lastEventAt !== right.lastEventAt) {
+        return (right.lastEventAt ?? "").localeCompare(left.lastEventAt ?? "");
+      }
+      return left.agentName.localeCompare(right.agentName);
+    }),
+    recentFailures,
+  };
+}
+
 /**
  * Counts leads captured during the last 24 hours for one workspace.
  */
@@ -936,6 +1221,7 @@ export async function listDashboardConversations(
   const agentOptions = agents.map((agent) => ({
     id: agent.id,
     name: agent.name,
+    surface: agent.surface,
   }));
 
   if (

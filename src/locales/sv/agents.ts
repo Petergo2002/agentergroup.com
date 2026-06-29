@@ -26,6 +26,7 @@ export const agents = {
   builder: "Builder",
   preview: "Förhandsvisa",
   activity: "Aktivitet",
+  viewActivity: "Visa aktivitet",
   internalAssistant: "Intern assistent",
   websiteWidget: "Webbplatswidget",
   automation: "Automation",

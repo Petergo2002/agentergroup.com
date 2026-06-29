@@ -1,6 +1,7 @@
 import type {
   AutomationActionResult,
   AutomationDecision,
+  AutomationGeneratedMessage,
   AutomationRunResult,
 } from "../types/automation.ts";
 
@@ -21,6 +22,7 @@ interface ModelAutomationReport {
   summary?: unknown;
   reason?: unknown;
   missingInformation?: unknown;
+  generatedMessage?: unknown;
 }
 
 const DECISIONS = new Set<AutomationDecision>([
@@ -44,6 +46,43 @@ function cleanText(value: unknown, maxLength = 800) {
   if (typeof value !== "string") return null;
   const cleaned = value.replace(/\s+/g, " ").trim();
   return cleaned ? cleaned.slice(0, maxLength) : null;
+}
+
+function cleanMultilineText(value: unknown, maxLength = 4_000) {
+  if (typeof value !== "string") return null;
+  const cleaned = value
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return cleaned ? cleaned.slice(0, maxLength) : null;
+}
+
+function readGeneratedMessage(value: unknown): AutomationGeneratedMessage | null {
+  if (!isRecord(value)) return null;
+
+  const cleanNullableText = (input: unknown, maxLength: number) => {
+    const text = cleanText(input, maxLength);
+    return text && text.toLowerCase() !== "null" ? text : null;
+  };
+  const rawType = typeof value.type === "string" ? value.type : "message";
+  const type: AutomationGeneratedMessage["type"] =
+    rawType === "email" || rawType === "reply" || rawType === "message"
+      ? rawType
+      : "message";
+  const to = cleanNullableText(value.to, 500);
+  const subject = cleanNullableText(value.subject, 500);
+  const body = cleanMultilineText(value.body);
+
+  if (!to && !subject && !body) return null;
+
+  return {
+    type,
+    to,
+    subject,
+    body,
+  };
 }
 
 function parseJsonRecord(value: string) {
@@ -254,6 +293,7 @@ export function buildAutomationRunResult({
     reason: cleanText(modelReport?.reason, 500) ?? defaultReason,
     missingInformation,
     actions,
+    generatedMessage: readGeneratedMessage(modelReport?.generatedMessage),
   };
 }
 
@@ -297,5 +337,6 @@ export function readAutomationRunResult(value: unknown): AutomationRunResult | n
     reason: value.reason,
     missingInformation,
     actions,
+    generatedMessage: readGeneratedMessage(value.generatedMessage),
   };
 }

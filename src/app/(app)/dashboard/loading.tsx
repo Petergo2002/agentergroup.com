@@ -2,33 +2,37 @@
 
 export default function DashboardLoading() {
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="h-[140px] w-full max-w-xl animate-pulse rounded-2xl bg-surface-container-low" />
-        <div className="h-[48px] w-[140px] animate-pulse rounded-full bg-surface-container-low" />
-      </div>
+    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="w-full max-w-2xl">
+            <div className="h-7 w-32 animate-pulse rounded-lg bg-surface-container-low" />
+            <div className="mt-3 h-9 w-72 max-w-full animate-pulse rounded-lg bg-surface-container-low" />
+            <div className="mt-3 h-5 w-full max-w-lg animate-pulse rounded-md bg-surface-container-low" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-11 w-32 animate-pulse rounded-xl bg-surface-container-low" />
+            <div className="h-11 w-32 animate-pulse rounded-xl bg-surface-container-low" />
+          </div>
+        </div>
+      </header>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
           <div
             key={index}
-            className="h-[132px] animate-pulse rounded-[1.6rem] bg-surface-container-low shadow-[0_18px_50px_rgba(15,23,42,0.06)]"
+            className="h-[164px] animate-pulse rounded-2xl border border-outline-variant/10 bg-surface-container-low"
           />
         ))}
       </section>
 
-      <section className="mt-4 grid gap-4 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div
-            key={index}
-            className="h-[110px] animate-pulse rounded-[1.4rem] bg-surface-container-low"
-          />
-        ))}
-      </section>
-
-      <section className="mt-8">
-        <div className="h-[400px] animate-pulse rounded-[2rem] bg-surface-container-low" />
-      </section>
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="h-[520px] animate-pulse rounded-2xl border border-outline-variant/10 bg-surface-container-low" />
+        <section className="flex flex-col gap-6">
+          <div className="h-[430px] animate-pulse rounded-2xl border border-outline-variant/10 bg-surface-container-low" />
+          <div className="h-[178px] animate-pulse rounded-2xl border border-outline-variant/10 bg-surface-container-low" />
+        </section>
+      </div>
     </div>
   );
 }

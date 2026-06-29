@@ -14,6 +14,7 @@ function report(
     summary: "Reviewed the incoming email.",
     reason: "The saved instructions were evaluated.",
     missingInformation: [],
+    generatedMessage: null,
     ...overrides,
   });
 }
@@ -31,6 +32,29 @@ test("successful tool evidence determines that an action was taken", () => {
   assert.equal(result.actions[0]?.label, "Replied in Gmail thread");
   assert.equal(result.actions[0]?.threadId, "thread-123");
   assert.equal(result.actions[0]?.messageId, "message-456");
+});
+
+test("generated message details are preserved for activity inspection", () => {
+  const result = buildAutomationRunResult({
+    assistantContent: report("action_taken", {
+      generatedMessage: {
+        type: "reply",
+        to: "customer@example.com",
+        subject: "Hello support",
+        body: "Thanks for reaching out.\n\nCould you share which issue you are seeing?",
+      },
+    }),
+    toolMessages: [{
+      name: "GMAIL_REPLY_TO_THREAD",
+      content: JSON.stringify({ thread_id: "thread-123", message_id: "message-456" }),
+    }],
+  });
+
+  assert.equal(result.generatedMessage?.type, "reply");
+  assert.equal(result.generatedMessage?.to, "customer@example.com");
+  assert.match(result.generatedMessage?.body ?? "", /\n\nCould you share/);
+  assert.match(result.generatedMessage?.body ?? "", /which issue/);
+  assert.equal(readAutomationRunResult(result)?.generatedMessage?.subject, "Hello support");
 });
 
 test("a model cannot claim action_taken without a successful tool result", () => {

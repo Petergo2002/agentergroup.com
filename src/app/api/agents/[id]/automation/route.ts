@@ -248,13 +248,17 @@ export async function PUT(
   }
 
   if (connectionId) {
-    const { data: connection } = await supabase
+    const { data: connection, error: connectionError } = await supabase
       .from("connections")
       .select("id, workspace_id, toolkit_slug, status")
       .eq("id", connectionId)
       .eq("workspace_id", context.workspace.id)
       .eq("toolkit_slug", "gmail")
       .maybeSingle();
+
+    if (connectionError) {
+      return NextResponse.json({ error: connectionError.message }, { status: 500 });
+    }
 
     if (!connection || connection.status !== "connected") {
       return NextResponse.json({ error: "Select a connected Gmail account." }, { status: 400 });
