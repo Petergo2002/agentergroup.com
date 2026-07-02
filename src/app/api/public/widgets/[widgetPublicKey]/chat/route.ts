@@ -5,6 +5,11 @@ import {
   buildPersistedToolMessages,
 } from "@/lib/debug-trace-security";
 import { extractEndChatPolicyFromDefinition } from "@/lib/end-chat";
+import {
+  buildConversationExcerpt,
+  createUnansweredQueryCandidate,
+  detectUnansweredQueryCandidate,
+} from "@/lib/flywheel/server";
 import { extractGmailRecipientPolicyFromDefinition } from "@/lib/gmail";
 import { extractGoogleCalendarSelectionFromDefinition } from "@/lib/google-calendar";
 import { extractCalSelectionFromDefinition } from "@/lib/cal";
@@ -639,7 +644,7 @@ export async function POST(
     turnLockHeld = true;
 
     const userMessageTimestamp = new Date().toISOString();
-    await Promise.all([
+    const [, userMessageRows] = await Promise.all([
       upsertWidgetSession(supabase, {
         widgetId: loaded.widget.id,
         sessionId,
@@ -659,6 +664,8 @@ export async function POST(
         messages: [{ role: "user", content: message, metadata: attachments ? { attachments } : undefined }],
       }),
     ]);
+    const userMessageId =
+      userMessageRows.find((row) => row.role === "user")?.id ?? null;
 
     const [history, publishedVersion] = await Promise.all([
       loadOrderedWidgetSessionHistory(supabase, widgetSession.id),
@@ -726,6 +733,68 @@ export async function POST(
         request.signal.addEventListener("abort", handleRequestAbort, {
           once: true,
         });
+        const scheduleFlywheelCapture = (input: {
+          assistantAnswer: string;
+          assistantMessageId: string | null;
+          knowledgeMatchCount: number;
+          runtimeHadError: boolean;
+          detectionReason?: string;
+          confidence?: number;
+          metadata?: Record<string, unknown>;
+        }) => {
+          if (access.source === "preview") {
+            return;
+          }
+
+          after(async () => {
+            const detection = detectUnansweredQueryCandidate({
+              question: message,
+              assistantAnswer: input.assistantAnswer,
+              knowledgeMatchCount: input.knowledgeMatchCount,
+              runtimeHadError: input.runtimeHadError,
+            });
+
+            if (!detection.shouldCreate) {
+              return;
+            }
+
+            try {
+              await createUnansweredQueryCandidate(createAdminClient() as never, {
+                workspaceId: loaded.widget.workspace_id,
+                widgetId: loaded.widget.id,
+                widgetAgentId: selected!.persistedWidgetAgentId,
+                agentId: selected!.agent.id,
+                widgetSessionId: widgetSession.id,
+                userMessageId,
+                assistantMessageId: input.assistantMessageId,
+                question: message,
+                assistantAnswer: input.assistantAnswer,
+                contextExcerpt: buildConversationExcerpt(
+                  history.slice(0, -1).map((item) => ({
+                    role: item.role,
+                    content: item.content,
+                  })),
+                  message,
+                ),
+                detectionReason: input.detectionReason ?? detection.reason,
+                confidence: input.confidence ?? detection.confidence,
+                metadata: {
+                  requestId: chatRequestId,
+                  knowledgeMatchCount: input.knowledgeMatchCount,
+                  runtimeHadError: input.runtimeHadError,
+                  ...(input.metadata ?? {}),
+                },
+              });
+            } catch (error) {
+              console.error("[flywheel] Failed to create unanswered query.", {
+                requestId: chatRequestId,
+                widgetId: loaded.widget.id,
+                agentId: selected!.agent.id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          });
+        };
 
         try {
           const result = await runAgentChat({
@@ -767,7 +836,7 @@ export async function POST(
             result.toolMessages,
           );
 
-          await insertWidgetMessages(supabase, {
+          const persistedMessages = await insertWidgetMessages(supabase, {
             widgetSessionId: widgetSession.id,
             widgetId: loaded.widget.id,
             widgetAgentId: selected!.persistedWidgetAgentId,
@@ -788,6 +857,8 @@ export async function POST(
               },
             ],
           });
+          const assistantMessageId =
+            persistedMessages.find((row) => row.role === "assistant")?.id ?? null;
 
           let completedSession = await upsertWidgetSession(supabase, {
             widgetId: loaded.widget.id,
@@ -837,6 +908,16 @@ export async function POST(
               : {}),
           });
 
+          scheduleFlywheelCapture({
+            assistantAnswer: result.assistantContent,
+            assistantMessageId,
+            knowledgeMatchCount: result.knowledgeMatches.length,
+            runtimeHadError: result.debugTrace?.hadError ?? false,
+            metadata: result.debugTrace?.errorSummary
+              ? { runtimeErrorSummary: result.debugTrace.errorSummary }
+              : undefined,
+          });
+
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } catch (error) {
           if (streamAbortController.signal.aborted || isAbortError(error)) {
@@ -848,12 +929,25 @@ export async function POST(
             error,
             "Something went wrong while generating a reply.",
           );
+          const errorFields = getErrorLogFields(error);
           logWidgetChatEvent("error", "widget_chat_stream_failed", {
             requestId: chatRequestId,
             widgetId: loaded.widget.id,
             agentId: selected!.agent.id,
             durationMs: Date.now() - requestStartedAt,
-            ...getErrorLogFields(error),
+            ...errorFields,
+          });
+          scheduleFlywheelCapture({
+            assistantAnswer: safeError.error,
+            assistantMessageId: null,
+            knowledgeMatchCount: 0,
+            runtimeHadError: true,
+            detectionReason: "The widget runtime failed before producing an answer.",
+            confidence: 0.92,
+            metadata: {
+              ...errorFields,
+              ...(safeError.code ? { clientErrorCode: safeError.code } : {}),
+            },
           });
           controller.enqueue(
             new TextEncoder().encode(

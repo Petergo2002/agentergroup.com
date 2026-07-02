@@ -4,7 +4,11 @@ import type {
   WidgetSessionMessageRecord,
   WidgetSessionRecord,
 } from "@/lib/types";
-import type { WidgetAdminSupabase, WidgetOrderedSelectBuilder } from "./server-types";
+import type {
+  WidgetAdminSupabase,
+  WidgetOrderedSelectBuilder,
+  WidgetQueryResult,
+} from "./server-types";
 
 export async function upsertWidgetSession(
   supabase: WidgetAdminSupabase,
@@ -190,22 +194,26 @@ export async function insertWidgetMessages(
   },
 ) {
   if (input.messages.length === 0) {
-    return;
+    return [];
   }
 
-  const { error } = await supabase.from("widget_session_messages").insert(
-    input.messages.map((message) => ({
-      widget_session_id: input.widgetSessionId,
-      widget_id: input.widgetId,
-      widget_agent_id: input.widgetAgentId,
-      agent_id: input.agentId,
-      role: message.role,
-      content: message.content,
-      metadata: message.metadata ?? {},
-    })),
-  );
+  const payload = input.messages.map((message) => ({
+    widget_session_id: input.widgetSessionId,
+    widget_id: input.widgetId,
+    widget_agent_id: input.widgetAgentId,
+    agent_id: input.agentId,
+    role: message.role,
+    content: message.content,
+    metadata: message.metadata ?? {},
+  }));
+  const insertBuilder = supabase.from("widget_session_messages").insert(payload) as unknown as {
+    select: (columns?: string) => Promise<WidgetQueryResult<WidgetSessionMessageRecord[]>>;
+  };
+  const { data, error } = await insertBuilder.select("*");
 
   if (error) {
     throw new Error(error.message);
   }
+
+  return (data ?? []) as WidgetSessionMessageRecord[];
 }

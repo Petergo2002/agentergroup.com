@@ -4,6 +4,9 @@ export type {
   ConnectionStatus,
   KnowledgeSourceStatus,
   KnowledgeSourceType,
+  UnansweredQueryStatus,
+  VerifiedFactStatus,
+  VerifiedFactVisibility,
   WidgetDeploymentStatus,
   RunStatus,
   MessageRole,
@@ -50,6 +53,13 @@ export type {
   DriveImportFileRecord,
   KnowledgeMatchRecord,
 } from "./knowledge";
+
+export type {
+  UnansweredQueryRecord,
+  VerifiedFactRecord,
+  FlywheelQuestionListItem,
+  FlywheelQuestionDetail,
+} from "./flywheel";
 
 export type { WidgetQuickAction, WidgetContactFormSettingsRecord } from "./widget-shared";
 

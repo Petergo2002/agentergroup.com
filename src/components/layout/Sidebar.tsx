@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Network,
   Database,
+  CircleHelp,
   X,
   ChevronLeft,
   ChevronRight,
@@ -95,6 +96,7 @@ export function Sidebar({
           icon: Users,
           badgeCount: newLeadCount,
         },
+        { name: t("nav.questions"), href: "/questions", icon: CircleHelp },
       ],
     },
     {

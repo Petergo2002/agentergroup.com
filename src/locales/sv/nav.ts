@@ -8,6 +8,7 @@ export const nav = {
   assistants: "Assistenter",
   widgets: "Widgets",
   leads: "Leads",
+  questions: "Frågor",
   knowledge: "Kunskap",
   connections: "Anslutningar",
   settings: "Inställningar",

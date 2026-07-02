@@ -7,6 +7,9 @@ export type ConnectionStatus =
   | "disconnected";
 export type KnowledgeSourceStatus = "pending" | "processing" | "ready" | "failed";
 export type KnowledgeSourceType = "text" | "file" | "website";
+export type UnansweredQueryStatus = "open" | "answered" | "dismissed" | "duplicate";
+export type VerifiedFactStatus = "draft" | "published" | "retired";
+export type VerifiedFactVisibility = "agent_only" | "public_ready";
 export type WidgetDeploymentStatus = "draft" | "deployed";
 export type RunStatus =
   | "queued"
