@@ -122,7 +122,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`flex h-full flex-col text-on-surface transition-all duration-300 ease-in-out ${
+      className={`depth-shell flex h-full flex-col text-on-surface transition-all duration-300 ease-in-out ${
         mobile
           ? "bg-surface shadow-2xl shadow-black/40"
           : `sticky top-0 h-screen shrink-0 border-r border-outline-variant/10 bg-surface-container-low transition-all duration-300 ease-in-out ${
@@ -154,7 +154,7 @@ export function Sidebar({
           {!mobile && onToggleCollapse && (
             <button
               onClick={onToggleCollapse}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+              className="depth-button flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container text-on-surface-variant transition-colors hover:border-primary/20 hover:bg-surface-container-high hover:text-on-surface"
               aria-label={isCollapsed ? t("common.expand") : t("common.collapse")}
               title={isCollapsed ? t("common.expand") : t("common.collapse")}
             >
@@ -169,7 +169,7 @@ export function Sidebar({
           {mobile && (
             <button
               aria-label={t("common.close")}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+              className="depth-button flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant/10 bg-surface-container text-on-surface-variant transition-colors hover:border-primary/20 hover:bg-surface-container-high hover:text-on-surface"
               onClick={onNavigate}
             >
               <X className="h-4.5 w-4.5" strokeWidth={2} />
@@ -228,12 +228,12 @@ export function Sidebar({
                         }${hasBadge ? ` (${t("nav.newLeads", { count: badgeCount })})` : ""}`
                       : undefined
                   }
-                  className={`group relative flex items-center gap-3 rounded-lg py-2.5 transition-all duration-200 ${
+                  className={`depth-nav-item group relative flex items-center gap-3 rounded-lg border py-2.5 transition-all duration-200 ${
                     isCollapsed && !mobile ? 'justify-center px-0 mx-1' : 'px-3 mx-0'
                   } ${
                     isActive 
-                      ? "bg-primary/[0.08] text-primary"
-                      : "text-on-surface-variant hover:bg-on-surface/[0.04] hover:text-on-surface"
+                      ? "depth-nav-item-active border-primary/15 bg-primary/[0.08] text-primary"
+                      : "border-transparent text-on-surface-variant hover:border-outline-variant/12 hover:bg-on-surface/[0.04] hover:text-on-surface"
                   }`}
                 >
                   <Icon
@@ -337,7 +337,7 @@ export function Sidebar({
         {/* Message Usage Bar */}
         {subscription && (
           <div className={`relative w-full ${isCollapsed && !mobile ? 'flex justify-center' : ''}`}>
-            <div className={`group relative rounded-xl border border-outline-variant/10 bg-surface-container-high/40 transition-all ${isCollapsed && !mobile ? 'flex h-12 w-12 flex-col items-center justify-center p-0' : 'p-2.5 w-full'}`}>
+            <div className={`depth-card group relative rounded-xl border border-outline-variant/10 bg-surface-container-high/40 transition-all ${isCollapsed && !mobile ? 'flex h-12 w-12 flex-col items-center justify-center p-0' : 'p-2.5 w-full'}`}>
               {isCollapsed && !mobile ? (
                 <>
                   <div className="flex items-center justify-center flex-1">
@@ -406,7 +406,7 @@ export function Sidebar({
         )}
 
         {membership.role !== 'owner' && (!isCollapsed || mobile) && (
-          <div className="group relative flex items-center gap-2.5 rounded-xl border border-primary/10 bg-primary/[0.02] px-2.5 py-2 transition-all duration-300 hover:border-primary/25 hover:bg-primary/[0.06]">
+          <div className="depth-card group relative flex items-center gap-2.5 rounded-xl border border-primary/10 bg-primary/[0.02] px-2.5 py-2 transition-all duration-300 hover:border-primary/25 hover:bg-primary/[0.06]">
             {/* Ambient glowing background spotlight matching brand orange */}
             <div className="pointer-events-none absolute -inset-px rounded-xl bg-gradient-to-r from-primary/0 via-primary/[0.04] to-primary/0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 

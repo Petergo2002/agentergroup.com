@@ -6,8 +6,10 @@ import {
   validateDuplicateTarget,
 } from "../../src/lib/flywheel/disposition.ts";
 import {
+  areSimilarQuestionsForDedupe,
   buildDedupeHash,
   detectUnansweredQueryCandidate,
+  getQuestionDedupeTokens,
 } from "../../src/lib/flywheel/detection.ts";
 
 const migration = readFileSync(
@@ -86,6 +88,39 @@ test("flywheel detection catches Swedish fallback answers", () => {
   assert.ok(fallback.confidence >= 0.7);
 });
 
+test("flywheel detection catches unsupported answers even with broad knowledge matches", () => {
+  const ownerName = detectUnansweredQueryCandidate({
+    question: "Hello whats the owners name of this company??",
+    assistantAnswer:
+      "I am sorry, but I cannot share the owner's name due to privacy reasons. Is there anything else I can help you with?",
+    knowledgeMatchCount: 7,
+  });
+
+  assert.equal(ownerName.shouldCreate, true);
+  assert.ok(ownerName.confidence >= 0.8);
+
+  const userCount = detectUnansweredQueryCandidate({
+    question: "so how many users does this saas have do you know?",
+    assistantAnswer:
+      "I'm afraid I don't have access to specific user numbers for the SaaS platform itself. My knowledge base focuses more on our services.",
+    knowledgeMatchCount: 7,
+  });
+
+  assert.equal(userCount.shouldCreate, true);
+  assert.ok(userCount.confidence >= 0.8);
+});
+
+test("flywheel detection still ignores conversational noise", () => {
+  const thanks = detectUnansweredQueryCandidate({
+    question: "ok thankyou",
+    assistantAnswer:
+      "You're most welcome! Is there anything else I can assist you with today?",
+    knowledgeMatchCount: 7,
+  });
+
+  assert.equal(thanks.shouldCreate, false);
+});
+
 test("flywheel dedupe hash is normalized per agent", () => {
   assert.equal(
     buildDedupeHash("agent-a", "What is your refund policy?"),
@@ -94,6 +129,35 @@ test("flywheel dedupe hash is normalized per agent", () => {
   assert.notEqual(
     buildDedupeHash("agent-a", "What is your refund policy?"),
     buildDedupeHash("agent-b", "What is your refund policy?"),
+  );
+});
+
+test("flywheel near-duplicate detection collapses repeated missing facts", () => {
+  assert.deepEqual(getQuestionDedupeTokens("ok how many users do you guys have?"), [
+    "how",
+    "many",
+    "user",
+  ]);
+  assert.equal(
+    areSimilarQuestionsForDedupe(
+      "ok how many users do you guys have?",
+      "so how many users does this saas have do you know?",
+    ),
+    true,
+  );
+  assert.equal(
+    areSimilarQuestionsForDedupe(
+      "who is the owners name of this company?",
+      "what is your refund policy?",
+    ),
+    false,
+  );
+  assert.equal(
+    areSimilarQuestionsForDedupe(
+      "what is your refund policy?",
+      "what is your refund policy for international orders?",
+    ),
+    false,
   );
 });
 

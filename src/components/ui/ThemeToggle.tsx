@@ -14,7 +14,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="h-9 w-9 rounded-xl border border-outline-variant/10 bg-surface-container animate-pulse" />
+      <div className="depth-card h-9 w-9 rounded-xl border border-outline-variant/10 bg-surface-container animate-pulse" />
     );
   }
 
@@ -23,7 +23,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container text-on-surface-variant transition-all hover:border-primary/20 hover:bg-surface-container-high hover:text-on-surface active:scale-90 group overflow-hidden"
+      className="depth-button relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container text-on-surface-variant transition-all hover:border-primary/20 hover:bg-surface-container-high hover:text-on-surface active:scale-90 group"
       aria-label="Toggle theme"
     >
       <div className="relative h-5 w-5 transition-transform duration-300 group-hover:rotate-[15deg]">

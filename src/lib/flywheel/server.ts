@@ -8,6 +8,7 @@ import {
   validateDuplicateTarget,
 } from "@/lib/flywheel/disposition";
 import {
+  areSimilarQuestionsForDedupe,
   buildDedupeHash,
   clampConfidence,
   truncate,
@@ -358,6 +359,35 @@ export async function dedupeUnansweredQuery(
   return (data ?? null) as UnansweredQueryRecord | null;
 }
 
+async function findSimilarOpenUnansweredQuery(
+  supabase: SupabaseAny,
+  input: {
+    workspaceId: string;
+    agentId: string;
+    question: string;
+  },
+) {
+  const { data, error } = await supabase
+    .from("unanswered_queries")
+    .select("*")
+    .eq("workspace_id", input.workspaceId)
+    .eq("agent_id", input.agentId)
+    .eq("status", "open")
+    .is("duplicate_of", null)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    throw new FlywheelError(error.message);
+  }
+
+  return (
+    ((data ?? []) as UnansweredQueryRecord[]).find((row) =>
+      areSimilarQuestionsForDedupe(row.question, input.question),
+    ) ?? null
+  );
+}
+
 export async function createUnansweredQueryCandidate(
   supabase: SupabaseAny,
   input: CreateCandidateInput,
@@ -373,6 +403,16 @@ export async function createUnansweredQueryCandidate(
 
   if (existing) {
     return { query: existing, created: false };
+  }
+
+  const similarExisting = await findSimilarOpenUnansweredQuery(supabase, {
+    workspaceId: input.workspaceId,
+    agentId: input.agentId,
+    question,
+  });
+
+  if (similarExisting) {
+    return { query: similarExisting, created: false };
   }
 
   const { data, error } = await supabase

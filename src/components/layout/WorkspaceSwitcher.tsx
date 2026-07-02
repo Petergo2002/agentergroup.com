@@ -89,8 +89,8 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
       {/* Switcher Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`group flex items-center gap-2.5 rounded-xl border border-transparent transition-all duration-200 active:scale-[0.98] hover:bg-on-surface/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-          isOpen ? 'bg-on-surface/[0.04]' : ''
+        className={`depth-button group flex items-center gap-2.5 rounded-xl border border-outline-variant/10 bg-surface-container-lowest transition-all duration-200 active:scale-[0.98] hover:border-primary/15 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+          isOpen ? 'border-primary/20 bg-surface-container-low' : ''
         } ${isMinimized ? 'h-12 w-12 justify-center p-0' : 'w-full px-2 py-2'}`}
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -129,7 +129,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
       {/* Dropdown Menu */}
       {isOpen && (
         <div
-          className={`absolute bottom-full z-50 mb-2 w-[280px] overflow-hidden rounded-2xl glass-panel shadow-premium p-2 animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-200 ease-out origin-bottom-left ${
+          className={`depth-panel absolute bottom-full z-50 mb-2 w-[280px] overflow-hidden rounded-2xl glass-panel p-2 animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-200 ease-out origin-bottom-left ${
             isMinimized ? 'left-full ml-4 bottom-0 origin-bottom-left' : 'left-0'
           }`}
         >
@@ -149,10 +149,10 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
                   key={ws.id}
                   onClick={() => handleSwitchWorkspace(ws.id)}
                   disabled={isActive || isSwitching}
-                  className={`group/ws-item flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  className={`depth-nav-item group/ws-item flex w-full items-center gap-2.5 rounded-lg border px-2 py-2 text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     isActive
-                      ? 'bg-primary/[0.08] text-primary'
-                      : 'text-on-surface-variant hover:bg-on-surface/[0.04] hover:text-on-surface'
+                      ? 'depth-nav-item-active border-primary/15 bg-primary/[0.08] text-primary'
+                      : 'border-transparent text-on-surface-variant hover:border-outline-variant/12 hover:bg-on-surface/[0.04] hover:text-on-surface'
                   }`}
                 >
                   <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${isActive ? 'bg-primary/10' : 'bg-surface-container-high group-hover/ws-item:bg-surface-container-highest'}`}>
@@ -176,7 +176,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
               setIsOpen(false);
               onNavigate?.();
             }}
-            className="group/settings flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] font-medium text-on-surface-variant transition-all duration-200 active:scale-[0.98] hover:bg-on-surface/[0.04] hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="depth-nav-item group/settings flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-2 text-left text-[13px] font-medium text-on-surface-variant transition-all duration-200 active:scale-[0.98] hover:border-outline-variant/12 hover:bg-on-surface/[0.04] hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <Settings className="h-4 w-4 text-on-surface-variant transition-transform duration-300 group-hover/settings:rotate-45 group-hover/settings:text-on-surface" />
             <span>{t('nav.settings') || 'Settings'}</span>
@@ -194,9 +194,9 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
             }}
             disabled={!hasWorkspaceCapacity && subscription?.plan_tier === 'premium'}
             title={!hasWorkspaceCapacity ? createWorkspaceLimitLabel : undefined}
-            className={`group/create flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] font-medium transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+            className={`depth-nav-item group/create flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-2 text-left text-[13px] font-medium transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               hasWorkspaceCapacity
-                ? 'text-on-surface-variant hover:bg-on-surface/[0.04] hover:text-on-surface'
+                ? 'text-on-surface-variant hover:border-outline-variant/12 hover:bg-on-surface/[0.04] hover:text-on-surface'
                 : subscription?.plan_tier === 'premium'
                   ? 'cursor-not-allowed text-on-surface-variant/50'
                   : 'text-primary hover:bg-primary/10 hover:text-primary'
@@ -223,7 +223,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
           <form action="/auth/logout" method="post" className="w-full">
             <button
               type="submit"
-              className="group/logout flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] font-medium text-on-surface-variant transition-all duration-200 active:scale-[0.98] hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="depth-nav-item group/logout flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-2 text-left text-[13px] font-medium text-on-surface-variant transition-all duration-200 active:scale-[0.98] hover:border-error/15 hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <LogOut className="h-4 w-4 text-on-surface-variant transition-colors duration-200 group-hover/logout:text-error" />
               <span className="transition-colors duration-200">{t('nav.signOut') || 'Sign out'}</span>

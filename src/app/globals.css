@@ -45,6 +45,14 @@
   --primary-rgb: 255, 92, 0;
   --shadow-premium: 0 12px 40px -12px rgba(0, 0, 0, 0.08);
   --shadow-tactile: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-shell: 0 24px 60px -44px rgba(15, 23, 42, 0.28), 0 1px 0 rgba(255, 255, 255, 0.82) inset;
+  --shadow-panel: 0 18px 42px -30px rgba(15, 23, 42, 0.22), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-control: 0 1px 1px rgba(15, 23, 42, 0.06), 0 8px 18px -15px rgba(15, 23, 42, 0.32);
+  --shadow-control-hover: 0 2px 4px rgba(15, 23, 42, 0.08), 0 16px 30px -20px rgba(15, 23, 42, 0.36);
+  --shadow-control-pressed: 0 1px 1px rgba(15, 23, 42, 0.06), 0 4px 10px -12px rgba(15, 23, 42, 0.3);
+  --shadow-primary-control: 0 12px 24px -16px rgba(15, 23, 42, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --shadow-focus: 0 0 0 3px rgba(var(--primary-rgb), 0.14);
+  --depth-border: rgba(15, 23, 42, 0.1);
   --precision-border: rgba(15, 23, 42, 0.08);
   --glass-background: rgba(255, 255, 255, 0.7);
   --app-shell-bg: radial-gradient(circle at top right, rgba(255, 92, 0, 0.05), transparent 35%),
@@ -89,6 +97,14 @@
 
   --primary-rgb: 255, 92, 0;
   --shadow-premium: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
+  --shadow-shell: 0 28px 70px -36px rgba(0, 0, 0, 0.82), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --shadow-panel: 0 24px 56px -34px rgba(0, 0, 0, 0.78), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --shadow-control: 0 1px 1px rgba(255, 255, 255, 0.04) inset, 0 10px 22px -18px rgba(0, 0, 0, 0.9);
+  --shadow-control-hover: 0 1px 1px rgba(255, 255, 255, 0.06) inset, 0 18px 34px -22px rgba(0, 0, 0, 0.95);
+  --shadow-control-pressed: 0 1px 1px rgba(255, 255, 255, 0.035) inset, 0 6px 16px -18px rgba(0, 0, 0, 0.9);
+  --shadow-primary-control: 0 16px 34px -20px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow-focus: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
+  --depth-border: rgba(255, 255, 255, 0.1);
   --glass-background: rgba(10, 10, 10, 0.82);
   --app-shell-bg: radial-gradient(circle at top right, rgba(255, 92, 0, 0.1), transparent 28%),
                   linear-gradient(180deg, #080808 0%, #050505 100%);
@@ -160,6 +176,7 @@
     background: var(--glass-background);
     backdrop-filter: blur(18px);
     border: 1px solid var(--color-outline-variant);
+    box-shadow: var(--shadow-panel);
   }
   .app-shell-gradient {
     background: var(--app-shell-bg);
@@ -179,6 +196,110 @@
 }
 
 @layer components {
+  .depth-shell {
+    border-color: var(--depth-border);
+    box-shadow: var(--shadow-shell);
+  }
+
+  .depth-panel {
+    border-color: var(--depth-border);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .depth-card {
+    border-color: var(--depth-border);
+    box-shadow: var(--shadow-control);
+  }
+
+  .depth-input {
+    border-color: var(--depth-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .dark .depth-input {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  .depth-input:focus,
+  .depth-input:focus-visible {
+    box-shadow: var(--shadow-focus), var(--shadow-control);
+  }
+
+  .depth-button,
+  .depth-row {
+    box-shadow: var(--shadow-control);
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      background-color 180ms ease,
+      color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .depth-nav-item {
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      background-color 180ms ease,
+      color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .depth-button:not(:disabled):hover,
+  .depth-row:not(:disabled):hover,
+  .depth-nav-item:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-control-hover);
+  }
+
+  .depth-button:not(:disabled):active,
+  .depth-row:not(:disabled):active,
+  .depth-nav-item:not(:disabled):active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-control-pressed);
+  }
+
+  .depth-button:focus-visible,
+  .depth-row:focus-visible,
+  .depth-nav-item:focus-visible {
+    box-shadow: var(--shadow-focus), var(--shadow-control-hover);
+  }
+
+  .depth-button-primary {
+    box-shadow: var(--shadow-primary-control);
+  }
+
+  .depth-button-primary:not(:disabled):hover {
+    box-shadow: var(--shadow-primary-control);
+  }
+
+  .depth-nav-item-active {
+    box-shadow: var(--shadow-control-hover);
+  }
+
+  .depth-row-selected {
+    box-shadow: var(--shadow-focus), var(--shadow-control-hover);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .depth-button,
+    .depth-row,
+    .depth-nav-item,
+    .depth-button:not(:disabled):hover,
+    .depth-row:not(:disabled):hover,
+    .depth-nav-item:not(:disabled):hover,
+    .depth-button:not(:disabled):active,
+    .depth-row:not(:disabled):active,
+    .depth-nav-item:not(:disabled):active {
+      transform: none;
+      transition-duration: 1ms;
+    }
+  }
+
   /* Google OAuth sign-in button on the login page */
   .google-sign-in-btn {
     display: flex;

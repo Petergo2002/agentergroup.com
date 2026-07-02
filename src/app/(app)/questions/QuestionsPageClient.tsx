@@ -9,6 +9,7 @@ import {
   Copy,
   ExternalLink,
   Filter,
+  Info,
   Loader2,
   MessageSquareText,
   MoreHorizontal,
@@ -75,9 +76,9 @@ const copy = {
     loadErrorTitle: "Questions could not be loaded",
     retry: "Retry",
     selectedEmpty: "Select a question",
-    selectedEmptyBody: "Choose a row to review context and publish a verified answer.",
+    selectedEmptyBody: "Choose a row to review details and publish a verified answer.",
     previousAnswer: "Assistant answer",
-    context: "Conversation context",
+    details: "Details",
     verifiedAnswer: "Verified answer",
     answerPlaceholder: "Write the reusable, customer-approved answer...",
     publish: "Publish to agent",
@@ -91,9 +92,13 @@ const copy = {
     retryProcessing: "Retry processing",
     openConversation: "Open conversation",
     source: "Source",
+    referrer: "Referrer",
     reason: "Reason",
     confidence: "Confidence",
     visibility: "Visibility",
+    visibilityHelpLabel: "What do these options mean?",
+    visibilityHelpAgentOnly: "Agent only: added to this agent's knowledge for future chats, but not marked as public copy.",
+    visibilityHelpPublicReady: "Public ready: polished enough to reuse later in a public FAQ or help page. It still only publishes to the agent right now.",
     agentOnly: "Agent only",
     publicReady: "Public ready",
     addedToKnowledge: "Added to agent knowledge",
@@ -128,9 +133,9 @@ const copy = {
     loadErrorTitle: "Frågorna kunde inte laddas",
     retry: "Försök igen",
     selectedEmpty: "Välj en fråga",
-    selectedEmptyBody: "Välj en rad för att granska kontext och publicera ett verifierat svar.",
+    selectedEmptyBody: "Välj en rad för att granska detaljer och publicera ett verifierat svar.",
     previousAnswer: "Agentens svar",
-    context: "Konversation",
+    details: "Detaljer",
     verifiedAnswer: "Verifierat svar",
     answerPlaceholder: "Skriv det återanvändbara, kundgodkända svaret...",
     publish: "Publicera till agent",
@@ -144,9 +149,13 @@ const copy = {
     retryProcessing: "Kör processing igen",
     openConversation: "Öppna konversation",
     source: "Källa",
+    referrer: "Hänvisning",
     reason: "Orsak",
     confidence: "Confidence",
     visibility: "Synlighet",
+    visibilityHelpLabel: "Vad betyder alternativen?",
+    visibilityHelpAgentOnly: "Endast agent: läggs till i agentens kunskap för framtida chattar, men markeras inte som publik text.",
+    visibilityHelpPublicReady: "Publik redo: godkänt nog att senare återanvändas i en publik FAQ eller hjälpsida. Just nu publiceras det ändå bara till agenten.",
     agentOnly: "Endast agent",
     publicReady: "Publik redo",
     addedToKnowledge: "Tillagd i agentens kunskap",
@@ -214,20 +223,6 @@ function formatConfidence(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
-function getConversationMessages(
-  question: FlywheelQuestionDetail | FlywheelQuestionListItem | null,
-): FlywheelQuestionDetail["conversation_messages"] {
-  if (
-    question &&
-    "conversation_messages" in question &&
-    Array.isArray(question.conversation_messages)
-  ) {
-    return question.conversation_messages;
-  }
-
-  return [];
-}
-
 function QuestionSkeleton() {
   return (
     <div className="space-y-3">
@@ -251,8 +246,8 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-dashed border-outline-variant/25 bg-surface-container-lowest px-6 py-14 text-center shadow-sm">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant ring-1 ring-outline-variant/15">
+    <section className="depth-panel rounded-2xl border border-dashed border-outline-variant/25 bg-surface-container-lowest px-6 py-14 text-center">
+      <div className="depth-card mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-low text-on-surface-variant">
         <MessageSquareText className="h-5 w-5" />
       </div>
       <h2 className="text-base font-semibold text-on-surface">{title}</h2>
@@ -327,7 +322,6 @@ export default function QuestionsPageClient({
   const selectedVerifiedFactVisibility =
     selectedQuestion?.verified_fact?.visibility ?? "agent_only";
   const selectedAgentId = selectedQuestion?.agent_id ?? null;
-  const conversationMessages = getConversationMessages(selectedQuestion);
 
   useEffect(() => {
     if (!selectedQuestionId && questions[0]) {
@@ -553,7 +547,7 @@ export default function QuestionsPageClient({
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+      <header className="depth-panel rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 sm:px-6 lg:px-7">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/8 px-2.5 py-1 text-primary">
@@ -583,9 +577,9 @@ export default function QuestionsPageClient({
                   key={status}
                   type="button"
                   onClick={() => setStatusFilter(status)}
-                  className={`rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                  className={`depth-button rounded-xl border px-3 py-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                     statusFilter === status
-                      ? "border-primary/25 bg-primary/[0.08]"
+                      ? "depth-button-primary border-primary/25 bg-primary/[0.08]"
                       : "border-outline-variant/15 bg-surface-container-low hover:bg-surface-container"
                   }`}
                 >
@@ -602,7 +596,7 @@ export default function QuestionsPageClient({
         </div>
       </header>
 
-      <section className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-3 shadow-sm">
+      <section className="depth-panel rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-3">
         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_160px_180px_180px_180px_auto]">
           <label className="relative min-w-0">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/45" />
@@ -611,7 +605,7 @@ export default function QuestionsPageClient({
               onChange={(event) => setSearch(event.target.value)}
               type="search"
               placeholder={text.search}
-              className="h-11 w-full rounded-xl border border-transparent bg-surface-container-low pl-11 pr-4 text-sm font-medium text-on-surface outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/20 focus:bg-background focus:ring-2 focus:ring-primary/15"
+              className="depth-input h-11 w-full rounded-xl border border-transparent bg-surface-container-low pl-11 pr-4 text-sm font-medium text-on-surface outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/20 focus:bg-background focus:ring-2 focus:ring-primary/15"
             />
           </label>
 
@@ -622,7 +616,7 @@ export default function QuestionsPageClient({
               onChange={(event) =>
                 setStatusFilter(event.target.value as UnansweredQueryStatus | "all")
               }
-              className="h-11 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-9 pr-8 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
+              className="depth-input h-11 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-9 pr-8 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
             >
               <option value="all">{text.allStatuses}</option>
               <option value="open">Open</option>
@@ -635,7 +629,7 @@ export default function QuestionsPageClient({
           <select
             value={agentFilter}
             onChange={(event) => setAgentFilter(event.target.value)}
-            className="h-11 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
+            className="depth-input h-11 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
             aria-label={text.agent}
           >
             <option value="">{text.allAgents}</option>
@@ -649,7 +643,7 @@ export default function QuestionsPageClient({
           <select
             value={widgetFilter}
             onChange={(event) => setWidgetFilter(event.target.value)}
-            className="h-11 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
+            className="depth-input h-11 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
             aria-label={text.widget}
           >
             <option value="">{text.allWidgets}</option>
@@ -665,7 +659,7 @@ export default function QuestionsPageClient({
             <select
               value={sortMode}
               onChange={(event) => setSortMode(event.target.value as SortMode)}
-              className="h-11 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-9 pr-8 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
+              className="depth-input h-11 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-9 pr-8 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
             >
               <option value="newest">{text.newest}</option>
               <option value="oldest">{text.oldest}</option>
@@ -677,7 +671,7 @@ export default function QuestionsPageClient({
           <button
             type="button"
             onClick={() => void refreshAll()}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-outline-variant/15 px-3 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="depth-button inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             <RefreshCw className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`} />
             {text.retry}
@@ -697,7 +691,7 @@ export default function QuestionsPageClient({
                 <button
                   type="button"
                   onClick={() => void mutate()}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background"
+                  className="depth-button depth-button-primary inline-flex h-10 items-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background"
                 >
                   <RefreshCw className="h-4 w-4" />
                   {text.retry}
@@ -713,7 +707,7 @@ export default function QuestionsPageClient({
                   <button
                     type="button"
                     onClick={clearFilters}
-                    className="inline-flex h-10 items-center rounded-xl bg-on-surface px-4 text-sm font-semibold text-background"
+                    className="depth-button depth-button-primary inline-flex h-10 items-center rounded-xl bg-on-surface px-4 text-sm font-semibold text-background"
                   >
                     {text.clearFilters}
                   </button>
@@ -729,9 +723,9 @@ export default function QuestionsPageClient({
                   key={question.id}
                   type="button"
                   onClick={() => setSelectedQuestionId(question.id)}
-                  className={`group grid w-full gap-4 rounded-xl border bg-surface-container-lowest px-4 py-4 text-left shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 md:grid-cols-[minmax(0,1fr)_180px_120px] md:items-center ${
+                  className={`depth-row group grid w-full gap-4 rounded-xl border bg-surface-container-lowest px-4 py-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 md:grid-cols-[minmax(0,1fr)_180px_120px] md:items-center ${
                     isSelected
-                      ? "border-primary/30 bg-primary/[0.04]"
+                      ? "depth-row-selected border-primary/30 bg-primary/[0.04]"
                       : "border-outline-variant/12 hover:border-primary/20 hover:bg-surface-container-low/45"
                   }`}
                 >
@@ -787,7 +781,7 @@ export default function QuestionsPageClient({
           )}
         </section>
 
-        <aside className="min-w-0 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm xl:sticky xl:top-6 xl:max-h-[calc(100vh-48px)] xl:overflow-hidden">
+        <aside className="depth-panel min-w-0 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest xl:sticky xl:top-6 xl:max-h-[calc(100vh-48px)] xl:overflow-hidden">
           {!selectedQuestion ? (
             <div className="p-6">
               <EmptyState title={text.selectedEmpty} body={text.selectedEmptyBody} />
@@ -808,6 +802,15 @@ export default function QuestionsPageClient({
                     <h2 className="mt-3 text-lg font-semibold leading-snug text-on-surface">
                       {selectedQuestion.question}
                     </h2>
+                    {selectedQuestion.widget_session_id ? (
+                      <Link
+                        href={`/analytics?session=${encodeURIComponent(selectedQuestion.widget_session_id)}`}
+                        className="depth-button mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        {text.openConversation}
+                      </Link>
+                    ) : null}
                   </div>
                   {isDetailLoading ? (
                     <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" />
@@ -815,103 +818,79 @@ export default function QuestionsPageClient({
                 </div>
               </div>
 
-              <div className="flex-1 space-y-5 overflow-y-auto p-5">
-                <section className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-outline-variant/12 bg-surface-container-low p-3">
-                    <p className="text-xs font-medium text-on-surface-variant/65">
-                      {text.agent}
-                    </p>
-                    <p className="mt-1 truncate text-sm font-semibold text-on-surface">
-                      {selectedQuestion.agent_name ?? "Unknown"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-outline-variant/12 bg-surface-container-low p-3">
-                    <p className="text-xs font-medium text-on-surface-variant/65">
-                      {text.widget}
-                    </p>
-                    <p className="mt-1 truncate text-sm font-semibold text-on-surface">
-                      {selectedQuestion.widget_name ?? "Unknown"}
-                    </p>
-                  </div>
-                </section>
-
-                {selectedQuestion.page_url || selectedQuestion.referrer ? (
-                  <section className="rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
-                    <h3 className="text-xs font-semibold text-on-surface-variant">
-                      {text.source}
-                    </h3>
+              <div className="flex-1 space-y-4 overflow-y-auto p-5">
+                <section className="depth-card rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
+                  <h3 className="text-xs font-semibold text-on-surface-variant">
+                    {text.details}
+                  </h3>
+                  <dl className="mt-3 divide-y divide-outline-variant/10 text-sm">
+                    <div className="grid gap-1 pb-3 sm:grid-cols-[84px_minmax(0,1fr)]">
+                      <dt className="text-xs font-medium text-on-surface-variant/65">
+                        {text.agent}
+                      </dt>
+                      <dd className="min-w-0 truncate font-semibold text-on-surface">
+                        {selectedQuestion.agent_name ?? "Unknown"}
+                      </dd>
+                    </div>
+                    <div className="grid gap-1 py-3 sm:grid-cols-[84px_minmax(0,1fr)]">
+                      <dt className="text-xs font-medium text-on-surface-variant/65">
+                        {text.widget}
+                      </dt>
+                      <dd className="min-w-0 truncate font-semibold text-on-surface">
+                        {selectedQuestion.widget_name ?? "Unknown"}
+                      </dd>
+                    </div>
                     {selectedQuestion.page_url ? (
-                      <a
-                        href={selectedQuestion.page_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-2 flex min-w-0 items-center gap-2 text-sm font-medium text-primary"
-                      >
-                        <ExternalLink className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{selectedQuestion.page_url}</span>
-                      </a>
+                      <div className="grid gap-1 py-3 sm:grid-cols-[84px_minmax(0,1fr)]">
+                        <dt className="text-xs font-medium text-on-surface-variant/65">
+                          {text.source}
+                        </dt>
+                        <dd className="min-w-0">
+                          <a
+                            href={selectedQuestion.page_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex max-w-full items-center gap-2 font-medium text-primary hover:text-primary/80"
+                          >
+                            <ExternalLink className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{selectedQuestion.page_url}</span>
+                          </a>
+                        </dd>
+                      </div>
                     ) : null}
                     {selectedQuestion.referrer ? (
-                      <p className="mt-2 truncate text-xs text-on-surface-variant/65">
-                        {selectedQuestion.referrer}
-                      </p>
+                      <div className="grid gap-1 py-3 sm:grid-cols-[84px_minmax(0,1fr)]">
+                        <dt className="text-xs font-medium text-on-surface-variant/65">
+                          {text.referrer}
+                        </dt>
+                        <dd className="min-w-0 truncate font-medium text-on-surface-variant">
+                          {selectedQuestion.referrer}
+                        </dd>
+                      </div>
                     ) : null}
-                  </section>
-                ) : null}
-
-                <section className="rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
-                  <h3 className="text-xs font-semibold text-on-surface-variant">
-                    {text.reason}
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-on-surface">
-                    {selectedQuestion.detection_reason}
-                  </p>
+                    <div className="pt-3">
+                      <dt className="text-xs font-medium text-on-surface-variant/65">
+                        {text.reason}
+                      </dt>
+                      <dd className="mt-1 text-sm leading-6 text-on-surface">
+                        {selectedQuestion.detection_reason}
+                      </dd>
+                    </div>
+                  </dl>
                 </section>
 
                 {selectedQuestion.assistant_answer ? (
-                  <section className="rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
+                  <section className="depth-card rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
                     <h3 className="text-xs font-semibold text-on-surface-variant">
                       {text.previousAnswer}
                     </h3>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-on-surface-variant">
+                    <p className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-on-surface-variant">
                       {selectedQuestion.assistant_answer}
                     </p>
                   </section>
                 ) : null}
 
-                <section className="rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
-                  <h3 className="text-xs font-semibold text-on-surface-variant">
-                    {text.context}
-                  </h3>
-                  {conversationMessages.length > 0 ? (
-                    <div className="mt-3 space-y-2">
-                      {conversationMessages.slice(-8).map((message) => (
-                        <div
-                          key={message.id}
-                          className="rounded-lg bg-surface-container-lowest px-3 py-2"
-                        >
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant/60">
-                              {message.role}
-                            </span>
-                            <span className="text-[11px] text-on-surface-variant/45">
-                              {formatRelativeDate(message.created_at, language)}
-                            </span>
-                          </div>
-                          <p className="line-clamp-4 whitespace-pre-wrap text-xs leading-5 text-on-surface-variant">
-                            {message.content}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-on-surface-variant">
-                      {selectedQuestion.context_excerpt || selectedQuestion.question}
-                    </p>
-                  )}
-                </section>
-
-                <section className="rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
+                <section className="depth-card rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <h3 className="text-xs font-semibold text-on-surface-variant">
                       {text.verifiedAnswer}
@@ -926,34 +905,63 @@ export default function QuestionsPageClient({
                     value={answerDraft}
                     onChange={(event) => setAnswerDraft(event.target.value)}
                     placeholder={text.answerPlaceholder}
-                    rows={7}
-                    className="min-h-[180px] w-full resize-y rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3 text-sm leading-6 text-on-surface outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/30 focus:ring-2 focus:ring-primary/15"
+                    rows={6}
+                    className="depth-input min-h-[150px] w-full resize-y rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3 text-sm leading-6 text-on-surface outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/30 focus:ring-2 focus:ring-primary/15"
                   />
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <div className="inline-flex rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-1">
-                      {(["agent_only", "public_ready"] as VerifiedFactVisibility[]).map(
-                        (option) => (
+                    <div className="flex min-w-0 flex-col gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-on-surface-variant">
+                          {text.visibility}
+                        </span>
+                        <span className="group/visibility-help relative inline-flex">
                           <button
-                            key={option}
                             type="button"
-                            onClick={() => setVisibility(option)}
-                            className={`h-9 rounded-lg px-3 text-xs font-semibold transition-colors ${
-                              visibility === option
-                                ? "bg-on-surface text-background"
-                                : "text-on-surface-variant hover:bg-surface-container"
-                            }`}
+                            aria-label={text.visibilityHelpLabel}
+                            aria-describedby="question-visibility-help"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-outline-variant/15 bg-surface-container-lowest text-on-surface-variant transition-all hover:border-primary/25 hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                           >
-                            {option === "agent_only" ? text.agentOnly : text.publicReady}
+                            <Info className="h-3.5 w-3.5" />
                           </button>
-                        ),
-                      )}
+                          <span
+                            id="question-visibility-help"
+                            role="tooltip"
+                            className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-outline-variant/15 bg-on-surface px-3 py-2 text-left text-xs leading-5 text-background opacity-0 shadow-xl transition-opacity group-hover/visibility-help:opacity-100 group-focus-within/visibility-help:opacity-100"
+                          >
+                            <span className="block font-semibold">
+                              {text.visibilityHelpAgentOnly}
+                            </span>
+                            <span className="mt-1 block text-background/75">
+                              {text.visibilityHelpPublicReady}
+                            </span>
+                          </span>
+                        </span>
+                      </div>
+                      <div className="depth-card inline-flex rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-1">
+                        {(["agent_only", "public_ready"] as VerifiedFactVisibility[]).map(
+                          (option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => setVisibility(option)}
+                              className={`h-9 rounded-lg px-3 text-xs font-semibold transition-all ${
+                                visibility === option
+                                  ? "depth-button-primary bg-on-surface text-background"
+                                  : "text-on-surface-variant hover:bg-surface-container"
+                              }`}
+                            >
+                              {option === "agent_only" ? text.agentOnly : text.publicReady}
+                            </button>
+                          ),
+                        )}
+                      </div>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => void submitAnswer()}
                       disabled={isSaving || !answerDraft.trim() || selectedQuestion.status === "duplicate"}
-                      className="inline-flex h-11 items-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="depth-button depth-button-primary inline-flex h-11 items-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-all hover:bg-on-surface/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isSaving ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -977,7 +985,7 @@ export default function QuestionsPageClient({
                         <button
                           type="button"
                           onClick={() => void retryProcessing()}
-                          className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg bg-error px-3 text-xs font-semibold text-white"
+                          className="depth-button mt-3 inline-flex h-9 items-center gap-2 rounded-lg bg-error px-3 text-xs font-semibold text-white"
                         >
                           <RefreshCw className="h-3.5 w-3.5" />
                           {text.retryProcessing}
@@ -994,7 +1002,7 @@ export default function QuestionsPageClient({
                 </section>
 
                 {canMarkDuplicate ? (
-                  <section className="rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
+                  <section className="depth-card rounded-xl border border-outline-variant/12 bg-surface-container-low p-4">
                     <h3 className="text-xs font-semibold text-on-surface-variant">
                       {text.duplicate}
                     </h3>
@@ -1002,7 +1010,7 @@ export default function QuestionsPageClient({
                       <select
                         value={duplicateTargetId}
                         onChange={(event) => setDuplicateTargetId(event.target.value)}
-                        className="h-10 min-w-0 flex-1 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 text-sm text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
+                        className="depth-input h-10 min-w-0 flex-1 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 text-sm text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
                       >
                         <option value="">{text.chooseOriginal}</option>
                         {duplicateOptions.map((question) => (
@@ -1015,7 +1023,7 @@ export default function QuestionsPageClient({
                         type="button"
                         disabled={!duplicateTargetId || isUpdatingStatus}
                         onClick={() => void updateQuestionStatus("mark_duplicate")}
-                        className="inline-flex h-10 items-center rounded-xl border border-outline-variant/15 px-3 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:opacity-50"
+                        className="depth-button inline-flex h-10 items-center rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface disabled:opacity-50"
                       >
                         <Copy className="h-4 w-4" />
                       </button>
@@ -1024,25 +1032,14 @@ export default function QuestionsPageClient({
                 ) : null}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/10 p-5">
-                {selectedQuestion.widget_session_id ? (
-                  <Link
-                    href={`/analytics?session=${encodeURIComponent(selectedQuestion.widget_session_id)}`}
-                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-outline-variant/15 px-3 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    {text.openConversation}
-                  </Link>
-                ) : (
-                  <span />
-                )}
-                <div className="flex gap-2">
+              {canReopenQuestion || canDismissQuestion ? (
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-outline-variant/10 p-5">
                   {canReopenQuestion ? (
                     <button
                       type="button"
                       disabled={isUpdatingStatus}
                       onClick={() => void updateQuestionStatus("reopen")}
-                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-outline-variant/15 px-3 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:opacity-50"
+                      className="depth-button inline-flex h-10 items-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface disabled:opacity-50"
                     >
                       <RotateCcw className="h-4 w-4" />
                       {text.reopen}
@@ -1053,14 +1050,14 @@ export default function QuestionsPageClient({
                       type="button"
                       disabled={isUpdatingStatus}
                       onClick={() => void updateQuestionStatus("dismiss")}
-                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-outline-variant/15 px-3 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:opacity-50"
+                      className="depth-button inline-flex h-10 items-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface disabled:opacity-50"
                     >
                       <Clock3 className="h-4 w-4" />
                       {text.dismiss}
                     </button>
                   ) : null}
                 </div>
-              </div>
+              ) : null}
             </div>
           )}
         </aside>
