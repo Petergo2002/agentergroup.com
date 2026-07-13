@@ -32,7 +32,7 @@ function StatCard({ item, isLoading }: StatCardProps) {
   const Icon = item.icon;
 
   return (
-    <article className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low/45">
+    <article className="app-card transition-colors hover:border-primary/25 hover:bg-surface-container-low/45">
       <div className="flex items-start justify-between gap-4">
         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.tone}`}>
           <Icon className="h-5 w-5" strokeWidth={2.1} />

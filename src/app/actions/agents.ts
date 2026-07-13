@@ -50,7 +50,11 @@ export async function createAgentAction(formData: FormData) {
     .single();
 
   if (error) {
-    return { error: error.message };
+    return {
+      error: error.message.includes('AGENT_LIMIT_REACHED')
+        ? 'You have reached your agent limit. Please upgrade your plan.'
+        : error.message,
+    };
   }
 
   revalidatePath('/agents');

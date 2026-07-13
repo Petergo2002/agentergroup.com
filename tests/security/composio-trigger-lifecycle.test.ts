@@ -14,6 +14,10 @@ const webhookRouteSource = readFileSync(
   "src/app/api/composio/webhook/route.ts",
   "utf8",
 );
+const authorizeConnectionSource = readFileSync(
+  "src/app/api/connections/authorize/route.ts",
+  "utf8",
+);
 const adminToggleSource = readFileSync(
   "src/components/admin/AdminAutomationsToggle.tsx",
   "utf8",
@@ -56,6 +60,19 @@ test("save and delete authorize edits before mutating provider triggers", () => 
   }
 });
 
+test("automation cleanup remains available after the agent returns to widget mode", () => {
+  const deleteStart = automationRouteSource.indexOf("export async function DELETE");
+  const deleteBlock = automationRouteSource.slice(deleteStart);
+
+  assert.match(deleteBlock, /loadWorkspaceAgent\(/);
+  assert.doesNotMatch(deleteBlock, /loadAutomationHostAgent\(/);
+  assert.match(deleteBlock, /const admin = createAdminClient\(\)/);
+  assert.match(
+    deleteBlock,
+    /admin[\s\S]*from\("agent_automations"\)[\s\S]*delete\(\)/,
+  );
+});
+
 test("pause persists automation state before agent state and compensates failures", () => {
   const pauseStart = statusRouteSource.indexOf('if (action === "pause")');
   const pauseEnd = statusRouteSource.indexOf(
@@ -83,6 +100,25 @@ test("activation is blocked when the admin feature flag is disabled", () => {
   assert.match(statusRouteSource, /AUTOMATIONS_DISABLED_CODE/);
 });
 
+test("connection and automation activation require integration entitlement", () => {
+  const authorizationRequest = authorizeConnectionSource.indexOf(
+    "await createConnectionRequest",
+  );
+  const authorizationEntitlement = authorizeConnectionSource.indexOf(
+    "context.subscription?.integrations_enabled",
+  );
+  const triggerActivation = statusRouteSource.indexOf("await createComposioTrigger");
+  const activationEntitlement = statusRouteSource.indexOf(
+    "context.subscription?.integrations_enabled",
+  );
+
+  assert.ok(authorizationEntitlement >= 0);
+  assert.ok(authorizationRequest > authorizationEntitlement);
+  assert.ok(activationEntitlement >= 0);
+  assert.ok(triggerActivation > activationEntitlement);
+  assert.match(authorizeConnectionSource, /authorizeConnectionSchema\.safeParse/);
+});
+
 test("V3 platform events are routed from the verified raw webhook envelope", () => {
   assert.match(webhookRouteSource, /isRecord\(verified\.rawPayload\)/);
   assert.match(webhookRouteSource, /COMPOSIO_CONNECTION_EXPIRED_EVENT/);
@@ -99,6 +135,23 @@ test("trigger webhooks can be matched from raw V3 trigger metadata", () => {
   assert.match(webhookRouteSource, /rawEventMetadata\.trigger_id/);
   assert.match(webhookRouteSource, /rawEventData\.trigger_nano_id/);
   assert.match(webhookRouteSource, /Ignoring trigger webhook without active automation/);
+});
+
+test("trigger webhooks reject stale agents and disabled workspace entitlements", () => {
+  const eligibilityCheck = webhookRouteSource.indexOf(
+    "const automationIsRunnable",
+  );
+  const eventInsert = webhookRouteSource.indexOf(
+    'from("automation_events")',
+    eligibilityCheck,
+  );
+
+  assert.ok(eligibilityCheck >= 0);
+  assert.ok(eventInsert > eligibilityCheck);
+  assert.match(webhookRouteSource, /agentGuard\.data\.surface === "automation"/);
+  assert.match(webhookRouteSource, /workspaceGuard\.data\?\.automations_enabled/);
+  assert.match(webhookRouteSource, /subscriptionGuard\.data\?\.integrations_enabled/);
+  assert.match(webhookRouteSource, /status: "paused"/);
 });
 
 test("Gmail trigger activation enforces the managed-auth polling minimum", () => {

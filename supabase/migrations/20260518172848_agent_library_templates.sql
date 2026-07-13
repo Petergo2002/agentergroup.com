@@ -64,7 +64,7 @@ to authenticated
 using (
   status = 'approved'
   or submitted_by = (select auth.uid())
-  or private.is_workspace_member(source_workspace_id)
+  or public.is_workspace_member(source_workspace_id)
 );
 
 drop policy if exists "agent_library_templates_member_insert" on public.agent_library_templates;
@@ -74,7 +74,7 @@ to authenticated
 with check (
   submitted_by = (select auth.uid())
   and status = 'pending'
-  and private.is_workspace_member(source_workspace_id)
+  and public.is_workspace_member(source_workspace_id)
 );
 
 drop policy if exists "agent_library_template_sources_member_select" on public.agent_library_template_sources;
@@ -89,7 +89,7 @@ using (
       and (
         templates.status = 'approved'
         or templates.submitted_by = (select auth.uid())
-        or private.is_workspace_member(templates.source_workspace_id)
+        or public.is_workspace_member(templates.source_workspace_id)
       )
   )
 );
@@ -105,6 +105,6 @@ with check (
     where templates.id = template_id
       and templates.status = 'pending'
       and templates.submitted_by = (select auth.uid())
-      and private.is_workspace_member(templates.source_workspace_id)
+      and public.is_workspace_member(templates.source_workspace_id)
   )
 );

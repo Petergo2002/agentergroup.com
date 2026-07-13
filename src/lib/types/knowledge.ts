@@ -45,6 +45,7 @@ export interface KnowledgeFolderRecord {
   created_by: string;
   name: string;
   description: string;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }

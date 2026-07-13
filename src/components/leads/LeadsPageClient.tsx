@@ -67,7 +67,7 @@ function getLeadInitials(name: string) {
  */
 function LeadsTableSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+    <div className="app-card overflow-hidden p-0">
       <div className="hidden h-14 animate-pulse border-b border-outline-variant/10 bg-surface-container-low md:block" />
       {Array.from({ length: 6 }).map((_, index) => (
         <div
@@ -86,7 +86,7 @@ function LeadsEmptyState({ hasSearch }: { hasSearch: boolean }) {
   const { t } = useLanguage();
 
   return (
-    <section className="rounded-2xl border border-dashed border-outline-variant/25 bg-surface-container-lowest px-6 py-16 text-center shadow-sm sm:px-10">
+    <section className="app-empty-state sm:px-10">
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant ring-1 ring-outline-variant/15">
         {hasSearch ? (
           <Search className="h-5 w-5" strokeWidth={2} />
@@ -254,7 +254,7 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
           <div className="border-t border-outline-variant/10 bg-surface-container-lowest p-5 sm:p-8">
             <Link
               href={`/analytics?session=${encodeURIComponent(lead.widget_session_id)}`}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-on-surface px-5 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="app-primary-button w-full"
             >
               <MessageSquareText className="h-4 w-4" />
               {t("leads.openConversation")}
@@ -322,12 +322,12 @@ export default function LeadsPageClient({
   return (
     <div
       key={workspaceId}
-      className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8"
+      className="app-page"
     >
-      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+      <header className="app-section-header">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/8 px-2.5 py-1 text-primary">
+            <div className="app-kicker">
               <UserCheck className="h-3.5 w-3.5" strokeWidth={2.2} />
               <span className="text-xs font-semibold">{t("leads.badge")}</span>
             </div>
@@ -357,7 +357,7 @@ export default function LeadsPageClient({
         </div>
       </header>
 
-      <section className="flex items-center gap-3 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-2 shadow-sm">
+      <section className="app-filter-panel flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/40" />
           <input
@@ -384,7 +384,7 @@ export default function LeadsPageClient({
           <button
             type="button"
             onClick={() => void mutate()}
-            className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-on-surface px-5 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90"
+          className="app-primary-button mt-6"
           >
             <RefreshCw className="h-4 w-4" />
             {t("leads.tryAgain")}

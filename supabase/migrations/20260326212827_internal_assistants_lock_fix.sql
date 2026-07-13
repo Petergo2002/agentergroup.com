@@ -25,9 +25,9 @@ begin
     where id = p_thread_id
       and public.chat_threads.source = 'assistant'
       and (
-        public.chat_threads.active_turn_request_id is null
-        or public.chat_threads.active_turn_started_at is null
-        or public.chat_threads.active_turn_started_at < p_stale_before
+        active_turn_request_id is null
+        or active_turn_started_at is null
+        or active_turn_started_at < p_stale_before
       )
     returning
       public.chat_threads.id,

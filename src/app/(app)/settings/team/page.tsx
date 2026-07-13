@@ -239,7 +239,7 @@ export default function TeamSettingsPage() {
   const ownerName = workspaceOwner?.profile?.full_name ?? workspaceOwner?.profile?.email ?? 'another user';
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <div className="app-page max-w-4xl">
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -264,7 +264,7 @@ export default function TeamSettingsPage() {
             }}
             disabled={!canCreateInvites}
             title={inviteDisabledReason ?? undefined}
-            className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="app-primary-button rounded-full px-5 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t('settings.team.invite') || 'Invite member'}
           </button>
@@ -347,7 +347,7 @@ export default function TeamSettingsPage() {
                 </button>
                 <button
                   onClick={() => window.location.href = `/invite/accept?token=${invite.token}`}
-                  className="flex-1 sm:flex-none rounded-full bg-primary px-5 py-2 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90"
+                  className="app-primary-button min-h-10 flex-1 rounded-full px-5 sm:flex-none"
                 >
                   {t('common.accept') || 'Accept'}
                 </button>
@@ -573,7 +573,7 @@ export default function TeamSettingsPage() {
               <button
                 onClick={handleSendInvite}
                 disabled={!inviteEmail.trim() || isInviting || !canCreateInvites}
-                className="flex-1 rounded-full bg-on-surface px-4 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="app-primary-button flex-1 rounded-full px-4 disabled:opacity-50"
               >
                 {isInviting
                   ? (t('settings.team.sending') || 'Sending...')

@@ -28,6 +28,7 @@ import { formatLocaleDateTime } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/json-fetcher";
 import type {
   FlywheelQuestionDetail,
+  FlywheelQuestionCounts,
   FlywheelQuestionListItem,
   UnansweredQueryStatus,
   VerifiedFactVisibility,
@@ -46,9 +47,15 @@ interface QuestionWidgetOption {
 
 interface QuestionsPageClientProps {
   initialQuestions: FlywheelQuestionListItem[];
+  initialCounts: FlywheelQuestionCounts;
   agents: QuestionAgentOption[];
   widgets: QuestionWidgetOption[];
   workspaceName: string;
+}
+
+interface QuestionsResponse {
+  questions: FlywheelQuestionListItem[];
+  counts: FlywheelQuestionCounts;
 }
 
 const copy = {
@@ -177,8 +184,13 @@ const statusLabels: Record<UnansweredQueryStatus, string> = {
   duplicate: "Duplicate",
 };
 
-function buildQuestionsUrl(agentId: string, widgetId: string) {
-  const params = new URLSearchParams({ status: "all", limit: "200" });
+function buildQuestionsUrl(
+  status: UnansweredQueryStatus | "all",
+  agentId: string,
+  widgetId: string,
+  limit = 150,
+) {
+  const params = new URLSearchParams({ status, limit: String(limit) });
 
   if (agentId) {
     params.set("agentId", agentId);
@@ -223,6 +235,10 @@ function formatConfidence(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
+function getQuestionActivityTime(question: FlywheelQuestionListItem) {
+  return question.updated_at || question.created_at;
+}
+
 function QuestionSkeleton() {
   return (
     <div className="space-y-3">
@@ -261,6 +277,7 @@ function EmptyState({
 
 export default function QuestionsPageClient({
   initialQuestions,
+  initialCounts,
   agents,
   widgets,
   workspaceName,
@@ -283,8 +300,8 @@ export default function QuestionsPageClient({
   const [duplicateTargetId, setDuplicateTargetId] = useState("");
 
   const questionsUrl = useMemo(
-    () => buildQuestionsUrl(agentFilter, widgetFilter),
-    [agentFilter, widgetFilter],
+    () => buildQuestionsUrl(statusFilter, agentFilter, widgetFilter),
+    [agentFilter, statusFilter, widgetFilter],
   );
   const {
     data: response,
@@ -292,12 +309,16 @@ export default function QuestionsPageClient({
     isLoading,
     isValidating,
     mutate,
-  } = useSWR<{ questions: FlywheelQuestionListItem[] }>(questionsUrl, jsonFetcher, {
-    fallbackData: { questions: initialQuestions },
+  } = useSWR<QuestionsResponse>(questionsUrl, jsonFetcher, {
+    fallbackData: { questions: initialQuestions, counts: initialCounts },
     keepPreviousData: true,
     refreshInterval: 45_000,
   });
   const questions = useMemo(() => response?.questions ?? [], [response?.questions]);
+  const counts = useMemo(
+    () => response?.counts ?? initialCounts,
+    [initialCounts, response?.counts],
+  );
   const selectedFromList = useMemo(
     () =>
       questions.find((question) => question.id === selectedQuestionId) ??
@@ -372,7 +393,7 @@ export default function QuestionsPageClient({
 
     return [...next].sort((left, right) => {
       if (sortMode === "oldest") {
-        return left.created_at.localeCompare(right.created_at);
+        return getQuestionActivityTime(left).localeCompare(getQuestionActivityTime(right));
       }
 
       if (sortMode === "confidence_desc") {
@@ -383,33 +404,10 @@ export default function QuestionsPageClient({
         return left.confidence - right.confidence;
       }
 
-      return right.created_at.localeCompare(left.created_at);
+      return getQuestionActivityTime(right).localeCompare(getQuestionActivityTime(left));
     });
   }, [questions, search, sortMode, statusFilter]);
 
-  const counts = useMemo(() => {
-    return questions.reduce(
-      (acc, question) => {
-        acc.total += 1;
-        acc[question.status] += 1;
-        return acc;
-      },
-      { total: 0, open: 0, answered: 0, dismissed: 0, duplicate: 0 },
-    );
-  }, [questions]);
-
-  const duplicateOptions = useMemo(() => {
-    if (!selectedQuestionIdForDraft || !selectedAgentId) {
-      return [];
-    }
-
-    return questions.filter(
-      (question) =>
-        question.id !== selectedQuestionIdForDraft &&
-        question.agent_id === selectedAgentId &&
-        ["open", "answered"].includes(question.status),
-    );
-  }, [questions, selectedAgentId, selectedQuestionIdForDraft]);
   const hasVerifiedAnswer = Boolean(selectedQuestion?.verified_fact);
   const canChangeDisposition =
     Boolean(selectedQuestion) &&
@@ -422,6 +420,28 @@ export default function QuestionsPageClient({
     canChangeDisposition &&
     Boolean(selectedQuestion) &&
     selectedQuestion?.status !== "open";
+  const duplicateOptionsUrl =
+    canMarkDuplicate && selectedAgentId
+      ? buildQuestionsUrl("all", selectedAgentId, "", 200)
+      : null;
+  const { data: duplicateOptionsResponse } = useSWR<QuestionsResponse>(
+    duplicateOptionsUrl,
+    jsonFetcher,
+    { keepPreviousData: true },
+  );
+  const duplicateQuestionPool = duplicateOptionsResponse?.questions ?? questions;
+  const duplicateOptions = useMemo(() => {
+    if (!selectedQuestionIdForDraft || !selectedAgentId) {
+      return [];
+    }
+
+    return duplicateQuestionPool.filter(
+      (question) =>
+        question.id !== selectedQuestionIdForDraft &&
+        question.agent_id === selectedAgentId &&
+        ["open", "answered"].includes(question.status),
+    );
+  }, [duplicateQuestionPool, selectedAgentId, selectedQuestionIdForDraft]);
 
   const clearFilters = () => {
     setSearch("");
@@ -546,11 +566,11 @@ export default function QuestionsPageClient({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <header className="depth-panel rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 sm:px-6 lg:px-7">
+    <div className="app-page app-page-wide app-page-compact">
+      <header className="app-section-header">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/8 px-2.5 py-1 text-primary">
+            <div className="app-kicker">
               <MessageSquareText className="h-3.5 w-3.5" />
               <span className="text-xs font-semibold">{text.badge}</span>
             </div>
@@ -596,7 +616,7 @@ export default function QuestionsPageClient({
         </div>
       </header>
 
-      <section className="depth-panel rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-3">
+      <section className="app-filter-panel p-3">
         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_160px_180px_180px_180px_auto]">
           <label className="relative min-w-0">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/45" />
@@ -691,7 +711,7 @@ export default function QuestionsPageClient({
                 <button
                   type="button"
                   onClick={() => void mutate()}
-                  className="depth-button depth-button-primary inline-flex h-10 items-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background"
+                  className="app-primary-button min-h-10 px-4"
                 >
                   <RefreshCw className="h-4 w-4" />
                   {text.retry}
@@ -707,7 +727,7 @@ export default function QuestionsPageClient({
                   <button
                     type="button"
                     onClick={clearFilters}
-                    className="depth-button depth-button-primary inline-flex h-10 items-center rounded-xl bg-on-surface px-4 text-sm font-semibold text-background"
+                    className="app-primary-button min-h-10 px-4"
                   >
                     {text.clearFilters}
                   </button>
@@ -946,7 +966,7 @@ export default function QuestionsPageClient({
                               onClick={() => setVisibility(option)}
                               className={`h-9 rounded-lg px-3 text-xs font-semibold transition-all ${
                                 visibility === option
-                                  ? "depth-button-primary bg-on-surface text-background"
+                                  ? "depth-button-primary bg-primary text-on-primary"
                                   : "text-on-surface-variant hover:bg-surface-container"
                               }`}
                             >
@@ -961,7 +981,7 @@ export default function QuestionsPageClient({
                       type="button"
                       onClick={() => void submitAnswer()}
                       disabled={isSaving || !answerDraft.trim() || selectedQuestion.status === "duplicate"}
-                      className="depth-button depth-button-primary inline-flex h-11 items-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-all hover:bg-on-surface/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="app-primary-button px-4 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isSaving ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

@@ -154,11 +154,11 @@ export default function AgentsPageClient({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-4 py-5 sm:px-6 lg:px-10 lg:py-7">
-      <header className="rounded-2xl border border-outline/70 bg-surface-container-lowest px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-7 lg:px-8">
+    <div className="app-page app-page-compact">
+      <header className="app-section-header overflow-hidden">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/15 bg-secondary-container px-2.5 py-1 text-primary">
+            <div className="app-kicker">
               <Activity className="h-3.5 w-3.5" strokeWidth={2} />
               <span className="text-xs font-semibold leading-5">{t('agents.agentLibrary')}</span>
             </div>
@@ -174,7 +174,7 @@ export default function AgentsPageClient({
             <button
               type="button"
               onClick={() => setIsLibraryOpen(true)}
-              className="inline-flex h-11 min-w-32 items-center justify-center gap-2 rounded-lg border border-outline bg-surface-container-lowest px-4 text-sm font-semibold text-on-surface shadow-[0_1px_1px_rgba(15,23,42,0.03)] transition-colors hover:border-on-surface/15 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="app-secondary-button min-w-32"
             >
               <Library className="h-[18px] w-[18px] text-primary" />
               {t('agents.library')}
@@ -183,7 +183,7 @@ export default function AgentsPageClient({
             <button
               type="button"
               onClick={() => openCreateAgent()}
-              className="inline-flex h-11 min-w-36 items-center justify-center gap-2 rounded-lg bg-on-surface px-4 text-sm font-semibold text-background shadow-[0_8px_18px_rgba(15,23,42,0.12)] transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]"
+              className="app-primary-button min-w-36"
             >
               <Plus className="h-[18px] w-[18px]" />
               {t('agents.createAgent')}
@@ -192,16 +192,16 @@ export default function AgentsPageClient({
         </div>
       </header>
 
-      <section className="flex flex-col gap-3 rounded-xl border border-outline/70 bg-surface-container-lowest p-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)] md:flex-row md:items-center md:justify-between">
-        <div className="flex w-full items-center gap-1 overflow-x-auto p-0.5 md:w-auto">
+      <section className="app-filter-panel flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full items-center gap-1 overflow-x-auto rounded-xl bg-surface-container-low p-1 md:w-auto">
           {(["all", "active", "draft", "archived"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setFilter(tab)}
-              className={`h-10 flex-1 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-colors md:flex-none ${
+              className={`h-9 flex-1 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-all md:flex-none ${
                 filter === tab
-                  ? "bg-on-surface text-background"
+                  ? "bg-primary text-on-primary shadow-[0_10px_22px_-18px_rgba(var(--primary-rgb),0.72)]"
                   : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
               }`}
             >
@@ -216,7 +216,7 @@ export default function AgentsPageClient({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('agents.searchPlaceholder')}
-            className="h-11 w-full rounded-lg border border-outline/70 bg-surface-container-low pl-11 pr-4 text-sm font-medium text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/45 focus:border-primary/30 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/15"
+            className="depth-input h-11 w-full rounded-xl border bg-surface-container-low pl-11 pr-4 text-sm font-medium text-on-surface outline-none placeholder:text-on-surface-variant/45 focus:border-primary/30 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/15"
           />
         </div>
       </section>
@@ -224,11 +224,11 @@ export default function AgentsPageClient({
       {isLoading ? (
         <div className="flex flex-col gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-[88px] animate-pulse rounded-xl border border-outline/70 bg-surface-container-low" />
+            <div key={i} className="h-[104px] animate-pulse rounded-2xl border border-outline-variant/10 bg-surface-container-low" />
           ))}
         </div>
       ) : filteredAgents.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-outline bg-surface-container-lowest px-6 py-16 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <div className="app-empty-state">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant ring-1 ring-outline/70">
             <Filter className="h-5 w-5" />
           </div>
@@ -272,7 +272,7 @@ export default function AgentsPageClient({
                 onClick={() => setCurrentPage(page)}
                 className={`flex h-9 w-9 items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
                   page === safePage
-                    ? "bg-on-surface text-background"
+                    ? "bg-primary text-on-primary"
                     : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
                 }`}
               >

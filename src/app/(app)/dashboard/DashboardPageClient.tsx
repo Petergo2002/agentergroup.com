@@ -30,7 +30,7 @@ export default function DashboardPageClient({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <div className="app-page">
       <DashboardHeader 
         userName={profile?.full_name?.split(" ")[0]} 
         onCreateAgent={openCreateAgent}
@@ -53,7 +53,7 @@ export default function DashboardPageClient({
             onCreateAgent={openCreateAgent}
           />
 
-          <section className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+          <section className="app-card">
             <div className="flex items-start gap-4">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Plus className="h-5 w-5" strokeWidth={2.2} />
@@ -70,7 +70,7 @@ export default function DashboardPageClient({
             <button
               type="button"
               onClick={() => openCreateAgent()}
-              className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]"
+              className="app-primary-button mt-5 w-full"
             >
               {t("dashboard.initializeAgent")}
               <ArrowUpRight className="h-4 w-4" strokeWidth={2} />

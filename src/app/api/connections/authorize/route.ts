@@ -4,6 +4,18 @@ import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createConnectionRequest } from "@/lib/composio";
 import { getSupportedIntegration } from "@/lib/integrations";
 import { createClientSafeError } from "@/lib/server-errors";
+import { z } from "zod";
+
+const authorizeConnectionSchema = z
+  .object({
+    toolkitSlug: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .regex(/^[a-z0-9_-]+$/i),
+  })
+  .strict();
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -15,13 +27,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { toolkitSlug } = await request.json();
+  const parsedBody = authorizeConnectionSchema.safeParse(
+    await request.json().catch(() => null),
+  );
 
-  if (!toolkitSlug) {
-    return NextResponse.json({ error: "toolkitSlug is required." }, { status: 400 });
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      { error: "A valid toolkitSlug is required." },
+      { status: 400 },
+    );
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+  const toolkitSlug = parsedBody.data.toolkitSlug.toLowerCase();
+
+  if (!context.subscription?.integrations_enabled) {
+    return NextResponse.json(
+      { error: "Connections are available on workspaces with integrations enabled." },
+      { status: 403 },
+    );
+  }
+
   const toolkit = getSupportedIntegration(toolkitSlug);
 
   if (!toolkit) {

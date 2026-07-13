@@ -96,6 +96,33 @@ function resolveIdentityDisplay(
   };
 }
 
+function resolvePresenceDisplay(
+  presenceStatus: DashboardAnalyticsConversationListItem["presenceStatus"],
+  t: (key: string, values?: Record<string, string | number>) => string,
+) {
+  if (presenceStatus === "live") {
+    return {
+      label: t("analytics.live"),
+      className: "bg-primary/10 text-primary ring-primary/15",
+      dotClassName: "bg-primary",
+    };
+  }
+
+  if (presenceStatus === "completed") {
+    return {
+      label: t("analytics.completed"),
+      className: "bg-surface-container-low text-on-surface-variant/70 ring-outline-variant/15",
+      dotClassName: "bg-outline-variant/50",
+    };
+  }
+
+  return {
+    label: t("analytics.idle"),
+    className: "bg-surface-container text-on-surface-variant ring-outline-variant/15",
+    dotClassName: "bg-on-surface-variant/45",
+  };
+}
+
 function ConversationAttachments({
   attachments,
   alignEnd,
@@ -266,6 +293,7 @@ function ConversationRow({
     t("analytics.anonymousUser"),
     conversation.agentLabel || conversation.agentName,
   );
+  const presenceDisplay = resolvePresenceDisplay(conversation.presenceStatus, t);
 
   return (
     <button
@@ -300,10 +328,14 @@ function ConversationRow({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="mt-0.5 flex min-w-0 items-center gap-2">
             <p className="truncate text-xs font-medium text-on-surface-variant/70">
               {identityDisplay.secondary}
             </p>
+            <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${presenceDisplay.className}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${presenceDisplay.dotClassName}`} />
+              {presenceDisplay.label}
+            </span>
             {conversation.hasLead && (
               <span className="flex h-1.5 w-1.5 rounded-full bg-primary" />
             )}
@@ -363,7 +395,7 @@ function ConversationInboxPane({
           </span>
           <span className="h-1 w-1 rounded-full bg-outline-variant/30" />
           <span className="text-xs font-medium text-on-surface-variant">
-            {t("analytics.activeSessions", { count: conversations.length })}
+            {t("analytics.conversationResults", { count: conversations.length })}
           </span>
         </div>
       </div>
@@ -380,8 +412,8 @@ function ConversationInboxPane({
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant/55 ring-1 ring-outline-variant/15">
               <span className="material-symbols-outlined">analytics</span>
             </div>
-            <p className="text-sm font-medium text-on-surface">{t("analytics.noActiveSessions")}</p>
-            <p className="text-[12px] text-on-surface-variant mt-1.5">{t("analytics.awaitingTraffic")}</p>
+            <p className="text-sm font-medium text-on-surface">{t("analytics.noConversations")}</p>
+            <p className="mt-1.5 text-[12px] text-on-surface-variant">{t("analytics.awaitingConversations")}</p>
           </div>
         ) : (
           <div className="divide-y divide-outline-variant/5">
@@ -720,7 +752,7 @@ function AnalyticsViewSwitch({
             onClick={() => onChange(value)}
             className={`flex h-9 min-w-0 items-center justify-between gap-3 rounded-lg px-3 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary/25 ${
               selected
-                ? "bg-on-surface text-background shadow-sm"
+                ? "bg-primary text-on-primary shadow-sm"
                 : "text-on-surface-variant hover:bg-surface hover:text-on-surface"
             }`}
           >
@@ -728,7 +760,7 @@ function AnalyticsViewSwitch({
             <span
               className={`rounded-full px-2 py-0.5 text-[11px] tabular-nums ${
                 selected
-                  ? "bg-background/15 text-background"
+                  ? "bg-on-primary/15 text-on-primary"
                   : "bg-surface text-on-surface-variant"
               }`}
             >
@@ -777,7 +809,7 @@ function AnalyticsFilterBar({
               onClick={() => onChange({ ...filters, range: option.value })}
               className={`h-9 rounded-lg px-3 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary/25 ${
                 filters.range === option.value
-                  ? "bg-on-surface text-background"
+                  ? "bg-primary text-on-primary"
                   : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
               }`}
             >
@@ -845,8 +877,9 @@ function AnalyticsFilterBar({
                 className="h-10 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none transition-colors focus:border-primary"
               >
                 <option value="all">All statuses</option>
-                <option value="active">Active sessions</option>
-                <option value="completed">Completed sessions</option>
+                <option value="live">Live visitors</option>
+                <option value="idle">Idle sessions</option>
+                <option value="completed">Completed conversations</option>
               </select>
               <input
                 aria-label="Search conversations"
@@ -1423,7 +1456,11 @@ export function AnalyticsWorkspaceView() {
             .join(" ")
       : filters.sessionStatus === "all"
         ? "All statuses"
-        : filters.sessionStatus[0].toUpperCase() + filters.sessionStatus.slice(1);
+        : filters.sessionStatus === "live"
+          ? "Live visitors"
+          : filters.sessionStatus === "idle"
+            ? "Idle sessions"
+            : "Completed";
   const collapsedDetailSummary =
     activeView === "automations"
       ? `${rangeLabel} · ${selectedAgentName} · ${statusLabel}`

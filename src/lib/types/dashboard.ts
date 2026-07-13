@@ -10,6 +10,10 @@ export type DashboardAutomationStatusFilter =
   | "processed"
   | "ignored"
   | "failed";
+export type DashboardConversationPresenceStatus = "live" | "idle" | "completed";
+export type DashboardConversationStatusFilter =
+  | "all"
+  | DashboardConversationPresenceStatus;
 
 export interface DashboardAnalyticsOverview {
   conversations: number;
@@ -78,7 +82,7 @@ export interface DashboardAnalyticsAppliedFilters {
   agentId: string | null;
   automationStatus: DashboardAutomationStatusFilter;
   search: string;
-  sessionStatus: "all" | "active" | "completed";
+  sessionStatus: DashboardConversationStatusFilter;
 }
 
 export interface DashboardAnalyticsConversationListItem {
@@ -92,6 +96,8 @@ export interface DashboardAnalyticsConversationListItem {
   agentName: string | null;
   agentLabel: string | null;
   source: "embedded" | "hosted";
+  status: "active" | "completed";
+  presenceStatus: DashboardConversationPresenceStatus;
   startedAt: string;
   lastActivityAt: string;
   messageCount: number;

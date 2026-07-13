@@ -53,7 +53,7 @@ export function ConfirmSimpleModal({
           <button
             onClick={onConfirm}
             disabled={isProcessing}
-            className={`flex-1 rounded-xl ${variant === 'error' ? 'bg-error' : 'bg-primary'} px-4 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg ${variant === 'error' ? 'shadow-error/20' : 'shadow-primary/20'} transition-all duration-150 active:scale-[0.98] hover:brightness-110 disabled:opacity-50`}
+            className={`flex-1 rounded-xl ${variant === 'error' ? 'bg-error text-white' : 'bg-primary text-on-primary'} px-4 py-3 text-xs font-bold uppercase tracking-widest shadow-lg ${variant === 'error' ? 'shadow-error/20' : 'shadow-primary/20'} transition-all duration-150 active:scale-[0.98] hover:brightness-110 disabled:opacity-50`}
           >
             {isProcessing ? t('common.processing') : confirmLabel || t('common.confirm')}
           </button>

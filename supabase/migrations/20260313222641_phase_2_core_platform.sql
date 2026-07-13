@@ -3,7 +3,6 @@ create extension if not exists pgcrypto;
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
-set search_path = public
 as $$
 begin
   new.updated_at = timezone('utc', now());
@@ -232,7 +231,7 @@ with check (id = auth.uid());
 drop policy if exists "workspaces_member_select" on public.workspaces;
 create policy "workspaces_member_select"
 on public.workspaces for select
-using (owner_id = auth.uid() or public.is_workspace_member(id));
+using (public.is_workspace_member(id));
 
 drop policy if exists "workspaces_owner_insert" on public.workspaces;
 create policy "workspaces_owner_insert"
@@ -248,16 +247,7 @@ with check (owner_id = auth.uid());
 drop policy if exists "workspace_members_member_select" on public.workspace_members;
 create policy "workspace_members_member_select"
 on public.workspace_members for select
-using (
-  user_id = auth.uid()
-  or exists (
-    select 1
-    from public.workspaces
-    where workspaces.id = workspace_id
-      and workspaces.owner_id = auth.uid()
-  )
-  or public.is_workspace_member(workspace_id)
-);
+using (public.is_workspace_member(workspace_id));
 
 drop policy if exists "workspace_members_self_insert" on public.workspace_members;
 create policy "workspace_members_self_insert"

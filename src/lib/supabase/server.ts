@@ -17,7 +17,7 @@ export async function createClient() {
             cookieStore.set(name, value, options);
           });
         } catch {
-          // Cookie writes from server components can be ignored when proxy.ts is active.
+          // Cookie writes from server components can be ignored when request middleware is active.
         }
       },
     },

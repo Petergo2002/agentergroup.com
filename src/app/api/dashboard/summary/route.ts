@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { loadDashboardSummary } from "@/lib/dashboard/summary";
 import { createClient } from "@/lib/supabase/server";
 
-export const revalidate = 30;
-
 export async function GET() {
   const supabase = await createClient();
   const {

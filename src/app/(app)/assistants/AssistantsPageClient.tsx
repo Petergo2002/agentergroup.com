@@ -28,11 +28,11 @@ export default function AssistantsPageClient({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+    <div className="app-page">
+      <header className="app-section-header">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/8 px-2.5 py-1 text-primary">
+            <div className="app-kicker">
               <AppIcon name="forum" className="h-3.5 w-3.5" />
               <span className="text-xs font-semibold">{t('assistants.badge')}</span>
             </div>
@@ -51,7 +51,7 @@ export default function AssistantsPageClient({
           <button
             type="button"
             onClick={() => openCreateAgent('assistant')}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]"
+            className="app-primary-button"
           >
             {t('assistants.newAssistant')}
           </button>
@@ -68,7 +68,7 @@ export default function AssistantsPageClient({
           ))}
         </div>
       ) : sortedAssistants.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-outline-variant/25 bg-surface-container-lowest px-6 py-16 text-center shadow-sm">
+        <div className="app-empty-state">
           <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant ring-1 ring-outline-variant/15">
             <AppIcon name="forum" className="h-5 w-5" />
           </span>
@@ -81,7 +81,7 @@ export default function AssistantsPageClient({
           <button
             type="button"
             onClick={() => openCreateAgent('assistant')}
-            className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="app-primary-button mt-6"
           >
             {t('assistants.createInternalAssistant')}
           </button>
@@ -92,7 +92,7 @@ export default function AssistantsPageClient({
             <Link
               key={assistant.id}
               href={`/assistants/${assistant.id}`}
-              className="group rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low/45"
+              className="app-card group transition-colors hover:border-primary/25 hover:bg-surface-container-low/45"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>

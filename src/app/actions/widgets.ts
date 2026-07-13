@@ -78,7 +78,11 @@ export async function createWidgetAction(formData: FormData) {
     .single();
 
   if (error) {
-    return { error: error.message };
+    return {
+      error: error.message.includes('WIDGET_LIMIT_REACHED')
+        ? buildWidgetLimitError(context.subscription?.plan_tier)
+        : error.message,
+    };
   }
 
   revalidatePath('/widgets');

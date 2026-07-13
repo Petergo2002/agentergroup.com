@@ -170,7 +170,7 @@ export function DeploymentTab() {
                    addOrigin(localOriginInput);
                    setLocalOriginInput('');
                 }}
-                className="shrink-0 rounded-[14px] bg-on-surface px-8 h-[52px] text-sm font-semibold text-background hover:bg-on-surface/90 transition-all active:scale-95 shadow-lg shadow-on-surface/5"
+                className="app-primary-button h-[52px] shrink-0 rounded-[14px] px-8"
               >
                 {t('widgetBuilder.deployment.addDomain')}
               </button>

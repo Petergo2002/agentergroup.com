@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import {
   getEffectiveConnectionStatus,
@@ -127,11 +128,12 @@ export async function POST(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!user) {
+  if (!user || !session?.access_token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+  const admin = createAdminClient();
   const body = await request.json().catch(() => ({}));
   const fileId = String(body.fileId ?? "").trim();
   const overrideName = String(body.name ?? "").trim();
@@ -225,7 +227,7 @@ export async function POST(request: NextRequest) {
       fileName = `${fileName}.pdf`;
     }
 
-    const { data: source, error: sourceError } = await supabase
+    const { data: source, error: sourceError } = await admin
       .from("knowledge_sources")
       .insert({
         workspace_id: context.workspace.id,
@@ -237,7 +239,7 @@ export async function POST(request: NextRequest) {
         storage_bucket: KNOWLEDGE_BUCKET,
         storage_path: "",
         mime_type: finalMimeType,
-        file_size_bytes: fileBytes.byteLength,
+        file_size_bytes: 0,
         metadata: {
           origin: "googledrive",
           drive_file_id: metadata.id,
@@ -257,6 +259,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const reservationResult = await admin.rpc("reserve_knowledge_source_storage", {
+      p_workspace_id: context.workspace.id,
+      p_source_id: source.id,
+      p_size_bytes: fileBytes.byteLength,
+    });
+
+    if (reservationResult.error) {
+      await admin.from("knowledge_sources").delete().eq("id", source.id);
+
+      if (
+        reservationResult.error.message.includes(
+          "KNOWLEDGE_STORAGE_LIMIT_EXCEEDED",
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.`,
+          },
+          { status: 402 },
+        );
+      }
+
+      console.error("[knowledge/drive/import] Storage reservation failed", {
+        sourceId: source.id,
+        workspaceId: context.workspace.id,
+        message: reservationResult.error.message,
+      });
+      return NextResponse.json(
+        { error: "Failed to reserve knowledge storage." },
+        { status: 500 },
+      );
+    }
+
+    source.file_size_bytes = fileBytes.byteLength;
+
     const storagePath = `${context.workspace.id}/${source.id}/${sanitizeFileName(fileName)}`;
     const uploadResult = await supabase.storage
       .from(KNOWLEDGE_BUCKET)
@@ -266,17 +303,23 @@ export async function POST(request: NextRequest) {
       });
 
     if (uploadResult.error) {
+      await admin.from("knowledge_sources").delete().eq("id", source.id);
       return NextResponse.json({ error: uploadResult.error.message }, { status: 500 });
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await admin
       .from("knowledge_sources")
       .update({
         storage_path: storagePath,
       })
-      .eq("id", source.id);
+      .eq("id", source.id)
+      .eq("workspace_id", context.workspace.id);
 
     if (updateError) {
+      await Promise.all([
+        supabase.storage.from(KNOWLEDGE_BUCKET).remove([storagePath]),
+        admin.from("knowledge_sources").delete().eq("id", source.id),
+      ]);
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 

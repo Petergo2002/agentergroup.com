@@ -22,8 +22,6 @@ function buildWidgetSlug(name: string) {
   return `${base}-${Date.now().toString().slice(-6)}`;
 }
 
-export const revalidate = 30;
-
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -159,6 +157,18 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (widgetError || !widget) {
+    if (widgetError?.message.includes("WIDGET_LIMIT_REACHED")) {
+      return NextResponse.json(
+        {
+          error: buildWidgetLimitError(context.subscription?.plan_tier),
+          code: "widget_limit_reached",
+          widgetLimit,
+          widgetCount: currentWidgetCount,
+        },
+        { status: 403 },
+      );
+    }
+
     return NextResponse.json(
       { error: widgetError?.message ?? "Failed to create widget." },
       { status: 500 },

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ExternalLink } from "lucide-react";
+import { Activity, Bot, ExternalLink, MessageSquare, Workflow } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { EntityActionsMenu } from "@/components/ui/EntityActionsMenu";
 import type { AgentRecord } from "@/lib/types";
@@ -41,6 +41,12 @@ function getDotColor(agent: AgentRecord) {
   return "bg-on-surface-variant/35";
 }
 
+function getSurfaceAccent(agent: AgentRecord) {
+  if (agent.surface === "automation") return "from-orange-500/90 to-amber-400/80";
+  if (agent.surface === "assistant") return "from-sky-500/90 to-cyan-400/80";
+  return "from-emerald-500/90 to-teal-400/80";
+}
+
 /**
  * Returns the label and colour tokens for the surface/type badge.
  * - automation  → orange
@@ -51,19 +57,22 @@ function useTypeBadge(agent: AgentRecord, t: (key: string) => string) {
   if (agent.surface === "automation") {
     return {
       label: t("agents.automation"),
-      classes: "bg-orange-50 text-orange-700 ring-1 ring-orange-200/80 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/20",
+      classes: "bg-orange-50 text-orange-700 ring-1 ring-orange-200/80 dark:bg-orange-500/10 dark:text-orange-200 dark:ring-orange-500/20",
+      icon: Workflow,
     };
   }
   if (agent.surface === "assistant") {
     return {
       label: t("agents.internalAssistant"),
-      classes: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/80 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20",
+      classes: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/80 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20",
+      icon: Bot,
     };
   }
   // widget (default)
   return {
     label: t("agents.websiteWidget"),
-    classes: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20",
+    classes: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20",
+    icon: MessageSquare,
   };
 }
 
@@ -81,6 +90,10 @@ export function AgentCard({
 
   const stateLabel = useAgentStateLabel(agent, t);
   const typeBadge = useTypeBadge(agent, t);
+  const SurfaceIcon = typeBadge.icon;
+  const showStatusToggle = agent.surface !== "automation";
+  const showActivityAction = true;
+  const showPreviewAction = agent.surface !== "automation";
 
   const primaryHref = `/agents/${agent.id}/${
     canEdit || agent.surface === "widget" || agent.surface === "automation"
@@ -101,31 +114,33 @@ export function AgentCard({
       !agent.published_version_id);
 
   return (
-    <article className="group grid grid-cols-1 gap-4 rounded-xl border border-outline/70 bg-surface-container-lowest px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-on-surface/15 hover:bg-surface-container-low/35 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:px-5 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
-      <div className="relative w-11 shrink-0">
-        <div className="flex h-11 w-11 select-none items-center justify-center rounded-lg bg-surface-container text-lg font-bold text-primary ring-1 ring-outline/60">
+    <article className="depth-row group relative grid grid-cols-1 gap-4 overflow-hidden rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-4 transition-all hover:border-primary/18 hover:bg-surface-container-lowest sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:px-5 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
+      <div className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${getSurfaceAccent(agent)} opacity-75`} />
+
+      <div className="relative w-12 shrink-0 pl-1">
+        <div className="flex h-11 w-11 select-none items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container text-lg font-bold text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
           {agent.name.charAt(0).toUpperCase()}
         </div>
         <span
-          className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface-container-lowest ${getDotColor(agent)}`}
+          className={`absolute -bottom-0.5 right-0 h-3.5 w-3.5 rounded-full border-2 border-surface-container-lowest ${getDotColor(agent)}`}
         />
       </div>
 
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-semibold tracking-normal text-on-surface">
+        <h3 className="truncate text-[15px] font-semibold leading-5 tracking-normal text-on-surface">
           {agent.name}
         </h3>
-        <p className="mt-1 line-clamp-2 max-w-3xl text-sm leading-6 text-on-surface-variant/70">
+        <p className="mt-1 line-clamp-2 max-w-3xl text-sm leading-6 text-on-surface-variant/72">
           {agent.description || t("agents.noInstructions")}
         </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${typeBadge.classes}`}
+            className={`inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold ${typeBadge.classes}`}
           >
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80" />
+            <SurfaceIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
             {typeBadge.label}
           </span>
-          <span className="rounded-full bg-surface-container px-2.5 py-1 text-xs font-semibold text-on-surface-variant ring-1 ring-outline/50">
+          <span className="inline-flex h-6 items-center rounded-full bg-surface-container px-2.5 text-xs font-semibold text-on-surface-variant ring-1 ring-outline-variant/10">
             {stateLabel}
           </span>
         </div>
@@ -135,26 +150,30 @@ export function AgentCard({
         <span className="sr-only">
           {t("common.status")}: {stateLabel}
         </span>
-        <button
-          type="button"
-          onClick={() => onStatusToggle(agent)}
-          disabled={toggleDisabled}
-          aria-pressed={isActive}
-          aria-label={isActive ? t("common.off") : t("common.on")}
-          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40 ${
-            isActive ? "bg-on-surface" : "bg-surface-container-high"
-          }`}
-        >
-          <span
-            className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-surface-container-lowest shadow-[0_1px_3px_rgba(15,23,42,0.22)] transition-transform ${
-              isActive ? "translate-x-5" : "translate-x-0"
+        {showStatusToggle ? (
+          <button
+            type="button"
+            onClick={() => onStatusToggle(agent)}
+            disabled={toggleDisabled}
+            aria-pressed={isActive}
+            aria-label={isActive ? t("common.off") : t("common.on")}
+            className={`relative h-7 w-12 shrink-0 rounded-full border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-45 ${
+              isActive
+                ? "border-primary bg-primary shadow-[0_10px_22px_-16px_rgba(var(--primary-rgb),0.8)]"
+                : "border-outline-variant/10 bg-surface-container-high"
             }`}
-          />
-        </button>
+          >
+            <span
+              className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-surface-container-lowest shadow-[0_1px_3px_rgba(15,23,42,0.22)] transition-transform ${
+                isActive ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+        ) : null}
 
         <Link
           href={primaryHref}
-          className="inline-flex h-9 items-center justify-center rounded-lg border border-outline bg-surface-container-lowest px-3.5 text-sm font-semibold text-on-surface transition-colors hover:border-on-surface/15 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="app-primary-button min-h-9 px-3.5"
         >
           {agent.surface === "automation"
             ? t("agents.builder")
@@ -163,18 +182,20 @@ export function AgentCard({
               : t("common.open")}
         </Link>
 
-        <Link
-          href={activityHref}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-outline bg-surface-container-lowest px-3.5 text-sm font-semibold text-on-surface transition-colors hover:border-on-surface/15 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          <Activity className="h-3.5 w-3.5 text-primary" />
-          {t("agents.viewActivity")}
-        </Link>
+        {showActivityAction ? (
+          <Link
+            href={activityHref}
+            className="app-secondary-button min-h-9 px-3.5"
+          >
+            <Activity className="h-3.5 w-3.5 text-primary" />
+            {t("agents.viewActivity")}
+          </Link>
+        ) : null}
 
-        {agent.surface !== "automation" ? (
+        {showPreviewAction ? (
           <Link
             href={`/agents/${agent.id}/preview`}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-outline text-on-surface-variant transition-colors hover:border-on-surface/15 hover:bg-surface-container-low hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="depth-button flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-lowest text-on-surface-variant transition-all hover:border-primary/20 hover:bg-surface-container-low hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             title={t("agents.preview")}
           >
             <ExternalLink className="h-3.5 w-3.5" />
@@ -189,7 +210,7 @@ export function AgentCard({
           deleteDisabled={
             isBusy || !agent.archived_at || membershipRole !== "owner"
           }
-          buttonClassName="flex h-9 w-9 items-center justify-center rounded-lg border border-outline text-on-surface-variant hover:border-on-surface/15 hover:bg-surface-container-low hover:text-on-surface transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          buttonClassName="depth-button flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-lowest text-on-surface-variant transition-all hover:border-primary/20 hover:bg-surface-container-low hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         />
       </div>
     </article>

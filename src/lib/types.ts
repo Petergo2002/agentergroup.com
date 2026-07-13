@@ -48,6 +48,7 @@ export type {
   AgentLibraryTemplateSourceRecord,
   AgentLibraryTemplateStatus,
   AgentLibraryTemplateWithSources,
+  TemplateVariable,
 } from "./types/agent-library";
 
 export type {
@@ -73,6 +74,7 @@ export type {
   VerifiedFactRecord,
   FlywheelQuestionListItem,
   FlywheelQuestionDetail,
+  FlywheelQuestionCounts,
 } from "./types/flywheel";
 
 export type {

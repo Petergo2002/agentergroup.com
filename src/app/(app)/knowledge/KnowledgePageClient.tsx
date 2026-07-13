@@ -51,9 +51,9 @@ const formLabelClass = "ml-1 text-sm font-medium text-on-surface-variant";
 const formControlClass =
   "w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/45 focus:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
 const primaryActionClass =
-  "inline-flex h-11 items-center justify-center rounded-xl bg-on-surface px-5 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 disabled:opacity-50";
+  "app-primary-button px-5 disabled:opacity-50";
 const secondaryActionClass =
-  "inline-flex h-10 items-center justify-center rounded-xl border border-outline-variant/15 px-4 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:opacity-50";
+  "app-secondary-button min-h-10 px-4 disabled:opacity-50";
 
 type InputTab = "text" | "file" | "drive" | "website" | null;
 
@@ -857,11 +857,11 @@ export default function KnowledgePageClient({
   const moveTargetFolders = folders.filter((folder) => folder.id !== selectedFolder?.id);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+    <div className="app-page">
+      <header className="app-section-header">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/8 px-2.5 py-1 text-primary">
+            <div className="app-kicker">
               <BookOpenText className="h-3.5 w-3.5" strokeWidth={2.2} />
               <span className="text-xs font-semibold">{t("knowledge.badge")}</span>
             </div>
@@ -906,7 +906,7 @@ export default function KnowledgePageClient({
         </div>
 
         {activeTab ? (
-          <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm sm:p-6 lg:p-7">
+          <div className="app-card sm:p-6 lg:p-7">
             <div className="mb-6 flex items-center justify-between border-b border-outline-variant/10 pb-4">
               <div className="flex items-center gap-3">
                 <button
@@ -1371,7 +1371,7 @@ export default function KnowledgePageClient({
             </div>
             <button
               onClick={openCreateFolderDialog}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90"
+              className="app-primary-button min-h-10 px-4"
             >
               <FolderPlus className="h-4 w-4" />
               {t("knowledge.createFolder")}
@@ -1547,7 +1547,7 @@ export default function KnowledgePageClient({
               <button
                 onClick={() => void handleSaveFolder()}
                 disabled={isSavingFolder || !folderName.trim()}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-on-surface px-5 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 disabled:opacity-50"
+                className="app-primary-button min-h-10 px-5 disabled:opacity-50"
               >
                 {isSavingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {editingFolderId ? t("common.save") : t("knowledge.createFolder")}

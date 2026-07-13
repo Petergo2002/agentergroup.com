@@ -1,5 +1,7 @@
 # Plan: Build The Data Flywheel First
 
+Status: historical implementation plan. The Data Flywheel/Questions feature has shipped; use `docs/guides/questions-data-flywheel.md` and `docs/architecture/core.md#questions--data-flywheel-architecture` as the current source of truth for runtime behavior, API contracts, detection rules, dedupe behavior, and database indexes.
+
 ## Summary
 
 Start with the learning loop, not the mini-site.
@@ -105,8 +107,9 @@ Create authenticated routes.
 
 `GET /api/flywheel/unanswered`
 - Returns queries for the active workspace.
-- Filters: `status`, `agentId`, `widgetId`, `confidence`, `from`, `to`.
-- Default: open questions, newest first.
+- Current filters: `status`, `agentId`, `widgetId`, `limit`.
+- Current response: `{ questions, counts }`.
+- Default: open questions, latest activity first.
 
 `GET /api/flywheel/unanswered/[id]`
 - Returns one query with assistant answer, context excerpt, session metadata, and linked verified fact if one exists.

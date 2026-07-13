@@ -71,7 +71,7 @@ const RUN_SELECT =
 const AUTOMATION_EVENT_SELECT =
   "id, workspace_id, agent_id, automation_id, run_id, external_event_id, trigger_slug, payload, status, created_at, updated_at";
 const KNOWLEDGE_FOLDER_WITH_SOURCES_SELECT =
-  "id, workspace_id, created_by, name, description, created_at, updated_at, sources:knowledge_folder_sources(knowledge_source_id)";
+  "id, workspace_id, created_by, name, description, metadata, created_at, updated_at, sources:knowledge_folder_sources(knowledge_source_id)";
 
 interface AgentKnowledgeJoinRow {
   source: KnowledgeSourceRecord | KnowledgeSourceRecord[] | null;

@@ -62,3 +62,15 @@ test("analytics workspace shows automation summaries and links failures back to 
   assert.match(dashboardTypesSource, /DashboardAutomationAnalytics/);
   assert.match(dashboardTypesSource, /DashboardAutomationTrendPoint/);
 });
+
+test("dashboard analytics separates live, idle, and completed conversation states", () => {
+  assert.match(analyticsHelperSource, /WIDGET_LIVE_HEARTBEAT_WINDOW_MS = 90 \* 1000/);
+  assert.match(analyticsHelperSource, /resolveConversationPresenceStatus/);
+  assert.match(analyticsHelperSource, /\.gt\("last_activity_at", input\.liveCutoffIso\)/);
+  assert.match(analyticsHelperSource, /\.lte\("last_activity_at", input\.liveCutoffIso\)/);
+  assert.match(analyticsRouteSource, /value === "active"[\s\S]*return "live"/);
+  assert.match(analyticsViewSource, /<option value="live">Live visitors<\/option>/);
+  assert.match(analyticsViewSource, /<option value="idle">Idle sessions<\/option>/);
+  assert.match(analyticsViewSource, /conversationResults/);
+  assert.match(dashboardTypesSource, /DashboardConversationPresenceStatus = "live" \| "idle" \| "completed"/);
+});

@@ -169,8 +169,16 @@ export const CreateAgentModal = ({
       router.push(`/agents/${agent.id}/builder`);
       router.refresh();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : t('agents.createModal.createError');
+      const rawMessage =
+        error instanceof Error
+          ? error.message
+          : error && typeof error === 'object' && 'message' in error
+            ? String(error.message)
+            : '';
+      const message = rawMessage.includes('AGENT_LIMIT_REACHED')
+        ? t('settings.billing.agentLimitReached') ||
+          'You have reached your agent limit. Please upgrade your plan.'
+        : rawMessage || t('agents.createModal.createError');
       showToast(message, 'error');
     } finally {
       setIsSaving(false);

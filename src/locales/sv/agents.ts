@@ -2,10 +2,10 @@ export const agents = {
   agentLibrary: "Agentbibliotek",
   headline: "Driftsätt din intelligens.",
   description:
-    "Bygg, hantera och skala specialiserade AI-agenter för interna processer och externa kundupplevelser.",
+    "Bygg, finjustera och driftsätt AI-agenter för webbplatsen, automationer och interna arbetsflöden.",
   createAgent: "Skapa agent",
   library: "Bibliotek",
-  searchPlaceholder: "Sök i biblioteket...",
+  searchPlaceholder: "Sök agenter...",
   noAgentsFound: "Inga agenter hittades",
   noAgentsFoundDescription:
     "Vi kunde inte hitta några agenter som matchar dina nuvarande filter eller din sökning.",
@@ -36,7 +36,7 @@ export const agents = {
     draft: "Utkast",
     archived: "Arkiverade",
   },
-  showingSummary: "Visar {shown} av {total} intelligensenheter",
+  showingSummary: "Visar {shown} av {total} agenter",
   deleteTitle: "Radera agent permanent",
   deleteEntityLabel: "Agent",
   deleteDescription:

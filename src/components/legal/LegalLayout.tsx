@@ -132,7 +132,7 @@ export function LegalLayout({ copy, language, pageType }: LegalLayoutProps) {
             <Link
               href={`/${pageType}?lang=en`}
               className={`px-2 py-1 rounded-md transition-all duration-200 ${
-                language === "en" ? "bg-primary text-white shadow-sm font-extrabold" : "text-on-surface-variant hover:text-on-surface"
+                language === "en" ? "bg-primary text-on-primary shadow-sm font-extrabold" : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               EN
@@ -140,7 +140,7 @@ export function LegalLayout({ copy, language, pageType }: LegalLayoutProps) {
             <Link
               href={`/${pageType}?lang=sv`}
               className={`px-2 py-1 rounded-md transition-all duration-200 ${
-                language === "sv" ? "bg-primary text-white shadow-sm font-extrabold" : "text-on-surface-variant hover:text-on-surface"
+                language === "sv" ? "bg-primary text-on-primary shadow-sm font-extrabold" : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               SV
@@ -159,7 +159,7 @@ export function LegalLayout({ copy, language, pageType }: LegalLayoutProps) {
                 onClick={() => scrollToSection(index)}
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all duration-300 focus:outline-none ${
                   isActive
-                    ? "bg-primary border-primary text-white shadow-md scale-95"
+                    ? "bg-primary border-primary text-on-primary shadow-md scale-95"
                     : "bg-surface-container-low border-outline text-on-surface-variant/90 hover:text-on-surface active:scale-95"
                 }`}
               >

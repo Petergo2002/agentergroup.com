@@ -9,6 +9,7 @@ import {
   areSimilarQuestionsForDedupe,
   buildDedupeHash,
   detectUnansweredQueryCandidate,
+  extractQuestionText,
   getQuestionDedupeTokens,
 } from "../../src/lib/flywheel/detection.ts";
 
@@ -25,6 +26,18 @@ const widgetChatRoute = readFileSync(
   "utf8",
 );
 const flywheelServer = readFileSync("src/lib/flywheel/server.ts", "utf8");
+const flywheelUnansweredRoute = readFileSync(
+  "src/app/api/flywheel/unanswered/route.ts",
+  "utf8",
+);
+const questionsPage = readFileSync(
+  "src/app/(app)/questions/page.tsx",
+  "utf8",
+);
+const questionsPageClient = readFileSync(
+  "src/app/(app)/questions/QuestionsPageClient.tsx",
+  "utf8",
+);
 
 test("flywheel migration creates scoped RLS tables without anonymous access", () => {
   assert.match(migration, /create table if not exists public\.unanswered_queries/);
@@ -56,6 +69,18 @@ test("flywheel migrations cover foreign key advisor indexes", () => {
   assert.match(flywheelMigrations, /unanswered_queries_user_message_id_idx/);
   assert.match(flywheelMigrations, /unanswered_queries_assistant_message_id_idx/);
   assert.match(flywheelMigrations, /verified_facts_created_by_idx/);
+});
+
+test("flywheel migration organizes verified answers into agent knowledge folders", () => {
+  assert.match(flywheelMigrations, /add column if not exists metadata jsonb not null default '\{\}'::jsonb/);
+  assert.match(flywheelMigrations, /knowledge_folders_flywheel_verified_answers_agent_idx/);
+  assert.match(flywheelMigrations, /'system', 'flywheel'/);
+  assert.match(flywheelMigrations, /'purpose', 'verified_answers'/);
+  assert.match(flywheelMigrations, /'agentId', agent_id::text/);
+  assert.match(flywheelMigrations, /insert into public\.knowledge_folder_sources/);
+  assert.match(flywheelMigrations, /insert into public\.agent_knowledge_folders/);
+  assert.match(flywheelMigrations, /delete from public\.agent_knowledge_sources direct_links/);
+  assert.match(flywheelMigrations, /sources\.metadata ->> 'flywheel' = 'true'/);
 });
 
 test("flywheel detection creates conservative candidates for factual misses", () => {
@@ -110,6 +135,38 @@ test("flywheel detection catches unsupported answers even with broad knowledge m
   assert.ok(userCount.confidence >= 0.8);
 });
 
+test("flywheel detection catches meaningful yes/no factual questions without punctuation", () => {
+  const cases = [
+    {
+      question: "Can I pay by invoice",
+      assistantAnswer: "I don't see invoice payment details in the provided information.",
+    },
+    {
+      question: "Do you integrate with Slack",
+      assistantAnswer: "The provided information does not mention Slack integrations.",
+    },
+    {
+      question: "Is your product GDPR compliant",
+      assistantAnswer: "The provided information does not mention GDPR compliance.",
+    },
+    {
+      question: "Kan jag betala med faktura",
+      assistantAnswer: "Jag ser inte någon information om fakturabetalning.",
+    },
+  ];
+
+  for (const item of cases) {
+    const detection = detectUnansweredQueryCandidate({
+      question: item.question,
+      assistantAnswer: item.assistantAnswer,
+      knowledgeMatchCount: 4,
+    });
+
+    assert.equal(detection.shouldCreate, true, item.question);
+    assert.ok(detection.confidence >= 0.8, item.question);
+  }
+});
+
 test("flywheel detection still ignores conversational noise", () => {
   const thanks = detectUnansweredQueryCandidate({
     question: "ok thankyou",
@@ -119,6 +176,38 @@ test("flywheel detection still ignores conversational noise", () => {
   });
 
   assert.equal(thanks.shouldCreate, false);
+
+  const help = detectUnansweredQueryCandidate({
+    question: "Can you help?",
+    assistantAnswer: "Yes, how can I help?",
+    knowledgeMatchCount: 0,
+  });
+
+  assert.equal(help.shouldCreate, false);
+
+  const presence = detectUnansweredQueryCandidate({
+    question: "Are you there?",
+    assistantAnswer: "Yes, I am here.",
+    knowledgeMatchCount: 0,
+  });
+
+  assert.equal(presence.shouldCreate, false);
+});
+
+test("flywheel detection saves a cleaned question from mixed visitor messages", () => {
+  assert.equal(
+    extractQuestionText("Hi, can I pay by invoice thanks"),
+    "can I pay by invoice",
+  );
+
+  const detection = detectUnansweredQueryCandidate({
+    question: "Hi. Can I pay by invoice? Thanks",
+    assistantAnswer: "I don't see invoice payment details in the provided information.",
+    knowledgeMatchCount: 3,
+  });
+
+  assert.equal(detection.shouldCreate, true);
+  assert.equal(detection.question, "Can I pay by invoice?");
 });
 
 test("flywheel dedupe hash is normalized per agent", () => {
@@ -161,6 +250,36 @@ test("flywheel near-duplicate detection collapses repeated missing facts", () =>
   );
 });
 
+test("flywheel repeat captures update existing open questions and latest activity ordering", () => {
+  assert.match(flywheelServer, /function buildCaptureMetadata/);
+  assert.match(flywheelServer, /occurrenceCount/);
+  assert.match(flywheelServer, /lastWidgetSessionId/);
+  assert.match(flywheelServer, /lastUserMessageId/);
+  assert.match(flywheelServer, /updateExistingUnansweredQueryCapture/);
+  assert.match(flywheelServer, /"updated_at"/);
+  assert.match(flywheelMigrations, /unanswered_queries_workspace_status_updated_idx/);
+});
+
+test("questions API and UI use status-scoped loading with server counts", () => {
+  assert.match(flywheelUnansweredRoute, /countFlywheelQuestions/);
+  assert.match(flywheelUnansweredRoute, /NextResponse\.json\(\{ questions, counts \}\)/);
+  assert.match(questionsPage, /initialCounts: counts/);
+  assert.match(
+    questionsPageClient,
+    /function buildQuestionsUrl\(\s*status: UnansweredQueryStatus \| "all"/,
+  );
+  assert.match(
+    questionsPageClient,
+    /buildQuestionsUrl\(statusFilter, agentFilter, widgetFilter\)/,
+  );
+  assert.match(
+    questionsPageClient,
+    /fallbackData: \{ questions: initialQuestions, counts: initialCounts \}/,
+  );
+  assert.match(questionsPageClient, /const counts = useMemo/);
+  assert.match(questionsPageClient, /duplicateOptionsUrl/);
+});
+
 test("widget chat creates flywheel candidates only after assistant persistence and never for preview", () => {
   const assistantPersistIndex = widgetChatRoute.indexOf(
     "const persistedMessages = await insertWidgetMessages",
@@ -179,6 +298,7 @@ test("widget chat creates flywheel candidates only after assistant persistence a
   assert.match(widgetChatRoute, /if \(access\.source === "preview"\)/);
   assert.match(widgetChatRoute, /userMessageId/);
   assert.match(widgetChatRoute, /assistantMessageId/);
+  assert.match(widgetChatRoute, /question: detection\.question/);
 });
 
 test("widget chat creates flywheel candidates for hard stream failures", () => {
@@ -249,11 +369,15 @@ test("question disposition blocks verified and answered state rewrites", () => {
   );
 });
 
-test("verified answer publishing preserves existing agent knowledge attachments", () => {
-  assert.match(flywheelServer, /\.from\("agent_knowledge_sources"\)[\s\S]*?\.upsert/);
-  assert.doesNotMatch(
-    flywheelServer,
-    /\.from\("agent_knowledge_sources"\)[\s\S]*?\.delete\(\)[\s\S]*?publishVerifiedAnswer/,
-  );
+test("verified answer publishing uses auto-managed agent knowledge folders", () => {
+  assert.match(flywheelServer, /function buildVerifiedAnswersFolderMetadata/);
+  assert.match(flywheelServer, /purpose: "verified_answers"/);
+  assert.match(flywheelServer, /function buildVerifiedAnswersFolderName/);
+  assert.match(flywheelServer, /Verified answers - \$\{agentName\}/);
+  assert.match(flywheelServer, /getOrCreateVerifiedAnswersFolder/);
+  assert.match(flywheelServer, /\.from\("knowledge_folder_sources"\)[\s\S]*?\.upsert/);
+  assert.match(flywheelServer, /\.from\("agent_knowledge_folders"\)[\s\S]*?\.upsert/);
+  assert.match(flywheelServer, /linkKnowledgeSourceToVerifiedAnswersFolder\(supabase/);
+  assert.doesNotMatch(flywheelServer, /\.from\("agent_knowledge_sources"\)[\s\S]*?\.upsert/);
   assert.match(flywheelServer, /queueKnowledgeProcessing\(supabase, source\.id/);
 });

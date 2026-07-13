@@ -21,6 +21,10 @@ const migration = readFileSync(
   "supabase/migrations/20260611203129_secure_widget_attachments.sql",
   "utf8",
 );
+const storagePathGuardMigration = readFileSync(
+  "supabase/migrations/20260713184610_guard_widget_attachment_storage_path_uuid.sql",
+  "utf8",
+);
 
 test("widget attachment inspection accepts matching safe image bytes", () => {
   const png = Uint8Array.from([
@@ -98,8 +102,12 @@ test("widget attachment storage is private, quota-bound, and deleted with sessio
   assert.match(migration, /WIDGET_ATTACHMENT_COUNT_LIMIT_EXCEEDED/);
   assert.match(migration, /WIDGET_ATTACHMENT_BYTES_LIMIT_EXCEEDED/);
   assert.match(migration, /widgets\.workspace_id = new\.workspace_id/);
-  assert.match(migration, /split_part\(name, '\/', 1\) ~\*/);
-  assert.doesNotMatch(migration, /nullif\(split_part\(name, '\/', 1\), ''\)::uuid/);
+  assert.match(storagePathGuardMigration, /split_part\(name, '\/', 1\) ~\*/);
+  assert.match(storagePathGuardMigration, /split_part\(name, '\/', 1\)::uuid/);
+  assert.doesNotMatch(
+    storagePathGuardMigration,
+    /nullif\(split_part\(name, '\/', 1\), ''\)::uuid/,
+  );
   assert.match(uploadRoute, /getPublicWidgetRateLimitRules\([\s\S]*"uploads"/);
   assert.match(uploadRoute, /inspectWidgetAttachment/);
   assert.match(uploadRoute, /id: attachmentId/);

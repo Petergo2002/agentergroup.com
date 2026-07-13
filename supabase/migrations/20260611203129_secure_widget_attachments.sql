@@ -138,8 +138,7 @@ on storage.objects for select
 to authenticated
 using (
   bucket_id = 'widget-attachments'
-  and split_part(name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
   and private.is_workspace_member(
-    split_part(name, '/', 1)::uuid
+    nullif(split_part(name, '/', 1), '')::uuid
   )
 );

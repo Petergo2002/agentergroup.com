@@ -16,8 +16,10 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   AgentRecord,
+  FlywheelQuestionCounts,
   FlywheelQuestionDetail,
   FlywheelQuestionListItem,
+  KnowledgeFolderRecord,
   KnowledgeSourceRecord,
   KnowledgeSourceStatus,
   UnansweredQueryRecord,
@@ -107,6 +109,12 @@ interface ListQuestionsInput {
   limit?: number;
 }
 
+interface CountQuestionsInput {
+  workspaceId: string;
+  agentId?: string | null;
+  widgetId?: string | null;
+}
+
 interface AgentLookupRow {
   id: string;
   name: string;
@@ -140,6 +148,60 @@ interface ConversationMessageLookupRow {
 
 function uniqueValues(values: Array<string | null | undefined>) {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+const QUESTION_STATUSES: UnansweredQueryStatus[] = [
+  "open",
+  "answered",
+  "dismissed",
+  "duplicate",
+];
+const VERIFIED_ANSWERS_FOLDER_DESCRIPTION =
+  "Auto-managed verified answers from the Questions queue.";
+
+function buildVerifiedAnswersFolderMetadata(agentId: string) {
+  return {
+    system: "flywheel",
+    purpose: "verified_answers",
+    agentId,
+  };
+}
+
+function buildVerifiedAnswersFolderName(agentName: string, agentId: string, includeSuffix = false) {
+  const baseName = truncate(`Verified answers - ${agentName}`, 180);
+
+  if (!includeSuffix) {
+    return baseName;
+  }
+
+  return truncate(`${baseName} (${agentId.slice(0, 8)})`, 220);
+}
+
+function metadataNumber(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function buildCaptureMetadata(
+  row: UnansweredQueryRecord | null,
+  input: CreateCandidateInput,
+) {
+  const capturedAt = new Date().toISOString();
+  const previousMetadata = row?.metadata ?? {};
+  const occurrenceCount = row
+    ? metadataNumber(previousMetadata.occurrenceCount, 1) + 1
+    : 1;
+
+  return {
+    ...previousMetadata,
+    ...(input.metadata ?? {}),
+    occurrenceCount,
+    lastCapturedAt: capturedAt,
+    lastWidgetSessionId: input.widgetSessionId,
+    lastUserMessageId: input.userMessageId,
+    lastAssistantMessageId: input.assistantMessageId,
+    lastDetectionReason: input.detectionReason,
+    lastConfidence: clampConfidence(input.confidence),
+  };
 }
 
 async function hydrateFlywheelQuestions(
@@ -256,10 +318,13 @@ export async function listFlywheelQuestions(
       ? input.limit
       : 100;
   const limit = Math.min(Math.max(requestedLimit, 1), 200);
+  const orderByLatestActivity =
+    !input.status || input.status === "open" || input.status === "all";
   let query = supabase
     .from("unanswered_queries")
     .select("*")
     .eq("workspace_id", input.workspaceId)
+    .order(orderByLatestActivity ? "updated_at" : "created_at", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -284,6 +349,46 @@ export async function listFlywheelQuestions(
   }
 
   return hydrateFlywheelQuestions(supabase, (data ?? []) as UnansweredQueryRecord[]);
+}
+
+export async function countFlywheelQuestions(
+  supabase: SupabaseAny,
+  input: CountQuestionsInput,
+): Promise<FlywheelQuestionCounts> {
+  const statusCounts = await Promise.all(
+    QUESTION_STATUSES.map(async (status) => {
+      let query = supabase
+        .from("unanswered_queries")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", input.workspaceId)
+        .eq("status", status);
+
+      if (input.agentId) {
+        query = query.eq("agent_id", input.agentId);
+      }
+
+      if (input.widgetId) {
+        query = query.eq("widget_id", input.widgetId);
+      }
+
+      const { count, error } = await query;
+
+      if (error) {
+        throw new FlywheelError(error.message);
+      }
+
+      return [status, count ?? 0] as const;
+    }),
+  );
+  const counts = Object.fromEntries(statusCounts) as Record<UnansweredQueryStatus, number>;
+
+  return {
+    total: QUESTION_STATUSES.reduce((sum, status) => sum + counts[status], 0),
+    open: counts.open,
+    answered: counts.answered,
+    dismissed: counts.dismissed,
+    duplicate: counts.duplicate,
+  };
 }
 
 export async function getFlywheelQuestionDetail(
@@ -374,6 +479,7 @@ async function findSimilarOpenUnansweredQuery(
     .eq("agent_id", input.agentId)
     .eq("status", "open")
     .is("duplicate_of", null)
+    .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -386,6 +492,37 @@ async function findSimilarOpenUnansweredQuery(
       areSimilarQuestionsForDedupe(row.question, input.question),
     ) ?? null
   );
+}
+
+async function updateExistingUnansweredQueryCapture(
+  supabase: SupabaseAny,
+  row: UnansweredQueryRecord,
+  input: CreateCandidateInput,
+) {
+  const assistantAnswer = truncate(input.assistantAnswer, 3000);
+  const { data, error } = await supabase
+    .from("unanswered_queries")
+    .update({
+      widget_id: input.widgetId,
+      widget_agent_id: input.widgetAgentId,
+      widget_session_id: input.widgetSessionId,
+      user_message_id: input.userMessageId,
+      assistant_message_id: input.assistantMessageId,
+      assistant_answer: assistantAnswer,
+      context_excerpt: truncate(input.contextExcerpt ?? "", 1600),
+      detection_reason: truncate(input.detectionReason, 400),
+      confidence: Math.max(row.confidence, clampConfidence(input.confidence)),
+      metadata: buildCaptureMetadata(row, input),
+    })
+    .eq("id", row.id)
+    .select()
+    .single();
+
+  if (error || !data) {
+    throw new FlywheelError(error?.message ?? "Failed to update existing question.");
+  }
+
+  return data as UnansweredQueryRecord;
 }
 
 export async function createUnansweredQueryCandidate(
@@ -402,7 +539,12 @@ export async function createUnansweredQueryCandidate(
   });
 
   if (existing) {
-    return { query: existing, created: false };
+    const updated = await updateExistingUnansweredQueryCapture(
+      supabase,
+      existing,
+      input,
+    );
+    return { query: updated, created: false };
   }
 
   const similarExisting = await findSimilarOpenUnansweredQuery(supabase, {
@@ -412,7 +554,12 @@ export async function createUnansweredQueryCandidate(
   });
 
   if (similarExisting) {
-    return { query: similarExisting, created: false };
+    const updated = await updateExistingUnansweredQueryCapture(
+      supabase,
+      similarExisting,
+      input,
+    );
+    return { query: updated, created: false };
   }
 
   const { data, error } = await supabase
@@ -431,7 +578,7 @@ export async function createUnansweredQueryCandidate(
       detection_reason: truncate(input.detectionReason, 400),
       confidence: clampConfidence(input.confidence),
       dedupe_hash: dedupeHash,
-      metadata: input.metadata ?? {},
+      metadata: buildCaptureMetadata(null, input),
     })
     .select()
     .single();
@@ -445,7 +592,12 @@ export async function createUnansweredQueryCandidate(
       });
 
       if (query) {
-        return { query, created: false };
+        const updated = await updateExistingUnansweredQueryCapture(
+          supabase,
+          query,
+          input,
+        );
+        return { query: updated, created: false };
       }
     }
 
@@ -512,6 +664,35 @@ async function reserveKnowledgeStorage(
   }
 }
 
+async function updateKnowledgeSourceText(
+  workspaceId: string,
+  sourceId: string,
+  rawText: string,
+) {
+  const admin = createAdminClient();
+  const { error } = await admin.rpc("update_knowledge_source_text", {
+    p_workspace_id: workspaceId,
+    p_source_id: sourceId,
+    p_raw_text: rawText,
+  });
+
+  if (error) {
+    const isStorageLimit = error.message.includes(
+      "KNOWLEDGE_STORAGE_LIMIT_EXCEEDED",
+    );
+    const isBusy = error.message.includes("KNOWLEDGE_SOURCE_BUSY");
+
+    throw new FlywheelError(
+      isStorageLimit
+        ? "Storage limit exceeded for this workspace."
+        : isBusy
+          ? "This knowledge source is already being processed."
+          : "Failed to update the verified knowledge source.",
+      isStorageLimit ? 402 : isBusy ? 409 : 500,
+    );
+  }
+}
+
 async function deleteKnowledgeSource(supabase: SupabaseAny, sourceId: string) {
   const { error } = await supabase
     .from("knowledge_sources")
@@ -526,6 +707,96 @@ async function deleteKnowledgeSource(supabase: SupabaseAny, sourceId: string) {
   }
 }
 
+async function findVerifiedAnswersFolder(
+  supabase: SupabaseAny,
+  input: {
+    workspaceId: string;
+    agentId: string;
+  },
+) {
+  const { data, error } = await supabase
+    .from("knowledge_folders")
+    .select("*")
+    .eq("workspace_id", input.workspaceId)
+    .contains("metadata", buildVerifiedAnswersFolderMetadata(input.agentId))
+    .maybeSingle();
+
+  if (error) {
+    throw new FlywheelError(error.message);
+  }
+
+  return (data ?? null) as KnowledgeFolderRecord | null;
+}
+
+async function createVerifiedAnswersFolder(
+  supabase: SupabaseAny,
+  input: {
+    workspaceId: string;
+    agentId: string;
+    agentName: string;
+    userId: string;
+  },
+) {
+  const baseName = buildVerifiedAnswersFolderName(input.agentName, input.agentId);
+  const { data: nameCollision, error: collisionError } = await supabase
+    .from("knowledge_folders")
+    .select("id")
+    .eq("workspace_id", input.workspaceId)
+    .eq("name", baseName)
+    .maybeSingle();
+
+  if (collisionError) {
+    throw new FlywheelError(collisionError.message);
+  }
+
+  const folderName = nameCollision
+    ? buildVerifiedAnswersFolderName(input.agentName, input.agentId, true)
+    : baseName;
+  const { data, error } = await supabase
+    .from("knowledge_folders")
+    .insert({
+      workspace_id: input.workspaceId,
+      created_by: input.userId,
+      name: folderName,
+      description: VERIFIED_ANSWERS_FOLDER_DESCRIPTION,
+      metadata: buildVerifiedAnswersFolderMetadata(input.agentId),
+    })
+    .select("*")
+    .single();
+
+  if (!error && data) {
+    return data as KnowledgeFolderRecord;
+  }
+
+  if (error?.code === "23505") {
+    const existing = await findVerifiedAnswersFolder(supabase, input);
+
+    if (existing) {
+      return existing;
+    }
+  }
+
+  throw new FlywheelError(error?.message ?? "Failed to create verified answers folder.");
+}
+
+export async function getOrCreateVerifiedAnswersFolder(
+  supabase: SupabaseAny,
+  input: {
+    workspaceId: string;
+    agentId: string;
+    agentName: string;
+    userId: string;
+  },
+) {
+  const existing = await findVerifiedAnswersFolder(supabase, input);
+
+  if (existing) {
+    return existing;
+  }
+
+  return createVerifiedAnswersFolder(supabase, input);
+}
+
 export async function createKnowledgeSourceFromVerifiedFact(
   supabase: SupabaseAny,
   input: {
@@ -537,7 +808,8 @@ export async function createKnowledgeSourceFromVerifiedFact(
   },
 ) {
   const rawText = buildVerifiedKnowledgeText(input.question, input.answer);
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("knowledge_sources")
     .insert({
       workspace_id: input.workspaceId,
@@ -576,26 +848,46 @@ export async function createKnowledgeSourceFromVerifiedFact(
   return source;
 }
 
-export async function linkKnowledgeSourceToAgent(
+export async function linkKnowledgeSourceToVerifiedAnswersFolder(
   supabase: SupabaseAny,
   input: {
+    workspaceId: string;
     agentId: string;
+    agentName: string;
+    userId: string;
     knowledgeSourceId: string;
   },
 ) {
-  const { error } = await supabase
-    .from("agent_knowledge_sources")
+  const folder = await getOrCreateVerifiedAnswersFolder(supabase, input);
+  const { error: sourceLinkError } = await supabase
+    .from("knowledge_folder_sources")
+    .upsert(
+      {
+        folder_id: folder.id,
+        knowledge_source_id: input.knowledgeSourceId,
+      },
+      { onConflict: "folder_id,knowledge_source_id" },
+    );
+
+  if (sourceLinkError) {
+    throw new FlywheelError(sourceLinkError.message);
+  }
+
+  const { error: agentFolderError } = await supabase
+    .from("agent_knowledge_folders")
     .upsert(
       {
         agent_id: input.agentId,
-        knowledge_source_id: input.knowledgeSourceId,
+        knowledge_folder_id: folder.id,
       },
-      { onConflict: "agent_id,knowledge_source_id" },
+      { onConflict: "agent_id,knowledge_folder_id" },
     );
 
-  if (error) {
-    throw new FlywheelError(error.message);
+  if (agentFolderError) {
+    throw new FlywheelError(agentFolderError.message);
   }
+
+  return folder;
 }
 
 export function queueKnowledgeProcessing(
@@ -604,6 +896,7 @@ export function queueKnowledgeProcessing(
   accessToken?: string | null,
 ) {
   after(async () => {
+    const admin = createAdminClient();
     const processResponse = await supabase.functions.invoke(
       "process-knowledge-source",
       {
@@ -635,7 +928,7 @@ export function queueKnowledgeProcessing(
       error: errorMessage,
     });
 
-    await supabase
+    await admin
       .from("knowledge_sources")
       .update({
         status: "failed",
@@ -676,7 +969,7 @@ export async function publishVerifiedAnswer(
   }
 
   const unansweredQuery = query as UnansweredQueryRecord;
-  await loadAgentForEdit(supabase, {
+  const agent = await loadAgentForEdit(supabase, {
     workspaceId: input.workspaceId,
     agentId: unansweredQuery.agent_id,
     userId: input.userId,
@@ -696,8 +989,11 @@ export async function publishVerifiedAnswer(
   });
 
   try {
-    await linkKnowledgeSourceToAgent(supabase, {
+    await linkKnowledgeSourceToVerifiedAnswersFolder(supabase, {
+      workspaceId: input.workspaceId,
       agentId: unansweredQuery.agent_id,
+      agentName: agent.name,
+      userId: input.userId,
       knowledgeSourceId: source.id,
     });
   } catch (error) {
@@ -734,7 +1030,7 @@ export async function publishVerifiedAnswer(
 
   const verifiedFact = fact as VerifiedFactRecord;
 
-  await supabase
+  await createAdminClient()
     .from("knowledge_sources")
     .update({
       metadata: {
@@ -912,7 +1208,7 @@ export async function retryVerifiedFactKnowledgeProcessing(
     throw new FlywheelError("This verified fact has no linked knowledge source.", 409);
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await createAdminClient()
     .from("knowledge_sources")
     .update({
       status: "pending",
@@ -972,24 +1268,11 @@ export async function updateVerifiedFactAnswer(
   }
 
   const rawText = buildVerifiedKnowledgeText(verifiedFact.question, answer);
-  await reserveKnowledgeStorage(
+  await updateKnowledgeSourceText(
     input.workspaceId,
     verifiedFact.knowledge_source_id,
-    Buffer.byteLength(rawText, "utf8"),
+    rawText,
   );
-
-  const { error: sourceError } = await supabase
-    .from("knowledge_sources")
-    .update({
-      raw_text: rawText,
-      status: "pending",
-      error_message: null,
-    })
-    .eq("id", verifiedFact.knowledge_source_id);
-
-  if (sourceError) {
-    throw new FlywheelError(sourceError.message);
-  }
 
   const { data: updatedFact, error: updateError } = await supabase
     .from("verified_facts")

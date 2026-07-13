@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import {
+  countFlywheelQuestions,
   FlywheelError,
   listFlywheelQuestions,
 } from "@/lib/flywheel/server";
@@ -43,15 +44,23 @@ export async function GET(request: NextRequest) {
   try {
     const context = await ensureWorkspaceContext(supabase as never, user);
     const searchParams = request.nextUrl.searchParams;
-    const questions = await listFlywheelQuestions(supabase as never, {
+    const input = {
       workspaceId: context.workspace.id,
       status: parseStatus(searchParams.get("status")),
       agentId: searchParams.get("agentId"),
       widgetId: searchParams.get("widgetId"),
       limit: Number(searchParams.get("limit") ?? 100),
-    });
+    };
+    const [questions, counts] = await Promise.all([
+      listFlywheelQuestions(supabase as never, input),
+      countFlywheelQuestions(supabase as never, {
+        workspaceId: input.workspaceId,
+        agentId: input.agentId,
+        widgetId: input.widgetId,
+      }),
+    ]);
 
-    return NextResponse.json({ questions });
+    return NextResponse.json({ questions, counts });
   } catch (error) {
     return toErrorResponse(error);
   }

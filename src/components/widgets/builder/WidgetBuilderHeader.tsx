@@ -84,7 +84,7 @@ export function WidgetBuilderHeader() {
                   <button
                     type="button"
                     onClick={commitName}
-                    className="rounded-md bg-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-background transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="rounded-md bg-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-on-primary transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     ✓
                   </button>
@@ -136,7 +136,7 @@ export function WidgetBuilderHeader() {
               <button
                 onClick={() => void updateWidgetDeployment('deployed')}
                 disabled={isUpdatingDeployment || isSaving}
-                className="group relative flex items-center gap-2 overflow-hidden rounded-md bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-background transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50"
+                className="group relative flex items-center gap-2 overflow-hidden rounded-md bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-on-primary transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50"
               >
                 <span className="relative z-10">
                   {isUpdatingDeployment ? t('widgetBuilder.syncing') : t('widgetBuilder.syncChanges')}
@@ -153,7 +153,7 @@ export function WidgetBuilderHeader() {
               className={`group relative flex items-center gap-2 overflow-hidden rounded-md px-6 py-2.5 text-xs font-bold uppercase tracking-[0.16em] transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 ${
                 isDeployed 
                   ? 'border border-outline-variant/20 text-on-surface-variant hover:bg-on-surface/5 hover:text-on-surface' 
-                  : 'bg-on-surface text-background'
+                  : 'bg-primary text-on-primary'
               }`}
             >
               <span className="relative z-10">

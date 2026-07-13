@@ -62,6 +62,18 @@ test("automation event processing consumes quota before running the agent runtim
   );
 });
 
+test("automation execution rechecks feature and billing entitlement before creating a run", () => {
+  const entitlementCheck = source.indexOf(
+    "subscriptionResult.data?.integrations_enabled",
+  );
+  const runInsert = source.indexOf('from("runs")', entitlementCheck);
+
+  assert.ok(entitlementCheck >= 0);
+  assert.ok(runInsert > entitlementCheck);
+  assert.match(source, /workspaceResult\.data\?\.automations_enabled/);
+  assert.match(source, /status: "paused"/);
+});
+
 test("automation runtime receives the normalized trigger event as a user message", () => {
   assert.match(source, /normalizeAutomationTriggerPayload/);
   assert.match(source, /const automationInput = buildAutomationInput/);

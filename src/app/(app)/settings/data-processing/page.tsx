@@ -17,8 +17,8 @@ async function SettingsDataProcessingPageContent({
   const sections = messages.dataProcessing.sections;
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <section className="rounded-[1.7rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+    <div className="app-page max-w-4xl">
+      <section className="app-section-header">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
           {messages.dataProcessing.badge}
         </p>
@@ -57,7 +57,7 @@ async function SettingsDataProcessingPageContent({
         {sections.map((section) => (
           <section
             key={section.title}
-            className="rounded-[1.7rem] border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]"
+            className="app-card"
           >
             <h2 className="text-xl font-semibold tracking-tight text-on-surface">
               {section.title}

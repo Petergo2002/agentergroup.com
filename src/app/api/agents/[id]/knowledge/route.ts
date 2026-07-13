@@ -14,7 +14,7 @@ import type { KnowledgeSourceRecord } from "@/lib/types";
 const KNOWLEDGE_SOURCE_LIST_SELECT =
   "id, workspace_id, created_by, name, description, source_type, status, storage_bucket, storage_path, mime_type, file_size_bytes, chunk_count, last_processed_at, error_message, metadata, created_at, updated_at";
 const KNOWLEDGE_FOLDER_WITH_SOURCES_SELECT =
-  "id, workspace_id, created_by, name, description, created_at, updated_at, sources:knowledge_folder_sources(knowledge_source_id)";
+  "id, workspace_id, created_by, name, description, metadata, created_at, updated_at, sources:knowledge_folder_sources(knowledge_source_id)";
 
 interface AgentKnowledgeJoinRow {
   source: KnowledgeSourceRecord | KnowledgeSourceRecord[] | null;

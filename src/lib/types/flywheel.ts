@@ -66,3 +66,11 @@ export interface FlywheelQuestionDetail extends FlywheelQuestionListItem {
     created_at: string;
   }>;
 }
+
+export interface FlywheelQuestionCounts {
+  total: number;
+  open: number;
+  answered: number;
+  dismissed: number;
+  duplicate: number;
+}

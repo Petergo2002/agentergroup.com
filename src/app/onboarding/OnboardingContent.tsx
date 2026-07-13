@@ -101,7 +101,7 @@ export default function OnboardingContent({
       {/* Top Banner for Status */}
       {status !== 'idle' && (
         <div className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-3 px-6 py-3 text-sm font-bold tracking-tight animate-in fade-in slide-in-from-top-4 duration-500 ${
-          status === 'success' ? 'bg-primary text-white' : 'bg-red-500/10 text-red-500 border-b border-red-500/20'
+          status === 'success' ? 'bg-primary text-on-primary' : 'bg-red-500/10 text-red-500 border-b border-red-500/20'
         }`}>
           {status === 'success' ? 'Success! Finalizing your workspace...' : 'Payment was canceled. Please select a plan to continue.'}
         </div>
@@ -138,7 +138,7 @@ export default function OnboardingContent({
                 }`}
               >
                 {isPremium && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-on-primary">
                     Recommended
                   </div>
                 )}
@@ -181,7 +181,7 @@ export default function OnboardingContent({
                   disabled={loading !== null}
                   className={`relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl py-4 text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${
                     isPremium
-                      ? "bg-primary text-white hover:shadow-[0_8px_20px_-4px_rgba(255,92,0,0.4)] active:scale-[0.98]"
+                      ? "bg-primary text-on-primary hover:shadow-[0_8px_20px_-4px_rgba(255,92,0,0.4)] active:scale-[0.98]"
                       : isFree 
                         ? "border border-white/10 text-white hover:bg-white/5 active:scale-[0.98]"
                         : "bg-white text-[#0F172A] hover:bg-white/90 active:scale-[0.98]"

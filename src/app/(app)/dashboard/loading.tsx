@@ -2,8 +2,8 @@
 
 export default function DashboardLoading() {
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+    <div className="app-page">
+      <header className="app-section-header">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="w-full max-w-2xl">
             <div className="h-7 w-32 animate-pulse rounded-lg bg-surface-container-low" />

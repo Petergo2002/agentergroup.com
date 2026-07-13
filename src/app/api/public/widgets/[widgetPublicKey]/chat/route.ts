@@ -767,14 +767,14 @@ export async function POST(
                 widgetSessionId: widgetSession.id,
                 userMessageId,
                 assistantMessageId: input.assistantMessageId,
-                question: message,
+                question: detection.question,
                 assistantAnswer: input.assistantAnswer,
                 contextExcerpt: buildConversationExcerpt(
                   history.slice(0, -1).map((item) => ({
                     role: item.role,
                     content: item.content,
                   })),
-                  message,
+                  detection.question,
                 ),
                 detectionReason: input.detectionReason ?? detection.reason,
                 confidence: input.confidence ?? detection.confidence,

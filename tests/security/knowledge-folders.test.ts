@@ -41,6 +41,7 @@ test("knowledge folder helpers dedupe source ids and expose source membership", 
       created_by: "user-a",
       name: "Sales",
       description: "",
+      metadata: {},
       created_at: "2026-05-20T00:00:00.000Z",
       updated_at: "2026-05-20T00:00:00.000Z",
       sources: [

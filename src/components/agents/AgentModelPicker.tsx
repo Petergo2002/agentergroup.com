@@ -221,7 +221,7 @@ export function AgentModelPicker({
                                 </p>
                               </div>
                               {isSelected ? (
-                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white">
+                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-on-primary">
                                   <span className="material-symbols-outlined text-[14px] font-bold">
                                     check
                                   </span>

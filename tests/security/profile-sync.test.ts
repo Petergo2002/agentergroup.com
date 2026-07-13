@@ -32,9 +32,11 @@ function buildProfile(overrides?: Partial<ProfileRecord>): ProfileRecord {
 function createProfileClient(initialProfile: ProfileRecord | null) {
   let storedProfile = initialProfile;
   const operations: string[] = [];
+  const writePayloads: Array<Record<string, unknown>> = [];
 
   return {
     operations,
+    writePayloads,
     client: {
       from(table: string) {
         assert.equal(table, "profiles");
@@ -54,6 +56,7 @@ function createProfileClient(initialProfile: ProfileRecord | null) {
           },
           update(payload: Partial<ProfileRecord>) {
             operations.push("update");
+            writePayloads.push({ ...payload });
             return {
               eq() {
                 return {
@@ -74,6 +77,7 @@ function createProfileClient(initialProfile: ProfileRecord | null) {
           },
           insert(payload: ProfileRecord) {
             operations.push("insert");
+            writePayloads.push({ ...payload });
             return {
               select() {
                 return {
@@ -118,6 +122,28 @@ test("profile sync inserts missing profiles", async () => {
 
   assert.deepEqual(profile, buildProfile());
   assert.deepEqual(operations, ["select", "insert"]);
+});
+
+test("profile sync never copies authorization fields from user metadata", async () => {
+  const { client, writePayloads } = createProfileClient(null);
+  const user = buildUser({
+    user_metadata: {
+      full_name: "User One",
+      avatar_url: "https://example.com/avatar.png",
+      is_admin: true,
+    },
+  });
+
+  await syncUserProfile(client as never, user);
+
+  assert.equal(writePayloads.length, 1);
+  assert.deepEqual(Object.keys(writePayloads[0]).sort(), [
+    "avatar_url",
+    "email",
+    "full_name",
+    "id",
+  ]);
+  assert.equal("is_admin" in writePayloads[0], false);
 });
 
 test("profile comparison ignores unchanged nullable fields", () => {

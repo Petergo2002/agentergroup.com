@@ -28,9 +28,9 @@ begin
       and session_id = p_session_id
       and public.widget_sessions.status <> 'completed'
       and (
-        public.widget_sessions.active_turn_request_id is null
-        or public.widget_sessions.active_turn_started_at is null
-        or public.widget_sessions.active_turn_started_at < p_stale_before
+        active_turn_request_id is null
+        or active_turn_started_at is null
+        or active_turn_started_at < p_stale_before
       )
     returning
       id,

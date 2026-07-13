@@ -180,11 +180,11 @@ begin
       active_turn_request_id = p_request_id,
       active_turn_started_at = p_started_at
     where id = p_thread_id
-      and public.chat_threads.source = 'assistant'
+      and source = 'assistant'
       and (
-        public.chat_threads.active_turn_request_id is null
-        or public.chat_threads.active_turn_started_at is null
-        or public.chat_threads.active_turn_started_at < p_stale_before
+        active_turn_request_id is null
+        or active_turn_started_at is null
+        or active_turn_started_at < p_stale_before
       )
     returning
       public.chat_threads.id,
@@ -232,7 +232,7 @@ as $$
       active_turn_request_id = null,
       active_turn_started_at = null
     where id = p_thread_id
-      and public.chat_threads.active_turn_request_id = p_request_id
+      and active_turn_request_id = p_request_id
     returning 1
   )
   select exists(select 1 from released);

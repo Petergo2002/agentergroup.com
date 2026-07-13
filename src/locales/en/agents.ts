@@ -1,11 +1,11 @@
 export const agents = {
   agentLibrary: "Agent Library",
-  headline: "Deploy your Intelligence.",
+  headline: "Deploy your intelligence.",
   description:
-    "Construct, manage, and scale specialized AI agents for your internal processes and external customer experiences.",
+    "Build, tune, and deploy AI agents across your website, automations, and internal workflows.",
   createAgent: "Create Agent",
   library: "Library",
-  searchPlaceholder: "Search the library...",
+  searchPlaceholder: "Search agents...",
   noAgentsFound: "No agents found",
   noAgentsFoundDescription:
     "We couldn't find any agents matching your current filters or search criteria.",
@@ -35,7 +35,7 @@ export const agents = {
     draft: "Draft",
     archived: "Archived",
   },
-  showingSummary: "Showing {shown} of {total} Intelligence Units",
+  showingSummary: "Showing {shown} of {total} agents",
   deleteTitle: "Permanently Delete Agent",
   deleteEntityLabel: "Agent",
   deleteDescription:

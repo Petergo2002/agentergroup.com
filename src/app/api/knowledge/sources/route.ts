@@ -1,14 +1,22 @@
-import { Buffer } from "node:buffer";
 import { after, NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import {
+  InvalidJsonBodyError,
+  readJsonBodyWithLimit,
+  RequestBodyTooLargeError,
+} from "@/lib/bounded-json";
 import {
   KNOWLEDGE_BUCKET,
   getSupportedKnowledgeFileTypesLabel,
   inferKnowledgeMimeType,
   isSupportedKnowledgeMimeType,
 } from "@/lib/knowledge";
+import {
+  MAX_KNOWLEDGE_TEXT_REQUEST_BYTES,
+  validateKnowledgeText,
+} from "@/lib/knowledge-text";
 import {
   MAX_WEBSITE_KNOWLEDGE_PAGES,
   normalizeSelectedWebsiteUrls,
@@ -125,6 +133,7 @@ function queueKnowledgeProcessing(
   accessToken?: string | null,
 ) {
   after(async () => {
+    const admin = createAdminClient();
     const processResponse = await supabase.functions.invoke(
       "process-knowledge-source",
       {
@@ -156,7 +165,7 @@ function queueKnowledgeProcessing(
         message: errorMessage,
       });
 
-      await supabase
+      await admin
         .from("knowledge_sources")
         .update({
           status: "failed",
@@ -203,12 +212,42 @@ export async function POST(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!user) {
+  if (!user || !session?.access_token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  const body = await request.json().catch(() => ({}));
+  const admin = createAdminClient();
+  let bodyValue: unknown;
+
+  try {
+    bodyValue = await readJsonBodyWithLimit(
+      request,
+      MAX_KNOWLEDGE_TEXT_REQUEST_BYTES,
+    );
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Text knowledge sources are limited to 1MB each." },
+        { status: 413 },
+      );
+    }
+
+    if (error instanceof InvalidJsonBodyError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    throw error;
+  }
+
+  if (!bodyValue || typeof bodyValue !== "object" || Array.isArray(bodyValue)) {
+    return NextResponse.json(
+      { error: "Request body must be a JSON object." },
+      { status: 400 },
+    );
+  }
+
+  const body = bodyValue as Record<string, unknown>;
   const name = String(body.name ?? "").trim();
   const description = String(body.description ?? "").trim();
   const sourceType = String(body.sourceType ?? "").trim() as KnowledgeSourceType;
@@ -241,13 +280,19 @@ export async function POST(request: NextRequest) {
     DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES;
 
   if (sourceType === "text") {
-    const rawText = String(body.rawText ?? "").trim();
+    const textValidation = validateKnowledgeText(
+      typeof body.rawText === "string" ? body.rawText.trim() : body.rawText,
+    );
 
-    if (!rawText) {
-      return NextResponse.json({ error: "rawText is required for text sources." }, { status: 400 });
+    if (!textValidation.valid) {
+      return NextResponse.json(
+        { error: textValidation.error },
+        { status: textValidation.code === "too_large" ? 413 : 400 },
+      );
     }
 
-    const newSizeBytes = Buffer.byteLength(rawText, "utf8");
+    const rawText = textValidation.text;
+    const newSizeBytes = textValidation.sizeBytes;
     if (currentTotalBytes + newSizeBytes > storageLimit) {
       return NextResponse.json(
         { error: buildStorageLimitError(storageLimit) },
@@ -255,7 +300,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: source, error } = await supabase
+    const { data: source, error } = await admin
       .from("knowledge_sources")
       .insert({
         workspace_id: context.workspace.id,
@@ -395,7 +440,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the source immediately without waiting for Firecrawl
-    const { data: source, error } = await supabase
+    const { data: source, error } = await admin
       .from("knowledge_sources")
       .insert({
         workspace_id: context.workspace.id,
@@ -475,7 +520,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: source, error } = await supabase
+  const { data: source, error } = await admin
     .from("knowledge_sources")
     .insert({
       workspace_id: context.workspace.id,
@@ -524,12 +569,13 @@ export async function POST(request: NextRequest) {
   }
 
   const storagePath = `${context.workspace.id}/${source.id}/${sanitizeFileName(fileName)}`;
-  const { data: updatedSource, error: updateError } = await supabase
+  const { data: updatedSource, error: updateError } = await admin
     .from("knowledge_sources")
     .update({
       storage_path: storagePath,
     })
     .eq("id", source.id)
+    .eq("workspace_id", context.workspace.id)
     .select()
     .single();
 

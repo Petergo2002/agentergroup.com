@@ -1,6 +1,6 @@
 # Agentergroup Architecture
 
-Last updated: 2026-06-24
+Last updated: 2026-07-08
 
 ## Purpose
 
@@ -24,12 +24,14 @@ The current product is a conversational AI agent platform with four core capabil
 4. Let agents use:
    - workspace knowledge stored in Supabase
    - connected external tools through Composio
+5. Capture unanswered public widget questions, review them in `/questions`, and publish verified answers back into agent knowledge
 
 The current MVP is intentionally narrow:
 
 - chat-first agent runtime
 - Automation agents with Composio external trigger ingestion, starting with Gmail
 - workspace-scoped knowledge base with semantic retrieval
+- Questions/Data Flywheel queue for missed public widget questions
 - limited live tools for Gmail, Microsoft Outlook, Slack, HubSpot, Shopify, Google Ads, Google Calendar, and Cal.com
 - Google Drive only as a knowledge import source
 - internal assistant toolkit for Text to PDF generation
@@ -102,6 +104,7 @@ Important implementation docs:
 
 - `docs/guides/agent-builder.md`
 - `docs/guides/automation-agents.md`
+- `docs/guides/questions-data-flywheel.md`
 - `docs/architecture/core.md`
 - `docs/guides/composio-integrations.md` — **read this before writing any Composio tool integration**
 
@@ -120,6 +123,7 @@ Important implementation docs:
 - `src/app/(app)/widgets/page.tsx`
 - `src/app/(app)/widgets/[id]/page.tsx`
 - `src/app/(app)/widgets/[id]/preview/page.tsx`
+- `src/app/(app)/questions/page.tsx`
 - `src/app/(app)/connections/page.tsx`
 - `src/app/(app)/knowledge/page.tsx`
 - `src/app/(app)/settings/page.tsx`
@@ -188,6 +192,10 @@ Important implementation docs:
 - `src/app/api/knowledge/sources/[id]/process/route.ts`
 - `src/app/api/knowledge/drive/files/route.ts`
 - `src/app/api/knowledge/drive/import/route.ts`
+- `src/app/api/flywheel/unanswered/route.ts`
+- `src/app/api/flywheel/unanswered/[id]/route.ts`
+- `src/app/api/flywheel/unanswered/[id]/answer/route.ts`
+- `src/app/api/flywheel/verified-facts/[id]/route.ts`
 - `src/app/api/widgets/route.ts`
 - `src/app/api/widgets/[id]/route.ts`
 - `src/app/api/widgets/[id]/agents/route.ts`
@@ -774,7 +782,32 @@ Purpose:
 - `agent_knowledge_folders`: live folder attachments for an agent
 - `match_agent_knowledge_chunks`: similarity search scoped to one agent and workspace, including direct sources, ready sources in attached folders, and optional session-scoped widget upload sources
 
-### 4C. Dashboard conversation summaries
+### 4A. Questions/Data Flywheel
+
+- `unanswered_queries`
+- `verified_facts`
+
+Purpose:
+
+- `unanswered_queries`: workspace-scoped queue items for concrete public widget questions the assistant could not answer confidently
+- `verified_facts`: operator-approved question/answer pairs that can be published back into agent knowledge and later reused for public FAQ/SEO surfaces
+
+Important current behavior:
+
+- Public widget chat creates candidates through the server-side admin client after the user and assistant messages have been persisted.
+- Preview widget chats are explicitly excluded from capture.
+- `unanswered_queries.status` is one of `open`, `answered`, `dismissed`, or `duplicate`.
+- `verified_facts.visibility` is one of `agent_only` or `public_ready`; `public_ready` is a future-facing content flag and does not currently publish a public page.
+- Publishing an answer creates a normal text `knowledge_sources` row, places it in the agent's auto-managed verified answers folder through `knowledge_folder_sources` and `agent_knowledge_folders`, queues `process-knowledge-source`, and only then marks the question `answered`.
+- RLS is workspace/member scoped for reads and agent-edit scoped for writes. Public runtime capture does not grant anonymous table access.
+
+Important indexes:
+
+- `unanswered_queries_open_dedupe_idx`: unique open dedupe by workspace, agent, and normalized dedupe hash.
+- `unanswered_queries_workspace_status_updated_idx`: latest-activity queue loading by workspace/status.
+- `unanswered_queries_widget_id_idx`, `unanswered_queries_widget_agent_id_idx`, `unanswered_queries_user_message_id_idx`, `unanswered_queries_assistant_message_id_idx`, and `verified_facts_created_by_idx`: foreign-key lookup coverage from the follow-up FK-index migration.
+
+### 4B. Dashboard conversation summaries
 
 - `dashboard_conversation_summaries`
 
@@ -789,8 +822,10 @@ Purpose:
 - Only covers `source IN ('embedded', 'hosted')` sessions; preview sessions are excluded.
 - Used by the analytics backend to serve paginated conversation lists and search without expensive per-request aggregations.
 - RLS mirrors `widget_sessions`: workspace members can select their own workspace rows.
+- Supabase runs the `close-stale-widget-sessions` `pg_cron` job every 5 minutes. The job calls `public.close_stale_widget_sessions(interval '30 minutes', false, 5000)` to mark hosted and embedded active sessions as `completed` with `end_reason = 'inactivity_timeout'` when `last_seen_at` is stale.
+- Analytics presence labels are intentionally shorter lived than database completion. App code treats active sessions with activity in the last 90 seconds as `live`, older active sessions as `idle`, and database-completed sessions as `completed`.
 
-### 4B. Agent library templates
+### 4C. Agent library templates
 
 - `agent_library_templates`
 - `agent_library_template_sources`
@@ -884,7 +919,8 @@ password protection, which is an Auth dashboard setting and is intentionally not
 
 ## Route Protection
 
-Middleware is centralized in `src/lib/supabase/proxy.ts`.
+Root request interception lives in `middleware.ts`; the auth/session policy is centralized in
+`src/lib/supabase/proxy.ts`.
 
 Current policy:
 
@@ -1584,6 +1620,7 @@ Main surfaces:
 Current behavior:
 
 - analytics is built from widget session, message, lead, failure, automation event, and run data
+- conversation rows expose `live`, `idle`, and `completed` presence states; `live` is based on the 90-second heartbeat window, while stale database completion is handled by the Supabase cron after 30 minutes
 - the primary UI can switch between conversation inbox/detail and automation performance views
 - conversation analytics excludes preview sessions and focuses on customer-facing widget traffic
 - automation analytics exposes event totals, processed/failed trends, per-agent summaries, and recent failures that link to Activity
@@ -1604,6 +1641,53 @@ It loads in parallel:
 - widget lead count
 
 The dashboard home page renders stats cards, an agent status list, and a recent conversations activity panel.
+
+## Questions / Data Flywheel Architecture
+
+Questions/Data Flywheel is the closed loop from missed visitor questions to verified agent knowledge.
+
+Main surfaces:
+
+- `/questions`
+- `src/lib/flywheel/detection.ts`
+- `src/lib/flywheel/server.ts`
+- `GET /api/flywheel/unanswered`
+- `GET /api/flywheel/unanswered/[id]`
+- `POST /api/flywheel/unanswered/[id]/answer`
+- `PATCH /api/flywheel/unanswered/[id]`
+- `PATCH /api/flywheel/verified-facts/[id]`
+
+### Capture sequence
+
+The public widget chat route schedules capture only after the assistant message has been persisted. The route passes the durable widget session id, user message id, assistant message id, selected agent, assistant answer, knowledge-match count, runtime error state, and request metadata into `createUnansweredQueryCandidate()`.
+
+Capture runs in `after()` so the visitor response stream is not blocked. Preview widget chat skips capture entirely.
+
+### Detection
+
+`detectUnansweredQueryCandidate()` is deterministic and does not call a separate classifier model.
+
+The detector captures concrete English and Swedish question intent, including yes/no questions without punctuation such as `Can I pay by invoice`, `Do you integrate with Slack`, `Is your product GDPR compliant`, and `Kan jag betala med faktura`.
+
+The detector also looks for assistant miss language such as not knowing, not having enough information, not provided, not mentioned, not visible, not locatable, and Swedish equivalents. It ignores low-value conversational prompts such as greetings, thanks, `Can you help?`, and `Are you there?`.
+
+Mixed visitor messages are cleaned before storage. For example, `Hi, can I pay by invoice thanks` becomes `can I pay by invoice`.
+
+### Dedupe and repeat activity
+
+Open dedupe is scoped to workspace + agent. Exact duplicates use a normalized hash; near duplicates use token overlap after filler words and simple aliases are removed.
+
+Repeat open misses update the existing row instead of creating another open row. The update refreshes session/message references, assistant answer, context excerpt, detection reason, max confidence, `metadata.occurrenceCount`, `metadata.lastCapturedAt`, and `updated_at`.
+
+Open queues sort by latest activity, so repeated unresolved misses resurface. The supporting migration is `20260704170303_flywheel_unanswered_latest_activity_idx.sql`.
+
+### Review and publishing
+
+`/questions` loads initial open questions server-side, then the client requests the selected status from `GET /api/flywheel/unanswered`. The response includes both `questions` and server-side `counts`, so badges stay correct without relying on the currently visible page of rows.
+
+This status-scoped loading matters because fetching a capped all-status set and filtering client-side can hide open questions behind answered, dismissed, or duplicate rows.
+
+Publishing a verified answer writes a `verified_facts` row, creates a text `knowledge_sources` row with the question and verified answer, links that source to the agent, queues normal knowledge processing, and marks the source question `answered`. Dismiss, reopen, duplicate, answer update, and processing retry all go through authenticated API routes and agent-edit permission checks.
 
 ## OpenRouter Integration
 
@@ -2196,6 +2280,16 @@ After import, the source behaves like any other workspace knowledge source.
 | `GET /api/knowledge/drive/files` | List importable Google Drive files for a selected connected account |
 | `POST /api/knowledge/drive/import` | Import a supported Drive file into the knowledge base from a selected connected account |
 
+### Questions/Data Flywheel APIs
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/flywheel/unanswered` | List unanswered-question queue rows for the active workspace, filtered by `status`, `agentId`, `widgetId`, and `limit`, and return server-side status counts |
+| `GET /api/flywheel/unanswered/[id]` | Return one hydrated question, linked verified fact, knowledge-source state, session metadata, and recent conversation messages |
+| `POST /api/flywheel/unanswered/[id]/answer` | Publish an operator-approved answer into `verified_facts`, create/link a text knowledge source for the agent, queue processing, and mark the question answered |
+| `PATCH /api/flywheel/unanswered/[id]` | Dismiss, reopen, or mark an unanswered question as a duplicate |
+| `PATCH /api/flywheel/verified-facts/[id]` | Update a verified answer, change visibility, or retry linked knowledge-source processing |
+
 ### Widget management APIs
 
 | Route | Purpose |
@@ -2463,6 +2557,7 @@ When making major changes, verify all of the following:
 10. Public widget chat still enforces one active turn per session with `SESSION_BUSY` on overlap
 11. Widget-builder preview chat still consumes workspace credits before model execution even though preview-token traffic skips public rate limits
 12. Widget runtime changes still pass the load-test harness before shipping
+13. Questions/Data Flywheel capture still skips preview chats, records missed public widget questions after assistant persistence, dedupes open repeats, and keeps `/questions` status counts server-derived
 
 ## Source Files Worth Reading First
 
@@ -2482,8 +2577,11 @@ For a new engineer joining this codebase, these are the most important files to 
 12. `src/lib/widgets/server.ts`
 13. `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
 14. `apps/widget-v2/src/Widget.tsx`
-15. `scripts/widget-load-test.mjs`
-16. `src/lib/dashboard/summary.ts`
+15. `src/lib/flywheel/detection.ts`
+16. `src/lib/flywheel/server.ts`
+17. `src/app/(app)/questions/QuestionsPageClient.tsx`
+18. `scripts/widget-load-test.mjs`
+19. `src/lib/dashboard/summary.ts`
 
 ## Summary
 

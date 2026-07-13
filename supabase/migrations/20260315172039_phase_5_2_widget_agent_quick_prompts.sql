@@ -3,5 +3,4 @@ alter table public.widget_agents
 
 update public.widget_agents
 set show_quick_actions = true
-where show_quick_actions is distinct from true
-  and show_quick_actions is null;
+where show_quick_actions is null;

@@ -16,6 +16,7 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 - Create automation agents that start from external Composio triggers, beginning with Gmail new-message events, and then run the configured agent with selected tools and knowledge.
 - Deploy widgets for hosted usage or third-party site embedding.
 - Track widget sessions, transcripts, leads, and analytics inside each workspace.
+- Review unanswered visitor questions in the Questions queue and publish verified answers back into agent knowledge.
 - Run owner-only privacy workflows for lookup, export, deletion, and retention cleanup.
 
 ## Current Product Guarantees
@@ -26,6 +27,7 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 - DSAR email lookups use normalized exact matching, not wildcard matching. Session ids used in export filenames are sanitized before being written into headers.
 - Production chat persistence does not store raw debug traces or raw tool payloads. Conversation-detail debug traces are only returned to workspace owners/admins.
 - Automation activity is event-centered rather than conversational. Each run stores a versioned operational decision, generated-message preview, summary, missing-information list, and tool outcomes; successful actions require successful tool evidence, and production persistence excludes raw tool payloads.
+- The Questions queue is deterministic and service-captured from public widget chats only after assistant replies are persisted. Preview widget chats are intentionally excluded. Repeat open misses update the original row with occurrence metadata and latest activity instead of creating duplicate open rows.
 
 ## Local Development
 
@@ -134,9 +136,9 @@ npm run widget:load-test -- --help
 │   ├── functions/              # Edge functions for knowledge processing/search
 │   └── migrations/             # Database schema and platform migrations
 ├── scripts/                    # Load testing and utility scripts
-├── docs/                       # Current reference docs plus the active widget rate-limit plan
+├── docs/                       # Current architecture, feature guides, and operations runbooks
 ├── public/                     # Static assets served by the dashboard app
-└── proxy.ts                    # Request/session proxy hook for auth session updates
+└── middleware.ts               # Request middleware; delegates auth/session handling to src/lib/supabase/proxy.ts
 ```
 
 ## Important Routes
@@ -156,6 +158,7 @@ npm run widget:load-test -- --help
 | `/assistants/[id]` | Internal assistant chat surface with shared workspace threads |
 | `/widgets` | Widget list and management |
 | `/widgets/[id]` | Widget configuration, agents, appearance, and deployment state |
+| `/questions` | Review unanswered widget questions, publish verified answers, dismiss misses, and mark duplicates |
 | `/analytics` | Widget conversation analytics, transcript detail, and automation performance reporting |
 | `/connections` | Connected app authorization and status |
 | `/settings` | Workspace profile, compliance links, and admin settings |
@@ -210,6 +213,11 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - Embedded widget abuse controls trust only edge-supplied client IP headers (`x-vercel-forwarded-for` and `cf-connecting-ip`); requests without them fall back to the shared `"unknown"` rate-limit bucket.
 - Public widget/API failures now return stable client-safe errors while detailed exceptions stay in server logs.
 - Public lead submissions now return only `ok`, `leadId`, and `createdAt`.
+- Questions/Data Flywheel capture runs from the public widget chat route after the assistant response has been saved. `src/lib/flywheel/detection.ts` uses deterministic English/Swedish question-intent, missing-answer, noise-guard, and question-cleanup rules; it does not call an extra classifier model.
+- Captured misses are stored in `unanswered_queries`. Customer-approved answers create `verified_facts`, a text `knowledge_sources` row, place that source in the agent's auto-managed verified answers folder, then enqueue normal knowledge processing.
+- `GET /api/flywheel/unanswered` returns a status-scoped `questions` list plus server-side `counts`. The `/questions` UI requests the selected status directly so a capped mixed-status result set cannot hide open questions.
+- Open question dedupe is workspace + agent scoped. Exact and near-duplicate open repeats update occurrence metadata, latest message/session references, confidence, and `updated_at`; they do not create another open row.
+- Supabase runs `close-stale-widget-sessions` every 5 minutes through `pg_cron`. It marks hosted/embedded active widget sessions as `completed` with `inactivity_timeout` after 30 minutes without `last_seen_at` activity; Analytics still uses a separate 90-second app-side window to label active sessions as live versus idle.
 - Widget leads can have a persisted AI conversation summary. Generation runs after the response lifecycle, consumes one workspace message credit per attempt, and can be regenerated from Leads or Analytics when the transcript changes. See `docs/guides/lead-conversation-summaries.md`.
 - Analytics includes an Automation view with event totals, processed/failed trends, and recent failures that link back to Activity. Automation analytics excludes raw provider payloads and raw email bodies.
 - The dashboard app now sends baseline browser protections through CSP, HSTS, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.

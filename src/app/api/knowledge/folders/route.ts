@@ -11,7 +11,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 const KNOWLEDGE_FOLDER_LIST_SELECT =
-  "id, workspace_id, created_by, name, description, created_at, updated_at, sources:knowledge_folder_sources(knowledge_source_id)";
+  "id, workspace_id, created_by, name, description, metadata, created_at, updated_at, sources:knowledge_folder_sources(knowledge_source_id)";
 
 async function getValidSourceIds(
   supabase: Awaited<ReturnType<typeof createClient>>,

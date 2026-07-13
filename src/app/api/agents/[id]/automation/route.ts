@@ -5,6 +5,11 @@ import {
   AUTOMATION_GMAIL_TRIGGER_CONFIG,
   AUTOMATION_GMAIL_TRIGGER_SLUG,
 } from "@/lib/agents/defaults";
+import {
+  AUTOMATIONS_DISABLED_CODE,
+  AUTOMATIONS_DISABLED_MESSAGE,
+  hasAutomationsEnabled,
+} from "@/lib/assistants/feature-flags";
 import { buildWorkspaceComposioUserId } from "@/lib/connections";
 import {
   deleteComposioTrigger,
@@ -12,6 +17,7 @@ import {
   syncConnectedAccountsToDatabase,
 } from "@/lib/composio";
 import { getAppUrl, hasComposioEnv, hasComposioWebhookSecret } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AgentAutomationRecord, BuilderDefinition, ConnectionRecord } from "@/lib/types";
 
@@ -54,7 +60,7 @@ function isAutomationHostSurface(surface: string) {
   return surface === "automation";
 }
 
-async function loadAutomationHostAgent(
+async function loadWorkspaceAgent(
   supabase: Awaited<ReturnType<typeof createClient>>,
   agentId: string,
   workspaceId: string,
@@ -70,11 +76,16 @@ async function loadAutomationHostAgent(
     throw error;
   }
 
-  if (!agent || !isAutomationHostSurface(agent.surface)) {
-    return null;
-  }
+  return agent ?? null;
+}
 
-  return agent;
+async function loadAutomationHostAgent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  agentId: string,
+  workspaceId: string,
+) {
+  const agent = await loadWorkspaceAgent(supabase, agentId, workspaceId);
+  return agent && isAutomationHostSurface(agent.surface) ? agent : null;
 }
 
 export async function GET(
@@ -92,6 +103,24 @@ export async function GET(
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+
+  if (!hasAutomationsEnabled(context.workspace)) {
+    return NextResponse.json(
+      {
+        error: AUTOMATIONS_DISABLED_MESSAGE,
+        code: AUTOMATIONS_DISABLED_CODE,
+      },
+      { status: 403 },
+    );
+  }
+
+  if (!context.subscription?.integrations_enabled) {
+    return NextResponse.json(
+      { error: "Automations require a workspace plan with integrations enabled." },
+      { status: 403 },
+    );
+  }
+
   const agent = await loadAutomationHostAgent(supabase, agentId, context.workspace.id);
 
   if (!agent) {
@@ -202,6 +231,24 @@ export async function PUT(
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+
+  if (!hasAutomationsEnabled(context.workspace)) {
+    return NextResponse.json(
+      {
+        error: AUTOMATIONS_DISABLED_MESSAGE,
+        code: AUTOMATIONS_DISABLED_CODE,
+      },
+      { status: 403 },
+    );
+  }
+
+  if (!context.subscription?.integrations_enabled) {
+    return NextResponse.json(
+      { error: "Automations require a workspace plan with integrations enabled." },
+      { status: 403 },
+    );
+  }
+
   const agent = await loadAutomationHostAgent(supabase, agentId, context.workspace.id);
 
   if (!agent) {
@@ -387,7 +434,11 @@ export async function DELETE(
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  const agent = await loadAutomationHostAgent(supabase, agentId, context.workspace.id);
+  // Cleanup must remain available after a builder save changes the agent back
+  // to the widget surface. The automation RLS SELECT policy intentionally
+  // hides stale bindings in that state, so authorize with the user client and
+  // perform the provider/local cleanup with the server-only client below.
+  const agent = await loadWorkspaceAgent(supabase, agentId, context.workspace.id);
 
   if (!agent) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
@@ -405,10 +456,12 @@ export async function DELETE(
     );
   }
 
-  const { data: automation, error: automationError } = await supabase
+  const admin = createAdminClient();
+  const { data: automation, error: automationError } = await admin
     .from("agent_automations")
     .select(AUTOMATION_RECORD_SELECT)
     .eq("agent_id", agentId)
+    .eq("workspace_id", context.workspace.id)
     .maybeSingle();
 
   if (automationError) {
@@ -430,10 +483,11 @@ export async function DELETE(
     }
   }
 
-  const deleteResult = await supabase
+  const deleteResult = await admin
     .from("agent_automations")
     .delete()
-    .eq("id", automationRecord.id);
+    .eq("id", automationRecord.id)
+    .eq("workspace_id", context.workspace.id);
 
   if (deleteResult.error) {
     return NextResponse.json({ error: deleteResult.error.message }, { status: 500 });

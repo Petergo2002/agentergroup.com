@@ -9,8 +9,6 @@ import { listWorkspaceAssistants } from "@/lib/assistants/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export const revalidate = 30;
-
 export async function GET() {
   const supabase = await createClient();
   const {

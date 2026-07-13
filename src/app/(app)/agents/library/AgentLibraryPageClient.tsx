@@ -23,7 +23,7 @@ export default function AgentLibraryPageClient() {
       </p>
       <button
         onClick={() => setIsLibraryOpen(true)}
-        className="mt-8 rounded-full bg-on-surface px-6 py-3 text-xs font-bold uppercase tracking-[0.16em] text-background transition-opacity hover:opacity-90"
+        className="app-primary-button mt-8 rounded-full px-6 text-xs uppercase tracking-[0.16em]"
       >
         Open Library
       </button>

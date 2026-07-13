@@ -286,7 +286,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <div className="app-page max-w-4xl">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
@@ -302,7 +302,7 @@ export default function SettingsPage() {
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90"
+          className="app-primary-button rounded-full px-5"
         >
           {isSaving ? t('common.saving') : t('common.saveChanges')}
         </button>
@@ -575,7 +575,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handlePrivacyLookup}
                     disabled={isLookingUpPrivacyData}
-                    className="rounded-2xl bg-on-surface px-4 py-2.5 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="app-primary-button min-h-10 rounded-2xl px-4 disabled:opacity-50"
                   >
                     {isLookingUpPrivacyData ? t('common.loading') : t('settings.previewData')}
                   </button>

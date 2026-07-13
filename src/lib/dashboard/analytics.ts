@@ -164,6 +164,7 @@ const INTRO_NAME_PATTERN =
 const DASHBOARD_CONVERSATION_SUMMARY_SELECT =
   "widget_session_id, workspace_id, widget_id, session_id, active_agent_id, active_widget_agent_id, source, status, first_seen_at, last_activity_at, message_count, user_message_count, assistant_message_count, latest_snippet, lead_count, lead_name, lead_email, lead_phone, page_url, referrer";
 const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 60 * 60;
+const WIDGET_LIVE_HEARTBEAT_WINDOW_MS = 90 * 1000;
 
 function normalizeLimit(limit: number | null | undefined) {
   if (!limit || Number.isNaN(limit)) {
@@ -230,6 +231,28 @@ function buildDisplayIdentitySummary(summary: AnalyticsIdentitySummary | null) {
   }
 
   return null;
+}
+
+function getLiveSessionCutoffIso(now = new Date()) {
+  return new Date(now.getTime() - WIDGET_LIVE_HEARTBEAT_WINDOW_MS).toISOString();
+}
+
+function resolveConversationPresenceStatus(
+  summary: Pick<DashboardConversationSummaryRow, "status" | "last_activity_at">,
+  liveCutoffIso: string,
+) {
+  if (summary.status === "completed") {
+    return "completed";
+  }
+
+  const lastActivityMs = Date.parse(summary.last_activity_at);
+  const cutoffMs = Date.parse(liveCutoffIso);
+
+  if (!Number.isFinite(lastActivityMs) || !Number.isFinite(cutoffMs)) {
+    return "idle";
+  }
+
+  return lastActivityMs > cutoffMs ? "live" : "idle";
 }
 
 function compareConversationRows(
@@ -561,10 +584,12 @@ async function buildConversationRowsFromSummaries(
     widgets: AnalyticsWidgetRow[];
     agents: AnalyticsAgentRow[];
     summaries: DashboardConversationSummaryRow[];
+    liveCutoffIso?: string;
   },
 ) {
   const widgetById = new Map(input.widgets.map((widget) => [widget.id, widget]));
   const agentById = new Map(input.agents.map((agent) => [agent.id, agent]));
+  const liveCutoffIso = input.liveCutoffIso ?? getLiveSessionCutoffIso();
   const sessionWidgetIds = Array.from(
     new Set(input.summaries.map((summary) => summary.widget_id)),
   );
@@ -619,6 +644,8 @@ async function buildConversationRowsFromSummaries(
         agentName: agent?.name ?? null,
         agentLabel: agent?.name ?? widgetAgent?.label ?? null,
         source: summary.source,
+        status: summary.status,
+        presenceStatus: resolveConversationPresenceStatus(summary, liveCutoffIso),
         startedAt: summary.first_seen_at,
         lastActivityAt: summary.last_activity_at,
         messageCount: summary.message_count,
@@ -651,7 +678,8 @@ function applySummaryRowFilters(
     widgetId: string | null;
     agentId: string | null;
     search: string;
-    sessionStatus: "all" | "active" | "completed";
+    sessionStatus: DashboardAnalyticsAppliedFilters["sessionStatus"];
+    liveCutoffIso: string;
   },
 ) {
   let nextQuery = query
@@ -666,8 +694,16 @@ function applySummaryRowFilters(
     nextQuery = nextQuery.eq("active_agent_id", input.agentId);
   }
 
-  if (input.sessionStatus !== "all") {
-    nextQuery = nextQuery.eq("status", input.sessionStatus);
+  if (input.sessionStatus === "completed") {
+    nextQuery = nextQuery.eq("status", "completed");
+  } else if (input.sessionStatus === "live") {
+    nextQuery = nextQuery
+      .eq("status", "active")
+      .gt("last_activity_at", input.liveCutoffIso);
+  } else if (input.sessionStatus === "idle") {
+    nextQuery = nextQuery
+      .eq("status", "active")
+      .lte("last_activity_at", input.liveCutoffIso);
   }
 
   if (input.search) {
@@ -688,7 +724,8 @@ async function fetchAllMatchingSummaryRows(
     widgetId: string | null;
     agentId: string | null;
     search: string;
-    sessionStatus: "all" | "active" | "completed";
+    sessionStatus: DashboardAnalyticsAppliedFilters["sessionStatus"];
+    liveCutoffIso: string;
   },
 ) {
   const pageSize = 1000;
@@ -729,7 +766,8 @@ async function fetchPagedSummaryRows(
     widgetId: string | null;
     agentId: string | null;
     search: string;
-    sessionStatus: "all" | "active" | "completed";
+    sessionStatus: DashboardAnalyticsAppliedFilters["sessionStatus"];
+    liveCutoffIso: string;
     cursor: string | null;
     limit: number;
   },
@@ -1208,6 +1246,7 @@ export async function listDashboardConversations(
   input: DashboardConversationQueryInput,
 ): Promise<DashboardConversationAggregationResult> {
   const { startIso } = getAnalyticsDateRange(input.appliedFilters.range);
+  const liveCutoffIso = getLiveSessionCutoffIso();
   const [widgets, agents] = await Promise.all([
     listWorkspaceWidgetsForAnalytics(supabase, input.workspaceId),
     listWorkspaceAgentsForAnalytics(supabase, input.workspaceId),
@@ -1253,6 +1292,7 @@ export async function listDashboardConversations(
       agentId: input.appliedFilters.agentId,
       search: input.appliedFilters.search,
       sessionStatus: input.appliedFilters.sessionStatus,
+      liveCutoffIso,
       startIso,
     }),
     fetchPagedSummaryRows(supabase, {
@@ -1261,6 +1301,7 @@ export async function listDashboardConversations(
       agentId: input.appliedFilters.agentId,
       search: input.appliedFilters.search,
       sessionStatus: input.appliedFilters.sessionStatus,
+      liveCutoffIso,
       cursor: input.cursor,
       limit,
       startIso,
@@ -1290,6 +1331,7 @@ export async function listDashboardConversations(
     widgets,
     agents,
     summaries: pagedSummaries,
+    liveCutoffIso,
   });
   const conversations = pageRows.sort(compareConversationRows).slice(0, limit);
   const hasMore = pagedSummaries.length > limit;

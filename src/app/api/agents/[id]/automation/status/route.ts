@@ -161,6 +161,13 @@ export async function POST(
     return NextResponse.json({ ok: true, status: "paused" });
   }
 
+  if (!context.subscription?.integrations_enabled) {
+    return NextResponse.json(
+      { error: "Automations require a workspace plan with integrations enabled." },
+      { status: 403 },
+    );
+  }
+
   if (!hasAutomationsEnabled(context.workspace)) {
     return NextResponse.json(
       {

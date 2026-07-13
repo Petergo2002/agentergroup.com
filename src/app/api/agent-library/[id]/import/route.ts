@@ -8,6 +8,7 @@ import { hasAutomationsEnabled, hasInternalAssistantsEnabled } from "@/lib/assis
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { errorResponse, successResponse } from "@/lib/app/responses";
 import { resolveTemplateVariables } from "@/lib/template-variables";
+import { MAX_KNOWLEDGE_TEXT_SOURCE_BYTES } from "@/lib/knowledge-text";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -52,7 +53,7 @@ export async function POST(
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!user) {
+  if (!user || !session?.access_token) {
     return errorResponse("Unauthorized", 401);
   }
 
@@ -152,7 +153,12 @@ export async function POST(
     const processWarnings: string[] = [];
 
     for (const source of sources) {
-      const { data: importedSource, error: sourceError } = await supabase
+      const sourceSizeBytes = Buffer.byteLength(source.content_text, "utf8");
+      if (sourceSizeBytes > MAX_KNOWLEDGE_TEXT_SOURCE_BYTES) {
+        throw new Error("Imported text knowledge sources are limited to 1MB each.");
+      }
+
+      const { data: importedSource, error: sourceError } = await admin
         .from("knowledge_sources")
         .insert({
           workspace_id: context.workspace.id,
@@ -161,7 +167,7 @@ export async function POST(
           description: source.source_description,
           source_type: "text",
           raw_text: source.content_text,
-          file_size_bytes: Buffer.byteLength(source.content_text, "utf8"),
+          file_size_bytes: 0,
           status: "pending",
           metadata: {
             agentLibraryTemplateId: templateRecord.id,
@@ -176,6 +182,28 @@ export async function POST(
       if (sourceError || !importedSource) {
         throw sourceError ?? new Error("Failed to clone template knowledge.");
       }
+
+      const reservationResult = await admin.rpc(
+        "reserve_knowledge_source_storage",
+        {
+          p_workspace_id: context.workspace.id,
+          p_source_id: importedSource.id,
+          p_size_bytes: sourceSizeBytes,
+        },
+      );
+
+      if (reservationResult.error) {
+        await admin.from("knowledge_sources").delete().eq("id", importedSource.id);
+        throw new Error(
+          reservationResult.error.message.includes(
+            "KNOWLEDGE_STORAGE_LIMIT_EXCEEDED",
+          )
+            ? buildStorageLimitError(storageLimit)
+            : "Failed to reserve imported knowledge storage.",
+        );
+      }
+
+      importedSource.file_size_bytes = sourceSizeBytes;
 
       importedSourceIds.push(importedSource.id);
 
@@ -231,9 +259,14 @@ export async function POST(
     });
   } catch (error) {
     await cleanupImportedAgent(admin, createdAgentId);
+    const message =
+      error instanceof Error ? error.message : "Failed to import template.";
+    const agentLimitReached = message.includes("AGENT_LIMIT_REACHED");
     return errorResponse(
-      error instanceof Error ? error.message : "Failed to import template.",
-      500,
+      agentLimitReached
+        ? "You have reached your agent limit. Please upgrade your plan."
+        : message,
+      agentLimitReached ? 402 : 500,
     );
   }
 }

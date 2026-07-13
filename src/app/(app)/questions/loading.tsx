@@ -1,6 +1,6 @@
 export default function QuestionsLoading() {
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <div className="app-page app-page-wide app-page-compact">
       <div className="h-40 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest skeleton" />
       <div className="h-16 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest skeleton" />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">

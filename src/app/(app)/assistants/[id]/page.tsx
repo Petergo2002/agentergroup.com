@@ -440,7 +440,7 @@ export default function AssistantDetailPage() {
           onClick={() => void handleSelectThread(thread.id)}
           className={`group flex h-11 w-11 items-center justify-center rounded-2xl border text-[10px] font-bold transition-all ${
             isActive
-              ? 'border-primary/20 bg-primary text-white shadow-[0_8px_16px_rgba(0,0,0,0.24)]'
+              ? 'border-primary/20 bg-primary text-on-primary shadow-[0_8px_16px_rgba(0,0,0,0.24)]'
               : 'border-outline-variant/10 bg-surface-container-low text-on-surface-variant hover:border-primary/15 hover:bg-surface-container hover:text-on-surface'
           }`}
         >
@@ -635,13 +635,13 @@ export default function AssistantDetailPage() {
               onClick={() => void handleSendMessage(draftMessage)}
               disabled={isSending || isPaused || !draftMessage.trim()}
               className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 ${
-                draftMessage.trim() 
-                  ? 'bg-primary text-white shadow-[0_4px_12px_rgba(0,0,0,0.24)]' 
+                draftMessage.trim()
+                  ? 'bg-primary text-on-primary shadow-[0_4px_12px_rgba(0,0,0,0.24)]'
                   : 'bg-surface-container-high text-on-surface-variant'
               } disabled:cursor-not-allowed`}
             >
               {isSending ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-on-primary/30 border-t-on-primary" />
               ) : (
                 <Send className="h-3.5 w-3.5" />
               )}
@@ -885,10 +885,10 @@ export default function AssistantDetailPage() {
                                       className={`relative px-6 py-5 text-[15px] font-medium leading-[1.75] shadow-sm ${
                                       message.role === 'assistant'
                                           ? 'rounded-[1.4rem] rounded-tl-sm border border-outline-variant/10 bg-surface-container-low text-on-surface backdrop-blur-sm'
-                                          : 'rounded-[1.4rem] rounded-tr-sm bg-primary text-white shadow-[0_8px_16px_-4px_rgba(0,0,0,0.24)]'
+                                          : 'rounded-[1.4rem] rounded-tr-sm bg-primary text-on-primary shadow-[0_8px_16px_-4px_rgba(0,0,0,0.24)]'
                                       }`}
                                   >
-                                      <div className="whitespace-pre-wrap selection:bg-white/20">
+                                      <div className="whitespace-pre-wrap selection:bg-on-primary/20">
                                       {message.content ||
                                         (message.id.startsWith('streaming-assistant-')
                                           ? t('assistants.thinkingPlaceholder')

@@ -374,6 +374,61 @@ export async function POST(request: NextRequest) {
   }
 
   const automationRecord = automation as AgentAutomationRecord;
+  const [agentGuard, workspaceGuard, subscriptionGuard] = await Promise.all([
+    supabase
+      .from("agents")
+      .select("id, surface, status, archived_at")
+      .eq("id", automationRecord.agent_id)
+      .eq("workspace_id", automationRecord.workspace_id)
+      .maybeSingle(),
+    supabase
+      .from("workspaces")
+      .select("automations_enabled")
+      .eq("id", automationRecord.workspace_id)
+      .maybeSingle(),
+    supabase
+      .from("workspace_subscriptions")
+      .select("integrations_enabled")
+      .eq("workspace_id", automationRecord.workspace_id)
+      .maybeSingle(),
+  ]);
+
+  const guardError = agentGuard.error ?? workspaceGuard.error ?? subscriptionGuard.error;
+  if (guardError) {
+    console.error("[Composio] Failed to verify automation entitlement.", {
+      automationId: automationRecord.id,
+      message: guardError.message,
+    });
+    return NextResponse.json(
+      { error: "Failed to verify automation entitlement." },
+      { status: 500 },
+    );
+  }
+
+  const automationIsRunnable = Boolean(
+    agentGuard.data &&
+      agentGuard.data.surface === "automation" &&
+      agentGuard.data.status === "active" &&
+      !agentGuard.data.archived_at &&
+      workspaceGuard.data?.automations_enabled &&
+      subscriptionGuard.data?.integrations_enabled,
+  );
+
+  if (!automationIsRunnable) {
+    const reason =
+      "Automation paused because its agent or workspace entitlement is no longer active.";
+    await supabase
+      .from("agent_automations")
+      .update({ status: "paused", last_error: reason })
+      .eq("id", automationRecord.id);
+
+    console.warn("[Composio] Ignoring trigger for an ineligible automation.", {
+      automationId: automationRecord.id,
+      workspaceId: automationRecord.workspace_id,
+      triggerSlug,
+    });
+    return NextResponse.json({ ok: true, status: "ignored" });
+  }
 
   const externalEventId = buildExternalEventId(
     automationRecord.composio_trigger_id ?? triggerIdCandidates[0],

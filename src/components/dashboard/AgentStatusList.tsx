@@ -55,7 +55,7 @@ export function AgentStatusList({
   };
 
   return (
-    <section className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
+    <section className="app-card sm:p-6">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold text-primary">{t("dashboard.inventory")}</p>
@@ -66,7 +66,7 @@ export function AgentStatusList({
         <Link
           href="/agents"
           aria-label={t("dashboard.viewAgents")}
-          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface transition-colors hover:border-primary/25 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="app-secondary-button min-h-10 px-3"
         >
           {t("common.view")}
           <ChevronRight className="h-4 w-4" strokeWidth={2} />
@@ -82,7 +82,7 @@ export function AgentStatusList({
             />
           ))
         ) : agents.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-outline-variant/25 bg-surface-container-low/35 px-5 py-8 text-center">
+          <div className="app-empty-state px-5 py-8">
             <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface-variant ring-1 ring-outline-variant/15">
               <Bot className="h-5 w-5" strokeWidth={2} />
             </div>
@@ -96,7 +96,7 @@ export function AgentStatusList({
               <button
                 type="button"
                 onClick={onCreateAgent}
-                className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]"
+                className="app-primary-button mt-5 min-h-10"
               >
                 <Plus className="h-4 w-4" strokeWidth={2.2} />
                 {t("dashboard.initializeAgent")}

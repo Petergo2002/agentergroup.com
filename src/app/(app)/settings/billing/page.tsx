@@ -183,7 +183,7 @@ export default function BillingSettingsPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <div className="app-page max-w-4xl">
 
       {/* Toast notification */}
       {toast && (
@@ -287,7 +287,7 @@ export default function BillingSettingsPage() {
                 type="button"
                 onClick={() => handleUpgrade('starter')}
                 disabled={!isAdmin || checkoutLoading === 'starter'}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-primary-button rounded-2xl px-5 disabled:cursor-not-allowed disabled:opacity-50"
                 title={!isAdmin ? t('settings.billing.extraCreditsAdminOnly') : undefined}
               >
                 {checkoutLoading === 'starter' ? (
@@ -302,7 +302,7 @@ export default function BillingSettingsPage() {
                 type="button"
                 onClick={handleExtraCreditsCheckout}
                 disabled={!isAdmin || creditsCheckoutLoading}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-primary-button rounded-2xl px-5 disabled:cursor-not-allowed disabled:opacity-50"
                 title={!isAdmin ? t('settings.billing.extraCreditsAdminOnly') : undefined}
               >
                 {creditsCheckoutLoading ? (
@@ -410,7 +410,7 @@ export default function BillingSettingsPage() {
                         ? 'bg-surface-container text-on-surface-variant cursor-not-allowed opacity-50'
                         : isDowngrade
                         ? 'bg-surface-container hover:bg-surface-container-highest text-on-surface transition-colors disabled:opacity-60'
-                        : 'bg-primary text-white hover:opacity-90 shadow-lg shadow-primary/20 disabled:opacity-60'
+                        : 'bg-primary text-on-primary hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-60'
                     }`}
                   >
                     {checkoutLoading === plan || (portalLoading && isDowngrade) ? (

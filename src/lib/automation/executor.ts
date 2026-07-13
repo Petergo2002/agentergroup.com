@@ -119,6 +119,45 @@ export async function processAutomationEvent(eventId: string) {
       return { ok: true, status: "ignored" as const };
     }
 
+    // Re-check both feature and billing entitlements at execution time. This
+    // closes the race where an event is accepted immediately before a plan or
+    // workspace flag is downgraded.
+    const [workspaceResult, subscriptionResult] = await Promise.all([
+      supabase
+        .from("workspaces")
+        .select("automations_enabled")
+        .eq("id", agent.workspace_id)
+        .maybeSingle(),
+      supabase
+        .from("workspace_subscriptions")
+        .select("integrations_enabled")
+        .eq("workspace_id", agent.workspace_id)
+        .maybeSingle(),
+    ]);
+
+    const entitlementError = workspaceResult.error ?? subscriptionResult.error;
+    if (entitlementError) {
+      throw entitlementError;
+    }
+
+    if (
+      !workspaceResult.data?.automations_enabled ||
+      !subscriptionResult.data?.integrations_enabled
+    ) {
+      await Promise.all([
+        markEventIgnored(supabase, event.id),
+        supabase
+          .from("agent_automations")
+          .update({
+            status: "paused",
+            last_error:
+              "Automation paused because workspace integrations are disabled.",
+          })
+          .eq("id", automation.id),
+      ]);
+      return { ok: true, status: "ignored" as const };
+    }
+
     const payload = normalizeAutomationTriggerPayload(
       event.trigger_slug,
       readEventPayload(event),

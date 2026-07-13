@@ -22,8 +22,16 @@ function parseLimit(value: string | null) {
   return Number.isFinite(numeric) ? numeric : 25;
 }
 
-function parseSessionStatus(value: string | null): "all" | "active" | "completed" {
-  return value === "active" || value === "completed" ? value : "all";
+function parseSessionStatus(
+  value: string | null,
+): DashboardAnalyticsAppliedFilters["sessionStatus"] {
+  if (value === "active") {
+    return "live";
+  }
+
+  return value === "live" || value === "idle" || value === "completed"
+    ? value
+    : "all";
 }
 
 function parseAutomationStatus(
@@ -37,8 +45,6 @@ function parseAutomationStatus(
     ? value
     : "all";
 }
-
-export const revalidate = 30;
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();

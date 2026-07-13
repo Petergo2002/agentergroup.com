@@ -1,5 +1,8 @@
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { listFlywheelQuestions } from "@/lib/flywheel/server";
+import {
+  countFlywheelQuestions,
+  listFlywheelQuestions,
+} from "@/lib/flywheel/server";
 import { createClient } from "@/lib/supabase/server";
 import type { FlywheelQuestionListItem } from "@/lib/types";
 import QuestionsPageClient from "./QuestionsPageClient";
@@ -25,11 +28,14 @@ async function loadQuestionsPageData() {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
-  const [questions, agentsResult, widgetsResult] = await Promise.all([
+  const [questions, counts, agentsResult, widgetsResult] = await Promise.all([
     listFlywheelQuestions(supabase as never, {
       workspaceId: context.workspace.id,
       status: "open",
       limit: 150,
+    }),
+    countFlywheelQuestions(supabase as never, {
+      workspaceId: context.workspace.id,
     }),
     supabase
       .from("agents")
@@ -53,6 +59,7 @@ async function loadQuestionsPageData() {
 
   return {
     initialQuestions: questions as FlywheelQuestionListItem[],
+    initialCounts: counts,
     agents: (agentsResult.data ?? []) as QuestionAgentOption[],
     widgets: (widgetsResult.data ?? []) as QuestionWidgetOption[],
     workspaceName: context.workspace.name,

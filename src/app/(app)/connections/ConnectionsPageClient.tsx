@@ -263,11 +263,11 @@ export default function ConnectionsPageClient({
   }, [connections]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <header className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-5 shadow-sm sm:px-6 lg:px-7">
+    <div className="app-page">
+      <header className="app-section-header">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/8 px-2.5 py-1 text-primary">
+            <div className="app-kicker">
               <Network className="h-3.5 w-3.5" strokeWidth={2.2} />
               <span className="text-xs font-semibold">{t('connections.badge')}</span>
             </div>
@@ -283,7 +283,7 @@ export default function ConnectionsPageClient({
               <button
                 type="button"
                 onClick={() => setIsAuthLinksOpen(true)}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 text-sm font-semibold text-on-surface transition-colors hover:border-primary/25 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="app-secondary-button"
               >
                 <Link2 className="h-4 w-4" />
                 {t('connections.authLinksTitle')}
@@ -297,7 +297,7 @@ export default function ConnectionsPageClient({
                 setIsSyncing(true);
                 void load(true);
               }}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-on-surface px-4 text-sm font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="app-primary-button"
             >
               {isSyncing ? t('common.syncing') : t('connections.syncStatus')}
             </button>
@@ -313,7 +313,7 @@ export default function ConnectionsPageClient({
         ].map(([label, value]) => (
           <div
             key={label}
-            className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm"
+            className="app-card"
           >
             <p className="text-sm font-medium text-on-surface-variant/70">
               {label}
@@ -337,7 +337,7 @@ export default function ConnectionsPageClient({
               return (
                 <div
                   key={toolkit.slug}
-                  className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low/45"
+                  className="app-card transition-colors hover:border-primary/25 hover:bg-surface-container-low/45"
                 >
                   <div className="mb-5 flex items-start justify-between gap-3">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
@@ -410,7 +410,7 @@ export default function ConnectionsPageClient({
                       ) : null}
                       <button
                         onClick={() => handleConnect(toolkit)}
-                        className="h-9 rounded-xl bg-on-surface px-3 text-xs font-semibold text-background transition-colors hover:bg-on-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        className="app-primary-button min-h-9 px-3 text-xs"
                       >
                         {toolkit.status === 'connected' ? t('connections.replaceAccount') : t('connections.connect')}
                       </button>
@@ -543,7 +543,7 @@ export default function ConnectionsPageClient({
               <button
                 type="button"
                 onClick={() => handleCopyAuthLink(generatedAuthLink.url)}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-on-surface px-4 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+                className="app-primary-button min-h-12 rounded-2xl px-4"
               >
                 <Copy className="h-4 w-4" />
                 {t('common.copy')}
