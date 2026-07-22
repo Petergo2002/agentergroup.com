@@ -201,7 +201,7 @@ export default function AgentsPageClient({
               onClick={() => setFilter(tab)}
               className={`h-9 flex-1 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-all md:flex-none ${
                 filter === tab
-                  ? "bg-primary text-on-primary shadow-[0_10px_22px_-18px_rgba(var(--primary-rgb),0.72)]"
+                  ? "app-selected-control"
                   : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
               }`}
             >
@@ -272,7 +272,7 @@ export default function AgentsPageClient({
                 onClick={() => setCurrentPage(page)}
                 className={`flex h-9 w-9 items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
                   page === safePage
-                    ? "bg-primary text-on-primary"
+                    ? "app-selected-control"
                     : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
                 }`}
               >

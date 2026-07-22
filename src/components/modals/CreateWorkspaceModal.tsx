@@ -94,12 +94,12 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
           </button>
           <button
             type="submit"
-            className="signature-gradient rounded-lg px-5 py-2 text-[13px] font-semibold text-white shadow-sm transition-all duration-150 hover:shadow-md hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+            className="signature-gradient rounded-lg px-5 py-2 text-[13px] font-semibold shadow-sm transition-all duration-150 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
           >
             <span className="flex items-center justify-center gap-2">
               {isCreating ? (
                 <>
-                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-on-primary border-t-transparent" />
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   {t('common.saving') !== 'common.saving' ? t('common.saving') : 'Creating...'}
                 </>
               ) : (

@@ -210,7 +210,7 @@ export const CreateAgentModal = ({
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
                       isSelected
-                        ? 'bg-primary text-on-primary'
+                        ? 'app-selected-icon'
                         : 'bg-surface-container-high text-on-surface-variant'
                     }`}
                   >
@@ -261,7 +261,7 @@ export const CreateAgentModal = ({
             <span className="flex items-center justify-center gap-2">
               {isSaving ? (
                 <>
-                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-on-primary border-t-transparent" />
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   {t('agents.createModal.creating')}
                 </>
               ) : (

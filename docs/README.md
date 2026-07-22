@@ -5,6 +5,10 @@ Welcome to the technical documentation for Agentergroup. This directory contains
 ## 🏗️ [Architecture](./architecture/core.md)
 Detailed overview of the system design, database schema, and agent orchestration flow.
 
+## 🧭 Product Vision & Roadmap
+- **[Agent-Native Websites](./roadmap/agent-native-websites.md)** - Industry-neutral product vision for a Website Agent that powers a standalone Agent Site and embedded Chat Widget. Phase 0 selects the first niche and outcome; the existing Builder and Connections remain shared platform capabilities.
+- **[Agent-Native Websites: Implementation Plan](./roadmap/agent-native-websites-implementation-plan.md)** - Dependency-ordered work packages that prioritize Website Agent, preserve Automation Agent behavior, defer new Internal Assistant work, and define release gates, rollback paths, and compatibility rules.
+
 ## 📘 Guides
 Practical instructions for common tasks:
 - **[Agent Builder](./guides/agent-builder.md)** - How the flow-based builder works.
@@ -32,4 +36,4 @@ Public-facing legal and auth pages:
 - `/invite/accept` — Public workspace invite acceptance page (unauthenticated-friendly; moved from the `(app)` route group)
 
 ---
-*Last updated: July 9, 2026.*
+*Last updated: July 22, 2026.*

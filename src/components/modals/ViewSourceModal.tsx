@@ -255,7 +255,7 @@ export function ViewSourceModal({ isOpen, onClose, source, onSourceUpdated }: Vi
           target="_blank"
           rel="noopener noreferrer"
           download={content.name}
-          className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+          className="app-primary-surface flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold transition-all"
         >
           {t('knowledge.downloadFile')}
         </a>
@@ -310,7 +310,7 @@ export function ViewSourceModal({ isOpen, onClose, source, onSourceUpdated }: Vi
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-on-primary transition-all hover:bg-primary/90 disabled:opacity-50"
+                  className="app-primary-surface flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all disabled:opacity-50"
                 >
                   {isSaving ? t('common.saving') : t('common.save')}
                 </button>

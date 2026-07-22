@@ -752,7 +752,7 @@ function AnalyticsViewSwitch({
             onClick={() => onChange(value)}
             className={`flex h-9 min-w-0 items-center justify-between gap-3 rounded-lg px-3 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary/25 ${
               selected
-                ? "bg-primary text-on-primary shadow-sm"
+                ? "app-selected-control"
                 : "text-on-surface-variant hover:bg-surface hover:text-on-surface"
             }`}
           >
@@ -760,7 +760,7 @@ function AnalyticsViewSwitch({
             <span
               className={`rounded-full px-2 py-0.5 text-[11px] tabular-nums ${
                 selected
-                  ? "bg-on-primary/15 text-on-primary"
+                  ? "bg-primary/10 text-primary"
                   : "bg-surface text-on-surface-variant"
               }`}
             >
@@ -809,7 +809,7 @@ function AnalyticsFilterBar({
               onClick={() => onChange({ ...filters, range: option.value })}
               className={`h-9 rounded-lg px-3 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary/25 ${
                 filters.range === option.value
-                  ? "bg-primary text-on-primary"
+                  ? "app-selected-control"
                   : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
               }`}
             >

@@ -248,7 +248,7 @@ export function Sidebar({
                   ) : null}
                   {hasBadge && isCollapsed && !mobile ? (
                     <span
-                      className="absolute right-0.5 top-0 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[8px] font-extrabold leading-none text-on-primary ring-2 ring-surface-container-low"
+                      className="app-selected-control absolute right-0.5 top-0 flex min-h-4 min-w-4 items-center justify-center rounded-full px-1 text-[8px] font-extrabold leading-none ring-2 ring-surface-container-low"
                       aria-label={t("nav.newLeads", { count: badgeCount })}
                     >
                       {badgeLabel}

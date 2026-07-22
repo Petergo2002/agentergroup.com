@@ -13,6 +13,7 @@
   --brand-primary-hover: #e14d0e;
   --brand-primary-pressed: #c2410c;
   --brand-primary-soft: #fff4ec;
+  --brand-primary-strong: #b93800;
   --ink: #181818;
   --text-primary: #181818;
   --text-secondary: #667085;
@@ -22,6 +23,11 @@
   --surface-muted: #f6f2ee;
   --border-subtle: #e7e1db;
   --border-strong: #d6d0c8;
+  --action-primary: #181818;
+  --action-primary-hover: #2b2b2b;
+  --action-primary-pressed: #0f0f0f;
+  --action-primary-foreground: #ffffff;
+  --action-primary-accent: #ff7a29;
 
   --primary: #ff5c02;
   --primary-container: #ff7a29;
@@ -109,6 +115,14 @@
   --success: #4fa17c;
   --success-container: rgba(79, 161, 124, 0.14);
 
+  --brand-primary-soft: rgba(255, 92, 2, 0.14);
+  --brand-primary-strong: #ffb181;
+  --action-primary: #f5f1eb;
+  --action-primary-hover: #ffffff;
+  --action-primary-pressed: #ddd6cf;
+  --action-primary-foreground: #181818;
+  --action-primary-accent: #e14d0e;
+
   --primary-rgb: 255, 92, 2;
   --shadow-premium: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
   --shadow-shell: 0 28px 70px -36px rgba(0, 0, 0, 0.82), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
@@ -174,17 +188,17 @@
 
 @layer utilities {
   .signature-gradient {
-    background: #ffffff;
-    color: #0f172a;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.06);
+    background: var(--action-primary);
+    color: var(--action-primary-foreground);
+    border: 1px solid color-mix(in srgb, var(--action-primary) 88%, transparent);
+    box-shadow: var(--shadow-primary-control);
   }
 
   .dark .signature-gradient {
-    background: #ffffff;
-    color: #050505;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.5);
+    background: var(--action-primary);
+    color: var(--action-primary-foreground);
+    border-color: color-mix(in srgb, var(--action-primary) 88%, transparent);
+    box-shadow: var(--shadow-primary-control);
   }
   .glass-panel {
     background: var(--glass-background);
@@ -304,20 +318,56 @@
   }
 
   .app-primary-button {
-    border: 1px solid color-mix(in srgb, var(--brand-primary) 70%, var(--ink));
-    background: var(--brand-primary);
-    color: var(--on-primary);
+    border: 1px solid color-mix(in srgb, var(--action-primary) 88%, transparent);
+    background: var(--action-primary);
+    color: var(--action-primary-foreground);
     box-shadow: var(--shadow-primary-control);
   }
 
+  .app-primary-button > svg {
+    color: var(--action-primary-accent);
+  }
+
   .app-primary-button:not(:disabled):hover {
-    background: var(--brand-primary-hover);
+    background: var(--action-primary-hover);
     transform: translateY(-1px);
   }
 
   .app-primary-button:not(:disabled):active {
-    background: var(--brand-primary-pressed);
+    background: var(--action-primary-pressed);
     transform: translateY(0);
+  }
+
+  .app-primary-surface {
+    border-color: color-mix(in srgb, var(--action-primary) 88%, transparent);
+    background: var(--action-primary);
+    color: var(--action-primary-foreground);
+    box-shadow: var(--shadow-primary-control);
+  }
+
+  .app-primary-surface > svg {
+    color: var(--action-primary-accent);
+  }
+
+  .app-primary-surface:not(:disabled):hover {
+    background: var(--action-primary-hover);
+  }
+
+  .app-primary-surface:not(:disabled):active {
+    background: var(--action-primary-pressed);
+  }
+
+  .app-selected-control {
+    border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, transparent);
+    background: var(--brand-primary-soft);
+    color: var(--brand-primary-strong);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .app-selected-icon {
+    background: var(--brand-primary-soft);
+    color: var(--brand-primary-strong);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 18%, transparent);
   }
 
   .app-secondary-button {

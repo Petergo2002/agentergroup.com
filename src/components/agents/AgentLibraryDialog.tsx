@@ -272,7 +272,7 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
               <button
                 onClick={() => handleImportClick(selectedTemplate)}
                 disabled={importingId === selectedTemplate.id}
-                className="group/btn relative flex h-14 w-full items-center justify-center gap-3 overflow-hidden rounded-[1.25rem] bg-primary px-6 text-sm font-bold uppercase tracking-[0.16em] text-on-primary transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+                className="app-primary-surface group/btn relative flex h-14 w-full items-center justify-center gap-3 overflow-hidden rounded-[1.25rem] px-6 text-sm font-bold uppercase tracking-[0.16em] transition-all duration-300 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
               >
                 <div className="absolute inset-0 bg-white/20 translate-y-full transition-transform duration-300 group-hover/btn:translate-y-0" />
                 <span className="relative flex items-center gap-2">

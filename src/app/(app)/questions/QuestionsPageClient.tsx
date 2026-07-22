@@ -966,7 +966,7 @@ export default function QuestionsPageClient({
                               onClick={() => setVisibility(option)}
                               className={`h-9 rounded-lg px-3 text-xs font-semibold transition-all ${
                                 visibility === option
-                                  ? "depth-button-primary bg-primary text-on-primary"
+                                  ? "app-selected-control"
                                   : "text-on-surface-variant hover:bg-surface-container"
                               }`}
                             >

@@ -1382,7 +1382,7 @@ export default function KnowledgePageClient({
         {selectedSourceIds.length > 0 ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2 text-xs font-semibold text-on-primary">
+              <span className="app-selected-control flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-semibold">
                 {selectedSourceIds.length}
               </span>
               <span className="text-sm font-semibold text-on-surface">

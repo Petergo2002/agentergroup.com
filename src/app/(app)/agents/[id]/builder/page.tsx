@@ -1838,7 +1838,7 @@ function ConnectedAccountDisplay({
             type="button"
             onClick={onConnect}
             disabled={isConnecting}
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-black uppercase tracking-widest text-on-primary transition-all hover:bg-primary/90 active:scale-95 disabled:cursor-wait disabled:opacity-70"
+            className="app-primary-surface inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:cursor-wait disabled:opacity-70"
           >
             <span className={`material-symbols-outlined text-lg ${isConnecting ? 'animate-spin' : ''}`}>
               {isConnecting ? 'sync' : 'link'}
@@ -4623,7 +4623,7 @@ export default function AgentBuilderPage() {
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
                       isSelected
-                        ? 'bg-primary text-on-primary'
+                        ? 'app-selected-icon'
                         : 'bg-surface-container-high text-on-surface-variant'
                     }`}
                   >
@@ -5964,7 +5964,7 @@ export default function AgentBuilderPage() {
                           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all ${
                             item.disabled || isFixed || isDisabled 
                             ? 'bg-surface-container-high text-on-surface-variant/40' 
-                            : 'bg-primary/10 text-primary group-hover/item:bg-primary group-hover/item:text-on-primary'
+                            : 'bg-primary/10 text-primary group-hover/item:bg-on-surface group-hover/item:text-surface'
                           }`}>
                             <span className="material-symbols-outlined text-lg">
                               {item.icon}
@@ -6008,7 +6008,7 @@ export default function AgentBuilderPage() {
                 type="button"
                 onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
                 className={`flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-full shadow-premium transition-all duration-300 hover:scale-105 active:scale-95 ${
-                  isAddMenuOpen ? 'bg-surface text-primary border border-outline-variant/20' : 'bg-primary text-on-primary hover:shadow-primary/20'
+                  isAddMenuOpen ? 'bg-surface text-primary border border-outline-variant/20' : 'app-primary-surface'
                 }`}
                 aria-label={t('agentBuilder.nodeLibraryTitle')}
               >
@@ -6497,7 +6497,7 @@ export default function AgentBuilderPage() {
                 <div className="shrink-0 border-t border-outline-variant/10 bg-surface-container-lowest/80 p-6 backdrop-blur-xl">
                   <button
                     onClick={closeActionEditor}
-                    className="w-full rounded-[1.25rem] bg-primary px-8 py-4 text-xs font-black uppercase tracking-[0.2em] text-on-primary shadow-xl shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-2xl hover:shadow-primary/30 active:scale-[0.98]"
+                    className="app-primary-surface w-full rounded-[1.25rem] px-8 py-4 text-xs font-black uppercase tracking-[0.2em] transition-all active:scale-[0.98]"
                   >
                     {t('common.done')}
                   </button>

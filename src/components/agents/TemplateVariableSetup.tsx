@@ -105,11 +105,11 @@ export function TemplateVariableSetup({
         <button
           onClick={() => onImport(values)}
           disabled={!isReady || isImporting}
-          className="relative flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-primary text-xs font-bold uppercase tracking-[0.16em] text-on-primary transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          className="app-primary-surface relative flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl text-xs font-bold uppercase tracking-[0.16em] transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isImporting ? (
             <>
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-on-primary/30 border-t-on-primary" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
               Importing…
             </>
           ) : (
