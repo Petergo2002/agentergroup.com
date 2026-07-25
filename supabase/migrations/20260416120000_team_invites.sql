@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Team Invites Migration
--- Run this manually in the Supabase SQL editor.
+-- Apply through the ordered migration runner.
 -- ============================================================================
 
 -- 1. Create workspace_invites table

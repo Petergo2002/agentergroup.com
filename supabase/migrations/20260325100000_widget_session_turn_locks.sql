@@ -1,3 +1,4 @@
+-- Add Widget session turn-lock state.
 alter table if exists public.widget_sessions
   add column if not exists active_turn_request_id text,
   add column if not exists active_turn_started_at timestamptz;

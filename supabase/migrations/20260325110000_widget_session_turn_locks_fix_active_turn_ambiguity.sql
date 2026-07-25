@@ -1,3 +1,4 @@
+-- Resolve active-turn identifier ambiguity in the lock RPCs.
 create or replace function public.acquire_widget_session_turn_lock(
   p_widget_id uuid,
   p_session_id text,

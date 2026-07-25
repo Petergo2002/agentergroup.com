@@ -1,3 +1,4 @@
+-- Add the secondary Widget brand colour.
 alter table if exists public.widgets
   add column if not exists secondary_color text;
 
