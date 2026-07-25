@@ -81,62 +81,61 @@
 }
 
 .dark {
-  /* Dark Mode Palette (Premium) */
+  /* Minimalist Premium Dark Theme */
   --primary: #ff5c02;
   --primary-container: #ff7a29;
   --on-primary: #181818;
   --on-primary-container: #fff4eb;
   
   --secondary: #ff5c00;
-  --secondary-container: #34170a;
+  --secondary-container: #2e150a;
   --on-secondary: #fff4eb;
   
-  --surface: #090909;
-  --surface-bright: #161616;
-  --surface-dim: #050505;
-  --surface-container-lowest: #0e0e0e;
-  --surface-container-low: #141414;
-  --surface-container: #1b1b1b;
-  --surface-container-high: #232323;
-  --surface-container-highest: #2d2d2d;
+  --surface: #101013;
+  --surface-bright: #19191e;
+  --surface-dim: #0b0b0d;
+  --surface-container-lowest: #141417;
+  --surface-container-low: #18181d;
+  --surface-container: #1d1d23;
+  --surface-container-high: #24242c;
+  --surface-container-highest: #2b2b35;
   
-  --on-surface: #f5f1eb;
-  --on-surface-variant: #9d948a;
-  --on-background: #f5f1eb;
-  --background: #050505;
+  --on-surface: #f4f4f5;
+  --on-surface-variant: #94949e;
+  --on-background: #f4f4f5;
+  --background: #0c0c0e;
   
-  --outline: #3a312b;
-  --outline-variant: rgba(255, 255, 255, 0.08);
+  --outline: rgba(255, 255, 255, 0.06);
+  --outline-variant: rgba(255, 255, 255, 0.04);
   
-  --error: #df6d60;
-  --error-container: rgba(223, 109, 96, 0.14);
+  --error: #f87171;
+  --error-container: rgba(248, 113, 113, 0.12);
   --on-error: #ffffff;
   
-  --success: #4fa17c;
-  --success-container: rgba(79, 161, 124, 0.14);
+  --success: #34d399;
+  --success-container: rgba(52, 211, 153, 0.12);
 
-  --brand-primary-soft: rgba(255, 92, 2, 0.14);
+  --brand-primary-soft: rgba(255, 92, 2, 0.12);
   --brand-primary-strong: #ffb181;
-  --action-primary: #f5f1eb;
+  --action-primary: #f4f4f5;
   --action-primary-hover: #ffffff;
-  --action-primary-pressed: #ddd6cf;
-  --action-primary-foreground: #181818;
-  --action-primary-accent: #e14d0e;
+  --action-primary-pressed: #e4e4e7;
+  --action-primary-foreground: #0c0c0e;
+  --action-primary-accent: #ff5c02;
 
   --primary-rgb: 255, 92, 2;
-  --shadow-premium: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
-  --shadow-shell: 0 28px 70px -36px rgba(0, 0, 0, 0.82), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
-  --shadow-panel: 0 24px 56px -34px rgba(0, 0, 0, 0.78), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-  --shadow-control: 0 1px 1px rgba(255, 255, 255, 0.04) inset, 0 10px 22px -18px rgba(0, 0, 0, 0.9);
-  --shadow-control-hover: 0 1px 1px rgba(255, 255, 255, 0.06) inset, 0 18px 34px -22px rgba(0, 0, 0, 0.95);
-  --shadow-control-pressed: 0 1px 1px rgba(255, 255, 255, 0.035) inset, 0 6px 16px -18px rgba(0, 0, 0, 0.9);
-  --shadow-primary-control: 0 16px 34px -20px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow-premium: 0 16px 40px -12px rgba(0, 0, 0, 0.5);
+  --shadow-shell: 0 20px 50px -30px rgba(0, 0, 0, 0.7);
+  --shadow-panel: 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  --shadow-control: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-control-hover: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-control-pressed: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-primary-control: 0 8px 20px -10px rgba(0, 0, 0, 0.8);
   --shadow-focus: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
-  --depth-border: rgba(255, 255, 255, 0.1);
-  --glass-background: rgba(10, 10, 10, 0.82);
-  --app-shell-bg: radial-gradient(circle at top right, rgba(255, 92, 0, 0.1), transparent 28%),
-                  linear-gradient(180deg, #080808 0%, #050505 100%);
-  --skeleton-bg: linear-gradient(90deg, #141414 25%, #1b1b1b 50%, #141414 75%);
+  --depth-border: rgba(255, 255, 255, 0.05);
+  --glass-background: rgba(16, 16, 19, 0.85);
+  --app-shell-bg: #0c0c0e;
+  --skeleton-bg: linear-gradient(90deg, #141417 25%, #1d1d23 50%, #141417 75%);
 }
 
 @theme inline {
@@ -250,6 +249,20 @@
     border: 1px solid var(--depth-border);
     background: var(--surface-container-lowest);
     box-shadow: var(--shadow-panel);
+  }
+
+  .dark .app-section-header,
+  .dark .app-card,
+  .dark .app-filter-panel {
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: var(--surface-container-lowest);
+    box-shadow: 0 4px 20px -8px rgba(0, 0, 0, 0.4);
+  }
+
+  .dark .app-card:hover {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--surface-container-low);
+    box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.5);
   }
 
   .app-section-header {

@@ -201,29 +201,37 @@ export function LeadAiSummaryCard({
             </div>
           ) : null}
 
-          <div className="grid gap-3 lg:grid-cols-2">
-            <div className="rounded-xl border border-outline-variant/12 bg-surface-container-lowest px-4 py-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-outline-variant/12 bg-surface-container-lowest p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant/55">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant/60">
                   {t("leads.aiSummary.intent")}
                 </p>
-                <span className="rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning ring-1 ring-warning/15">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${
+                    content.intentLevel === "hot"
+                      ? "bg-orange-500/10 text-orange-600 ring-orange-500/25 dark:bg-orange-500/20 dark:text-orange-400"
+                      : content.intentLevel === "warm"
+                        ? "bg-amber-500/10 text-amber-600 ring-amber-500/25 dark:bg-amber-500/20 dark:text-amber-400"
+                        : "bg-blue-500/10 text-blue-600 ring-blue-500/25 dark:bg-blue-500/20 dark:text-blue-400"
+                  }`}
+                >
                   {t(`leads.aiSummary.intentLevels.${content.intentLevel}`)}
                 </span>
               </div>
-              <p className="mt-3 text-sm leading-6 text-on-surface-variant/75">
+              <p className="mt-3 text-sm leading-relaxed text-on-surface-variant/80">
                 {content.intentReason}
               </p>
             </div>
-            <div className="rounded-xl border border-outline-variant/12 bg-surface-container-lowest px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant/55">
+            <div className="rounded-xl border border-outline-variant/12 bg-surface-container-lowest p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant/60">
                 {t("leads.aiSummary.nextAction")}
               </p>
-              <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-on-surface">
-                <ArrowRight className="h-4 w-4 text-on-surface-variant" />
+              <p className="mt-2.5 flex items-center gap-2 text-sm font-bold text-primary">
+                <ArrowRight className="h-4 w-4" />
                 {t(`leads.aiSummary.actions.${content.recommendedAction}`)}
               </p>
-              <p className="mt-2 text-sm leading-6 text-on-surface-variant/75">
+              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/80">
                 {content.recommendedActionReason}
               </p>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, Filter, Activity, Library } from "lucide-react";
+import { Search, Plus, Filter, Library } from "lucide-react";
 import { canEditAgentRecord } from "@/lib/agents/access";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { useModals } from "@/components/ui/ModalProvider";
@@ -155,14 +155,10 @@ export default function AgentsPageClient({
 
   return (
     <div className="app-page app-page-compact">
-      <header className="app-section-header overflow-hidden">
+      <header className="app-section-header relative overflow-hidden transition-all duration-300">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="app-kicker">
-              <Activity className="h-3.5 w-3.5" strokeWidth={2} />
-              <span className="text-xs font-semibold leading-5">{t('agents.agentLibrary')}</span>
-            </div>
-            <h1 className="mt-3 text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
+            <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-on-surface sm:text-3xl">
               {t('agents.headline')}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
@@ -170,22 +166,22 @@ export default function AgentsPageClient({
             </p>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
             <button
               type="button"
               onClick={() => setIsLibraryOpen(true)}
-              className="app-secondary-button min-w-32"
+              className="app-secondary-button group min-w-32 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs active:scale-[0.98]"
             >
-              <Library className="h-[18px] w-[18px] text-primary" />
+              <Library className="h-[18px] w-[18px] text-primary transition-transform duration-200 group-hover:scale-110" />
               {t('agents.library')}
             </button>
 
             <button
               type="button"
               onClick={() => openCreateAgent()}
-              className="app-primary-button min-w-36"
+              className="app-primary-button group min-w-36 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
             >
-              <Plus className="h-[18px] w-[18px]" />
+              <Plus className="h-[18px] w-[18px] transition-transform duration-200 group-hover:rotate-90" />
               {t('agents.createAgent')}
             </button>
           </div>
@@ -199,10 +195,10 @@ export default function AgentsPageClient({
               key={tab}
               type="button"
               onClick={() => setFilter(tab)}
-              className={`h-9 flex-1 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-all md:flex-none ${
+              className={`h-8 flex-1 whitespace-nowrap rounded-lg px-4 text-xs font-semibold transition-all duration-150 md:flex-none ${
                 filter === tab
-                  ? "app-selected-control"
-                  : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
+                  ? "bg-primary/12 text-primary font-bold ring-1 ring-primary/20 shadow-xs"
+                  : "text-on-surface-variant hover:bg-surface-container/60 hover:text-on-surface"
               }`}
             >
               {t(`agents.filters.${tab}`)}
@@ -211,12 +207,12 @@ export default function AgentsPageClient({
         </div>
 
         <div className="relative w-full md:max-w-sm">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant/40" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant/50" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('agents.searchPlaceholder')}
-            className="depth-input h-11 w-full rounded-xl border bg-surface-container-low pl-11 pr-4 text-sm font-medium text-on-surface outline-none placeholder:text-on-surface-variant/45 focus:border-primary/30 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/15"
+            className="depth-input h-9 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-10 pr-4 text-xs font-semibold text-on-surface outline-none placeholder:text-on-surface-variant/45 transition-colors focus:border-primary/40 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/15"
           />
         </div>
       </section>

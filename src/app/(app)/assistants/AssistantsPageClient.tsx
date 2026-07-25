@@ -32,11 +32,7 @@ export default function AssistantsPageClient({
       <header className="app-section-header">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="app-kicker">
-              <AppIcon name="forum" className="h-3.5 w-3.5" />
-              <span className="text-xs font-semibold">{t('assistants.badge')}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
                 {t('assistants.title')}
               </h1>

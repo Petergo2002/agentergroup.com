@@ -655,37 +655,6 @@ function ConversationDetail({
   );
 }
 
-function MetricTile({
-  label,
-  value,
-  sublabel,
-  tone = "neutral",
-}: {
-  label: string;
-  value: ReactNode;
-  sublabel?: string;
-  tone?: "neutral" | "success" | "warning" | "error";
-}) {
-  const toneClass =
-    tone === "success"
-      ? "text-success"
-      : tone === "warning"
-        ? "text-warning"
-        : tone === "error"
-          ? "text-error"
-          : "text-on-surface";
-
-  return (
-    <div className="min-w-0 rounded-xl border border-outline-variant/12 bg-surface px-4 py-3">
-      <p className="truncate text-xs font-medium text-on-surface-variant/65">{label}</p>
-      <p className={`mt-1 truncate text-lg font-semibold tabular-nums ${toneClass}`}>{value}</p>
-      {sublabel ? (
-        <p className="mt-1 truncate text-[11px] font-medium text-on-surface-variant/55">{sublabel}</p>
-      ) : null}
-    </div>
-  );
-}
-
 function HeaderMetric({
   label,
   value,
@@ -737,7 +706,7 @@ function AnalyticsViewSwitch({
   onChange: (view: "conversations" | "automations") => void;
 }) {
   return (
-    <div className="grid grid-cols-2 rounded-xl border border-outline-variant/12 bg-surface-container-low p-1 sm:inline-grid">
+    <div className="inline-flex rounded-xl border border-outline-variant/15 bg-surface-container-low p-1 sm:inline-grid sm:grid-cols-2">
       {([
         ["conversations", "Conversations", conversations],
         ["automations", "Automations", automations],
@@ -750,18 +719,18 @@ function AnalyticsViewSwitch({
             type="button"
             aria-pressed={selected}
             onClick={() => onChange(value)}
-            className={`flex h-9 min-w-0 items-center justify-between gap-3 rounded-lg px-3 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary/25 ${
+            className={`flex h-8 min-w-0 items-center justify-between gap-2.5 rounded-lg px-3 text-xs font-bold transition-all duration-200 focus:outline-none ${
               selected
-                ? "app-selected-control"
-                : "text-on-surface-variant hover:bg-surface hover:text-on-surface"
+                ? "bg-surface-container-lowest text-on-surface shadow-xs ring-1 ring-outline-variant/15"
+                : "text-on-surface-variant hover:bg-surface-container/60 hover:text-on-surface"
             }`}
           >
             <span className="truncate">{label}</span>
             <span
-              className={`rounded-full px-2 py-0.5 text-[11px] tabular-nums ${
+              className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold tabular-nums transition-colors ${
                 selected
-                  ? "bg-primary/10 text-primary"
-                  : "bg-surface text-on-surface-variant"
+                  ? "bg-primary/12 text-primary"
+                  : "bg-surface-container text-on-surface-variant/70"
               }`}
             >
               {count}
@@ -796,9 +765,9 @@ function AnalyticsFilterBar({
   );
 
   return (
-    <div className="rounded-xl border border-outline-variant/12 bg-surface px-3 py-3">
-      <div className="grid gap-3 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+    <div className="rounded-xl border border-outline-variant/12 bg-surface p-2.5">
+      <div className="grid gap-2.5 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <span className="hidden text-xs font-semibold text-on-surface-variant/55 sm:inline">
             Range
           </span>
@@ -807,9 +776,9 @@ function AnalyticsFilterBar({
               key={option.value}
               type="button"
               onClick={() => onChange({ ...filters, range: option.value })}
-              className={`h-9 rounded-lg px-3 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary/25 ${
+              className={`h-8 rounded-lg px-3 text-xs font-semibold transition-all duration-150 focus:outline-none ${
                 filters.range === option.value
-                  ? "app-selected-control"
+                  ? "bg-primary/12 text-primary font-bold ring-1 ring-primary/20"
                   : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
               }`}
             >
@@ -829,7 +798,7 @@ function AnalyticsFilterBar({
             aria-label="Agent filter"
             value={filters.agentId ?? ""}
             onChange={(event) => onChange({ ...filters, agentId: event.target.value || null })}
-            className="h-10 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none transition-colors focus:border-primary"
+            className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
           >
             <option value="">All agents</option>
             {agentOptions.map((agent) => (
@@ -845,7 +814,7 @@ function AnalyticsFilterBar({
                 ...filters,
                 automationStatus: event.target.value as DashboardAnalyticsAppliedFilters["automationStatus"],
               })}
-              className="h-10 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none transition-colors focus:border-primary"
+              className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
             >
               <option value="all">All statuses</option>
               <option value="processed">Processed</option>
@@ -860,7 +829,7 @@ function AnalyticsFilterBar({
                 aria-label="Widget filter"
                 value={filters.widgetId ?? ""}
                 onChange={(event) => onChange({ ...filters, widgetId: event.target.value || null })}
-                className="h-10 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none transition-colors focus:border-primary"
+                className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
               >
                 <option value="">All widgets</option>
                 {(data?.filters.widgets ?? []).map((widget) => (
@@ -874,7 +843,7 @@ function AnalyticsFilterBar({
                   ...filters,
                   sessionStatus: event.target.value as DashboardAnalyticsAppliedFilters["sessionStatus"],
                 })}
-                className="h-10 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none transition-colors focus:border-primary"
+                className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
               >
                 <option value="all">All statuses</option>
                 <option value="live">Live visitors</option>
@@ -886,7 +855,7 @@ function AnalyticsFilterBar({
                 value={filters.search}
                 onChange={(event) => onChange({ ...filters, search: event.target.value })}
                 placeholder="Search conversations"
-                className="h-10 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/45 focus:border-primary"
+                className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/45 focus:border-primary"
               />
             </>
           )}
@@ -894,10 +863,6 @@ function AnalyticsFilterBar({
       </div>
     </div>
   );
-}
-
-function formatPercent(value: number) {
-  return `${Number.isFinite(value) ? value : 0}%`;
 }
 
 function formatTrendDate(value: string, language: "en" | "sv") {
@@ -943,13 +908,6 @@ function AutomationPerformancePanel({
         </div>
       ) : (
         <div className="space-y-5">
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <MetricTile label="Events" value={automation.totalEvents} sublabel="Received triggers" />
-            <MetricTile label="Processed" value={automation.processedEvents} sublabel={formatPercent(automation.successRate)} />
-            <MetricTile label="Failed" value={automation.failedEvents} sublabel="Needs review" />
-            <MetricTile label="Action taken" value={automation.actionTaken} sublabel={`${automation.noAction} no action`} />
-            <MetricTile label="Needs input" value={automation.needsInput} sublabel={`${automation.actionFailed} action failed`} />
-          </section>
 
           <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
             <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
@@ -1491,10 +1449,7 @@ export function AnalyticsWorkspaceView() {
         <div className="grid gap-3">
           <div className="grid gap-3 xl:grid-cols-[minmax(360px,0.75fr)_minmax(0,1.25fr)] xl:items-end">
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/45">
-                Workspace analytics
-              </p>
-              <h1 className="mt-1 truncate text-xl font-semibold tracking-normal text-on-surface">
+              <h1 className="truncate text-xl font-bold tracking-tight text-on-surface">
                 {activeView === "automations" ? "Automation performance" : "Conversation performance"}
               </h1>
             </div>
