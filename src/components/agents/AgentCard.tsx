@@ -114,23 +114,23 @@ export function AgentCard({
       !agent.published_version_id);
 
   return (
-    <article className="depth-row group relative grid grid-cols-1 gap-4 overflow-hidden rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-4 transition-all hover:border-primary/18 hover:bg-surface-container-lowest sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:px-5 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
-      <div className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${getSurfaceAccent(agent)} opacity-75`} />
+    <article className="depth-row group relative grid grid-cols-1 gap-4 overflow-hidden rounded-2xl border border-outline-variant/12 bg-surface-container-lowest px-4 py-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-surface-container-low/60 hover:shadow-xs sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:px-5 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
+      <div className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${getSurfaceAccent(agent)} opacity-85`} />
 
       <div className="relative w-12 shrink-0 pl-1">
-        <div className="flex h-11 w-11 select-none items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container text-lg font-bold text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+        <div className="flex h-11 w-11 select-none items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container text-lg font-extrabold text-primary transition-transform duration-300 group-hover:scale-105 group-hover:bg-primary/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
           {agent.name.charAt(0).toUpperCase()}
         </div>
         <span
-          className={`absolute -bottom-0.5 right-0 h-3.5 w-3.5 rounded-full border-2 border-surface-container-lowest ${getDotColor(agent)}`}
+          className={`absolute -bottom-0.5 right-0 h-3.5 w-3.5 rounded-full border-2 border-surface-container-lowest ${getDotColor(agent)} ${isActive ? "animate-pulse" : ""}`}
         />
       </div>
 
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-[15px] font-semibold leading-5 tracking-normal text-on-surface">
+        <h3 className="truncate text-[15px] font-bold leading-5 tracking-tight text-on-surface transition-colors group-hover:text-primary">
           {agent.name}
         </h3>
-        <p className="mt-1 line-clamp-2 max-w-3xl text-sm leading-6 text-on-surface-variant/72">
+        <p className="mt-1 line-clamp-2 max-w-3xl text-sm leading-relaxed text-on-surface-variant/75">
           {agent.description || t("agents.noInstructions")}
         </p>
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -157,14 +157,14 @@ export function AgentCard({
             disabled={toggleDisabled}
             aria-pressed={isActive}
             aria-label={isActive ? t("common.off") : t("common.on")}
-            className={`relative h-7 w-12 shrink-0 rounded-full border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={`relative h-7 w-12 shrink-0 rounded-full border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-45 ${
               isActive
                 ? "border-primary bg-primary shadow-[0_10px_22px_-16px_rgba(var(--primary-rgb),0.8)]"
                 : "border-outline-variant/10 bg-surface-container-high"
             }`}
           >
             <span
-              className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-surface-container-lowest shadow-[0_1px_3px_rgba(15,23,42,0.22)] transition-transform ${
+              className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-surface-container-lowest shadow-[0_1px_3px_rgba(15,23,42,0.22)] transition-transform duration-200 ${
                 isActive ? "translate-x-5" : "translate-x-0"
               }`}
             />
@@ -173,7 +173,7 @@ export function AgentCard({
 
         <Link
           href={primaryHref}
-          className="app-primary-button min-h-9 px-3.5"
+          className="app-primary-button min-h-9 px-3.5 group-hover:shadow-xs transition-all active:scale-[0.98]"
         >
           {agent.surface === "automation"
             ? t("agents.builder")
@@ -185,9 +185,9 @@ export function AgentCard({
         {showActivityAction ? (
           <Link
             href={activityHref}
-            className="app-secondary-button min-h-9 px-3.5"
+            className="app-secondary-button min-h-9 px-3.5 group/act transition-all active:scale-[0.98]"
           >
-            <Activity className="h-3.5 w-3.5 text-primary" />
+            <Activity className="h-3.5 w-3.5 text-primary transition-transform duration-200 group-hover/act:scale-110" />
             {t("agents.viewActivity")}
           </Link>
         ) : null}

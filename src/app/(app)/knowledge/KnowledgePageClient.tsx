@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  BookOpenText,
   CheckCircle2,
   ChevronRight,
   Cloud,
@@ -861,11 +860,7 @@ export default function KnowledgePageClient({
       <header className="app-section-header">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="app-kicker">
-              <BookOpenText className="h-3.5 w-3.5" strokeWidth={2.2} />
-              <span className="text-xs font-semibold">{t("knowledge.badge")}</span>
-            </div>
-            <h1 className="mt-3 text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
+            <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
               {t("knowledge.title")}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
@@ -1382,7 +1377,7 @@ export default function KnowledgePageClient({
         {selectedSourceIds.length > 0 ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2 text-xs font-semibold text-on-primary">
+              <span className="app-selected-control flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-semibold">
                 {selectedSourceIds.length}
               </span>
               <span className="text-sm font-semibold text-on-surface">

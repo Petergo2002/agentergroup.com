@@ -12,7 +12,7 @@ const knowledgeMigration = readFileSync(
   "utf8",
 );
 const knowledgeWriteContractMigration = readFileSync(
-  `${MIGRATIONS_DIRECTORY}/20260713184627_restrict_knowledge_source_direct_writes_after_app_deploy.sql`,
+  `${MIGRATIONS_DIRECTORY}/20260713192609_restrict_knowledge_source_direct_writes_after_app_deploy.sql`,
   "utf8",
 );
 

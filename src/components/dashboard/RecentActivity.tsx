@@ -65,18 +65,18 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
             <Link
               key={convo.widgetSessionId}
               href="/analytics"
-              className="group grid gap-4 rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-4 transition-colors hover:border-primary/25 hover:bg-surface-container-low/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:grid-cols-[minmax(0,1fr)_auto]"
+              className="group grid gap-4 rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-surface-container-low/60 hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:grid-cols-[minmax(0,1fr)_auto]"
             >
               <div className="flex min-w-0 gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/10 group-hover:text-primary">
                   <User className="h-5 w-5" strokeWidth={2} />
                 </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="truncate text-sm font-semibold tracking-normal text-on-surface">
+                    <h3 className="truncate text-sm font-semibold tracking-normal text-on-surface transition-colors group-hover:text-primary">
                       {convo.widgetName}
                     </h3>
-                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs font-medium text-on-surface-variant">
+                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs font-semibold text-on-surface-variant transition-colors group-hover:bg-surface-container-high">
                       {convo.agentLabel || convo.agentName || t("common.unknownAgent")}
                     </span>
                   </div>
@@ -86,9 +86,9 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-on-surface-variant sm:justify-end">
-                <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
+                <span className="h-2 w-2 rounded-full bg-success ring-2 ring-success/20 animate-pulse" aria-hidden="true" />
                 <span>{formatRelativeDate(convo.lastActivityAt, language)}</span>
-                <ArrowRight className="h-4 w-4 opacity-55 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
+                <ArrowRight className="h-4 w-4 opacity-55 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100 group-hover:text-primary" />
               </div>
             </Link>
           ))

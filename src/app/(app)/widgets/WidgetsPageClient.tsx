@@ -594,11 +594,7 @@ export default function WidgetsPageClient({
       <header className="app-section-header">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="app-kicker">
-              <MessageSquare className="h-3.5 w-3.5" strokeWidth={2.2} />
-              <span className="text-xs font-semibold">{t('widgets.badge')}</span>
-            </div>
-            <h1 className="mt-3 text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
+            <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
               {t('widgets.title')}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
@@ -632,10 +628,10 @@ export default function WidgetsPageClient({
               title={!hasWidgetCapacity ? t('widgets.limitReachedDescription') : undefined}
               className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 ${
                 hasWidgetCapacity
-                  ? 'bg-primary text-on-primary hover:bg-primary/90'
+                  ? 'app-primary-surface'
                   : subscription?.plan_tier === 'premium'
                     ? 'bg-on-surface/10 text-on-surface-variant'
-                    : 'bg-primary text-on-primary hover:bg-primary/90'
+                    : 'app-primary-surface'
               }`}
             >
               {hasWidgetCapacity ? <Plus className="h-4 w-4" /> : null}
@@ -681,7 +677,7 @@ export default function WidgetsPageClient({
 
       {highlightedAgentId && (
         <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/8 px-5 py-4 text-sm font-medium text-primary shadow-sm">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs text-on-primary">!</span>
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">!</span>
           {t('widgets.managementSessionActive')}
         </div>
       )}
@@ -763,7 +759,7 @@ export default function WidgetsPageClient({
                            onClick={() => void handleSync(widget.id)}
                            disabled={syncingWidgetId === widget.id || togglingWidgetId === widget.id || deletingWidgetId === widget.id}
                            title={t('widgetBuilder.syncChanges')}
-                           className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/8 text-primary transition-colors hover:bg-primary hover:text-on-primary disabled:cursor-not-allowed disabled:opacity-50"
+                           className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/8 text-primary transition-colors hover:bg-on-surface hover:text-surface disabled:cursor-not-allowed disabled:opacity-50"
                          >
                            <RefreshCw className={`h-4 w-4 ${syncingWidgetId === widget.id ? 'animate-spin' : ''}`} />
                          </button>

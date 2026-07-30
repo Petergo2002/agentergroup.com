@@ -410,7 +410,7 @@ export default function BillingSettingsPage() {
                         ? 'bg-surface-container text-on-surface-variant cursor-not-allowed opacity-50'
                         : isDowngrade
                         ? 'bg-surface-container hover:bg-surface-container-highest text-on-surface transition-colors disabled:opacity-60'
-                        : 'bg-primary text-on-primary hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-60'
+                        : 'app-primary-surface disabled:opacity-60'
                     }`}
                   >
                     {checkoutLoading === plan || (portalLoading && isDowngrade) ? (

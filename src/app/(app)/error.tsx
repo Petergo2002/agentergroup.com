@@ -32,7 +32,7 @@ export default function ErrorState({
         </div>
         <button
           onClick={() => reset()}
-          className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-on-primary shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all active:scale-95"
+          className="app-primary-surface rounded-full px-6 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all active:scale-95"
         >
           Try again
         </button>

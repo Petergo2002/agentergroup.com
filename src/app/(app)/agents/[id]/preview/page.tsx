@@ -744,7 +744,7 @@ export default function AgentPreviewPage() {
                   <button
                     onClick={() => void handleSendMessage(draftMessage)}
                     disabled={isSubmitting || isActiveThreadCompleted || !draftMessage.trim()}
-                    className="h-full rounded-xl bg-primary px-6 text-[11px] font-bold uppercase tracking-widest text-on-primary transition-all hover:bg-primary/90 active:scale-95 disabled:opacity-50"
+                    className="app-primary-surface h-full rounded-xl px-6 text-[11px] font-bold uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
                   >
                     {isSubmitting ? t('agentPreview.running') : t('agentPreview.send')}
                   </button>

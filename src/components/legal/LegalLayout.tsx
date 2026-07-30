@@ -132,7 +132,7 @@ export function LegalLayout({ copy, language, pageType }: LegalLayoutProps) {
             <Link
               href={`/${pageType}?lang=en`}
               className={`px-2 py-1 rounded-md transition-all duration-200 ${
-                language === "en" ? "bg-primary text-on-primary shadow-sm font-extrabold" : "text-on-surface-variant hover:text-on-surface"
+                language === "en" ? "app-selected-control font-extrabold" : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               EN
@@ -140,7 +140,7 @@ export function LegalLayout({ copy, language, pageType }: LegalLayoutProps) {
             <Link
               href={`/${pageType}?lang=sv`}
               className={`px-2 py-1 rounded-md transition-all duration-200 ${
-                language === "sv" ? "bg-primary text-on-primary shadow-sm font-extrabold" : "text-on-surface-variant hover:text-on-surface"
+                language === "sv" ? "app-selected-control font-extrabold" : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               SV
@@ -159,11 +159,11 @@ export function LegalLayout({ copy, language, pageType }: LegalLayoutProps) {
                 onClick={() => scrollToSection(index)}
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all duration-300 focus:outline-none ${
                   isActive
-                    ? "bg-primary border-primary text-on-primary shadow-md scale-95"
+                    ? "app-selected-control scale-95"
                     : "bg-surface-container-low border-outline text-on-surface-variant/90 hover:text-on-surface active:scale-95"
                 }`}
               >
-                <span className={`${isActive ? "text-white/80" : "text-primary"} font-mono text-[9px]`}>
+                <span className="font-mono text-[9px] text-primary">
                   {formattedIndex}
                 </span>
                 <span className="max-w-[120px] truncate">{section.title}</span>

@@ -178,16 +178,16 @@ export function Sidebar({
         </div>
       </div>
       
-      <nav className={`mt-2 flex-1 space-y-5 font-label transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-3'} overflow-y-auto overflow-x-hidden`}>
+      <nav className={`mt-2 flex-1 space-y-4 font-label transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-3'} overflow-y-auto overflow-x-hidden`}>
         {navGroups.map((group, groupIndex) => (
-          <div key={groupIndex} className="space-y-1.5 relative">
+          <div key={groupIndex} className="space-y-1 relative">
             {(!isCollapsed || mobile) && (
-              <h3 className="px-3 mb-1.5 text-[11px] font-semibold tracking-wider text-on-surface-variant/60">
+              <h3 className="px-3 mb-1 text-[11px] font-semibold tracking-wider text-on-surface-variant/60">
                 {group.title}
               </h3>
             )}
             {isCollapsed && !mobile && groupIndex > 0 && (
-              <div className="mx-auto w-8 border-t border-outline-variant/10 my-4" />
+              <div className="mx-auto w-8 border-t border-outline-variant/10 my-3" />
             )}
             
             {group.items.map((item) => {
@@ -228,16 +228,16 @@ export function Sidebar({
                         }${hasBadge ? ` (${t("nav.newLeads", { count: badgeCount })})` : ""}`
                       : undefined
                   }
-                  className={`depth-nav-item group relative flex items-center gap-3 rounded-lg border py-2.5 transition-all duration-200 ${
+                  className={`depth-nav-item group relative flex items-center gap-3 rounded-lg border py-2 transition-all duration-200 ${
                     isCollapsed && !mobile ? 'justify-center px-0 mx-1' : 'px-3 mx-0'
                   } ${
                     isActive 
-                      ? "depth-nav-item-active border-primary/15 bg-primary/[0.08] text-primary"
+                      ? "depth-nav-item-active border-primary/15 bg-primary/[0.08] text-primary shadow-xs"
                       : "border-transparent text-on-surface-variant hover:border-outline-variant/12 hover:bg-on-surface/[0.04] hover:text-on-surface"
                   }`}
                 >
                   <Icon
-                    className={`h-[1.125rem] w-[1.125rem] shrink-0 transition-colors duration-200 ${isActive ? "text-primary" : "text-on-surface-variant/70 group-hover:text-on-surface"}`}
+                    className={`h-[1.125rem] w-[1.125rem] shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-primary scale-105" : "text-on-surface-variant/70 group-hover:text-on-surface"}`}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
                   {hasAttention && isCollapsed && !mobile ? (
@@ -248,7 +248,7 @@ export function Sidebar({
                   ) : null}
                   {hasBadge && isCollapsed && !mobile ? (
                     <span
-                      className="absolute right-0.5 top-0 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[8px] font-extrabold leading-none text-on-primary ring-2 ring-surface-container-low"
+                      className="app-selected-control absolute right-0.5 top-0 flex min-h-4 min-w-4 items-center justify-center rounded-full px-1 text-[8px] font-extrabold leading-none ring-2 ring-surface-container-low"
                       aria-label={t("nav.newLeads", { count: badgeCount })}
                     >
                       {badgeLabel}

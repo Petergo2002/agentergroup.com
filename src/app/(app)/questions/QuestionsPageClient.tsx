@@ -570,11 +570,7 @@ export default function QuestionsPageClient({
       <header className="app-section-header">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
-            <div className="app-kicker">
-              <MessageSquareText className="h-3.5 w-3.5" />
-              <span className="text-xs font-semibold">{text.badge}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
                 {text.title}
               </h1>
@@ -966,7 +962,7 @@ export default function QuestionsPageClient({
                               onClick={() => setVisibility(option)}
                               className={`h-9 rounded-lg px-3 text-xs font-semibold transition-all ${
                                 visibility === option
-                                  ? "depth-button-primary bg-primary text-on-primary"
+                                  ? "app-selected-control"
                                   : "text-on-surface-variant hover:bg-surface-container"
                               }`}
                             >

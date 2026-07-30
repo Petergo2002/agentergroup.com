@@ -11,7 +11,7 @@ import {
   UserCheck,
   X,
 } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
@@ -110,6 +110,14 @@ function LeadsEmptyState({ hasSearch }: { hasSearch: boolean }) {
 function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProps) {
   const { language, t } = useLanguage();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleClose = useCallback(() => {
+    if (closeTimeoutRef.current !== null) return;
+    setIsOpen(false);
+    closeTimeoutRef.current = setTimeout(onClose, 300);
+  }, [onClose]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -117,50 +125,65 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     document.body.style.overflow = "hidden";
+
+    // Trigger smooth slide-in
+    const timer = requestAnimationFrame(() => setIsOpen(true));
     closeButtonRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        handleClose();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      cancelAnimationFrame(timer);
+      if (closeTimeoutRef.current !== null) {
+        clearTimeout(closeTimeoutRef.current);
+      }
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
       previousFocus?.focus();
     };
-  }, [onClose]);
+  }, [handleClose]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[70]">
+    <div className="fixed inset-0 z-[9999] flex justify-end overflow-hidden">
+      {/* Backdrop */}
       <button
         type="button"
         aria-label={t("leads.closeDetails")}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-500"
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${
+          isOpen ? "opacity-100" : "opacity-0"
+        }`}
+        onClick={handleClose}
       />
+
+      {/* Slide-over panel */}
       <aside
         role="dialog"
         aria-modal="true"
         aria-labelledby="lead-detail-title"
-        className="absolute inset-y-0 right-0 flex w-full max-w-lg flex-col border-l border-outline-variant/15 bg-surface-container-lowest shadow-2xl animate-in slide-in-from-right duration-300 ease-out"
+        className={`relative z-10 flex h-full w-full max-w-xl sm:max-w-2xl lg:max-w-3xl flex-col border-l border-outline-variant/15 bg-surface-container-lowest shadow-[0_0_60px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out transform ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
       >
-        <div className="border-b border-outline-variant/10 bg-surface px-5 pb-6 pt-5 sm:px-8 sm:pt-8">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-surface-container-low text-base font-semibold text-on-surface ring-1 ring-outline-variant/15">
+        {/* Panel Header */}
+        <div className="border-b border-outline-variant/10 bg-surface/80 backdrop-blur-md px-6 py-5 sm:px-8">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-base font-extrabold text-primary ring-1 ring-primary/20 shadow-xs">
                 {getLeadInitials(lead.name)}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-on-surface-variant/60">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant/60">
                   {t("leads.detailsTitle")}
                 </p>
                 <h2
                   id="lead-detail-title"
-                  className="mt-1 truncate text-xl font-semibold tracking-normal text-on-surface"
+                  className="mt-0.5 truncate text-xl font-bold tracking-tight text-on-surface"
                 >
                   {lead.name}
                 </h2>
@@ -169,16 +192,17 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
             <button
               ref={closeButtonRef}
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               aria-label={t("leads.closeDetails")}
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-on-surface/5 hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="group relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container-low text-on-surface-variant transition-all duration-200 hover:border-primary/30 hover:bg-surface-container-high hover:text-on-surface hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4.5 w-4.5 transition-transform duration-200 group-hover:rotate-90" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
+        {/* Panel Body */}
+        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6 sm:px-8">
           <LeadAiSummaryCard
             leadId={lead.id}
             summary={lead.ai_summary}
@@ -190,73 +214,74 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
             {lead.email ? (
               <a
                 href={`mailto:${lead.email}`}
-                className="flex items-center gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 text-sm text-on-surface shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low"
+                className="group flex items-center gap-3.5 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 text-sm text-on-surface shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-surface-container-low hover:shadow-sm"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-on-surface/[0.04] text-primary">
-                  <Mail className="h-4 w-4" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-110">
+                  <Mail className="h-4.5 w-4.5" />
                 </div>
-                <span className="truncate font-medium">{lead.email}</span>
+                <span className="truncate font-medium transition-colors group-hover:text-primary">{lead.email}</span>
               </a>
             ) : null}
             {lead.phone ? (
               <a
                 href={`tel:${lead.phone}`}
-                className="flex items-center gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 text-sm text-on-surface shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low"
+                className="group flex items-center gap-3.5 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 text-sm text-on-surface shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-surface-container-low hover:shadow-sm"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-on-surface/[0.04] text-primary">
-                  <Phone className="h-4 w-4" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-110">
+                  <Phone className="h-4.5 w-4.5" />
                 </div>
-                <span className="font-medium">{lead.phone}</span>
+                <span className="font-medium transition-colors group-hover:text-primary">{lead.phone}</span>
               </a>
             ) : null}
           </section>
 
-          <section className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+          <section className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-xs">
             <h3 className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
               <MessageSquareText className="h-3.5 w-3.5 text-primary" />
               {t("leads.messageLabel")}
             </h3>
-            <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-on-surface-variant">
+            <p className="mt-3.5 whitespace-pre-wrap text-sm leading-relaxed text-on-surface-variant">
               {lead.message || <span className="italic opacity-60">{t("leads.noMessage")}</span>}
             </p>
           </section>
 
           <section className="grid grid-cols-2 gap-4">
-            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-xs">
               <p className="text-xs font-medium text-on-surface-variant/65">
                 {t("leads.widgetLabel")}
               </p>
-              <p className="mt-2 truncate text-sm font-semibold text-on-surface">
+              <p className="mt-1.5 truncate text-sm font-semibold text-on-surface">
                 {lead.widget_name}
               </p>
             </div>
-            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-xs">
               <p className="text-xs font-medium text-on-surface-variant/65">
                 {t("leads.agentLabel")}
               </p>
-              <p className="mt-2 truncate text-sm font-semibold text-on-surface">
+              <p className="mt-1.5 truncate text-sm font-semibold text-on-surface">
                 {lead.agent_name || t("leads.unknownAgent")}
               </p>
             </div>
           </section>
 
-          <section className="flex items-center justify-between rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
+          <section className="flex items-center justify-between rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-xs">
             <h3 className="text-xs font-medium text-on-surface-variant/65">
               {t("leads.capturedLabel")}
             </h3>
-            <p className="text-sm font-medium text-on-surface">
+            <p className="text-sm font-semibold text-on-surface">
               {formatLocaleDateTime(lead.created_at, language)}
             </p>
           </section>
         </div>
 
+        {/* Panel Footer */}
         {lead.widget_session_id ? (
-          <div className="border-t border-outline-variant/10 bg-surface-container-lowest p-5 sm:p-8">
+          <div className="border-t border-outline-variant/10 bg-surface-container-lowest p-6 sm:p-8">
             <Link
               href={`/analytics?session=${encodeURIComponent(lead.widget_session_id)}`}
-              className="app-primary-button w-full"
+              className="app-primary-button group w-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
             >
-              <MessageSquareText className="h-4 w-4" />
+              <MessageSquareText className="h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
               {t("leads.openConversation")}
             </Link>
           </div>
@@ -294,6 +319,8 @@ export default function LeadsPageClient({
   const displayedWorkspaceName =
     workspace.id === workspaceId ? workspace.name : workspaceName;
 
+  const closeLeadDetails = useCallback(() => setSelectedLead(null), []);
+
   /**
    * Opens a lead while preserving native link behavior for row-level mail and phone links.
    */
@@ -327,11 +354,7 @@ export default function LeadsPageClient({
       <header className="app-section-header">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <div className="app-kicker">
-              <UserCheck className="h-3.5 w-3.5" strokeWidth={2.2} />
-              <span className="text-xs font-semibold">{t("leads.badge")}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
                 {t("leads.title")}
               </h1>
@@ -492,7 +515,7 @@ export default function LeadsPageClient({
       {selectedLead ? (
         <LeadDetailPanel
           lead={selectedLead}
-          onClose={() => setSelectedLead(null)}
+          onClose={closeLeadDetails}
           onSummaryChange={handleSummaryChange}
         />
       ) : null}
