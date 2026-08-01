@@ -23,8 +23,16 @@ import {
 } from '@/lib/billing-authorization';
 import { getOrCreateWorkspaceStripeCustomer } from '@/lib/billing-customer';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { SELF_SERVE_BILLING_ENABLED } from '@/lib/billing-mode';
 
 export async function POST(req: Request) {
+  if (!SELF_SERVE_BILLING_ENABLED) {
+    return NextResponse.json(
+      { error: 'Self-serve billing is not available.' },
+      { status: 404 },
+    );
+  }
+
   try {
     const supabase = await createClient();
 

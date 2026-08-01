@@ -31,6 +31,17 @@ export function AdminWorkspaceSummaryPanel({
       <p className="mt-2 text-sm text-on-surface-variant">
         {workspace.ownerEmail ?? (language === "sv" ? "Ingen ägaradress" : "No owner email")}
       </p>
+      <div
+        className={`mt-4 inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${
+          workspace.onboardingCompleted
+            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            : "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+        }`}
+      >
+        {workspace.onboardingCompleted
+          ? language === "sv" ? "Aktiv" : "Active"
+          : language === "sv" ? "Väntar aktivering" : "Pending activation"}
+      </div>
 
       <dl className="mt-6 space-y-4 border-t border-outline pt-6">
         <div>

@@ -1,0 +1,106 @@
+# Manual Plan Activation for the Managed Pilot
+
+## Current mode
+
+Agentergroup currently runs in **managed pilot mode**:
+
+- customer-facing plan selection is hidden
+- the Billing settings navigation item is hidden
+- upgrade prompts do not link customers to Stripe
+- Stripe checkout, extra-credit checkout, portal, and invoice endpoints return `404`
+- plan limits and extra message credits are assigned by an internal administrator
+- existing Stripe implementation remains in the codebase for future reactivation
+
+The mode is controlled by:
+
+```env
+NEXT_PUBLIC_SELF_SERVE_BILLING_ENABLED
+```
+
+It is disabled by default. Only the exact value `true` enables self-serve
+billing surfaces.
+
+The shared source of truth is:
+
+- `src/lib/billing-mode.ts`
+
+## New account flow
+
+1. A user signs up and a workspace is created with
+   `workspaces.onboarding_completed = false`.
+2. The owner is redirected to `/onboarding`.
+3. The onboarding page displays a **Workspace activation pending** screen. It
+   does not show plan prices or request payment details.
+4. The screen refreshes its server state every eight seconds and also provides
+   a manual **Check activation** button.
+5. The workspace appears immediately in the internal Admin overview with a
+   **Pending activation** badge.
+6. An internal administrator opens `/admin/workspaces/[id]` and selects
+   **Activate Free**, **Activate Starter**, or **Activate Premium**.
+7. `PATCH /api/admin/workspaces/[id]/plan` first writes the selected plan and
+   its limits to `workspace_subscriptions`, then sets
+   `workspaces.onboarding_completed = true`.
+8. The next automatic refresh redirects the owner to `/dashboard`.
+
+Plan assignment is therefore the approval action. No separate activation
+button is required.
+
+## Admin operations during the pilot
+
+### Assign or change a plan
+
+Open:
+
+```text
+/admin/workspaces/[workspace-id]
+```
+
+Use the **Plan & Access** panel. Pending workspaces can be activated on any
+plan, including Free. Active workspaces can be moved between plans using the
+same control.
+
+The admin plan endpoint does not call Stripe. It applies the limits defined in
+`src/lib/plan-limits.ts`.
+
+### Grant extra message credits
+
+Use the existing **Extra Credits** admin control on the same workspace page.
+This increases `workspace_subscriptions.messages_limit` without resetting
+`messages_used` and without contacting Stripe.
+
+## Customer-facing billing surfaces hidden in pilot mode
+
+- Settings → Billing navigation
+- sidebar Upgrade button
+- billing plans, payment method, invoices, and credit purchase page
+- workspace/widget limit upgrade links
+- Stripe plan checkout
+- Stripe extra-credit checkout
+- Stripe customer portal
+- Stripe invoice retrieval
+
+Direct navigation to `/settings/billing` redirects to `/settings`.
+
+## Re-enabling self-serve billing later
+
+1. Verify all Stripe environment variables and webhook configuration described
+   in `docs/runbooks/production-readiness.md`.
+2. Set:
+
+   ```env
+   NEXT_PUBLIC_SELF_SERVE_BILLING_ENABLED=true
+   ```
+
+3. Redeploy the application. This restores the existing customer Billing page,
+   upgrade links, and Stripe billing endpoints.
+4. Decide whether new accounts should remain manually approved or return to
+   self-serve plan selection.
+5. To restore self-serve plan selection during onboarding, replace the managed
+   waiting content in `src/app/onboarding/OnboardingContent.tsx` with the plan
+   picker flow that calls `/api/billing/checkout` and
+   `completeOnboarding()` for Free accounts.
+6. Run the Stripe checkout, webhook, portal, invoice, cancellation, and
+   extra-credit verification checklist before enabling it in production.
+
+Do not set the flag to `true` until Stripe price IDs and webhook processing have
+been verified in the target environment.

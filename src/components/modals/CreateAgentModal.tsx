@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, MessageSquare, Workflow } from 'lucide-react';
+import { Bot, MessageSquare, Workflow, Check, Sparkles, Plus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
@@ -186,13 +186,20 @@ export const CreateAgentModal = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('agents.createModal.title')}>
-      <div className="space-y-10 py-4">
-        <div className="space-y-4">
-          <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.25em] block">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={t('agents.createModal.title')}
+      description={t('agents.createModal.subtitle') !== 'agents.createModal.subtitle' ? t('agents.createModal.subtitle') : 'Select how your new agent will trigger and specify a name.'}
+    >
+      <div className="space-y-6 pt-1 pb-2">
+        {/* Surface selection */}
+        <div className="space-y-3">
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant block">
             {t('agents.createModal.trigger')}
           </label>
-          <div className="grid gap-3">
+
+          <div className="grid gap-2.5">
             {surfaceOptions.map((option) => {
               const isSelected = surface === option.surface;
 
@@ -201,24 +208,31 @@ export const CreateAgentModal = ({
                   key={option.surface}
                   type="button"
                   onClick={() => setSurface(option.surface)}
-                  className={`flex items-start gap-4 rounded-[1.5rem] border p-4 text-left transition-all ${
+                  className={`group relative flex items-center gap-3.5 rounded-xl border p-3.5 text-left transition-all duration-200 outline-none ${
                     isSelected
-                      ? 'border-primary/35 bg-primary/5 shadow-sm'
-                      : 'border-outline-variant/10 bg-surface-container-low/40 hover:border-primary/25 hover:bg-surface-container-low'
+                      ? 'border-primary/50 bg-primary/[0.04] ring-1 ring-primary/20 shadow-xs'
+                      : 'border-outline-variant/20 bg-surface-container-lowest/60 hover:border-outline-variant/50 hover:bg-surface-container-low/80'
                   }`}
                 >
                   <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
                       isSelected
-                        ? 'app-selected-icon'
-                        : 'bg-surface-container-high text-on-surface-variant'
+                        ? 'bg-primary text-on-primary shadow-xs'
+                        : 'bg-surface-container-high/60 text-on-surface-variant group-hover:text-on-surface group-hover:bg-surface-container-high'
                     }`}
                   >
                     {option.icon}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-on-surface">{option.title}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-on-surface-variant/65">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-on-surface tracking-tight">{option.title}</p>
+                      {isSelected && (
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Check className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-on-surface-variant/80 leading-relaxed">
                       {option.description}
                     </p>
                   </div>
@@ -229,45 +243,59 @@ export const CreateAgentModal = ({
         </div>
 
         {/* Input Section */}
-        <div className="space-y-5">
-          <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.25em] block">
+        <div className="space-y-2 pt-1">
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant block">
             {nameLabel}
           </label>
           
-          <div className="group relative">
+          <div className="relative flex items-center">
+            <div className="absolute left-3.5 text-on-surface-variant/50 pointer-events-none">
+              <Sparkles className="h-4 w-4" />
+            </div>
             <input 
               type="text" 
               placeholder={namePlaceholder}
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="w-full bg-surface-container-low/40 border border-outline-variant/15 rounded-[1.5rem] px-7 py-5 text-[15px] text-on-surface transition-all outline-none focus:bg-surface focus:ring-4 focus:ring-primary/5 focus:border-primary/30 shadow-sm placeholder:text-on-surface-variant/60"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isSaving && name.trim()) {
+                  e.preventDefault();
+                  handleCreate();
+                }
+              }}
+              autoFocus
+              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl py-3 pl-10 pr-4 text-sm text-on-surface transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 shadow-xs placeholder:text-on-surface-variant/50"
             />
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-6 pt-6">
+        {/* Actions Footer */}
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-outline-variant/15">
           <button 
+            type="button"
             onClick={onClose}
-            className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant hover:text-on-surface transition-all"
+            disabled={isSaving}
+            className="rounded-xl px-4 py-2.5 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all disabled:opacity-50"
           >
             {t('common.cancel')}
           </button>
           <button 
+            type="button"
             onClick={handleCreate}
-            disabled={isSaving}
-            className="signature-gradient flex-1 rounded-full px-10 py-5 text-xs font-bold uppercase tracking-[0.25em] shadow-premium transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/10 active:scale-[0.98] disabled:opacity-40"
+            disabled={isSaving || !name.trim()}
+            className="signature-gradient flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold shadow-xs transition-all duration-150 hover:shadow-md active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none"
           >
-            <span className="flex items-center justify-center gap-2">
-              {isSaving ? (
-                <>
-                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  {t('agents.createModal.creating')}
-                </>
-              ) : (
-                createLabel
-              )}
-            </span>
+            {isSaving ? (
+              <>
+                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                <span>{t('agents.createModal.creating')}</span>
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" />
+                <span>{createLabel}</span>
+              </>
+            )}
           </button>
         </div>
       </div>

@@ -1,21 +1,20 @@
-"use client";
+'use client';
 
 import Link from "next/link";
-import { Bot, ChevronRight, Plus } from "lucide-react";
+import { Bot, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { formatRelativeDate } from "@/lib/utils";
 import type { AgentRecord } from "@/lib/types";
+import { CreateAgentDropdown } from "@/components/agents/CreateAgentDropdown";
 
 interface AgentStatusListProps {
   agents: AgentRecord[];
   isLoading: boolean;
-  onCreateAgent?: () => void;
 }
 
 export function AgentStatusList({
   agents,
   isLoading,
-  onCreateAgent,
 }: AgentStatusListProps) {
   const { language, t } = useLanguage();
 
@@ -92,16 +91,9 @@ export function AgentStatusList({
             <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-on-surface-variant/70">
               {t("dashboard.noAgentsDescription")}
             </p>
-            {onCreateAgent ? (
-              <button
-                type="button"
-                onClick={onCreateAgent}
-                className="app-primary-button mt-5 min-h-10"
-              >
-                <Plus className="h-4 w-4" strokeWidth={2.2} />
-                {t("dashboard.initializeAgent")}
-              </button>
-            ) : null}
+            <div className="mt-5">
+              <CreateAgentDropdown buttonText={t("dashboard.initializeAgent")} />
+            </div>
           </div>
         ) : (
           agents.slice(0, 6).map((agent) => {

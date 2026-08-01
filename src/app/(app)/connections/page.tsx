@@ -5,6 +5,7 @@ import { SUPPORTED_INTEGRATIONS } from "@/lib/integrations";
 import { createClient } from "@/lib/supabase/server";
 import { isWorkspaceAdminRole } from "@/lib/workspace-security";
 import type { ConnectionAuthLinkRecord, ConnectionRecord } from "@/lib/types";
+import { SELF_SERVE_BILLING_ENABLED } from "@/lib/billing-mode";
 import ConnectionsPageClient from "./ConnectionsPageClient";
 
 async function loadConnectionsPageData() {
@@ -21,7 +22,7 @@ async function loadConnectionsPageData() {
 
   if (!context.subscription?.integrations_enabled) {
     const { redirect } = await import("next/navigation");
-    redirect("/settings/billing");
+    redirect(SELF_SERVE_BILLING_ENABLED ? "/settings/billing" : "/dashboard");
   }
 
   await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id);

@@ -22,6 +22,7 @@ Practical instructions for common tasks:
 - **[Composio Integration](./guides/composio-integrations.md)** - Details on tool execution, connected-account sync, and lifecycle webhooks.
 - **[Lead Conversation Summaries](./guides/lead-conversation-summaries.md)** - AI summary generation, persistence, regeneration, security, and operational behavior.
 - **[UI Patterns](./guides/ui-patterns.md)** - Shared dashboard surfaces, brand tokens, CTAs, and layout conventions.
+- **[Manual Plan Activation](./guides/manual-plan-activation.md)** - Managed pilot onboarding, Admin plan approval, hidden self-serve billing, and future reactivation steps.
 - **[Widget Realtime Voice](./guides/widget-realtime-voice.md)** - Product decision and future implementation direction for Gemini Live voice mode in the public widget.
 - **[Widget Security](./guides/widget-embed-security.md)** - Security protocols for public embeds.
 - **[Privacy Operations](./guides/privacy-operations.md)** - GDPR and data processing details.
@@ -36,4 +37,4 @@ Public-facing legal and auth pages:
 - `/invite/accept` — Public workspace invite acceptance page (unauthenticated-friendly; moved from the `(app)` route group)
 
 ---
-*Last updated: July 22, 2026.*
+*Last updated: July 30, 2026.*

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings, Users, CreditCard } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { SELF_SERVE_BILLING_ENABLED } from "@/lib/billing-mode";
 
 export function SettingsSidebar() {
   const pathname = usePathname();
@@ -21,11 +22,13 @@ export function SettingsSidebar() {
       href: "/settings/team", 
       icon: Users 
     },
-    { 
-      name: t("settings.navigation.billing") || "Billing", 
-      href: "/settings/billing", 
-      icon: CreditCard 
-    },
+    ...(SELF_SERVE_BILLING_ENABLED
+      ? [{
+          name: t("settings.navigation.billing") || "Billing",
+          href: "/settings/billing",
+          icon: CreditCard,
+        }]
+      : []),
   ];
 
   const isTeam = pathname?.startsWith("/settings/team");

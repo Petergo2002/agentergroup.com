@@ -478,6 +478,14 @@ The billing settings page lives at:
 
 - `src/app/(app)/settings/billing/page.tsx`
 
+> **Managed pilot mode (July 2026):** Self-serve billing is currently hidden
+> and disabled by default through `src/lib/billing-mode.ts`. New workspace
+> owners wait on `/onboarding` until an internal administrator assigns a plan.
+> Direct access to `/settings/billing` redirects to `/settings`, and customer
+> Stripe endpoints return `404`. See
+> `docs/guides/manual-plan-activation.md` for the operational flow and future
+> reactivation steps.
+
 Current billing UI surfaces:
 
 - message usage progress bar with percentage and reset date
@@ -512,6 +520,11 @@ The plan selector lives in the workspace detail sidebar at `/admin/workspaces/[i
 `PATCH /api/admin/workspaces/[id]/plan`
 
 Accepts `{ plan_tier: "free" | "starter" | "premium" }`. Protected by `isAdminUser()` check. Uses the service-role admin client, which bypasses RLS.
+
+During managed pilot mode, assigning a plan also activates a pending workspace:
+the endpoint stores the selected subscription limits first and then sets
+`workspaces.onboarding_completed = true`. The customer onboarding screen polls
+for that state and unlocks the workspace automatically.
 
 **Plan tier → limits mapping:**
 

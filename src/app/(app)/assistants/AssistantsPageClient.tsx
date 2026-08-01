@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
-import { useModals } from '@/components/ui/ModalProvider';
 import { formatRelativeDate } from '@/lib/utils';
 import type { AssistantListItem } from '@/lib/types';
+import { CreateAgentDropdown } from '@/components/agents/CreateAgentDropdown';
 
 export default function AssistantsPageClient({
   initialAssistants,
@@ -14,7 +14,6 @@ export default function AssistantsPageClient({
   initialAssistants: AssistantListItem[];
 }) {
   const { language, t } = useLanguage();
-  const { openCreateAgent } = useModals();
   const isLoading = false;
 
   const sortedAssistants = useMemo(
@@ -44,13 +43,7 @@ export default function AssistantsPageClient({
               {t('assistants.description')}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => openCreateAgent('assistant')}
-            className="app-primary-button"
-          >
-            {t('assistants.newAssistant')}
-          </button>
+          <CreateAgentDropdown buttonText={t('assistants.newAssistant')} />
         </div>
       </header>
 
@@ -74,13 +67,9 @@ export default function AssistantsPageClient({
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-on-surface-variant/70">
             {t('assistants.noAssistantsDescription')}
           </p>
-          <button
-            type="button"
-            onClick={() => openCreateAgent('assistant')}
-            className="app-primary-button mt-6"
-          >
-            {t('assistants.createInternalAssistant')}
-          </button>
+          <div className="mt-6">
+            <CreateAgentDropdown buttonText={t('assistants.createInternalAssistant')} />
+          </div>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

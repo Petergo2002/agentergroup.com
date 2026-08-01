@@ -21,6 +21,8 @@ export const widgets = {
   upgradeForMoreWidgets: "Uppgradera för fler widgets",
   upgradeForMoreWidgetsDescription:
     "Uppgradera din plan för att skapa fler kundnära widgets.",
+  contactForMoreWidgetsDescription:
+    "Kontakta din kontoansvariga för att höja widget-gränsen.",
   managementSessionActive:
     "Widgethantering aktiv. Skapa en widget för att koppla den valda specialisten.",
   noWidgets: "Inga registrerade widgets",

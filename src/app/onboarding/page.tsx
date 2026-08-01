@@ -28,10 +28,8 @@ export default async function OnboardingPage() {
 
   return (
     <OnboardingContent
-      workspaceId={context.workspace.id}
       workspaceName={context.workspace.name}
       userName={context.profile.full_name || ""}
-      currentPlan={context.subscription?.plan_tier || "free"}
     />
   );
 }

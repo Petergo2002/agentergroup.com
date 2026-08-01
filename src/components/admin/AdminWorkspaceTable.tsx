@@ -107,7 +107,16 @@ export function AdminWorkspaceTable({
           >
             <div className="flex items-center gap-3">
               <AdminStatusDot status={getAdminActivityState(workspace.lastActiveAt)} />
-              <span className="font-medium text-on-surface">{workspace.name}</span>
+              <div className="min-w-0">
+                <span className="block truncate font-medium text-on-surface">
+                  {workspace.name}
+                </span>
+                {!workspace.onboardingCompleted ? (
+                  <span className="mt-1 inline-flex rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-amber-700 dark:text-amber-300">
+                    {language === "sv" ? "Väntar aktivering" : "Pending activation"}
+                  </span>
+                ) : null}
+              </div>
             </div>
             <span className="truncate text-on-surface-variant">
               {workspace.ownerEmail ?? (language === "sv" ? "Okänd" : "Unknown")}

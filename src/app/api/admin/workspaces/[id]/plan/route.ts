@@ -10,7 +10,8 @@ const VALID_PLANS = new Set<PlanTier>(["free", "starter", "premium"]);
 /**
  * PATCH /api/admin/workspaces/[id]/plan
  *
- * Admin-only endpoint. Changes the subscription plan for a workspace.
+ * Admin-only endpoint. Changes the subscription plan for a workspace and
+ * activates a pending pilot workspace.
  * Automatically applies the correct limits (messages, agents, integrations)
  * for the chosen plan tier.
  *
@@ -18,7 +19,7 @@ const VALID_PLANS = new Set<PlanTier>(["free", "starter", "premium"]);
  * Does NOT reset messages_used — usage history is preserved across plan changes.
  *
  * Body: { plan_tier: "free" | "starter" | "premium" }
- * Returns: { subscription: { plan_tier, messages_limit, agents_limit, integrations_enabled } }
+ * Returns: { subscription, activation: { onboarding_completed } }
  */
 export async function PATCH(
   request: NextRequest,
@@ -81,5 +82,25 @@ export async function PATCH(
     );
   }
 
-  return NextResponse.json({ subscription });
+  // Plan limits must be stored before access is unlocked. This keeps pending
+  // users behind onboarding if subscription assignment fails.
+  const { data: activation, error: activationError } = await admin
+    .from("workspaces")
+    .update({ onboarding_completed: true })
+    .eq("id", workspaceId)
+    .select("onboarding_completed")
+    .maybeSingle();
+
+  if (activationError) {
+    return NextResponse.json({ error: activationError.message }, { status: 500 });
+  }
+
+  if (!activation) {
+    return NextResponse.json(
+      { error: "Workspace not found." },
+      { status: 404 },
+    );
+  }
+
+  return NextResponse.json({ subscription, activation });
 }

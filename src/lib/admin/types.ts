@@ -25,6 +25,7 @@ export interface AdminWorkspaceListItem {
   conversationCount30d: number;
   messageCount30d: number;
   lastActiveAt: string | null;
+  onboardingCompleted: boolean;
 }
 
 export interface AdminOverviewData {
@@ -54,6 +55,8 @@ export interface AdminWorkspaceDetailSummary {
   agentsLimit: number;
   /** Whether external tool integrations are unlocked. */
   integrationsEnabled: boolean;
+  /** Whether the workspace owner can access the product. */
+  onboardingCompleted: boolean;
 }
 
 export interface AdminWorkspaceAgentRow {

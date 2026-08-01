@@ -15,6 +15,7 @@ type WorkspaceRow = {
   created_at: string;
   internal_assistants_enabled?: boolean;
   automations_enabled?: boolean;
+  onboarding_completed: boolean;
 };
 type ProfileRow = { id: string; email: string | null };
 type AgentRow = {
@@ -108,7 +109,7 @@ export async function getAdminOverview(): Promise<AdminOverviewData> {
   const last30DaysIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const [workspacesResult, profilesResult, agentsResult, threadsResult, messagesResult, widgetsResult, sessionsResult, widgetMessagesResult] =
     await Promise.all([
-      admin.from("workspaces").select("id, name, owner_id, created_at").order("created_at", { ascending: false }),
+      admin.from("workspaces").select("id, name, owner_id, created_at, onboarding_completed").order("created_at", { ascending: false }),
       admin.from("profiles").select("id, email"),
       admin.from("agents").select("id, workspace_id, name, created_at, archived_at"),
       admin.from("chat_threads").select("id, workspace_id, agent_id"),
@@ -216,6 +217,7 @@ export async function getAdminOverview(): Promise<AdminOverviewData> {
       conversationCount30d: conversations30dByWorkspace.get(workspace.id)?.size ?? 0,
       messageCount30d: messageCount30dByWorkspace.get(workspace.id) ?? 0,
       lastActiveAt: lastActiveByWorkspace.get(workspace.id) ?? null,
+      onboardingCompleted: workspace.onboarding_completed === true,
     })),
   };
 }
@@ -229,7 +231,7 @@ export async function getWorkspaceDetail(
   const admin = createAdminClient();
   const workspaceResult = await admin
     .from("workspaces")
-    .select("id, name, owner_id, created_at, internal_assistants_enabled, automations_enabled")
+    .select("id, name, owner_id, created_at, internal_assistants_enabled, automations_enabled, onboarding_completed")
     .eq("id", workspaceId)
     .maybeSingle();
 
@@ -362,6 +364,7 @@ export async function getWorkspaceDetail(
       messagesUsed: sub?.messages_used ?? 0,
       agentsLimit: sub?.agents_limit ?? 1,
       integrationsEnabled: sub?.integrations_enabled ?? false,
+      onboardingCompleted: workspace.onboarding_completed === true,
     },
     agents: agents
       .map((agent) => ({

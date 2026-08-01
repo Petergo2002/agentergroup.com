@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, Filter, Library } from "lucide-react";
+import { Search, Filter, Library } from "lucide-react";
 import { canEditAgentRecord } from "@/lib/agents/access";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
-import { useModals } from "@/components/ui/ModalProvider";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import { AgentLibraryDialog } from "@/components/agents/AgentLibraryDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAppContext } from "@/components/app/AppContext";
 import { AgentCard } from "@/components/agents/AgentCard";
 import type { AgentRecord } from "@/lib/types";
+
+import { CreateAgentDropdown } from "@/components/agents/CreateAgentDropdown";
 
 export default function AgentsPageClient({
   initialAgents,
@@ -19,7 +20,6 @@ export default function AgentsPageClient({
 }) {
   const { user, membership } = useAppContext();
   const { t } = useLanguage();
-  const { openCreateAgent } = useModals();
   const { showToast } = useToast();
   const [agents, setAgents] = useState<AgentRecord[]>(initialAgents);
   const [query, setQuery] = useState("");
@@ -155,7 +155,7 @@ export default function AgentsPageClient({
 
   return (
     <div className="app-page app-page-compact">
-      <header className="app-section-header relative overflow-hidden transition-all duration-300">
+      <header className="app-section-header relative transition-all duration-300">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
             <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-on-surface sm:text-3xl">
@@ -176,14 +176,7 @@ export default function AgentsPageClient({
               {t('agents.library')}
             </button>
 
-            <button
-              type="button"
-              onClick={() => openCreateAgent()}
-              className="app-primary-button group min-w-36 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
-            >
-              <Plus className="h-[18px] w-[18px] transition-transform duration-200 group-hover:rotate-90" />
-              {t('agents.createAgent')}
-            </button>
+            <CreateAgentDropdown />
           </div>
         </div>
       </header>

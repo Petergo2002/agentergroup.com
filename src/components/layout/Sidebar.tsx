@@ -7,7 +7,6 @@ import {
   BarChart3,
   Bot,
   LayoutGrid,
-  ArrowUpRight,
   MessageCircle,
   MessageSquare,
   Network,
@@ -26,6 +25,7 @@ import { hasInternalAssistantsEnabled } from "@/lib/assistants/feature-flags";
 import { formatRelativeDate } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { SELF_SERVE_BILLING_ENABLED } from "@/lib/billing-mode";
 
 interface AnalyticsActivitySummary {
   agentName: string | null;
@@ -381,7 +381,7 @@ export function Sidebar({
                       date: new Date(subscription.billing_cycle_end).toLocaleDateString(language === 'sv' ? 'sv-SE' : 'en-US', { day: 'numeric', month: 'short' })
                     })}
                   </p>
-                  {isFreePlan && (
+                  {SELF_SERVE_BILLING_ENABLED && isFreePlan && (
                     <Link
                       href="/settings/billing"
                       onClick={onNavigate}
@@ -390,9 +390,6 @@ export function Sidebar({
                     >
                       {/* Inner button surface */}
                       <div className="relative flex h-10 w-full items-center justify-center gap-2.5 rounded-[10.5px] bg-surface-container-lowest transition-colors duration-300 group-hover/upgrade:bg-surface-container-lowest dark:bg-surface-container-low dark:group-hover/upgrade:bg-surface-container-high">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-on-surface text-background shadow-sm transition-transform duration-300 group-hover/upgrade:scale-110">
-                          <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.5} />
-                        </span>
                         <span className="text-sm font-bold text-on-surface">
                           Upgrade
                         </span>

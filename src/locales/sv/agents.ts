@@ -43,6 +43,11 @@ export const agents = {
     "Den här åtgärden går inte att ångra. Alla utkast, versioner och konversationer som hör till agenten tas bort.",
   createModal: {
     title: "Skapa ny agent",
+    selectTypeTitle: "Välj agenttyp",
+    selectTypeDescription: "Välj var agenten ska användas.",
+    nameStepTitle: "Namnge agenten",
+    nameStepDescription: "Använd ett tydligt namn som teamet känner igen.",
+    selectedType: "Vald typ",
     surface: "Yta",
     trigger: "Trigger",
     assistantTitle: "Intern assistent",

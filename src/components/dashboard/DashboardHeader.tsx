@@ -1,18 +1,17 @@
-"use client";
+'use client';
 
 import Link from "next/link";
 import { useMemo } from "react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
-import { ArrowUpRight, Plus } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { CreateAgentDropdown } from "@/components/agents/CreateAgentDropdown";
 
 interface DashboardHeaderProps {
   userName?: string;
-  onCreateAgent: () => void;
 }
 
 export function DashboardHeader({
   userName = "there",
-  onCreateAgent,
 }: DashboardHeaderProps) {
   const { t } = useLanguage();
   const greeting = useMemo(() => {
@@ -23,7 +22,7 @@ export function DashboardHeader({
   }, [t]);
 
   return (
-    <header className="app-section-header relative overflow-hidden transition-all duration-300">
+    <header className="app-section-header relative transition-all duration-300">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 max-w-2xl">
           <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-on-surface sm:text-3xl">
@@ -42,14 +41,7 @@ export function DashboardHeader({
             {t("dashboard.viewAllAnalytics")}
             <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" strokeWidth={2} />
           </Link>
-          <button
-            type="button"
-            onClick={onCreateAgent}
-            className="app-primary-button group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
-          >
-            <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" strokeWidth={2.2} />
-            {t("dashboard.initializeAgent")}
-          </button>
+          <CreateAgentDropdown buttonText={t("dashboard.initializeAgent")} />
         </div>
       </div>
     </header>

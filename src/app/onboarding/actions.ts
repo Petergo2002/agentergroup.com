@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { MANUAL_PLAN_ACTIVATION_ENABLED } from "@/lib/billing-mode";
 
 /**
  * Marks the current workspace as onboarding completed.
@@ -11,6 +12,10 @@ import { redirect } from "next/navigation";
  * to mark it proactively if we return from Stripe).
  */
 export async function completeOnboarding(workspaceId: string) {
+  if (MANUAL_PLAN_ACTIVATION_ENABLED) {
+    throw new Error("Workspace activation is managed by an administrator.");
+  }
+
   const supabase = await createClient();
 
   const { error } = await supabase

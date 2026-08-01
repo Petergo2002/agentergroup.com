@@ -11,6 +11,7 @@ import {
   getOwnedWorkspaceCount,
   getWorkspaceLimitForPlan,
 } from '@/lib/workspace-limits';
+import { SELF_SERVE_BILLING_ENABLED } from '@/lib/billing-mode';
 
 interface WorkspaceSwitcherProps {
   isCollapsed: boolean;
@@ -40,7 +41,9 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
   const createWorkspaceLimitLabel =
     subscription?.plan_tier === 'premium'
       ? `Premium allows up to ${workspaceLimit} workspaces.`
-      : 'Upgrade to Premium to create more workspaces.';
+      : SELF_SERVE_BILLING_ENABLED
+        ? 'Upgrade to Premium to create more workspaces.'
+        : 'Contact your account manager to increase the workspace limit.';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -188,16 +191,22 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
               setIsOpen(false);
               if (hasWorkspaceCapacity) {
                 setIsCreateModalOpen(true);
-              } else if (subscription?.plan_tier !== 'premium') {
+              } else if (
+                SELF_SERVE_BILLING_ENABLED &&
+                subscription?.plan_tier !== 'premium'
+              ) {
                 window.location.assign('/settings/billing');
               }
             }}
-            disabled={!hasWorkspaceCapacity && subscription?.plan_tier === 'premium'}
+            disabled={
+              !hasWorkspaceCapacity &&
+              (!SELF_SERVE_BILLING_ENABLED || subscription?.plan_tier === 'premium')
+            }
             title={!hasWorkspaceCapacity ? createWorkspaceLimitLabel : undefined}
             className={`depth-nav-item group/create flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-2 text-left text-[13px] font-medium transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               hasWorkspaceCapacity
                 ? 'text-on-surface-variant hover:border-outline-variant/12 hover:bg-on-surface/[0.04] hover:text-on-surface'
-                : subscription?.plan_tier === 'premium'
+                : !SELF_SERVE_BILLING_ENABLED || subscription?.plan_tier === 'premium'
                   ? 'cursor-not-allowed text-on-surface-variant/50'
                   : 'text-primary hover:bg-primary/10 hover:text-primary'
             }`}
@@ -207,7 +216,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
               <span className="block truncate">
                 {hasWorkspaceCapacity
                   ? t('nav.createWorkspace') || 'Create workspace'
-                  : subscription?.plan_tier === 'premium'
+                  : !SELF_SERVE_BILLING_ENABLED || subscription?.plan_tier === 'premium'
                     ? t('nav.workspaceLimitReached') || 'Workspace limit reached'
                     : t('nav.upgradeForWorkspaces') || 'Upgrade for more workspaces'}
               </span>

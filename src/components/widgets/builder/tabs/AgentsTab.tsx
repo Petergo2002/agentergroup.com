@@ -4,7 +4,7 @@
 import { Bot, UserCircle2 } from 'lucide-react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder } from '../WidgetBuilderContext';
-import { useModals } from '@/components/ui/ModalProvider';
+import { CreateAgentDropdown } from '@/components/agents/CreateAgentDropdown';
 
 const fieldLabelClassName = 'text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1';
 const sectionDescClassName = 'text-sm text-on-surface-variant/60 leading-relaxed max-w-2xl';
@@ -13,7 +13,6 @@ const inputFieldClassName = 'w-full rounded-[14px] border border-outline-variant
 export function AgentsTab() {
   const { t } = useLanguage();
   const { summary, attachedAgents, setAttachedAgents, addAgent, removeAgent, moveAgent } = useWidgetBuilder();
-  const { openCreateAgent } = useModals();
 
   if (!summary) return null;
 
@@ -174,13 +173,12 @@ export function AgentsTab() {
           {unattachedAgents.length === 0 && (
             <div className="col-span-full py-12 flex flex-col items-center justify-center opacity-40">
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] mb-4">{t('widgetBuilder.agents.noRemainingSpecialists')}</p>
-              <button
-                type="button"
-                onClick={() => openCreateAgent()}
-                className="text-xs font-bold uppercase tracking-[0.12em] text-primary hover:underline"
-              >
-                + {t('widgetBuilder.agents.createNewAgent')}
-              </button>
+              <CreateAgentDropdown
+                variant="ghost"
+                buttonClassName="text-xs font-bold uppercase tracking-[0.12em] text-primary hover:underline hover:bg-transparent px-0 py-0 min-h-0 min-w-0"
+                buttonText={`+ ${t('widgetBuilder.agents.createNewAgent')}`}
+                align="left"
+              />
             </div>
           )}
         </div>

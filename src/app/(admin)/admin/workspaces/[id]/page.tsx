@@ -99,6 +99,7 @@ export default async function AdminWorkspaceDetailPage({
               <AdminPlanSelector
                 workspaceId={workspace.id}
                 currentPlan={workspace.planTier}
+                isActivated={workspace.onboardingCompleted}
               />
               <AdminExtraCreditsGrant
                 workspaceId={workspace.id}

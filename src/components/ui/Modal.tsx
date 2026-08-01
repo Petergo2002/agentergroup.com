@@ -9,11 +9,12 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
   size?: 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | 'full';
 }
 
-export const Modal = ({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) => {
+export const Modal = ({ isOpen, onClose, title, description, children, size = 'lg' }: ModalProps) => {
   const { t } = useLanguage();
 
   const sizeClasses = {
@@ -54,22 +55,29 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'lg' }: ModalPr
       
       {/* Modal Container */}
       <div
-        className={`relative flex max-h-[calc(100vh-1.5rem)] w-full flex-col overflow-hidden rounded-xl border border-outline-variant/20 glass-panel shadow-xl animate-in zoom-in-95 duration-300 sm:max-h-[calc(100vh-2rem)] ${sizeClasses}`}
+        className={`relative flex max-h-[calc(100vh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl border border-outline-variant/20 glass-panel shadow-2xl animate-in zoom-in-95 duration-200 sm:max-h-[calc(100vh-2rem)] ${sizeClasses}`}
       >
         {/* Physical Top-Light Detail */}
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
         
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between px-5 pb-4 pt-5 sm:px-8 sm:pt-8">
-          <h3 className="text-2xl font-headline font-bold text-on-surface tracking-tight">
-            {title || t('modals.defaultTitle')}
-          </h3>
+        <div className="flex shrink-0 items-start justify-between gap-4 px-6 pb-2 pt-6 sm:px-8 sm:pt-8">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xl sm:text-2xl font-headline font-bold text-on-surface tracking-tight">
+              {title || t('modals.defaultTitle')}
+            </h3>
+            {description && (
+              <p className="mt-1 text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+                {description}
+              </p>
+            )}
+          </div>
           <button 
             onClick={onClose}
             aria-label={t('common.close')}
-            className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-on-surface-variant/70 hover:bg-surface-container-high hover:text-on-surface transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
-            <AppIcon name="close" className="h-6 w-6" />
+            <AppIcon name="close" className="h-5 w-5" />
           </button>
         </div>
         

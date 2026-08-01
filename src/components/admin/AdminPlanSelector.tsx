@@ -8,6 +8,8 @@ interface AdminPlanSelectorProps {
   workspaceId: string;
   /** The plan tier currently stored in workspace_subscriptions. */
   currentPlan: PlanTier;
+  /** Whether the workspace owner has been granted product access. */
+  isActivated: boolean;
 }
 
 /** Visual metadata for each plan tier. */
@@ -44,15 +46,17 @@ const ALL_PLANS: PlanTier[] = ["free", "starter", "premium"];
 export function AdminPlanSelector({
   workspaceId,
   currentPlan,
+  isActivated,
 }: AdminPlanSelectorProps) {
   const router = useRouter();
   const [activePlan, setActivePlan] = useState<PlanTier>(currentPlan);
+  const [isWorkspaceActivated, setIsWorkspaceActivated] = useState(isActivated);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handlePlanChange = async (plan: PlanTier) => {
     // No-op if clicking the already-active plan.
-    if (plan === activePlan || isSaving) return;
+    if ((plan === activePlan && isWorkspaceActivated) || isSaving) return;
 
     setIsSaving(true);
     setErrorMessage(null);
@@ -73,12 +77,13 @@ export function AdminPlanSelector({
 
       const payload = await response.json().catch(() => null);
 
-      if (!response.ok || !payload?.subscription) {
+      if (!response.ok || !payload?.subscription || !payload?.activation) {
         // Revert on failure.
         setActivePlan(previous);
         throw new Error(payload?.error || "Failed to update plan.");
       }
 
+      setIsWorkspaceActivated(payload.activation.onboarding_completed === true);
       router.refresh();
     } catch (error) {
       setActivePlan(previous);
@@ -97,23 +102,34 @@ export function AdminPlanSelector({
       {/* Header row */}
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-2">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-on-surface-variant">
-            Subscription Plan
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-on-surface-variant">
+              Plan & Access
+            </p>
+            {!isWorkspaceActivated ? (
+              <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-300">
+                Awaiting activation
+              </span>
+            ) : null}
+          </div>
           {/* Current plan badge */}
           <div
             className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${meta.badgeClasses}`}
           >
             {meta.label}
           </div>
-          <p className="text-[11px] text-on-surface-variant">{meta.description}</p>
+          <p className="text-[11px] text-on-surface-variant">
+            {isWorkspaceActivated
+              ? meta.description
+              : "Choose a plan to activate this workspace and unlock customer access."}
+          </p>
         </div>
       </div>
 
       {/* Plan selector buttons */}
       <div className="mt-4 flex gap-2">
         {ALL_PLANS.map((plan) => {
-          const isActive = plan === activePlan;
+          const isActive = plan === activePlan && isWorkspaceActivated;
           return (
             <button
               key={plan}
@@ -131,7 +147,9 @@ export function AdminPlanSelector({
                     : "bg-transparent text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
                 } disabled:cursor-not-allowed disabled:opacity-50`}
             >
-              {PLAN_META[plan].label}
+              {isWorkspaceActivated
+                ? PLAN_META[plan].label
+                : `Activate ${PLAN_META[plan].label}`}
             </button>
           );
         })}
@@ -139,7 +157,9 @@ export function AdminPlanSelector({
 
       {/* Saving indicator */}
       {isSaving && (
-        <p className="mt-3 text-[11px] text-on-surface-variant">Applying plan...</p>
+        <p className="mt-3 text-[11px] text-on-surface-variant">
+          {isWorkspaceActivated ? "Applying plan..." : "Activating workspace..."}
+        </p>
       )}
 
       {/* Error message */}

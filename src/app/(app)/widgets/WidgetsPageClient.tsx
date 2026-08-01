@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
@@ -9,9 +9,10 @@ import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { EntityActionsMenu } from '@/components/ui/EntityActionsMenu';
 import { StatusToggle } from '@/components/ui/StatusToggle';
 import { useToast } from '@/components/ui/ToastProvider';
-import { MessageSquare, Loader2, Plus, RefreshCw } from 'lucide-react';
+import { ChevronDown, MessageSquare, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { formatRelativeDate } from '@/lib/utils';
 import { canCreateWidget, getWidgetLimitForPlan } from '@/lib/widget-limits';
+import { SELF_SERVE_BILLING_ENABLED } from '@/lib/billing-mode';
 
 interface WidgetListItem {
   id: string;
@@ -23,34 +24,96 @@ interface WidgetListItem {
   updatedAt: string;
 }
 
-/**
- * Modal that collects a widget name before creating it.
- * Prevents the "Untitled Widget" confusion by requiring a name upfront.
- */
-function CreateWidgetModal({
-  isOpen,
+function CreateWidgetDropdown({
   isLoading,
   onConfirm,
-  onClose,
+  buttonText,
+  buttonTitle,
+  canOpen,
+  disabled,
+  onUnavailable,
 }: {
-  isOpen: boolean;
   isLoading: boolean;
   onConfirm: (name: string, description: string) => void;
-  onClose: () => void;
+  buttonText: string;
+  buttonTitle?: string;
+  canOpen: boolean;
+  disabled: boolean;
+  onUnavailable: () => void;
 }) {
   const { t } = useLanguage();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMenuRendered, setIsMenuRendered] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const dropdownId = useId();
+  const nameInputId = useId();
+  const descriptionInputId = useId();
 
-  // Auto-focus the input when modal opens
+  const openDropdown = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+
+    setIsMenuRendered(true);
+    setIsOpen(true);
+  }, []);
+
+  const closeDropdown = useCallback(() => {
+    if (isLoading) return;
+
+    setIsOpen(false);
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+
+    closeTimerRef.current = window.setTimeout(() => {
+      setIsMenuRendered(false);
+      setName('');
+      setDescription('');
+      closeTimerRef.current = null;
+    }, 180);
+  }, [isLoading]);
+
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
+      window.requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        closeDropdown();
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') closeDropdown();
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [closeDropdown, isOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,95 +123,127 @@ function CreateWidgetModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-widget-modal-title"
-    >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
-        onClick={() => { if (!isLoading) onClose(); }}
-      />
+    <div className="relative inline-flex text-left" ref={dropdownRef}>
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-controls={dropdownId}
+        title={buttonTitle}
+        disabled={disabled}
+        onClick={() => {
+          if (!canOpen) {
+            onUnavailable();
+          } else if (isOpen) {
+            closeDropdown();
+          } else {
+            openDropdown();
+          }
+        }}
+        className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 ${
+          canOpen
+            ? 'app-primary-surface'
+            : disabled
+              ? 'bg-on-surface/10 text-on-surface-variant'
+              : 'app-primary-surface'
+        }`}
+      >
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : canOpen ? (
+          <Plus className="h-4 w-4" />
+        ) : null}
+        <span>{buttonText}</span>
+        {canOpen ? (
+          <ChevronDown
+            className={`h-3.5 w-3.5 opacity-65 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
+            strokeWidth={2.2}
+          />
+        ) : null}
+      </button>
 
-      {/* Panel */}
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <MessageSquare className="h-5 w-5" strokeWidth={2} />
-        </div>
+      {isMenuRendered ? (
+        <div
+          id={dropdownId}
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby={`${dropdownId}-title`}
+          className={`absolute right-0 top-full z-[80] mt-2 w-[min(21.5rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-2xl border border-outline-variant/25 bg-surface-container-lowest shadow-[0_16px_40px_-18px_rgba(15,23,42,0.3)] ${
+            isOpen ? 'app-dropdown-enter' : 'app-dropdown-exit'
+          }`}
+        >
+          <div className="border-b border-outline-variant/15 px-3.5 py-3">
+            <h2 id={`${dropdownId}-title`} className="text-[13px] font-bold tracking-tight text-on-surface">
+              {t('widgets.createModalTitle')}
+            </h2>
+            <p className="mt-0.5 text-[11px] leading-4 text-on-surface-variant/70">
+              {t('widgets.createModalDescription')}
+            </p>
+          </div>
 
-        <h2 id="create-widget-modal-title" className="text-xl font-semibold tracking-normal text-on-surface">
-          {t('widgets.createModalTitle')}
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/60">
-          {t('widgets.createModalDescription')}
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="widget-name-input" className="ml-1 text-sm font-medium text-on-surface-variant">
+          <form onSubmit={handleSubmit} className="space-y-3 p-3">
+            <div className="space-y-1.5">
+              <label htmlFor={nameInputId} className="text-[11px] font-semibold text-on-surface-variant">
                 {t('common.name')}
               </label>
               <input
                 ref={inputRef}
-                id="widget-name-input"
+                id={nameInputId}
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(event) => setName(event.target.value)}
                 placeholder={t('widgets.createModalPlaceholder')}
                 maxLength={80}
                 disabled={isLoading}
-                className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/30 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 disabled:opacity-50"
+                className="h-10 w-full rounded-xl border border-outline-variant/25 bg-surface-container-lowest px-3 text-sm text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-2 focus:ring-primary/15 disabled:opacity-50"
               />
             </div>
 
-            <div className="space-y-2">
-              <label htmlFor="widget-description-input" className="ml-1 text-sm font-medium text-on-surface-variant">
-                {t('widgets.createModalDescriptionLabel')}
-              </label>
-              <textarea
-                id="widget-description-input"
-                value={description}
-                onChange={(e) => setDescription(e.target.value.slice(0, 200))}
-                placeholder={t('widgets.createModalDescriptionPlaceholder')}
-                rows={3}
-                disabled={isLoading}
-                className="w-full resize-none rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/30 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 disabled:opacity-50"
-              />
-              <div className="flex justify-end pr-2">
-                <span className={`text-xs font-medium ${description.length >= 180 ? 'text-primary' : 'text-on-surface-variant/50'}`}>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor={descriptionInputId} className="text-[11px] font-semibold text-on-surface-variant">
+                  {t('widgets.createModalDescriptionLabel')}
+                </label>
+                <span className={`text-[10px] font-medium ${description.length >= 180 ? 'text-primary' : 'text-on-surface-variant/45'}`}>
                   {description.length}/200
                 </span>
               </div>
+              <textarea
+                id={descriptionInputId}
+                value={description}
+                onChange={(event) => setDescription(event.target.value.slice(0, 200))}
+                placeholder={t('widgets.createModalDescriptionPlaceholder')}
+                rows={2}
+                disabled={isLoading}
+                className="w-full resize-none rounded-xl border border-outline-variant/25 bg-surface-container-lowest px-3 py-2.5 text-sm leading-5 text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-2 focus:ring-primary/15 disabled:opacity-50"
+              />
             </div>
-          </div>
 
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isLoading}
-              className="app-secondary-button flex-1"
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading || !name.trim()}
-              className="app-primary-button flex-1"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{t('widgets.creating')}</span>
-                </div>
-              ) : t('widgets.createConfirm')}
-            </button>
-          </div>
-        </form>
-      </div>
+            <div className="flex justify-end gap-2 border-t border-outline-variant/15 pt-3">
+              <button
+                type="button"
+                onClick={closeDropdown}
+                disabled={isLoading}
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-outline-variant/25 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:opacity-50"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !name.trim()}
+                className="app-primary-button h-9 min-h-0 px-3 text-xs"
+              >
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {t('widgets.creating')}
+                  </span>
+                ) : t('widgets.createConfirm')}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -299,7 +394,6 @@ export default function WidgetsPageClient({
   const [widgets, setWidgets] = useState<WidgetListItem[]>(initialWidgets);
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [widgetToEdit, setWidgetToEdit] = useState<WidgetListItem | null>(null);
   const [deletingWidgetId, setDeletingWidgetId] = useState<string | null>(null);
   const [togglingWidgetId, setTogglingWidgetId] = useState<string | null>(null);
@@ -415,8 +509,10 @@ export default function WidgetsPageClient({
   const createWidget = async (name: string, description: string) => {
     if (!hasWidgetCapacity) {
       showToast(t('widgets.limitReachedDescription'), 'error');
-      setShowCreateModal(false);
-      if (subscription?.plan_tier !== 'premium') {
+      if (
+        SELF_SERVE_BILLING_ENABLED &&
+        subscription?.plan_tier !== 'premium'
+      ) {
         router.push('/settings/billing');
       }
       return;
@@ -615,36 +711,42 @@ export default function WidgetsPageClient({
                   : `${t('widgetBuilder.syncChanges')} (${needsSyncCount})`}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => {
-                if (hasWidgetCapacity) {
-                  setShowCreateModal(true);
-                } else if (subscription?.plan_tier !== 'premium') {
-                  router.push('/settings/billing');
-                }
-              }}
-              disabled={isCreating || (!hasWidgetCapacity && subscription?.plan_tier === 'premium')}
-              title={!hasWidgetCapacity ? t('widgets.limitReachedDescription') : undefined}
-              className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 ${
-                hasWidgetCapacity
-                  ? 'app-primary-surface'
-                  : subscription?.plan_tier === 'premium'
-                    ? 'bg-on-surface/10 text-on-surface-variant'
-                    : 'app-primary-surface'
-              }`}
-            >
-              {hasWidgetCapacity ? <Plus className="h-4 w-4" /> : null}
-              {isCreating
+            <CreateWidgetDropdown
+              isLoading={isCreating}
+              onConfirm={(name, description) => void createWidget(name, description)}
+              canOpen={hasWidgetCapacity}
+              disabled={
+                isCreating ||
+                (!hasWidgetCapacity &&
+                  (!SELF_SERVE_BILLING_ENABLED || subscription?.plan_tier === 'premium'))
+              }
+              buttonTitle={
+                !hasWidgetCapacity
+                  ? SELF_SERVE_BILLING_ENABLED
+                    ? t('widgets.limitReachedDescription')
+                    : t('widgets.contactForMoreWidgetsDescription')
+                  : undefined
+              }
+              buttonText={
+                isCreating
                 ? t('widgets.creatingWorkspace')
                 : hasWidgetCapacity
                   ? highlightedAgentId
                     ? t('widgets.newWidgetFromAgent')
                     : t('widgets.initializeWidget')
-                  : subscription?.plan_tier === 'premium'
+                  : !SELF_SERVE_BILLING_ENABLED || subscription?.plan_tier === 'premium'
                     ? t('widgets.limitReached')
-                    : t('widgets.upgradeForMoreWidgets')}
-            </button>
+                    : t('widgets.upgradeForMoreWidgets')
+              }
+              onUnavailable={() => {
+                if (
+                  SELF_SERVE_BILLING_ENABLED &&
+                  subscription?.plan_tier !== 'premium'
+                ) {
+                  router.push('/settings/billing');
+                }
+              }}
+            />
           </div>
         </div>
       </header>
@@ -657,7 +759,9 @@ export default function WidgetsPageClient({
             </p>
             {!hasWidgetCapacity && (
               <p className="mt-1 text-sm leading-6 text-on-surface-variant/70">
-                {subscription?.plan_tier === 'premium'
+                {!SELF_SERVE_BILLING_ENABLED
+                  ? t('widgets.contactForMoreWidgetsDescription')
+                  : subscription?.plan_tier === 'premium'
                   ? t('widgets.limitReachedDescription')
                   : t('widgets.upgradeForMoreWidgetsDescription')}
               </p>
@@ -785,16 +889,6 @@ export default function WidgetsPageClient({
              );
           })}
         </div>
-      )}
-
-      {/* Create Widget Name Modal */}
-      {showCreateModal && (
-        <CreateWidgetModal
-          isOpen={showCreateModal}
-          isLoading={isCreating}
-          onConfirm={(name, description) => void createWidget(name, description)}
-          onClose={() => setShowCreateModal(false)}
-        />
       )}
 
       {widgetToEdit && (

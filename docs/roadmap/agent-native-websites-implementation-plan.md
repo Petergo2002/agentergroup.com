@@ -1,835 +1,1329 @@
-# Agent-Native Websites: Implementation Plan
+# Agent Sites on Widget V2: Implementation Plan
 
-Last updated: 2026-07-22
+Last updated: 2026-07-26
 
-Status: Proposed implementation sequence; implementation not started
+Status: Proposed implementation sequence; awaiting approval; no application implementation is authorized by this document
 
-Parent roadmap: [Agent-Native Websites](./agent-native-websites.md)
+Parent roadmap: [Agent Sites on Widget V2](./agent-native-websites.md)
 
-## Purpose
+## 1. Purpose
 
-This document translates the strategic roadmap into small, dependency-ordered work packages that can be implemented, verified, released, and rolled back independently.
+This document converts the product roadmap into dependency-ordered phases that can be implemented, verified, released, and rolled back independently.
 
-The parent roadmap remains the source of truth for product scope, evidence gates, market assumptions, security/privacy requirements, and the Phase 0-7 go/no-go decisions. This plan controls **implementation order**. Completing a work package never waives its parent phase gate.
+The implementation must evolve the architecture already in production:
 
-The implementation must preserve the current Agents, Automation Agents, Internal Assistants, Widgets, widget public keys, embeds, histories, leads, analytics, Questions/Flywheel records, and privacy operations until an explicit compatibility path has passed its own gate.
+- existing `widgets` and `widget_agents`
+- existing hosted and embedded Widget V2
+- existing public Widget APIs
+- existing Builder, published versions, Knowledge, and Connections
+- existing widget sessions, messages, leads, analytics, and Questions/Data Flywheel
 
-## Executive Sequencing Decision
+It must not create a parallel Agent Site product model.
 
-Do not begin with the new sidebar, a visual relabel of `surface = 'widget'`, or a public Agent Site.
+## 2. Implementation Outcome
 
-The safe critical path is:
+When the mandatory phases are complete, an operator can:
 
-> Select wedge/outcome -> validate evidence -> freeze contracts -> verification foundation -> durable agent identity and access -> typed business truth -> provider policy -> immutable publication -> neutral conversation runtime -> governed action ledger -> pilot launcher and shell -> static Agent Site -> read-only concierge -> confirmed selected outcome -> operator controls -> Chat Widget and manual domain -> private-alpha hardening -> staged pilot.
+1. open the existing Website & Widget area
+2. configure the current widget and its attached agent or agents
+3. enable an Agent Site, a Chat Widget, or both
+4. edit approved universal site content and SEO settings
+5. preview and publish safely
+6. use a platform URL
+7. optionally connect a verified custom domain
+8. see conversations, leads, analytics, and knowledge gaps by delivery channel
+9. improve the same agent intelligence for both delivery modes
 
-After the Phase 3 pilot gate, the governed Improve loop and self-service productization become separately gated branches. Search/paid growth follows the self-service/commercial gate. A second wedge follows durable first-wedge retention, economics, safety, and operational evidence.
+The public Agent Site will:
 
-## Why This Order Is Required
+- server-render approved, crawlable business content
+- load the existing Widget V2 chat runtime
+- use the existing public Widget APIs
+- remain useful when chat or JavaScript fails
+- preserve existing embed behavior
 
-The repository audit found several constraints that make a UI-first or all-at-once change unsafe:
+## 3. Number of Phases
 
-- `agents.surface` currently represents `widget`, `automation`, or `assistant`; it does not separate durable agent kind from delivery channel.
-- `CreateAgentModal.tsx` currently performs browser-side writes for agent creation. Client visibility checks are not a secure Product access boundary.
-- the current workspace controls are separate `automations_enabled` and `internal_assistants_enabled` booleans; they cannot represent discovery, creation, management, runtime, public delivery, suspension, downgrade, and restore independently
-- existing `widgets` and `widget_agents` support multi-agent widgets, so existing widgets cannot be silently reclassified as a one-agent Chat Widget channel
-- sessions, messages, leads, summaries, analytics, privacy operations, and unanswered questions are currently coupled to widget-owned records
-- the current runtime may execute external tools directly; any Agent Site consequential-action path requires a structurally separate propose-confirm-execute-reconcile boundary
-- the current connection model is workspace/toolkit scoped and enforces one connection per toolkit, which may not fit multiple future businesses or provider accounts inside one workspace
-- current mutable knowledge chunks are insufficient for immutable publication-scoped retrieval
-- `npm test` currently runs only `tests/security/*.test.ts`; the intended Agent Site, live database/RLS, browser, and accessibility suites do not exist yet
-- many existing security checks are source/contract assertions rather than live HTTP or database authorization tests; they remain valuable regression checks but cannot prove runtime isolation alone
-- `supabase/config.toml` references a seed file that is not currently present, and the production-readiness runbook records migration-history drift that must be reconciled before new schema evidence is trusted
-- the public widget has its own `apps/widget-v2` build and runtime, so shared-runtime changes must prove both Agent Site and existing Widget compatibility
+There are **seven mandatory phases**, numbered Phase 0 through Phase 6:
 
-These are planning facts, not authorization to change the code now.
+0. Confirm and protect the foundation
+1. Shared delivery foundation
+2. SEO-ready Agent Site
+3. Website & Widget management UI
+4. Custom domains
+5. Analytics and governed improvement
+6. Hardening and limited launch
 
-## Strategic Phases and Work Packages
+Phase 7 is optional earned expansion and is not part of the initial implementation commitment.
 
-| Roadmap phase | Ordered work packages | Outcome |
-| --- | --- | --- |
-| Phase 0 | WP-A, WP-B | Validate the idea and freeze the decisions required for safe implementation |
-| Phase 1 | WP-C through WP-I | Build the internal security, truth, publication, runtime, and action foundation |
-| Phase 2 | WP-J through WP-N, WP-O1, WP-O2, WP-P | Complete and harden the private end-to-end concierge MVP |
-| Phase 3 | WP-Q | Run the staged design-partner pilot and commercial gate |
-| Phase 4 | WP-R | Add the governed Improve loop only if pilot evidence supports it |
-| Phase 5 | WP-S, WP-T1 through WP-T4 | Productize the proven concierge workflow for safe self-service |
-| Phase 6 | WP-U | Add controlled search and paid-growth capabilities |
-| Phase 7 | WP-V | Add a separately validated next wedge |
+Do not start a later phase because an earlier phase appears visually complete. Each phase ends only when its verification gate passes.
 
-## Dependency Graph
+## 4. Critical-Path Decision
+
+The implementation order is:
+
+> Characterize the current Widget system -> freeze the shared channel contract -> add a safe site publication model -> build the server-rendered platform URL -> compose Widget V2 into it -> evolve the current Widget UI -> add custom domains -> connect analytics and governed improvement -> harden and release gradually.
+
+This order protects the working embed and standalone runtime while adding one capability at a time.
+
+The implementation does **not** begin with:
+
+- a new sidebar
+- a Chatbase-style global launcher
+- a new agent kind
+- a replacement for Widget V2
+- a full visual site builder
+- custom domains
+- destructive database cleanup
+
+## 5. Architecture Contract
+
+### 5.1 Canonical ownership
+
+The existing Widget deployment remains the owner of both customer-facing delivery modes.
+
+| Concern | Canonical owner |
+| --- | --- |
+| Agent behavior | `agents`, `agent_drafts`, `agent_versions` |
+| Deployment identity | `widgets` |
+| Attached agents and deployed versions | `widget_agents` |
+| Shared appearance | existing Widget fields, extended only when necessary |
+| Agent Site draft/publication | additive widget-owned site records |
+| Chat runtime | `apps/widget-v2` |
+| Public APIs | `src/app/api/public/widgets/[widgetPublicKey]/*` |
+| Sessions and messages | `widget_sessions`, `widget_session_messages` |
+| Leads | `widget_leads` |
+| Channel attribution | current session `source`: `hosted` or `embedded` |
+| Knowledge and improvement | existing Knowledge and Questions/Data Flywheel |
+| External capabilities | existing Connections and agent connection selection |
+
+### 5.2 Delivery mapping
+
+- Agent Site uses the current `hosted` source semantics.
+- Chat Widget uses the current `embedded` source semantics.
+- Operator preview uses the current `preview` semantics.
+
+Customer-facing UI may display “Agent Site” instead of “Hosted,” but existing database values should not be renamed merely for presentation.
+
+### 5.3 Runtime split
+
+The main Next.js application owns the server-rendered public document and public routing.
+
+Widget V2 owns the interactive conversation.
+
+The Next.js Agent Site may isolate the Widget V2 client in an iframe or equivalent mounting boundary, but the whole page must not be an iframe-only wrapper. Approved supporting content, metadata, fallback, privacy, and contact content are rendered by Next.js.
+
+### 5.4 Compatibility promise
+
+The following remain valid throughout the project:
+
+- current widget ids
+- current widget public keys
+- existing hosted URLs until an explicit redirect decision
+- existing embed snippets
+- allowed origins
+- current agent/widget relationships
+- current sessions, messages, leads, and analytics history
+- existing preview flow
+- current Widget V2 separate deployment
+- Automation behavior
+
+## 6. Delivery Rules for Every Work Package
+
+Every future implementation work package must:
+
+1. confirm the relevant roadmap decision and current worktree state
+2. add or update characterization tests first
+3. use additive schema changes before application cutover
+4. enforce authorization on the server and database, not only in UI
+5. keep public API responses field-allowlisted
+6. preserve existing Widget V2 contracts
+7. build and test both the Next.js app and `apps/widget-v2` when shared contracts change
+8. deploy dormant or disabled by default
+9. enable only for an explicit internal/test widget first
+10. exercise rollback before widening rollout
+11. update architecture/runbook documentation only after behavior is verified
+
+No work package is complete because a screen renders locally.
+
+## 7. Dependency Graph
 
 ```text
-WP-A -> WP-B -> WP-C -> WP-D -> WP-E -> WP-F -> WP-G -> WP-H -> WP-I
-     -> PHASE 1 GATE
-     -> WP-J -> WP-K -> WP-L -> WP-M -> WP-N
-     -> WP-O1 + WP-O2 -> WP-P
-     -> PHASE 2 GATE
-     -> WP-Q
-     -> PHASE 3 GATE
+Phase 0
+  WP-0A Current-state inventory
+    -> WP-0B Contract decisions
+    -> WP-0C Characterization and release baseline
 
-PHASE 3 GATE -> WP-R
-PHASE 3 GATE -> WP-S -> WP-T1 -> WP-T2 -> WP-T3 -> WP-T4 -> WP-U
+Phase 1
+  WP-1A Channel and launch contract
+    -> WP-1B Shared public runtime compatibility
+    -> WP-1C Internal end-to-end foundation gate
 
-FIRST-WEDGE MATURITY + SEPARATE PHASE 7 ENTRY APPROVAL -> WP-V
+Phase 2
+  WP-2A Widget-owned site schema
+    -> WP-2B Draft/publication services
+    -> WP-2C Server-rendered platform route
+    -> WP-2D Widget V2 site composition
+    -> WP-2E SEO, accessibility, and fallback gate
+
+Phase 3
+  WP-3A Website & Widget information architecture
+    -> WP-3B Agent Site and Content/SEO management
+    -> WP-3C Chat Widget and shared configuration
+    -> WP-3D Preview, publish, and deployment UX
+
+Phase 4
+  WP-4A Domain control-plane contract
+    -> WP-4B Verification, routing, and TLS
+    -> WP-4C Domain UI and operational gate
+
+Phase 5
+  WP-5A Channel-aware analytics
+    -> WP-5B Governed FAQ/public-content promotion
+    -> WP-5C Improvement validation
+
+Phase 6
+  WP-6A Security and privacy hardening
+    -> WP-6B Performance, accessibility, and resilience
+    -> WP-6C Staged limited launch
+
+Phase 7
+  Evidence from Phase 6 -> separately approved expansion packages
 ```
 
-The graph shows the default critical path. A package may be prototyped or prepared in parallel only when it does not write production data, expose traffic, create a second source of truth, or bypass an unmet dependency. Its release gate remains sequential.
+## 8. Phase 0 — Confirm and Protect the Foundation
+
+### Goal
+
+Freeze the correct architecture and prove current behavior before any application or database change.
+
+### WP-0A — Current-State Inventory
 
-## Delivery Contract for Every Code Work Package
+#### Work
+
+Document and verify:
+
+- current `widgets` and `widget_agents` fields and constraints
+- current single-agent and multi-agent widget records
+- current hosted and embedded bootstrap rules
+- current Widget V2 hosted, embedded, and preview URLs
+- current public API request/response contracts
+- current deployment, `deployed_at`, published-version snapshot, and `needsRedeploy` behavior
+- current sessions, source values, messages, leads, analytics summaries, retention, and privacy operations
+- current allowed-origin, CORS, token, rate-limit, and session-lock behavior
+- current Widget V2 and dashboard deployment environments
+- all live custom hostname or reverse-proxy behavior, if any
+
+#### Discarded Phase 1 schema audit
+
+The linked database contains dormant changes from the previous direction. Inventory:
+
+- `agents.kind` and its constraints/triggers
+- workspace product-access columns/functions
+- `agent_channels`
+- `agent_site_assets`
+- `agent_site_drafts`
+- atomic agent creation/import functions
+- automation archive/outbox structures
+
+For each item, record:
+
+- whether current application code reads or writes it
+- whether it changes existing Widget behavior through constraints or triggers
+- whether it can remain dormant safely
+- whether future cleanup is desirable
 
-Starting with WP-C, every package must follow the same delivery loop:
+Do not drop, rewrite, or adopt these structures during WP-0A.
 
-1. Confirm the relevant Phase 0 decision records and acceptance criteria.
-2. Record current behavior with characterization or contract tests.
-3. Add failing tests for the new behavior and negative security cases.
-4. Apply additive schema/types before callers; use separate migrations for separable concerns.
-5. Implement the server-owned domain service and authorization boundary.
-6. Add APIs or server actions, then UI; the UI must consume rather than invent policy.
-7. Verify locally and in a production-like environment with retained evidence.
-8. Deploy dormant or denied by default.
-9. Enable for the smallest explicit workspace/site cohort and observe the declared soak window.
-10. Exercise rollback/kill behavior before widening access.
-11. Update architecture, runbook, and user-facing documentation only after verified behavior matches reality.
+#### Repository focus
 
-No package is done because the happy path works. It is done only when its exit gate, rollback path, compatibility evidence, and documentation are complete.
+- `supabase/migrations/`
+- current linked Supabase schema and advisors
+- `src/lib/types/`
+- `src/lib/widgets/`
+- `src/app/api/widgets/`
+- `src/app/api/public/widgets/`
+- `src/components/widgets/`
+- `apps/widget-v2/`
+- analytics, privacy, and Flywheel services
 
-### Change-unit rules
+#### Exit gate
 
-- A work package is a release/evidence boundary, not necessarily one pull request.
-- Split large packages into reviewable changes in this order where applicable: characterization tests, schema expansion, backfill/validation, server domain service, API, UI, dormant deployment, controlled activation.
-- Do not combine unrelated work packages in one pull request merely to reduce the number of releases.
-- Schema expansion and legacy contraction must be different releases with an observation window between them.
-- A UI pull request may land dormant before its package gate, but it may not expose an incomplete or unauthorized path.
-- Update package status and attach evidence in the decision log; do not infer completion from merged branches.
+- schema history is synchronized
+- no unknown production-only table/constraint affects the Widget plan
+- current widget count, source distribution, and agent cardinality are understood
+- no destructive migration is required to start
+
+### WP-0B — Contract Decisions
 
-## Phase 0: Validate and Freeze
+#### Decisions to freeze
 
-### WP-A — Discovery Evidence
+1. exact platform URL shape; recommended default is `/s/[slug]`
+2. global slug uniqueness or public-key/slug lookup policy
+3. compatibility behavior for the old hosted Widget V2 URL
+4. Agent Site lifecycle values
+5. draft versus publication boundary
+6. exact fields and maximum counts for universal supporting sections
+7. site launch/bootstrap token and parent-origin contract
+8. whether Widget V2 adds a `site` UI mode that maps to existing `hosted` persistence
+9. publication cache and invalidation behavior
+10. canonical behavior when a custom domain becomes active
+11. chosen hosting/domain provider and its API contract
+12. minimum permissions for edit, preview, publish, unpublish, rollback, and domain management
+13. site/site-chat fallback when Widget V2, the model, or the database is unavailable
+14. compatibility deployment order between the Next.js app and Widget V2
 
-**Outcome:** Select a credible first wedge/outcome and determine whether its agent-first journey deserves production investment.
+#### Fixed constraints
 
-**Depends on:** Nothing.
+- no new required agent type
+- widget-centered ownership
+- existing session source values retained
+- no automatic content publication
+- no public draft reads
+- no full page builder
+- no Automation or global-sidebar redesign in this work
 
-**Deliverables:**
+#### Exit gate
 
-- a documented candidate-wedge scorecard and selected provisional wedge/outcome
-- 5-10 selected-wedge operator interviews or observations
-- at least 30 moderated visitor tasks across the pre-registered comparison experiences
-- provider shortlist and sandbox/controlled-account feasibility evidence
-- tested initial package, price hypothesis, support model, and five named design partners plus backups
-- recorded task outcomes, assistance, time, preference, safety failures, and operator objections
+Every decision has:
 
-**Out of scope:** Production schema, routes, migrations, live customer data, or real consequential provider actions.
+- chosen behavior
+- rejected alternatives
+- security/privacy impact
+- rollback behavior
+- testable acceptance criteria
 
-**Exit gate:** V01-V02 and the parent Phase 0 discovery criteria pass, or the team records a stop, narrow, or redesign decision. Thresholds may not be changed after results are reviewed.
+### WP-0C — Characterization and Release Baseline
 
-**Rollback:** Not applicable; prototypes and research artifacts only.
+#### Required baseline tests
 
-### WP-B — Decision and Contract Freeze
+- hosted bootstrap success/disabled behavior
+- embedded exact-origin success/denial
+- preview token success/expiry
+- Widget V2 hosted desktop and mobile behavior
+- loader-based embed behavior
+- token refresh
+- session turn conflict returns `409 SESSION_BUSY`
+- rate-limit responses
+- deployed agent-version behavior
+- draft preview does not alter live runtime
+- session/message/lead persistence
+- source is correctly `hosted`, `embedded`, or `preview`
+- analytics exclude preview
+- Questions capture excludes preview
+- existing public keys and embed snippets remain stable
 
-**Outcome:** Remove ambiguity that would otherwise force destructive redesign during implementation.
+#### Build baseline
 
-**Depends on:** WP-A.
+- main TypeScript/build verification
+- existing security tests
+- Widget V2 build
+- a minimal hosted and embedded browser smoke test
 
-**Deliverables:**
+Existing unrelated lint or dependency findings must be recorded separately rather than silently treated as caused by Agent Site.
 
-- approved shared-Builder invariant, agent-kind/channel cardinality, and legacy-widget coexistence decision
-- selected-agent route model, launcher/shell prototype, Website Agent page model, Automation compatibility promise, Internal Assistant deferral, and one-job-per-page information architecture
-- Product access precedence and lifecycle state machine covering `discover`, `create`, `view`, `edit`, `publish`, `execute`, `deliver_publicly`, `suspend`, `restore`, and downgrade behavior
-- industry-neutral business core plus selected-wedge typed truth, provenance, publication, URL/domain, and immutable knowledge-revision contracts
-- selected provider contract, capability allowlist, availability semantics, idempotency/status/webhook behavior, and hosted-link fallback
-- provider-connection cardinality and ownership decision for multiple future businesses/accounts inside a workspace, including how it coexists with the current one-connection-per-toolkit rule
-- durable outbox-consumer platform decision covering scheduler, leases/heartbeat, concurrency, retry/dead-letter policy, deployment owner, monitoring, and recovery
-- action, identity, exact-confirmation, reconciliation, unresolved-state, and human-review contracts
-- qualified domain-reviewer recommendation, eligibility, safety, escalation, and human-only rules plus evaluation set
-- privacy data map, retention/export/deletion rules, consent boundary, threat model, abuse budgets, SLOs, event dictionary, pilot metrics, and kill criteria
-- explicit mapping for every item under “Must be decided in Phase 0” in the parent roadmap, including owner, evidence, consequence, and reversal trigger
+#### Phase 0 gate
 
-**Out of scope:** Production implementation.
+No Phase 1 implementation begins until WP-0A through WP-0C pass and the two roadmap documents are approved.
 
-**Exit gate:** Every Phase 0 decision has written approval from its accountable owner; unresolved provider semantics narrow the selected outcome instead of being assumed away.
+## 9. Phase 1 — Shared Delivery Foundation
 
-**Rollback:** Revise the decision records before WP-C. Once implementation begins, a changed contract requires impact analysis and a revised plan rather than an informal deviation.
+### Goal
 
-### Phase 0 Release Gate
+Create the smallest shared contract that lets an existing widget be launched safely as an Agent Site without changing the agent model or breaking embedded delivery.
 
-WP-C may begin only after WP-A and WP-B are complete **and** the complete parent Phase 0 gate passes. That aggregate gate includes the pre-registered validation result, provider feasibility, launcher/visitor comprehension, security/privacy review, credible price/cost hypothesis, and committed design partners. A completed architecture decision list without the required market, provider, safety, and partner evidence is not permission to begin production changes.
+### WP-1A — Channel and Launch Contract
 
-## Phase 1: Secure Internal Foundation
+#### Work
 
-No anonymous public traffic or real customer consequential action is permitted during this phase. Every new capability defaults off/denied.
+- define server types that present `hosted` as Agent Site and `embedded` as Chat Widget
+- add an internal delivery-mode resolver owned by the Widget domain
+- define the Agent Site launch URL payload
+- define a short-lived, audience-bound site launch/bootstrap token if required by the Phase 0 contract
+- bind launch context to widget public key, source, parent/canonical origin, expiry, and preview/public state
+- reject arbitrary origin, widget key, source, or parent-domain substitution
+- keep stored `widget_sessions.source` values unchanged
+- define client-safe error codes for disabled site, unpublished content, invalid launch, invalid domain, and incompatible runtime
 
-### WP-C — Verification and Release Foundation
+#### Likely repository areas
 
-**Outcome:** Create the evidence system needed to make later architectural changes safely.
+- `src/lib/widgets/server-types.ts`
+- `src/lib/widgets/tokens.ts`
+- `src/lib/widgets/cors-origin.ts`
+- `src/lib/widgets/runtime-config.ts`
+- `src/app/api/public/widgets/[widgetPublicKey]/bootstrap/route.ts`
+- shared public Widget API validation
 
-**Depends on:** The complete Phase 0 release gate.
+#### Out of scope
 
-**Deliverables:**
+- new public page
+- new site tables
+- dashboard redesign
+- custom domains
 
-- reconcile linked Supabase migration history before generating a new migration
-- make local database startup deterministic by adding the approved seed or disabling the missing-seed reference intentionally
-- add explicit scripts for type checking, Agent Site unit/contract tests, live database/RLS tests, browser E2E, and accessibility
-- define the execution ladder: fast lint/type/unit/contract/secret/dependency checks on pull requests; isolated local-Supabase migration/RLS tests and browser journeys in CI; provider-fault, upgrade, performance, restore, and manual evidence in staging/release review
-- wire those suites into CI with named environments, non-production credentials, deterministic fixtures, retained failure artifacts, frequencies, and required checks; pull-request CI must never call a real provider or mutate linked production Supabase
-- add two-workspace, multi-role fixtures and a fault-injecting fake provider
-- prove the selected durable outbox consumer can schedule, lease, heartbeat, retry, dead-letter, resume, and expose health without relying on request-lifetime `after()` work
-- capture golden regression journeys for the current agent library/builder, Widget embed/hosted/preview, automation entitlement/execution, auth, billing, privacy, analytics, leads, and Questions/Flywheel behavior
-- define dormant rollout controls, deny-only kill switches, evidence ownership, and release checklist templates
+#### Exit gate
 
-**Repository focus:** `package.json`, `.github/workflows/ci.yml`, `supabase/config.toml`, `tests/security/`, new `tests/agent-sites/`, database integration tests, browser tests, and test fixtures.
+- hosted and embedded requests remain distinguishable
+- a launch token cannot be replayed for another widget or origin
+- embedded origins behave exactly as before
+- no new database source value is required
 
-**Out of scope:** User-visible product behavior or new production data models.
+#### Rollback
 
-**Exit gate:** A database can be replayed from zero and upgraded from the representative prior release; existing suites and golden journeys pass; the new suites demonstrably execute in their declared environments; dependency/secret checks and evidence retention are active; the worker test harness survives lease expiry and restart.
+Keep the old hosted/bootstrap path available. Disable the new site-launch contract without changing widget data.
 
-**Rollback:** Keep new checks non-destructive. A flaky or unavailable environment may block the package, but the check may not be silently removed or marked passing.
+### WP-1B — Shared Public Runtime Compatibility
 
-### WP-D — Agent Identity, Product Access, and Lifecycle
+#### Work
 
-**Outcome:** Establish the durable Website Agent model before any new navigation or public channel is built around it.
+- add a dedicated Agent Site presentation/mount mode to Widget V2 only if WP-0B requires it
+- keep the same `Widget` component, API helpers, session hook, streaming, upload, and completion paths
+- preserve hosted and embedded visual modes
+- add explicit runtime-version compatibility handling
+- make parent-page messaging exact-origin and schema-validated
+- define Widget V2 unavailable/loading/error behavior for the future Next.js shell
+- retain the current standalone hosted URL during compatibility rollout
 
-**Depends on:** WP-C.
+#### Likely repository areas
 
-**Deliverables:**
+- `apps/widget-v2/src/main.tsx`
+- `apps/widget-v2/src/Widget.tsx`
+- `apps/widget-v2/src/types.ts`
+- `apps/widget-v2/src/lib/api.ts`
+- `apps/widget-v2/src/lib/origin.ts`
+- `apps/widget-v2/src/lib/postmessage.ts`
+- `apps/widget-v2/public/loader.js`
+- `apps/widget-v2/README.md`
 
-- inventory current agents, surfaces, widgets, zero/one/multi-agent widget mappings, public keys, active histories, and embed origins
-- inventory every type-dependent contract before schema work, including agent-library template surface, surface checks, insert/update RLS, private agent-edit/identity guards, imports, builder bootstrap, automation execution, webhooks, plan-limit triggers, and dashboard/report filters
-- preserve the existing Agent Builder and supported Connections as shared core capabilities; Website Agent pages wrap them, Automation retains its existing behavior, and Internal Assistant remains compatible but deferred/hidden unless explicitly enabled
-- add the Phase 0-approved canonical immutable agent-kind representation while retaining `agents.surface` as a compatibility field
-- freeze and enforce the channel taxonomy, cardinality, access, and lifecycle contracts without yet creating Website Agent channel records or converting legacy widgets
-- add normalized workspace Product access for distinct `discover`, `create`, `view`, `edit`, `publish`, `execute`, `deliver_publicly`, `suspend`, and `restore` operations
-- define one authoritative source and fail-closed precedence for every migration stage between the new Product access records, current workspace booleans, subscription/integration entitlements, plan limits, roles, lifecycle, and kill switches; mismatches create an owned alert
-- implement one server-owned effective-access resolver with stable allow/deny reasons
-- enforce access in server actions/routes, workers, webhooks, database policy/constraints where appropriate, and audited suspend/restore operations
-- replace browser-owned multi-row agent creation with one validated, authorized, idempotent database transaction/RPC for agent, draft, Product access, and plan-limit checks before Website Agent creation is enabled; moving two independent inserts into a Route Handler is not atomic
-- make compatibility writes to legacy booleans and new Product access state one transactional/idempotent mutation with drift reconciliation, never sequential best-effort application writes
-- add immutable-kind and cross-workspace database backstops
-- backfill only deterministic kinds; leave ambiguous legacy widget agents on an explicit compatibility path
+#### Exit gate
 
-**Repository focus:** `src/lib/types/enums.ts`, `src/lib/types/agent.ts`, `src/lib/types/workspace.ts`, `src/lib/agents/`, `src/lib/assistants/feature-flags.ts`, `src/lib/app/bootstrap.ts`, `src/lib/plan-limits.ts`, `src/lib/widget-limits.ts`, `src/lib/automation/executor.ts`, `src/app/actions/agents.ts`, `src/components/modals/CreateAgentModal.tsx`, agent/library/import/clone/runtime/admin/webhook paths, dashboard filtering, `workspace_subscriptions.integrations_enabled`, relevant surface checks/RLS/private helpers/plan-limit triggers, and additive Supabase migrations.
+- Widget V2 runs in old hosted mode
+- Widget V2 runs through the new site mount contract
+- embedded loader behavior remains unchanged
+- mobile and desktop smoke tests pass
+- old Next.js plus new Widget V2 and new Next.js plus old Widget V2 fail safely during staged deployment
 
-**Out of scope:** Launcher redesign, public Website Agent creation, or legacy-widget conversion.
+#### Rollback
 
-**Exit gate:** The WP-D identity/access portion of V05 passes. Guessed ids, type-mismatched routes, direct Data API writes, disabled-kind creation, import/clone bypasses, stale membership, current create/view/edit/suspend/restore races, and contract-level deny tests for every future operation fail safely. Disagreement between legacy/new access state cannot broaden access. Restore preserves data but never automatically resumes runtime, delivery, a provider connection, or publication. Existing agents and widgets retain their behavior and identifiers. Each later caller must add its own race test when it becomes real.
+Redeploy the previous Widget V2 bundle and keep the Next.js feature disabled.
 
-**Rollback:** Keep old readers compatible, keep new behavior behind explicit workspace controls, and reverse the resolver/cutover flag. Do not destructively down-migrate identity or audit data.
+### WP-1C — Internal End-to-End Foundation Gate
 
-### WP-E — Typed Business Truth and Agent Site Identity
+#### Work
 
-**Outcome:** Create the tenant-safe industry-neutral business core and Phase 0-selected wedge data layer in a dark, internal-only state.
+- add an internal-only test route or harness using an existing test widget
+- prove Next.js can create the approved launch context
+- prove Widget V2 loads with the correct widget and source
+- prove chat persists to existing tables
+- prove analytics still sees hosted sessions
+- run cross-tenant, guessed-key, expired-token, origin-spoof, and version-mismatch tests
 
-**Depends on:** WP-D.
+#### Phase 1 gate
 
-**Deliverables:**
+- no new agent/site identity is required
+- existing Widget V2 hosted and embedded journeys pass
+- the new site launch path works internally
+- no cross-tenant or cross-widget context is possible
+- both deployables have tested rollback
 
-- typed business identity/publication core plus only the selected wedge's approved offers, people/resources, policies, proof/reviews, provenance, rights, and freshness state
-- Website Agent to business/site relationships with workspace-integrity constraints
-- concrete Website Agent channel records, Agent Site base record, section configuration, and domain reservation/verification state
-- server-only validation and authorization services plus authenticated draft APIs
-- RLS, explicit grants, indexes, composite tenant constraints, lifecycle behavior, and audit events
+## 10. Phase 2 — SEO-Ready Agent Site
 
-**Repository focus:** additive Supabase migrations; new `src/lib/agent-sites/`; new authenticated `src/app/api/agent-sites/`; shared types and validation.
+### Goal
 
-**Out of scope:** Public rendering, automatic imports, publication activation, provider mutations, or customer traffic.
+Publish a real server-rendered Agent Site at a platform URL, using approved content and the shared Widget V2 runtime.
 
-**Exit gate:** Typed validation, owner/admin/member/removed/other-workspace role tests, direct Data API tests, cross-workspace constraint tests, deletion/lifecycle behavior, and database advisor review pass.
+### WP-2A — Widget-Owned Site Schema
 
-**Rollback:** Disable the internal APIs and retain the additive dark tables. Do not drop data to roll back application behavior.
+#### Recommended additive schema
 
-### WP-F — Provider Binding and Versioned Action Policy
+Create the Phase 0-approved equivalent of:
 
-**Outcome:** Make provider and action authority deterministic before any live provider-backed consequential action is exposed.
+#### `widget_site_settings`
 
-**Depends on:** WP-E and the Phase 0 provider decision.
+- `widget_id`
+- workspace integrity key
+- site enabled/lifecycle state
+- unique platform slug
+- draft title and description
+- approved contact/business identity fields
+- typed section configuration
+- index preference
+- social image reference
+- allowlisted layout variant
+- active publication id
+- created/updated actor and timestamps
 
-**Deliverables:**
+#### `widget_site_publications`
 
-- explicit business/site provider bindings and connected-account ownership checks
-- additive connection-cardinality compatibility for the current workspace/toolkit connection model and the approved future business/provider-account model; no implicit “first connection” resolution
-- provider adapter contract with capability discovery, precondition/status, execute, webhook, evidence, and reconciliation semantics for the selected outcome
-- allowlisted accounts, resources/records, destinations, and permitted operations required by the selected outcome
-- immutable/versioned action policies covering identity, proposal, confirmation, limits, provider capability, and human-review rules
-- permission capabilities and deny-only runtime envelope that the model cannot broaden
+- publication id
+- widget/workspace identity
+- schema version
+- immutable public JSON projection
+- relevant attached agent-version manifest
+- content hash
+- lifecycle
+- created/published/retired actor and timestamps
 
-**Out of scope:** Production provider mutation or real visitor consequential action.
+Domain records may be created in Phase 4 unless the chosen hosting provider requires an earlier reservation table.
 
-**Repository focus:** connection and agent-connection schema; `src/lib/connections.ts`; `src/lib/composio.ts`; `src/lib/cal.ts`; `src/lib/google-calendar.ts`; connection APIs; builder connection resolution; provider webhooks; and new provider-binding/action-policy services.
+#### Database requirements
 
-**Exit gate:** Browser/model input cannot select arbitrary accounts, resources, records, destinations, policy versions, or actions. Revoked/stale bindings fail closed, and the fake/sandbox adapter satisfies the selected-outcome contract.
+- additive migrations only
+- RLS on every exposed table
+- explicit grants
+- composite widget/workspace integrity
+- safe uniqueness for active slugs
+- indexes for public resolution and workspace management
+- no anonymous direct draft access
+- publication rows append-only after activation
+- no dependency on `agent_site_drafts` or `agent_channels`
 
-**Rollback:** No live runtime is enabled. Retire test policies while retaining their history and audit references.
+#### Likely repository areas
 
-### WP-G — Immutable Publication, Retrieval, and Artifacts
+- new ordered Supabase migrations
+- `src/lib/types/widget.ts` or the current Widget type module
+- generated/manual database types used by the application
 
-**Outcome:** Prove that draft truth and live truth cannot mix.
+#### Exit gate
 
-**Depends on:** WP-E and WP-F.
+- same-workspace authorized CRUD passes
+- other-workspace, removed-member, and anonymous draft access fails
+- cross-workspace widget references fail at database level
+- public resolution returns only active publication data
+- migration upgrade and fresh replay pass
 
-**Deliverables:**
+#### Rollback
 
-- append-only source/chunk or equivalent knowledge revisions
-- immutable publications, source/policy manifests, content hashes, projected sections/search content, artifacts, and publication events
-- publication validation and atomic activation
-- nullable active-publication reference added only after publication records exist, avoiding circular migration dependencies
-- publication-scoped retrieval plus the immutable runtime-context contract that WP-H will bind to sessions
-- content-addressed last-known-good artifact plus conditional rollback that rechecks current rights, deletion, safety, provider, and policy conditions
-- cache keys that include tenant, site, channel, publication, locale, and relevant runtime version
+Keep tables dark and disable application callers. Do not drop publication history to roll back behavior.
 
-**Out of scope:** Anonymous routes or chat.
+### WP-2B — Draft and Publication Services
 
-**Exit gate:** V04 and the publication/retrieval portion of V03 pass. Draft edits do not alter active content or immutable retrieval inputs; Product access changes racing publication fail closed; an injected publication/cache failure leaves the prior version active; unsafe rollback is blocked; backup/restore preserves publications, pointers, domains, tombstones, and audit history. The complete pinned-session V03 scenario is required after WP-H and again at the aggregate Phase 1 gate.
+#### Work
 
-**Rollback:** Revalidate and move the active pointer to a known-safe publication. Never mutate or delete publication history as an application rollback.
+- create server-only loaders and validators for site settings
+- create authenticated draft update operations
+- create preview projection
+- create publication validation
+- create immutable publication record
+- activate publication atomically
+- add unpublish and validated rollback
+- build a deliberately public field allowlist
+- derive content hash and cache identity
+- retain previous publication on failure
+- audit publish, rollback, suspend, and validation failure
 
-### WP-H — Neutral Customer Persistence and Proposal-Only Runtime
+#### Authorization
 
-**Outcome:** Create a surface-neutral runtime without turning Agent Sites into hidden widgets.
+- view: current workspace member with Widget access
+- edit: current member allowed to edit the widget
+- publish/rollback/domain: owner/admin initially unless Phase 0 approves another role
+- all authorization rechecked server-side immediately before mutation
 
-**Depends on:** WP-D and WP-G.
+#### Likely repository areas
 
-**Deliverables:**
+- new `src/lib/widgets/site/`
+- new authenticated routes under `src/app/api/widgets/[id]/site/`
+- existing audit helpers
+- Widget loader and workspace authorization helpers
 
-- surface-neutral sessions, messages, contacts/leads, summaries, channel attribution, retention state, and publication/policy/runtime pinning
-- capped session bootstrap and scoped public-token contract
-- versioned notice/consent state, timestamps, withdrawal, permitted measurement state, and a no-consent service path associated with the correct visitor/session/channel scope
-- minimum retention, lookup, export, correction, deletion, and legal/incident-hold services for neutral customer data before any real identity is collected; existing legacy privacy behavior must retain parity
-- transport-neutral orchestration extracted from the current widget path rather than copied
-- publication-scoped retrieval, redacted events, and structurally proposal-only behavior for consequential requests
-- surface-neutral rate limiting, trusted-client-IP handling, message/usage accounting, lead/contact validation, billing attribution, and abuse budgets rather than reuse of widget-specific identifiers
-- compatibility repositories that let analytics, Customers, Improve, privacy, and admin reporting read the legacy and neutral stores intentionally
-- widget regression adapters/tests; existing widgets remain on their proven store until an opt-in migration is justified
+#### Exit gate
 
-**Repository focus:** new `src/lib/agent-sites/runtime/`; `src/lib/runtime/agent-chat.ts`; current widget chat routes; `src/lib/rate-limit.ts`; `src/lib/message-usage.ts`; `src/lib/trusted-client-ip.ts`; public validation/lead helpers; `src/lib/dashboard/analytics.ts`; `src/lib/flywheel/server.ts`; `src/lib/privacy.ts`; `src/lib/leads/conversation-summary.ts`; `src/lib/admin/queries.ts`; additive neutral persistence migrations.
+- draft changes cannot affect the active public projection
+- repeated publish request is idempotent
+- invalid or partial publication leaves the previous version live
+- rollback restores a valid prior projection
+- a deleted/suspended widget cannot be published
 
-**Out of scope:** Consequential provider execution, destructive session migration, or blind dual writes.
+### WP-2C — Server-Rendered Platform Route
 
-**Exit gate:** Agent Site fixtures operate without `widget_id`; every session is pinned and isolated; the complete V03 session-pin scenario passes; Product access changes racing session bootstrap/conversation fail closed; consent/withdrawal, quotas, usage, contacts, and privacy operations stay scoped; a neutral-data export/delete/retention test passes before real identities; proposal-only paths cannot fall through to direct tools; existing Widget build, runtime, security, histories, analytics, and privacy regression tests remain green.
+#### Work
 
-**Rollback:** Enable only for explicit test workspaces. Route Agent Site traffic off and leave existing Widget storage/runtime untouched. Avoid dual provider execution and unverified dual writes.
+- add the Phase 0-approved public route, recommended `src/app/(public-sites)/s/[slug]/page.tsx`
+- resolve only an active widget-owned site publication
+- render approved identity, supporting sections, privacy, contact, and chat region
+- return correct `404`, unpublished, suspended, and gone behavior
+- generate metadata from the publication
+- add canonical URL handling
+- add robots behavior
+- add sitemap generation
+- add safe JSON-LD
+- add no-JavaScript and chat-failure fallback
+- keep visitor-specific API data out of shared page caches
 
-### WP-I — Governed Action Ledger, Outbox, and Reconciliation
+#### Supporting components
 
-**Outcome:** Make the Phase 0-selected consequential action durable and truthful before its customer UI exists.
+Create a small universal component set under a widget-owned public-site namespace, for example:
 
-**Depends on:** WP-F and WP-H.
+- site shell
+- identity header
+- chat mount
+- services/capabilities section
+- FAQ section
+- About section
+- proof section
+- contact section
+- policy/footer links
+- unavailable fallback
 
-**Deliverables:**
+The exact directory name is frozen during WP-0B. Avoid a broad `agent-sites` domain that implies parallel ownership.
 
-- immutable proposals and material-change rules
-- exact visitor-confirmation binding
-- the canonical action state machine: `proposed -> awaiting_confirmation -> confirmed -> queued -> executing`; `executing -> succeeded | failed | unknown`; `unknown -> reconciling -> succeeded | failed | manual_review_required`; `manual_review_required -> succeeded | failed | unresolved`; plus `expired`, `cancelled_before_execution`, and `rejected_by_policy` before provider commitment
-- stable idempotency identity, execution attempts, atomic outbox insertion, worker claims, receipts, audits, and redacted events
-- the WP-B/WP-C-approved durable consumer with bounded leases, heartbeat, retry/dead-letter behavior, deployment ownership, health signals, and mixed-version job compatibility
-- fake/sandbox provider execution first, followed by verified status and webhook reconciliation
-- canonical states remain durable and auditable; simpler visitor/operator labels are projections and never replace ledger state
-- legal/safety and incident deny-only controls plus action kill switches at global, provider, workspace, and site scope and operational reconciliation queues
+#### Likely repository areas
 
-**Out of scope:** Real visitor provider mutations or model-controlled authorization.
+- `src/app/(public-sites)/`
+- `src/components/widgets/site/`
+- `src/lib/widgets/site/`
+- `src/app/sitemap.ts` or the approved sitemap route
+- `src/lib/security-headers.ts`
+- `middleware.ts` or `src/lib/supabase/proxy.ts` only where narrowly required
+- `next.config.ts`
 
-**Exit gate:** V06 passes. Product access changes racing confirmation/queue/execution fail closed without losing reconciliation; crash and concurrency tests at every provider boundary, duplicate clicks/retries/webhooks, out-of-order events, selected-outcome conflict races, revoked connections, worker restarts, lease expiry, dead-letter recovery, and mixed old/new worker-job versions converge on one local action identity without false success or unsafe retry.
+#### Exit gate
 
-**Rollback:** Disable new execution while continuing to reconcile queued/in-flight work. Never discard or blindly retry an ambiguous external effect.
+- useful HTML exists before client hydration
+- drafts and previews are `noindex`
+- metadata and JSON-LD match visible content
+- no visitor-specific data enters the HTML or shared cache
+- invalid slugs and cross-workspace ids disclose nothing
+- JavaScript-off test still exposes approved useful content and contact
 
-### Phase 1 Release Gate
+#### Rollback
 
-WP-C through WP-I must all pass the parent Phase 1 gate before any anonymous public traffic. This includes the complete V05 resolver/contract and all then-existing internal publication, conversation, and execution callers; real public-delivery race coverage repeats when WP-K/WP-O1 add those callers. Passing an individual package is not permission to expose it.
+Disable public site delivery and retain the current hosted Widget V2 URL according to the compatibility policy.
 
-## Phase 2: Private End-to-End Concierge MVP
+### WP-2D — Widget V2 Site Composition
 
-### WP-J — Pilot Launcher, Website Agent Shell, and Authoring
+#### Work
 
-**Outcome:** Introduce the pilot shell and stable navigation contract for staff and invited pilot operators without prematurely shipping general self-service.
+- mount/load Widget V2 in the public chat region
+- create the site launch context server-side
+- bind it to the published widget and exact platform origin
+- expose loading, expired, disabled, and retry states
+- coordinate theme and approved shared appearance
+- propagate only safe page/referrer/attribution values
+- preserve Widget V2 session behavior, uploads, completion, leads, and streaming
+- provide accessible status announcements outside the isolated chat client where needed
 
-**Depends on:** The complete Phase 1 gate.
+#### Exit gate
 
-**Deliverables:**
+- Agent Site conversation creates an existing hosted widget session
+- Chat Widget conversation creates an existing embedded session
+- sessions do not cross channels or widget ids
+- same-session overlap behavior remains correct
+- leads and uploads remain scoped
+- existing hosted URL and embed snippet still work
 
-- `/agents` as a calm launcher for authorized existing agents with clear empty/loading/error states
-- per-workspace authenticated-root cutover into the launcher for enabled pilot workspaces; non-enabled workspaces retain their current onboarding/default-root and legacy shell behavior
-- safe direct links, agent switching, selected-agent context, and an authoritative type guard in the selected-agent layout
-- Website Agent shell with only working destinations from `Overview`, `Builder`, `My Site`, `Widget`, `Customers`, `Improve`, `Connections`, and `Settings`
-- the existing Builder and supported Connections remain the same shared core pages; the shell adds Website Agent-specific `My Site` and `Widget` operations around them rather than creating a second builder
-- compatibility presentation for existing Widget and Automation agents without changing their durable type or redesigning their workflows; Internal Assistant remains hidden unless enabled and receives no new product work
-- unsaved-change protection and complete request/cache/form state clearing when switching agents
+### WP-2E — SEO, Accessibility, and Fallback Gate
 
-**Repository focus:** `src/app/(app)/agents/page.tsx`, `src/app/(app)/agents/AgentsPageClient.tsx`, `src/app/(app)/agents/[id]/layout.tsx`, `src/app/(app)/layout.tsx`, `src/app/onboarding/`, `src/lib/auth-redirect.ts`, login/callback actions, dashboard/default-root behavior, `src/components/ui/ModalProvider.tsx`, `src/components/layout/AppShell.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/app/AppContext.tsx`, `src/components/agents/AgentViewTabs.tsx`, new launcher/shell/sidebar components, `src/lib/agents/builder-bootstrap.ts`, and localization.
+#### Required checks
 
-**Out of scope:** Open self-service type creation, billing, automated entitlement administration, forced legacy migration, or nonfunctional placeholder navigation.
+- metadata and canonical tests
+- robots and sitemap tests
+- JSON-LD validation
+- keyboard navigation
+- screen-reader labels/status
+- focus behavior
+- reduced motion
+- 200% and 400% zoom
+- mobile viewport
+- slow Widget V2 load
+- Widget V2 unavailable
+- model/API unavailable
+- JavaScript disabled
+- long content and both supported application languages
+- noindex preview/unpublished/suspended behavior
+- basic Core Web Vitals budgets
 
-**Exit gate:** Direct-link, stale-role, cross-tenant, kind mismatch, agent switching, unsaved state, keyboard, screen-reader, responsive, and empty/error state tests pass. Builder/connection regression tests prove existing Agent and Automation work remains functional. `My Site` and `Widget` appear only for Website Agents; Internal Assistant remains deferred. Hiding a destination never substitutes for server authorization.
+#### Phase 2 gate
 
-**Rollback:** Enable per workspace behind the server-owned shell control. Preserve the current global shell and routes until pilot acceptance.
+The platform-hosted Agent Site is production-like for an internal/private test widget before Phase 3 management UI is exposed.
 
-### WP-K — Static Agent Site Channel
+## 11. Phase 3 — Website & Widget Management UI
 
-**Outcome:** Deliver a useful, trustworthy website before chat or actions.
+### Goal
 
-**Depends on:** WP-G and WP-J.
+Evolve the current Widget pages into a clear management experience for both delivery modes without rebuilding the application shell.
 
-**Deliverables:**
+### WP-3A — Information Architecture
 
-- platform URL and allowlisted public loader
-- server-rendered selected-wedge offers, price guidance where relevant, people/proof, policies, operating/service details, and human contact from the active publication only
-- accessible components, correct publication-derived document language/direction at the root document boundary, canonical metadata, robots, sitemap, structured data, and legal/privacy/contact pages
-- scoped public token/bootstrap boundary, explicit `/s` routing, host validation groundwork, cache isolation, and last-known-good delivery
+#### Work
 
-**Repository focus:** new `src/app/(public-sites)/s/[slug]/`; new `src/components/agent-sites/`; new scoped public APIs; `src/app/layout.tsx`; `src/lib/i18n-server.ts`; `src/lib/security-headers.ts`; `middleware.ts`; `src/lib/supabase/proxy.ts`; `next.config.ts`; and the WP-B-approved hosting/domain control plane.
+- rename the customer-facing area to `Website & Widget` or the final approved label
+- keep `/widgets` routes initially to avoid unnecessary redirects
+- update list cards to show Agent Site, Chat Widget, publication, and sync state
+- define detail navigation with one job per destination
+- keep shared appearance, agents, and behavior instead of duplicating forms
+- add complete loading, empty, validation, error, permission, and limit states
 
-**Out of scope:** Chat, provider writes, automated domains, or drafts in public rendering.
+#### Recommended detail destinations
 
-**Exit gate:** V07 plus applicable V14 and V16 scenarios pass. Product access and lifecycle changes racing public bootstrap/delivery fail closed according to the fallback policy. The site exposes no draft/private/cross-tenant data and remains useful without JavaScript, the model, selected operational provider, analytics, or live database within the approved staleness bound.
+- Overview
+- Agent Site
+- Chat Widget
+- Content & SEO
+- Appearance
+- Agents & Behavior
+- Domain
+- Deployment
 
-**Rollback:** Disable public delivery for the affected site while retaining the approved static/human-contact fallback according to the deny-only policy.
+The first UI release may combine related destinations, but it must not create empty placeholder tabs.
 
-### WP-L — Grounded Read-Only Concierge
+#### Likely repository areas
 
-**Outcome:** Prove safe selected-wedge discovery, recommendation, and escalation guidance before enabling provider mutations.
+- `src/app/(app)/widgets/WidgetsPageClient.tsx`
+- `src/app/(app)/widgets/[id]/page.tsx`
+- `src/components/widgets/builder/WidgetBuilderHeader.tsx`
+- `src/components/widgets/builder/WidgetBuilderContext.tsx`
+- localization dictionaries
+- app sidebar label only; no global shell redesign
 
-**Depends on:** WP-H and WP-K.
+#### Exit gate
 
-**Deliverables:**
+Usability review confirms operators understand:
 
-- scoped bootstrap/chat routes with streaming and non-streaming fallback
-- publication-pinned retrieval, suggested intents, grounded recommendations, uncertainty behavior, domain-approved must-escalate boundaries, and human handoff
-- read-only relevant provider status/data with freshness and source labels
-- versioned notice/consent UX with reject/withdraw behavior and a fully functional no-consent service path; non-essential measurement remains off unless permitted
-- private knowledge-gap capture, limits, abuse controls, cost budgets, redaction, and observable fallback events
+- Agent Site is standalone
+- Chat Widget is embedded
+- both share agents and appearance
+- enabling one does not require disabling the other
+- draft, published, and needs-sync states are different
 
-**Out of scope:** Provider mutation or claims of a completed selected outcome.
+### WP-3B — Agent Site and Content/SEO Management
 
-**Exit gate:** V08, V13, V14, and V16 pass with the qualified domain-evaluation thresholds, including must-escalate recall, conflicting/missing/expired facts, prompt injection, model/stream failure, slow network, and safe human fallback. Existing Widget golden tests stay green.
+#### Work
 
-**Rollback:** Disable conversation for the site; static content and human contact remain available.
+- Agent Site enable/disable control
+- platform URL and copy/open action
+- server-rendered preview
+- title and description fields
+- generic typed section editing
+- safe ordering and enablement
+- social preview
+- index preference with clear explanation
+- publication validation errors linked to fields
+- AI-assisted suggestions only as editable drafts
+- verified-fact/FAQ candidates only through explicit selection
 
-### WP-M — Confirmed Selected-Outcome End-to-End Slice
+#### Constraints
 
-**Outcome:** Complete the first provider-backed customer outcome without false success or duplicate effects.
+- bounded lengths and section counts
+- no arbitrary HTML/JavaScript
+- no automatic publish
+- no raw transcript insertion
+- no niche-specific required fields
 
-**Depends on:** WP-I and WP-L.
+#### Likely repository areas
 
-**Deliverables:**
+- existing Widget builder context or a carefully separated site sub-context
+- new `src/components/widgets/site-management/`
+- authenticated widget-site APIs
+- localization
 
-- persisted contact-verification challenge, provider, hashed/limited secret handling, attempts, expiry, audience binding, replay prevention, rate limits, and verified result at the approved point
-- relevant live-precondition recheck and immutable proposal UI showing every material action argument, expectation/commitment, price where relevant, and policy
-- exact explicit confirmation and material-change re-confirmation
-- separate policy/execution service, provider-backed status/receipt, reconciliation, connection health, abuse limits, and legal/safety plus global/provider/workspace/site action kill switches
-- truthful visitor labels backed by canonical `queued`, `executing`, `unknown`, `reconciling`, `manual_review_required`, `succeeded`, `failed`, and `unresolved` ledger states, plus provider-hosted/human fallback
+#### Exit gate
 
-**Out of scope:** Any consequential action beyond the one selected in Phase 0, marketing, returning-visitor memory, broad multi-location/complex workflows, or unrestricted tools.
+- an operator can prepare a valid universal Agent Site
+- all public text is visible before publish
+- cancelled/failed edits do not change the live site
+- permissions and validation work without relying on hidden buttons
 
-**Exit gate:** V09-V12 and V15 pass. Verification replay/expiry/attempt limits work; refreshes, double-clicks, retries, races, timeouts, webhook replay, and worker restarts cannot duplicate the external effect; every success has the approved system-of-record evidence; ambiguous outcomes remain truthful and owned. WP-M uses synthetic/internal identities only until WP-N's operator/privacy gate and WP-P's private-alpha gate pass.
+### WP-3C — Chat Widget and Shared Configuration
 
-**Rollback:** Turn actions off at site/workspace/provider/global scope, stop new execution, reconcile every in-flight action, and fall back to the provider-hosted flow or human handoff.
+#### Work
 
-### WP-N — Operator Outcomes, Privacy, and Incident Controls
+- preserve embed snippet
+- preserve allowed-origin management
+- clearly display embedded enablement/status
+- preserve shared appearance
+- preserve attached agents and behavior
+- explain which settings are shared and which are channel-specific
+- show existing sessions/history without migration
 
-**Outcome:** Give pilot operators and Agentergroup staff the minimum controls needed to operate real outcomes safely.
+#### Likely repository areas
 
-**Depends on:** WP-M.
+- `src/components/widgets/builder/tabs/AppearanceTab.tsx`
+- `src/components/widgets/builder/tabs/AgentsTab.tsx`
+- `src/components/widgets/builder/tabs/BehaviorTab.tsx`
+- `src/components/widgets/builder/tabs/DeploymentTab.tsx`
+- current Widget APIs
 
-**Deliverables:**
+#### Exit gate
 
-- minimal `Overview` view for connection, publication, action, unresolved, and incident attention
-- minimal `Customers` view for permitted contacts, conversations, proposals, outcomes, receipts, channel attribution, and handoff state
-- action-review and reconciliation ownership without exposing internal credentials or raw sensitive logs
-- privacy lookup/export/correction/deletion, retention enforcement, and legal-hold/incident exceptions across neutral and legacy stores
-- redacted operational dashboards, alerts, budgets, and named escalation paths
+- existing customers can retrieve the same valid snippet
+- existing allowed origins remain unchanged
+- no widget public key rotates
+- appearance changes preview correctly in both modes
+- multi-agent chooser and single-auto behavior remain correct
 
-**Repository focus:** existing dashboard, analytics, leads, privacy, admin, and Questions services/components through compatibility repositories; new Website Agent-scoped operator routes.
+### WP-3D — Preview, Publish, and Deployment UX
 
-**Out of scope:** Governed Improve publishing, automated follow-up, CRM replacement, or generalized analytics redesign.
+#### Work
 
-**Exit gate:** Same/cross-tenant role tests, DSAR/retention drills, redaction tests, unresolved-action ownership, and channel-attribution tests pass. Operators can distinguish proposed, awaiting confirmation, queued/in progress, succeeded, failed, unknown/reconciling, manual review required, and unresolved outcomes while support staff can see the underlying canonical ledger state.
+- one overview of draft changes
+- Agent Site preview using draft projection
+- embedded Widget preview
+- clear distinction between save draft, publish/sync, unpublish, and rollback
+- show agent-version drift and site-content drift
+- publish validation summary
+- channel-specific live status
+- deployment compatibility warnings when Widget V2 runtime version is not ready
 
-**Rollback:** Hide the new scoped views through the server control while retaining audit/reconciliation/privacy jobs. Never disable legal or in-flight action obligations merely because the UI rolls back.
+#### Likely repository areas
 
-### WP-O1 — Website Agent Chat Widget Channel
+- existing Widget preview route
+- preview token services
+- deploy/status routes
+- Widget builder header/context
+- new site preview route and components
 
-**Outcome:** Prove that one Website Agent can safely serve an Agent Site and optional embedded Chat Widget without duplicating intelligence.
+#### Phase 3 gate
 
-**Depends on:** WP-L, WP-M, and WP-N.
+- complete operator journey passes on desktop and mobile
+- keyboard and screen-reader behavior passes
+- no existing Widget operation is lost
+- no global launcher/sidebar work is required
 
-**Deliverables:**
+## 12. Phase 4 — Custom Domains
 
-- new Chat Widget channel backed by the Website Agent's approved publication, runtime, and policy
-- channel-specific appearance, origin allowlist, delivery state, sessions, consent context, and attribution
-- preservation of existing multi-agent Widgets as an explicit legacy subsystem
-- independent Agent Site, Chat Widget, and action suspension controls
+### Goal
 
-**Repository focus:** current Widget management and public APIs, `src/app/(app)/widgets/WidgetsPageClient.tsx`, `apps/widget-v2`, and new Website Agent channel services.
+Add safe custom-domain ownership, routing, TLS, canonical, removal, and recovery after the platform URL is stable.
 
-**Out of scope:** Forced legacy conversion, custom-domain work, or removing current Widget keys/history.
+### WP-4A — Domain Control-Plane Contract
 
-**Exit gate:** Cross-channel contract, browser, exact-origin, consent, usage, suspension, and isolation tests pass. Shared truth/runtime is demonstrated without duplicated agent configuration; channels suspend independently; no history, attribution, tenant, or consent state crosses boundaries.
+#### Work
 
-**Rollback:** Disable the new Chat Widget channel independently and leave Agent Sites and legacy Widgets untouched.
+- finalize domain provider adapter
+- define normalized hostname rules
+- define apex and `www` behavior
+- define challenge type and expiry
+- define verification retries and rate limits
+- define routing/TLS states
+- define activation, failure, removal, reassignment, and suspension
+- define platform URL fallback
+- define provider webhook or polling verification
+- define audit and operational alerts
 
-### WP-O2 — Manual Pilot Custom Domain
+#### Recommended domain states
 
-**Outcome:** Prove one manually operated custom domain without coupling DNS/TLS/host-routing risk to the new Chat Widget release.
+`pending_verification -> verified -> provisioning -> active`
 
-**Depends on:** WP-K, WP-M, and WP-N. It does not depend on WP-O1, although the default plan completes WP-O1 first to keep only one new release risk active at a time.
+Failure/terminal alternatives:
 
-**Deliverables:**
+- `verification_failed`
+- `provisioning_failed`
+- `suspended`
+- `removing`
+- `removed`
 
-- one manually operated verified custom-domain path with trusted host normalization and host-first routing
-- canonical ownership, apex/`www` behavior, certificate and verification state, cache invalidation, removal, and reassignment protection
-- independent domain delivery control and deterministic platform-URL fallback
-- hosting/control-plane runbook with named operator, proof of ownership, rollback, and incident steps
+#### Exit gate
 
-**Repository focus:** `middleware.ts`, `src/lib/supabase/proxy.ts`, `src/lib/security-headers.ts`, `src/app/layout.tsx`, `next.config.ts`, Agent Site domain records/services, and the approved hosting/domain control plane.
+The provider sandbox/test domain proves the full lifecycle, including removal and reassignment.
 
-**Out of scope:** Automated self-service domain lifecycle or Chat Widget channel changes.
+### WP-4B — Verification, Routing, and TLS
 
-**Exit gate:** V17 passes. Host and forwarded-host spoofing, inactive/unverified/ambiguous mappings, cross-tenant cache/routing, certificate failure, removal, reassignment, canonical/noindex behavior, and rollback are verified independently of WP-O1.
+#### Schema
 
-**Rollback:** Remove the custom-domain mapping safely, invalidate affected caches, and return to the platform URL without altering Chat Widget or selected-outcome state.
+Add the Phase 0-approved `widget_domains` table with:
 
-### WP-P — Private-Alpha Hardening
+- widget/workspace identity
+- normalized hostname
+- verification challenge and expiry
+- verification status
+- routing/TLS status
+- canonical/redirect preference
+- provider ids
+- activation/removal history
+- actor and audit metadata
 
-**Outcome:** Produce complete release evidence instead of adding more features.
+#### Routing work
 
-**Depends on:** WP-J through WP-N plus both WP-O1 and WP-O2.
+- validate trusted proxy headers for the deployment environment
+- reject arbitrary host and forwarded-host values
+- resolve only verified active domain rows
+- bind hostname to widget and active publication
+- generate absolute URLs from the resolved trusted domain record
+- partition caches by hostname and publication
+- prevent another tenant from claiming active/recently removed ownership without required re-verification
+- support deterministic platform fallback
 
-**Deliverables:**
+#### Likely repository areas
 
-- complete security, RLS/grant, privacy, accessibility, performance, abuse/cost, provider-fault, backup/restore, domain, and outage evidence
-- kill-switch, stale-content, reconciliation, DSAR, incident, and recovery drills
-- production-like evaluation and design-partner acceptance
-- release/rollback runbooks, dashboards, alert ownership, and traffic budgets
+- new domain migration
+- `src/lib/widgets/site/domains/`
+- hosting provider adapter
+- narrow changes to `middleware.ts` and/or `src/lib/supabase/proxy.ts`
+- public site loader
+- security headers and canonical generation
+- scheduled verification/reconciliation route or worker
 
-**Out of scope:** New feature scope.
+#### Exit gate
 
-**Exit gate:** The complete parent Phase 2 gate and V03-V17 pass in a production-like environment. Any duplicate external effect, false success, cross-tenant/private leak, must-escalate miss, or unsafe host mapping blocks launch.
+- host spoofing fails
+- unverified/inactive domain fails
+- valid domain resolves exactly one widget
+- cross-tenant caches cannot mix
+- certificate failure is visible and recoverable
+- platform URL remains correct
+- removal prevents domain takeover and stale serving
 
-**Rollback:** Do not start the live pilot until this package passes. If a finding occurs during hardening, keep the affected capability off while correcting it.
+#### Rollback
 
-## Phase 3: Staged Design-Partner Pilot
+Deactivate the domain mapping and return to the platform URL without changing widget, publication, sessions, or embed delivery.
 
-### WP-Q — Pilot Rollout Rings and Commercial Gate
+### WP-4C — Domain UI and Operations
 
-**Outcome:** Prove value, operator trust, reliability, supportability, and credible economics with real design partners.
+#### Work
 
-**Depends on:** The complete Phase 2 gate.
+- add domain
+- display exact DNS instructions
+- check verification
+- show provisioning/TLS health
+- set canonical preference
+- remove with impact confirmation
+- display platform fallback
+- add operator runbook and alerts
 
-**Rollout rings:**
+#### Phase 4 gate
 
-1. internal production smoke test with synthetic data
-2. one selected-wedge business on the platform URL with invited traffic
-3. one selected-wedge business on a verified custom domain
-4. up to five approved selected-wedge businesses under traffic caps
+At least one internal/test domain completes add, verify, activate, renew/health-check, remove, and recover scenarios before limited customer use.
 
-Each ring requires a predeclared soak window, evidence review, and written go/no-go decision. Rollout assignment is by explicit workspace/site allowlist, never random per request or model turn. A visitor session remains pinned to compatible publication, policy, provider, and runtime versions.
+## 13. Phase 5 — Analytics and Governed Improvement
 
-**Deliverables:** Paid or contractually meaningful pilot, daily early-stage review, operator training, support/cost tracking, outcome reconciliation, safety sampling, failure drills, and prospective metric reporting.
+### Goal
 
-**Out of scope:** Open signup, paid acquisition, a new wedge, or large features invented during the pilot.
+Make Agent Site performance visible and let approved real visitor questions improve both delivery modes and optional public FAQ content.
 
-**Exit gate:** V18 and the parent Phase 3 commercial/safety gate pass. Failures produce stop, narrow, or redesign—not automatic expansion.
+### WP-5A — Channel-Aware Analytics
 
-**Rollback:** Pause cohort expansion immediately on sentinel failure. Disable actions or public delivery only at the necessary scope, continue reconciliation, and preserve safe static information and human contact where permitted.
+#### Work
 
-## Phase 4: Governed Improve Loop
+- display `hosted` as Agent Site
+- display `embedded` as Chat Widget
+- retain raw source values in storage
+- filter conversations and leads by channel
+- show platform versus custom-domain attribution
+- add publication identity to events/sessions only if needed and approved as an additive nullable field
+- define conversion events and denominators
+- exclude preview and bot/internal traffic according to explicit rules
+- keep private transcript/tool content out of analytics properties
 
-### WP-R — Evidence-to-Approved-Truth Workflow
+#### Likely repository areas
 
-**Outcome:** Let real demand improve future answers and, separately, public information without making raw conversations or model output authoritative.
+- `src/lib/dashboard/analytics.ts`
+- `src/lib/dashboard/summary.ts`
+- dashboard conversation summary queries/views
+- analytics UI
+- public Widget event route and allowlisted properties
 
-**Depends on:** The Phase 3 gate plus WP-G and WP-H. It does not depend on self-service.
+#### Exit gate
 
-**Promotion rings:**
+- the same test widget produces correctly attributed hosted and embedded sessions
+- totals reconcile with source data
+- preview is excluded
+- no existing history is rewritten
 
-1. private observation and candidate collection
-2. operator review/edit with provenance and conflict checks
-3. approved fact eligible for new-session agent retrieval
-4. separately approved public-ready fact included through a new publication
+### WP-5B — Governed FAQ and Public-Content Promotion
 
-**Repository focus:** `src/lib/flywheel/server.ts`, `/questions`, neutral conversation references, publication projection, evaluation reports, and the Website Agent `Improve` destination.
+#### Work
 
-**Out of scope:** Automatic prompt, policy, action, or public-truth changes.
+- preserve existing unanswered-question capture
+- preserve operator answer/edit/dismiss behavior
+- allow an approved `public_ready` fact to become a site FAQ candidate
+- require explicit operator selection and editing
+- detect duplicates/conflicts with existing site FAQ
+- require a new site publication
+- record source fact and publication provenance
+- support removal/retirement through a new publication
 
-**Exit gate:** V19 passes. Correction/retirement removes the claim deterministically; raw transcript context, personal data, internal notes, and unapproved output never become public.
+#### Likely repository areas
 
-**Rollback:** Disable candidate use or public-ready publishing and retain the prior safe publication. Preserve private evidence according to approved retention rules.
+- `src/lib/flywheel/server.ts`
+- `/questions`
+- verified-fact APIs
+- widget-site draft/publication services
+- Content & SEO UI
 
-## Phase 5: Self-Service First-Wedge SaaS
+#### Exit gate
 
-Phase 4 and Phase 5 may be prioritized independently after Phase 3 based on the measured bottleneck. Neither gate waives the other.
+- answering a question improves agent knowledge as it does today
+- public FAQ remains unchanged until separately selected and published
+- private transcript/customer data is not copied
+- retirement removes public content from the next publication
 
-### WP-S — Self-Service Launcher and Guided Setup
+### WP-5C — Improvement Validation
 
-**Outcome:** Turn the proven concierge setup into a customer-operated flow without exposing platform internals.
+#### Work
 
-**Depends on:** The Phase 3 gate and WP-J. Phase 4 is optional.
+- measure repeated unanswered-question rate
+- sample owner-approved answers for correctness
+- compare Agent Site and Chat Widget answer behavior using the same agent version
+- verify that public FAQ and structured data match
+- test conflicts, expired facts, duplicate candidates, and deleted source records
 
-**Deliverables:**
+#### Phase 5 gate
 
-- full Agent launcher with `Create agent`, existing-agent cards, switching, limits, and safe direct links
-- intent-led choice: Website Agent is the primary product focus; Automation Agent remains available when entitled; Internal Assistant stays hidden unless explicitly enabled and receives no new scope
-- guided creation consumes the single server-owned atomic creation service and effective-access resolver established in WP-D; it must not introduce a second creation or entitlement path
-- final type-specific shells preserve the shared Builder and Connections; Website Agent uses `Overview`, `Builder`, `My Site`, `Widget`, `Customers`, `Improve`, `Connections`, and `Settings`; Automation retains relevant builder/run pages; Internal Assistant remains compatibility-only
-- selected-wedge onboarding around the shared Builder, reviewed import, safe defaults, scenario preview, launch-readiness scoring, and blocking completeness checks
+The improvement loop is useful, reviewable, reversible, and cannot automatically publish or change permissions.
 
-**Out of scope:** Paid growth, arbitrary themes/code, generalized multi-wedge behavior, or a broad agent marketplace.
+## 14. Phase 6 — Hardening and Limited Launch
 
-**Exit gate:** Representative selected-wedge operators choose the permitted type, use the preserved Builder and supported Connections, understand that `My Site` and `Widget` belong only to Website Agents, complete safe setup, and are blocked from unsafe launch without needing internal surface or deployment terminology. Automation regression tests remain green and Internal Assistant remains deferred. Import tests cover SSRF and DNS rebinding, redirects, private/reserved networks, size/time/content-type limits, malicious instructions, provenance/rights, draft-only status, conflicts, and required operator review.
+### Goal
 
-**Rollback:** Enable by explicit workspace/plan cohort. Disable new self-service creation while preserving all existing agents and concierge operation.
+Prove the complete system is secure, private, accessible, reliable, operable, and commercially useful before broader availability.
 
-### WP-T1 — Roles, Product Access, and Lifecycle UX
+### WP-6A — Security and Privacy Hardening
 
-**Outcome:** Let authorized owners/admins understand and operate access/lifecycle state without exposing database policy concepts.
+#### Required security tests
 
-**Depends on:** WP-S.
+- same-workspace and cross-workspace authorization
+- removed/stale member
+- anonymous and guessed ids/slugs/public keys
+- direct Data API access
+- RLS and grants
+- cross-workspace foreign keys
+- host/forwarded-host spoofing
+- domain reassignment
+- launch-token audience, expiry, replay, and widget binding
+- embedded exact-origin behavior
+- CORS and CSP
+- XSS and unsafe URL/content handling
+- cache separation
+- prompt injection and cross-tenant retrieval
+- upload limits and active-content handling
+- rate-limit and cost-abuse behavior
+- secrets and error redaction
 
-**Deliverables:**
+#### Required privacy tests
 
-- workspace roles/capabilities and audited Agentergroup-admin Product access controls
-- explicit plan downgrade, read-only, runtime suspension, public-delivery suspension, restore, and re-enable UX
+- AI disclosure
+- privacy/contact access without chat
+- essential versus non-essential consent
+- session/lead export and deletion
+- retention
+- no transcript or personal data in HTML, metadata, JSON-LD, sitemap, logs, or analytics
+- public image/testimonial permission records
 
-**Out of scope:** Billing enforcement, automated domains, paid growth, or another wedge.
+#### Exit gate
 
-**Exit gate:** Role and operation-specific `discover/create/view/edit/publish/execute/deliver_publicly/suspend/restore` behavior matches the central resolver and audit log. Disable/restore preserves data and never silently resumes runtime, delivery, provider connection, or publication.
+No unresolved critical/high release issue and no unexplained Supabase security advisor finding for the new schema.
 
-**Rollback:** Disable the self-service controls while retaining staff-operated lifecycle services and current explicit state.
+### WP-6B — Performance, Accessibility, and Resilience
 
-### WP-T2 — Channel, Domain, and Provider Operations
+#### Performance
 
-**Outcome:** Make the proven channels and provider connection safely operable without staff-only infrastructure steps.
+- mobile server response and render budgets
+- minimal public JavaScript before chat
+- lazy/controlled Widget V2 loading without harming first interaction
+- image optimization
+- cache correctness
+- rate and concurrency testing
 
-**Depends on:** WP-T1, WP-O1, and WP-O2.
+#### Accessibility
 
-**Deliverables:**
+- WCAG 2.2 AA target
+- keyboard-only
+- screen-reader
+- visible focus
+- semantic headings
+- contrast
+- 200%/400% zoom
+- reduced motion
+- status/stream announcements
+- non-streaming fallback
 
-- channel manager for Agent Site and optional Chat Widget from shared approved truth/policy
-- automated domain verification, certificate, routing, removal, and reassignment lifecycle
-- provider health/reauthorization, channel health, publication history/rollback, privacy tools, incident notices, and support paths
+#### Resilience
 
-**Out of scope:** Billing enforcement, paid growth, or another wedge.
+- Widget V2 deployment outage
+- public API outage
+- model outage
+- database/cache outage within approved behavior
+- failed publish
+- failed domain verification/TLS
+- domain removal
+- expired launch token
+- plan/message limit
+- connection failure
+- backup/restore
+- previous-publication rollback
+- site-only and widget-only suspension
 
-**Exit gate:** Channel and provider failures, domain takeover/reassignment, certificate failure, rollback, privacy requests, and incident notices pass independent tests and controls. Automated domain/provider recovery never silently republishes or executes.
+#### Exit gate
 
-**Rollback:** Disable domain automation, provider self-service, or either channel control independently while retaining the platform URL, existing publications, and staff-operated recovery.
+All approved service objectives and recovery drills pass in a production-like environment.
 
-### WP-T3 — Billing, Limits, and Downgrade Safety
+### WP-6C — Staged Limited Launch
 
-**Outcome:** Enforce the tested commercial package without deleting data or producing unsafe runtime surprises.
+#### Rollout rings
 
-**Depends on:** WP-T1 and WP-T2.
+1. internal synthetic widget on platform URL
+2. internal real workflow on platform URL
+3. one invited customer on platform URL
+4. one invited customer on verified custom domain
+5. small invite-only cohort
 
-**Deliverables:**
+Each ring requires:
 
-- billing and limits for agents, sites/channels, usage, verified contacts, actions, storage, and support
-- transactional plan-limit enforcement in create/import/duplicate/publish/execute paths
-- explicit trial, grace, read-only, downgrade, failed-payment, credit, and recovery behavior
-- usage/cost reconciliation and customer-visible limit reasons
+- explicit widget/workspace allowlist
+- declared observation period
+- support owner
+- dashboards and alerts
+- rollback rehearsal
+- written go/no-go decision
 
-**Out of scope:** Paid acquisition or a second wedge.
+#### Pilot measures
 
-**Exit gate:** Concurrent limit checks cannot over-create or over-execute; downgrade/billing failures preserve data and approved fallback content; recovery never silently resumes or republishes; invoices, usage, credits, and audit events reconcile.
+- setup time
+- publication success
+- conversation and lead outcomes by channel
+- owner-approved improvement activity
+- repeated-question reduction
+- support minutes
+- model/hosting/support variable cost
+- active retention
+- willingness to continue/pay
 
-**Rollback:** Stop new billing enforcement only through an approved operational override that preserves auditability; keep accounts in an explicit safe state and never delete data to resolve a plan mismatch.
+#### Sentinel failures
 
-### WP-T4 — Limited Availability and Phase 5 Gate
+Immediately pause the affected rollout scope for:
 
-**Outcome:** Prove that the self-service product is supportable, retained, and commercially credible before growth.
+- cross-tenant data exposure
+- private content publication
+- domain routing to the wrong tenant
+- unsupported public claim caused by automatic publication
+- duplicate consequential external action
+- loss of existing embed/public-key behavior
+- unrecoverable publication/domain failure
 
-**Depends on:** WP-T1 through WP-T3.
+#### Phase 6 gate
 
-**Deliverables:**
+The product may move to limited availability only when the technical gates pass and the pilot demonstrates useful customer value at an acceptable support and cost level.
 
-- staff-only -> design-partner owners -> invite-only new selected-wedge businesses -> limited-availability rollout rings
-- full V20 scenario, support runbooks, incident ownership, cohort observation, and rollback drills
-- activation, four-week retained operation, paid conversion/renewal, support burden, contribution margin, and early acquisition evidence
-- selected-wedge buyer go-to-market evidence separate from each business's visitor-acquisition work
+## 15. Phase 7 — Earned Expansion
 
-**Out of scope:** Search/paid growth or another wedge.
+Phase 7 is not a single backlog to implement automatically.
 
-**Exit gate:** V20 and the full Phase 5 gate pass, including activation, four-week retained operation, paid conversion/renewal, support burden, and contribution margin. Re-enable never silently resumes runtime, reconnects a provider, or republishes.
+Each expansion requires its own short proposal, evidence, security review, and gate.
 
-**Rollback:** Pause cohort expansion, creation, runtime, or delivery at the narrowest safe scope. Accounts may be made explicitly read-only without deletion; existing safe public content follows the approved billing/downgrade policy.
+Possible earned expansions:
 
-## Phase 6: Search and Paid Growth
+- additional polished layout variants
+- richer universal section types
+- multilingual site publications
+- deeper Search Console/crawl monitoring
+- consent-aware campaign attribution
+- owner-approved AI drafting assistance
+- more advanced action confirmation and receipts
+- optional global agent launcher/type-specific shell
+- migration or retirement of dormant discarded Phase 1 schema
 
-### WP-U — Controlled Growth Capabilities
+Still prohibited without a separate roadmap revision:
 
-**Outcome:** Acquire qualified outcomes without weakening consent, site quality, or measurement truth.
+- general drag-and-drop page builder
+- arbitrary custom code
+- automatic fact/publication promotion
+- unrestricted provider tools
+- niche-specific hardcoding presented as universal architecture
+- a second parallel chat runtime
 
-**Depends on:** The Phase 5 commercial/self-service gate.
+## 16. Database Migration Protocol
 
-**Deliverables:** Stable useful URL model, crawl/index monitoring, canonical and structured-data audits, validated intent states, consent-aware measurement, first-party attribution, outcome reconciliation, spend controls, and marginal contribution reporting.
+Every schema change follows:
 
-**Out of scope:** Thin programmatic pages, automatic SEO promises, unrestricted ad automation, or sending personal/sensitive conversation data to advertising platforms.
+1. **Reconcile** local and linked migration history.
+2. **Inspect** current production constraints, policies, grants, triggers, functions, and indexes.
+3. **Expand** with nullable/additive tables or columns.
+4. **Secure** with RLS, explicit grants, tenant constraints, and indexes.
+5. **Deploy dormant** with no public caller.
+6. **Backfill only if required**, in bounded idempotent batches.
+7. **Validate** counts, ownership, orphans, and policy behavior.
+8. **Shadow/read internally** before serving public traffic.
+9. **Cut over one caller/cohort** behind a server-owned control.
+10. **Observe** through the declared compatibility window.
+11. **Contract later**, in a separate release, only with zero-use evidence.
 
-**Exit gate:** V21 and the full Phase 6 gate pass. Growth is evaluated on completed qualified outcomes and economics, not conversation starts or clicks alone.
+Rules:
 
-**Rollback:** Stop experiments and spend per site/campaign without affecting core Agent Site, Widget, or selected-outcome service.
+- do not invent migration timestamps
+- do not edit already-applied migrations
+- do not combine schema expansion, destructive cleanup, public activation, and domain activation
+- do not remove dormant Phase 1 schema merely to make the diagram cleaner
+- do not bulk rewrite existing widgets, agents, sessions, or public keys
+- application rollback must remain compatible with additive schema
 
-## Phase 7: Wedge Expansion
-
-### WP-V — Next-Wedge Package
-
-**Outcome:** Add one independently validated next wedge without weakening first-wedge defaults.
-
-**Depends on:** Durable first-wedge retention, economics, incident maturity, support capacity, and the separate parent Phase 7 **entry approval**. Similar UI is not sufficient evidence; V22 remains the implementation exit gate.
-
-**Deliverables:** New ICP/buyer, typed truth, domain-expert safety rules, provider semantics, action/identity/confirmation matrix, privacy/regulatory review, evaluation set, pricing/support/acquisition hypothesis, coexistence plan, and separate rollout controls.
-
-**Out of scope:** Reusing first-wedge policy, provider assumptions, evaluations, or safety defaults without independent evidence.
-
-**Exit gate:** V22 and the complete Phase 7 gate pass.
-
-**Rollback:** Keep the next wedge behind separate policy, evaluation, and rollout boundaries. Disabling it must not alter first-wedge data, defaults, runtime, or delivery.
-
-## Migration and Compatibility Protocol
-
-Every replacement follows this sequence:
-
-1. **Expand:** add nullable columns/tables, RLS, grants, and staged indexes/constraints without changing current behavior. Changes to live tables require approved lock/statement-time budgets, representative-scale testing, non-blocking index strategy, and `NOT VALID`-then-validate constraints where appropriate.
-2. **Backfill:** copy only deterministic records in bounded, idempotent, checkpointed batches with provenance. Capture writes that occur during the backfill through the approved transactional writer or change marker before validation.
-3. **Validate:** compare counts, hashes, orphans, tenant ownership, permissions, and representative outcomes.
-4. **Shadow read:** compute the new result without serving it; compare to the legacy result and alert on drift.
-5. **Dual-compatible write:** use only where necessary, with stable idempotency and reconciliation. Never dual-execute an external provider action.
-6. **Cut over:** switch one caller or explicit cohort at a time behind a server-owned control.
-7. **Observe:** retain a tested mixed-version compatibility matrix across N/N-1 schema, application/API nodes, workers, webhook handlers, provider adapters, publication artifacts, and queued jobs, plus telemetry, rollback ownership, and a declared observation window.
-8. **Contract:** remove legacy readers/writers only after zero-use evidence, DSAR/retention parity, preserved history, and a separate approved release.
-
-Specific compatibility rules:
-
-- keep `agents.surface` until every builder, runtime, import, library, automation, and reporting caller uses the canonical resolver
-- backfill Automation and Internal Assistant only where unambiguous; do not automatically classify legacy widget agents as Website Agents
-- keep current workspace booleans until all callers use the Product access resolver; each rollout stage has one documented authority, and compatibility updates use one transactional/idempotent mutation with fail-closed drift alerts before retirement
-- do not migrate multi-agent widgets automatically
-- preserve widget public keys, embed snippets, origins, sessions, messages, leads, analytics, Questions/Flywheel references, and privacy history
-- do not drop widget-owned customer tables merely because new operator views can read neutral conversations
-- existing Widget storage may remain an explicit legacy subsystem indefinitely if forced migration adds more risk than value
-- create each migration with `supabase migration new <descriptive-name>` after migration-history reconciliation; never invent timestamps
-- never combine expansion, backfill, `NOT NULL` enforcement, cutover, and legacy drop in one migration/deployment
-- never add an immediately validated heavy constraint/index or one-transaction bulk backfill to a live high-volume table without measured lock/query impact and an approved staged alternative
-- external provider calls stay outside short database transactions; the transaction persists intent/outbox state, not the network side effect
-
-## Rollout and Effective-Access Model
-
-Runtime permission is the intersection of separate controls:
-
-1. global rollout ring
-2. commercial plan entitlement
-3. workspace Product access for the exact requested operation: `discover`, `create`, `view`, `edit`, `publish`, `execute`, `deliver_publicly`, `suspend`, or `restore`
-4. member role/capability
-5. agent lifecycle
-6. channel runtime/public-delivery state
-7. provider connection and policy state
-8. independent legal, safety, incident, abuse, budget, or provider deny-only kill switch
-
-Unknown/error fails closed for every requested Product access operation, including private view, suspend, and restore. Safe already-published fallback behavior follows the explicit legal/deletion/suspension/staleness policy rather than a generic boolean.
-
-The UI may display the resolver result, but it never enforces the boundary by itself. Routes, server actions, workers, webhooks, RLS/grants, and database constraints enforce their own relevant layer.
-
-Use explicit workspace/site allowlists and sticky session/version assignment for stateful capabilities. Do not use per-request percentage rollout for consequential actions or publication behavior.
-
-Suggested rollout-control concepts, with exact names/mechanism frozen in WP-B:
-
-- launcher/shell v2
-- Website Agent authoring
-- public Agent Site delivery
-- read-only concierge
-- Agent Site actions
-- Customers/operator outcomes
-- Website Agent Chat Widget channel
-- governed Improve
-- self-service creation
-
-## Rollback Rules
-
-- Application rollback must remain compatible with additive new schema.
-- Prefer forward-fix for schema defects; never delete action, audit, publication, or consent history to simulate rollback.
-- Publication rollback changes a validated pointer only after current safety, rights, provider, policy, deletion, and tombstone checks.
-- Action rollback stops new work and reconciles in-flight work; it never assumes an ambiguous external effect did not happen.
-- Product access re-enable restores eligibility only. It does not automatically restart runtime, reconnect a provider, re-enable a channel, or republish.
-- Public-delivery rollback preserves the approved static/human-contact fallback when policy permits; deletion and legal blocks override fallback.
-- Domain rollback removes the verified mapping safely and returns to the platform URL without serving another tenant.
-- Legacy Widgets remain the fallback until the new channel has proven parity and an explicit operator opts into any migration.
-
-## Required Verification Gates
-
-This section highlights cross-package gates and is deliberately **not exhaustive**. Every applicable subsection, scenario, and phase tag in the parent roadmap's [Verification Plan](./agent-native-websites.md#verification-plan) remains mandatory.
-
-### Authorization and tenancy
-
-Test owner, admin, member, removed member, suspended workspace, other workspace, anonymous visitor, and scoped public token across select/insert/update/delete, RPC, views, storage, sequences, routes, workers, and webhooks. Include guessed ids/public keys, stale JWT/membership, direct Data API calls, cross-workspace foreign keys, switching agents, cache keys, logs, analytics, and exports.
-
-Test raw privileged/service-role clients separately: Supabase service-role access bypasses RLS by design, so the gate is server-only custody, explicit application authorization/scoping, tenant constraints, auditability, and proof that no browser or public route can invoke an unscoped privileged query.
-
-RLS must be paired with explicit grants, safe view behavior, private security-definer helpers with a fixed search path where needed, and composite tenant constraints. Source-text assertions alone do not satisfy the runtime authorization gate.
-
-### Application, API, and supply-chain security
-
-Verify runtime request/response schemas, CSRF, exact-origin/CORS, CSP/XSS, safe URL handling, host normalization, cache/no-store partitioning, error disclosure, secret/log redaction, dependency and secret scanning, upload/import validation, and SSRF/DNS-rebinding defenses. Provider webhooks require raw-body signature verification, timestamp tolerance, replay protection, event/account scoping, and idempotent handling. No broad anonymous table access or browser-accessible service-role operation is acceptable.
-
-### Accessibility and public quality
-
-Run automated browser accessibility checks plus manual keyboard, screen-reader, focus/stream-announcement, 200%/400% zoom, contrast, target-size, reduced-motion, slow-network, JavaScript-off, mobile, and selected-locale long-content scenarios. Begin in WP-J/WP-K and repeat for every affected operator/public package.
-
-### Compatibility and reliability
-
-Every shared runtime change must run both Agent Site and existing Widget contracts/builds/journeys. Test publication/cache failure, provider failure before and after possible commitment, duplicate/out-of-order webhooks, worker crash/restart, rate/budget exhaustion, connection revocation, database/model/stream outage, backup/restore, DSAR, domain removal, and every kill switch.
-
-## Prohibited Shortcuts
-
-The following require an explicit roadmap revision; they are not acceptable implementation shortcuts:
-
-1. relabeling `surface = 'widget'` as Website Agent in the UI without a durable kind/channel model
-2. treating sidebar visibility or a client feature flag as authorization
-3. keeping browser-side direct inserts for Website Agent creation
-4. changing an existing agent's kind in place
-5. implementing an Agent Site as a hidden Widget or making `widget_id` its permanent ownership key
-6. automatically converting legacy or multi-agent Widgets
-7. exposing public traffic before immutable publication, scoped projection, RLS/grants, and last-known-good behavior exist
-8. opening `/s` through a broad middleware exception or trusting arbitrary `Host`/`X-Forwarded-Host`
-9. shipping grounded chat and the real selected consequential action in the same activation step
-10. enabling a consequential provider action before durable proposal, exact confirmation, outbox, idempotency, provider evidence, reconciliation, and kill switches
-11. allowing the model or browser to select credentials, accounts, resources, permissions, or success state
-12. combining a major schema cutover, public traffic activation, and consequential action activation in one release
-13. expanding, backfilling, enforcing required values, cutting over, and dropping legacy data in one deploy
-14. dual-executing provider calls or blindly dual-writing legacy/new sessions
-15. treating source-string tests, mocks, or provider happy paths as proof of RLS or reliability
-16. showing nonfunctional sidebar destinations merely to make the shell look complete
-17. exposing a general self-service launcher, billing, or domain automation before the Phase 3 gate
-18. automatically promoting customer questions, analytics, imports, or model output into agent or public truth
-19. beginning paid acquisition before the Phase 5 commercial gate
-20. beginning a second wedge because its UI appears reusable
-
-## Repository Change Map
-
-This map identifies likely implementation areas. WP-B freezes exact ownership and naming before code begins.
-
-| Concern | Existing areas likely to change | Likely new areas |
+## 17. Deployment Protocol
+
+The main application and Widget V2 deploy independently.
+
+For every cross-app contract:
+
+1. add backward-compatible server support
+2. deploy and verify the main application
+3. deploy compatible Widget V2 support
+4. verify old and new paths
+5. enable the Agent Site cohort
+6. remove old compatibility behavior only in a later release
+
+Never require both deployments to become live at the exact same moment.
+
+The public Agent Site feature control must be server-owned and scoped to explicit widgets/workspaces during rollout.
+
+## 18. Rollback Rules
+
+- **Application rollback:** previous application remains compatible with additive schema.
+- **Widget V2 rollback:** redeploy the prior Widget V2 bundle; existing hosted/embed URLs remain valid.
+- **Publication rollback:** select a previously valid immutable publication.
+- **Public delivery rollback:** disable Agent Site while preserving Chat Widget when safe.
+- **Embed rollback:** disable embedded delivery without disabling Agent Site when safe.
+- **Domain rollback:** deactivate the domain and return to platform URL.
+- **Analytics rollback:** stop new derived reporting without rewriting source sessions/history.
+- **Flywheel/public FAQ rollback:** disable candidate promotion and retain the previous publication.
+- **Database rollback:** prefer forward-fix; never delete publication, audit, session, or lead history to simulate rollback.
+
+## 19. Required Test Matrix
+
+### 19.1 Roles and tenancy
+
+- owner
+- admin
+- standard member
+- removed member
+- other workspace
+- anonymous visitor
+- scoped public launch token
+- raw privileged server client with explicit scope
+
+### 19.2 Delivery modes
+
+- old hosted Widget V2 URL
+- new Agent Site platform URL
+- embedded loader
+- operator preview
+- custom domain
+- Agent Site only
+- Chat Widget only
+- both enabled
+- each independently disabled
+
+### 19.3 Widget shapes
+
+- zero attached agents where the current product permits a draft
+- one attached agent with `single_auto`
+- multiple attached agents with chooser
+- unpublished agent
+- published agent
+- agent version changed after widget deployment
+- deleted/archived/inaccessible agent
+
+### 19.4 Site lifecycle
+
+- no settings
+- draft
+- validation failure
+- published
+- updated draft with old publication still live
+- republished
+- rolled back
+- unpublished
+- suspended
+- deleted widget
+
+### 19.5 Domain lifecycle
+
+- pending
+- invalid DNS
+- verified
+- provisioning
+- active
+- certificate failure
+- apex/`www`
+- canonical switch
+- removal
+- stale DNS
+- reassignment attempt
+- host spoof
+
+### 19.6 Failure modes
+
+- slow/offline Widget V2
+- expired token
+- CORS/origin denial
+- model failure
+- streaming failure
+- message limit
+- rate limit
+- session busy
+- database/publication lookup failure
+- cache stale/miss
+- publish failure
+- domain provider failure
+- connection/provider failure
+
+## 20. Repository Change Map
+
+| Concern | Existing areas | Likely additive areas |
 | --- | --- | --- |
-| Test/release foundation | `package.json`, `.github/workflows/ci.yml`, `supabase/config.toml`, `tests/security/` | `tests/agent-sites/`, DB/RLS, E2E, accessibility, provider-fault fixtures |
-| Agent identity/access | `src/lib/types/`, `src/lib/assistants/feature-flags.ts`, `src/lib/app/bootstrap.ts`, `src/lib/plan-limits.ts`, `src/lib/widget-limits.ts`, `src/lib/automation/executor.ts`, `src/app/actions/agents.ts`, `src/components/modals/CreateAgentModal.tsx`, agent-library/import/runtime/admin/webhook paths, surface checks/private helpers/RLS/limit triggers | `src/lib/agents/kinds.ts`, access/lifecycle resolver and transactional server creation service |
-| Launcher/shell | `src/app/(app)/layout.tsx`, `src/app/(app)/agents/`, `src/app/onboarding/`, `src/lib/auth-redirect.ts`, `src/components/layout/AppShell.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/app/AppContext.tsx`, `src/components/agents/AgentViewTabs.tsx`, `src/components/ui/ModalProvider.tsx`, `src/lib/agents/builder-bootstrap.ts` | launcher, selected-agent context, shell, type-specific sidebar and route guards |
-| Truth/publication | knowledge services and additive migrations | `src/lib/agent-sites/`, authenticated Agent Site APIs, publication/retrieval modules |
-| Provider binding | connection schema, `src/lib/connections.ts`, `src/lib/composio.ts`, `src/lib/cal.ts`, `src/lib/google-calendar.ts`, connection routes, builder resolution, provider webhooks | business/site binding, versioned action policy, provider adapter contract |
-| Public Agent Site | `src/app/layout.tsx`, `src/lib/i18n-server.ts`, `src/lib/security-headers.ts`, `middleware.ts`, `src/lib/supabase/proxy.ts`, `next.config.ts` | `src/app/(public-sites)/s/[slug]/`, public Agent Site APIs, `src/components/agent-sites/` |
-| Neutral runtime/customers | widget chat/runtime, `src/lib/rate-limit.ts`, `src/lib/message-usage.ts`, `src/lib/trusted-client-ip.ts`, dashboard, analytics, leads, summaries, privacy, Flywheel, admin queries | neutral conversation repositories, public session/chat services, scoped Customers views |
-| Consequential actions | current integration/runtime contracts | provider adapter, proposal/action/outbox/durable-worker/webhook/reconciliation modules |
-| Chat Widget channel | `src/app/(app)/widgets/WidgetsPageClient.tsx`, Widget APIs, `apps/widget-v2` | Website Agent channel adapter and channel-scoped configuration |
-| Improve | `src/app/(app)/questions/QuestionsPageClient.tsx`, `src/lib/flywheel/server.ts` | Website Agent Improve view and publication projection |
-| Product access/admin | current automation/assistant toggles and admin workspace pages | audited Product access matrix/API and lifecycle controls |
+| Widget domain | `src/lib/widgets/`, current Widget types | `src/lib/widgets/site/` |
+| Widget management API | `src/app/api/widgets/` | widget-owned site draft, preview, publish, rollback, and domain routes |
+| Public runtime API | `src/app/api/public/widgets/[widgetPublicKey]/` | compatible site launch/bootstrap handling |
+| Public page | current Next.js routing/security helpers | `src/app/(public-sites)/s/[slug]/`, `src/components/widgets/site/` |
+| Widget V2 | `apps/widget-v2/src/`, `public/loader.js` | compatible Agent Site presentation/mount mode |
+| Widget UI | `src/app/(app)/widgets/`, `src/components/widgets/builder/` | site/content/domain management components |
+| Database | existing Widget and customer tables | widget-owned site settings, publications, and domains |
+| SEO | root metadata/routing helpers | publication-driven metadata, sitemap, robots, JSON-LD |
+| Analytics | dashboard analytics and summary services | customer-facing channel labels and optional publication attribution |
+| Improve | `src/lib/flywheel/`, `/questions` | explicit FAQ candidate-to-publication workflow |
+| Operations | current runbooks/health checks | site/domain/publication deployment and incident runbooks |
 
-## Definition of Ready for Future Coding Tasks
+Names in the additive column are directional. WP-0B freezes exact paths before implementation.
 
-A work package may be selected for implementation only when:
+## 21. Prohibited Implementation Shortcuts
 
-- every listed dependency and parent-phase gate is complete
-- relevant Phase 0 decisions are approved and unchanged
-- scope, exclusions, migration shape, rollout cohort, exit tests, rollback owner, and evidence owner are named
-- current user changes in the worktree have been inventoried and protected
-- no package spans both a schema contract and an unrelated public activation merely for convenience
+Do not:
 
-## Definition of Complete
+1. build or copy a separate Agent Site chat component
+2. require a new `agents.kind = website` cutover
+3. use `agent_channels` or `agent_site_drafts` as the new foundation
+4. create a hidden widget for every site
+5. create separate Agent Site sessions/leads
+6. migrate existing session source values
+7. rotate widget public keys
+8. force existing multi-agent widgets into one agent
+9. expose mutable draft site rows publicly
+10. publish generated text without operator approval
+11. use only client-side React/Vite meta tags for SEO
+12. render the complete public site as only an iframe
+13. trust arbitrary host headers
+14. reflect arbitrary origins in CORS
+15. cache visitor-specific chat/session data publicly
+16. put private conversations into public FAQ or structured data
+17. combine custom domains with the first platform-site activation
+18. redesign the global sidebar before the Widget area works
+19. change Automation or Internal Assistant as incidental scope
+20. delete dormant database structures in the same release as Agent Site
 
-The implementation plan is complete only when all applicable work packages have passed their gates. “Code merged,” “UI visible,” and “model answered correctly in a demo” are intermediate signals, not completion.
+## 22. Definition of Ready
 
-For the private concierge MVP, completion means WP-A through WP-P have passed, including one Phase 0-selected provider-evidenced outcome, safe fallback, operator controls, and private-alpha evidence. The initial product is validated only after WP-Q also passes the Phase 3 commercial/safety gate. WP-R through WP-V are earned expansion, not hidden MVP backlog.
+A work package is ready only when:
+
+- its dependencies and previous phase gate pass
+- the relevant Phase 0 decision remains approved
+- exact scope and exclusions are written
+- current user worktree changes are inventoried and protected
+- migration and deployment order are known
+- test cases and rollback owner are named
+- no destructive cleanup is hidden inside it
+
+## 23. Definition of Complete
+
+The initial Agent Site implementation is complete only when Phase 0 through Phase 6 pass.
+
+That means:
+
+- the product is built on existing Widget V2
+- Agent Site and Chat Widget both work from one Widget configuration
+- platform and custom-domain URLs are safe
+- approved content is server-rendered and index-controlled
+- Builder, Knowledge, Connections, conversations, leads, analytics, and Flywheel remain shared
+- old embeds and public keys remain valid
+- public drafts/private conversations never leak
+- accessibility, performance, privacy, security, reliability, and rollback gates pass
+- limited customers demonstrate real value
+
+Code merged, a new tab visible, or a successful local demo does not by itself mean the phase or plan is complete.

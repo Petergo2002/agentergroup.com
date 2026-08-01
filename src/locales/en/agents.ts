@@ -42,6 +42,11 @@ export const agents = {
     "This action is irreversible. All drafts, versions, and conversations associated with this agent will be purged.",
   createModal: {
     title: "Create New Agent",
+    selectTypeTitle: "Choose an agent type",
+    selectTypeDescription: "Select where this agent will work.",
+    nameStepTitle: "Name your agent",
+    nameStepDescription: "Use a clear name your team will recognize.",
+    selectedType: "Selected type",
     surface: "Surface",
     trigger: "Trigger",
     assistantTitle: "Internal Assistant",

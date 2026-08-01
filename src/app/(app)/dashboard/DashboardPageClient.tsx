@@ -1,14 +1,15 @@
 "use client";
 
-import { ArrowUpRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
-import { useModals } from "@/components/ui/ModalProvider";
 import { useAppContext } from "@/components/app/AppContext";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { StatsGrid } from "@/components/dashboard/StatsGrid";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { AgentStatusList } from "@/components/dashboard/AgentStatusList";
 import type { DashboardSummaryResponse } from "@/lib/types";
+
+import { CreateAgentDropdown } from "@/components/agents/CreateAgentDropdown";
 
 export default function DashboardPageClient({
   initialData,
@@ -17,7 +18,6 @@ export default function DashboardPageClient({
 }) {
   const { profile } = useAppContext();
   const { t } = useLanguage();
-  const { openCreateAgent } = useModals();
 
   const stats = {
     totalAgents: initialData.agents.filter((agent) => !agent.archived_at).length,
@@ -33,7 +33,6 @@ export default function DashboardPageClient({
     <div className="app-page">
       <DashboardHeader 
         userName={profile?.full_name?.split(" ")[0]} 
-        onCreateAgent={openCreateAgent}
       />
 
       <StatsGrid stats={stats} isLoading={false} />
@@ -50,7 +49,6 @@ export default function DashboardPageClient({
           <AgentStatusList
             agents={initialData.agents}
             isLoading={false}
-            onCreateAgent={openCreateAgent}
           />
 
           <section className="app-card">
@@ -67,14 +65,9 @@ export default function DashboardPageClient({
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => openCreateAgent()}
-              className="app-primary-button mt-5 w-full"
-            >
-              {t("dashboard.initializeAgent")}
-              <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
-            </button>
+            <div className="mt-5 w-full">
+              <CreateAgentDropdown buttonText={t("dashboard.initializeAgent")} buttonClassName="app-primary-button w-full justify-center" />
+            </div>
           </section>
         </section>
       </div>
