@@ -4,11 +4,10 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bot, MessageSquare, Workflow, Check, Sparkles, Plus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
-import { createClient } from '@/lib/supabase/client';
 import { useAppContext } from '@/components/app/AppContext';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
-import { buildAgentPayload, buildInitialDefinition } from '@/lib/agents/defaults';
+import { AgentCreationError, createAgent } from '@/lib/agents/create-client';
 import type { AgentSurface } from '@/lib/types';
 import { hasInternalAssistantsEnabled, hasAutomationsEnabled } from '@/lib/assistants/feature-flags';
 
@@ -24,8 +23,7 @@ export const CreateAgentModal = ({
   initialSurface = 'widget',
 }: CreateAgentModalProps) => {
   const router = useRouter();
-  const supabase = createClient();
-  const { workspace, user, subscription } = useAppContext();
+  const { workspace } = useAppContext();
   const { t } = useLanguage();
   const { showToast } = useToast();
   const internalAssistantsEnabled = hasInternalAssistantsEnabled(workspace);
@@ -116,51 +114,10 @@ export const CreateAgentModal = ({
     setIsSaving(true);
 
     try {
-      // Check agent limit
-      const { count, error: countError } = await supabase
-        .from('agents')
-        .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', workspace.id)
-        .is('archived_at', null);
-
-      if (countError) throw countError;
-
-      if ((count ?? 0) >= (subscription?.agents_limit ?? 1)) {
-        showToast(
-          t('settings.billing.agentLimitReached') || 
-          'You have reached your agent limit. Please upgrade your plan.', 
-          'error'
-        );
-        return;
-      }
-
-      const agentPayload = buildAgentPayload('custom', name, surface);
-      const definition = buildInitialDefinition('custom', surface);
-
-      const { data: agent, error: agentError } = await supabase
-        .from('agents')
-        .insert({
-          workspace_id: workspace.id,
-          created_by: user.id,
-          ...agentPayload,
-        })
-        .select()
-        .single();
-
-      if (agentError || !agent) {
-        throw agentError ?? new Error(t('agents.createModal.createError'));
-      }
-
-      const { error: draftError } = await supabase.from('agent_drafts').insert({
-        agent_id: agent.id,
-        workspace_id: workspace.id,
-        updated_by: user.id,
-        definition,
+      const agent = await createAgent({
+        name: name.trim(),
+        surface,
       });
-
-      if (draftError) {
-        throw draftError;
-      }
 
       showToast(t('agents.createModal.created'), 'success');
       onClose();
@@ -175,7 +132,10 @@ export const CreateAgentModal = ({
           : error && typeof error === 'object' && 'message' in error
             ? String(error.message)
             : '';
-      const message = rawMessage.includes('AGENT_LIMIT_REACHED')
+      const isAgentLimitError =
+        (error instanceof AgentCreationError && error.code === 'agent_limit_reached') ||
+        rawMessage.includes('AGENT_LIMIT_REACHED');
+      const message = isAgentLimitError
         ? t('settings.billing.agentLimitReached') ||
           'You have reached your agent limit. Please upgrade your plan.'
         : rawMessage || t('agents.createModal.createError');

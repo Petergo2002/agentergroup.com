@@ -73,6 +73,7 @@ export function getTemplatePreset(templateId: string) {
 export function buildInitialDefinition(
   templateId: string,
   surface: AgentSurface = "widget",
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
 ): BuilderDefinition {
   const preset = getTemplatePreset(templateId);
   const isAutomation = surface === "automation";
@@ -137,7 +138,7 @@ export function buildInitialDefinition(
         ? "Inspect each incoming event, decide whether the event requires action under these instructions, and use only the configured actions needed to complete it. If no action is needed, record that clearly. Never claim an external action succeeded unless its tool call succeeded."
         : preset.instructions,
       starterPrompts: isAutomation ? [] : [...preset.starterPrompts],
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone,
       trigger: {
         source: isAutomation ? "gmail_new_message" : "user_message",
         provider: isAutomation ? "composio" : "internal",
@@ -154,6 +155,7 @@ export function buildAgentPayload(
   templateId: string,
   customName: string,
   surface: AgentSurface = "widget",
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
 ) {
   const preset = getTemplatePreset(templateId);
   const name = customName.trim() || preset.name;
@@ -172,6 +174,6 @@ export function buildAgentPayload(
       ? "Inspect each incoming event, decide whether the event requires action under these instructions, and use only the configured actions needed to complete it. If no action is needed, record that clearly. Never claim an external action succeeded unless its tool call succeeded."
       : preset.instructions,
     starter_prompts: isAutomation ? [] : [...preset.starterPrompts],
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone,
   };
 }

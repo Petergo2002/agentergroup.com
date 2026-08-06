@@ -22,8 +22,7 @@ import {
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
-import { createClient } from '@/lib/supabase/client';
-import { buildAgentPayload, buildInitialDefinition } from '@/lib/agents/defaults';
+import { AgentCreationError, createAgent } from '@/lib/agents/create-client';
 import type { AgentSurface } from '@/lib/types';
 import {
   hasAutomationsEnabled,
@@ -46,8 +45,7 @@ export function CreateAgentDropdown({
   onCreated,
 }: CreateAgentDropdownProps) {
   const router = useRouter();
-  const supabase = createClient();
-  const { workspace, user, subscription } = useAppContext();
+  const { workspace } = useAppContext();
   const { t } = useLanguage();
   const { showToast } = useToast();
 
@@ -228,51 +226,11 @@ export function CreateAgentDropdown({
     setCreatingSurface(surfaceToCreate);
 
     try {
-      const { count, error: countError } = await supabase
-        .from('agents')
-        .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', workspace.id)
-        .is('archived_at', null);
-
-      if (countError) throw countError;
-
-      if ((count ?? 0) >= (subscription?.agents_limit ?? 1)) {
-        showToast(
-          t('settings.billing.agentLimitReached') ||
-            'You have reached your agent limit. Please upgrade your plan.',
-          'error',
-        );
-        return;
-      }
-
       const finalName = nameToUse.trim() || 'New Agent';
-      const agentPayload = buildAgentPayload('custom', finalName, surfaceToCreate);
-      const definition = buildInitialDefinition('custom', surfaceToCreate);
-
-      const { data: agent, error: agentError } = await supabase
-        .from('agents')
-        .insert({
-          workspace_id: workspace.id,
-          created_by: user.id,
-          ...agentPayload,
-        })
-        .select()
-        .single();
-
-      if (agentError || !agent) {
-        throw agentError ?? new Error(t('agents.createModal.createError'));
-      }
-
-      const { error: draftError } = await supabase.from('agent_drafts').insert({
-        agent_id: agent.id,
-        workspace_id: workspace.id,
-        updated_by: user.id,
-        definition,
+      const agent = await createAgent({
+        name: finalName,
+        surface: surfaceToCreate,
       });
-
-      if (draftError) {
-        throw draftError;
-      }
 
       showToast(t('agents.createModal.created'), 'success');
       closeDropdown();
@@ -286,7 +244,10 @@ export function CreateAgentDropdown({
           : error && typeof error === 'object' && 'message' in error
             ? String(error.message)
             : '';
-      const message = rawMessage.includes('AGENT_LIMIT_REACHED')
+      const isAgentLimitError =
+        (error instanceof AgentCreationError && error.code === 'agent_limit_reached') ||
+        rawMessage.includes('AGENT_LIMIT_REACHED');
+      const message = isAgentLimitError
         ? t('settings.billing.agentLimitReached') ||
           'You have reached your agent limit. Please upgrade your plan.'
         : rawMessage || t('agents.createModal.createError');
