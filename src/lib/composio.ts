@@ -4,6 +4,10 @@ import {
   buildWorkspaceComposioUserId,
   getConnectionComposioUserId,
 } from "@/lib/connections";
+import {
+  buildConnectionSyncRows,
+  persistConnectionSyncRows,
+} from "@/lib/connection-sync";
 import { assertComposioToolCallRuntime } from "@/lib/composio-tool-runtime";
 import {
   listCalEventTypesWithExecutor,
@@ -737,31 +741,21 @@ export async function syncConnectedAccountsToDatabase(
     return [];
   }
 
+  const rows = buildConnectionSyncRows(connectedAccounts, {
+    workspaceId,
+    userId,
+    syncedAt: syncTimestamp,
+  });
+
   // The database enforces one connection per toolkit in each workspace.
-  // Composio can return a new external id during reconnects, so conflict on
-  // the stable workspace/toolkit pair rather than external_id.
-  for (const account of connectedAccounts) {
-    const row = {
-      workspace_id: workspaceId,
-      provider: "composio",
-      toolkit_slug: account.toolkitSlug,
-      display_name: account.displayName,
-      status: account.status,
-      external_id: account.externalId,
-      account_label: account.accountLabel ?? "default",
-      toolkit_data: account.toolkitData,
-      created_by: userId,
-      last_synced_at: syncTimestamp,
-    };
-
-    const { error: upsertError } = await connectionsTable.upsert(row, {
+  // Composio can return a new external id during reconnects, so the whole
+  // workspace snapshot can be persisted in one request against the stable
+  // workspace/toolkit conflict key.
+  await persistConnectionSyncRows(rows, (connectionRows) =>
+    connectionsTable.upsert(connectionRows, {
       onConflict: "workspace_id,toolkit_slug",
-    });
-
-    if (upsertError) {
-      throw new Error(upsertError.message);
-    }
-  }
+    }),
+  );
 
   return connectedAccounts;
 }

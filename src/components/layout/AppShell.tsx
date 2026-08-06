@@ -8,7 +8,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { ModalProvider } from "@/components/ui/ModalProvider";
 import { AppContextProvider } from "@/components/app/AppContext";
-import { jsonFetcher } from "@/lib/json-fetcher";
+import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
 import type {
   AppWorkspaceContext,
   DashboardLatestActivityResponse,
@@ -34,7 +34,11 @@ export function AppShell({ children, context, user }: AppShellProps) {
       localStorage.getItem("agenter_sidebar_collapsed") === "true",
   );
   const { data: latestActivityData } = useSWR<DashboardLatestActivityResponse>(
-    "/api/dashboard/latest-activity",
+    workspaceSWRKey(
+      user.id,
+      context.workspace.id,
+      "/api/dashboard/latest-activity",
+    ),
     jsonFetcher,
     {
       refreshInterval: 60_000,
@@ -168,6 +172,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
   return (
     <AppContextProvider value={{ ...context, user }}>
       <SWRConfig
+        key={`${user.id}:${context.workspace.id}`}
         value={{
           fetcher: jsonFetcher,
           revalidateOnFocus: false,

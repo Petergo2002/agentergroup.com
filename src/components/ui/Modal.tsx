@@ -49,13 +49,13 @@ export const Modal = ({ isOpen, onClose, title, description, children, size = 'l
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
       
       {/* Modal Container */}
       <div
-        className={`relative flex max-h-[calc(100vh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl border border-outline-variant/20 glass-panel shadow-2xl animate-in zoom-in-95 duration-200 sm:max-h-[calc(100vh-2rem)] ${sizeClasses}`}
+        className={`relative flex max-h-[calc(100vh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl border border-outline-variant/20 glass-panel shadow-2xl animate-in fade-in-50 zoom-in-95 duration-200 sm:max-h-[calc(100vh-2rem)] ${sizeClasses}`}
       >
         {/* Physical Top-Light Detail */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />

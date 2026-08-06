@@ -1,10 +1,15 @@
 import type { User } from "@supabase/supabase-js";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { getEffectiveConnectionStatus } from "@/lib/connections";
-import { syncConnectedAccountsToDatabase } from "@/lib/composio";
 import { hasComposioEnv, hasComposioWebhookSecret } from "@/lib/env";
 import { isChatIntegrationSlug } from "@/lib/integrations";
 import { toKnowledgeFolderWithSources, type KnowledgeFolderJoinRow } from "@/lib/knowledge-folders";
+import {
+  BUILDER_VERSION_LIST_LIMIT,
+  WORKSPACE_CONNECTION_LIST_LIMIT,
+  WORKSPACE_KNOWLEDGE_FOLDER_LIST_LIMIT,
+  WORKSPACE_KNOWLEDGE_SOURCE_LIST_LIMIT,
+} from "@/lib/query-limits";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AgentAutomationRecord,
@@ -106,12 +111,6 @@ export async function loadAgentBuilderBootstrap(
 ): Promise<AgentBuilderBootstrapResponse> {
   const context = await ensureWorkspaceContext(supabase as never, user);
 
-  await syncConnectedAccountsToDatabase(
-    supabase as never,
-    context.workspace.id,
-    user.id,
-  );
-
   const [
     agentResult,
     draftResult,
@@ -141,19 +140,22 @@ export async function loadAgentBuilderBootstrap(
       .from("agent_versions")
       .select(BUILDER_VERSION_SELECT)
       .eq("agent_id", agentId)
-      .order("version", { ascending: false }),
+      .order("version", { ascending: false })
+      .limit(BUILDER_VERSION_LIST_LIMIT),
     supabase
       .from("connections")
       .select(CONNECTION_SELECT)
       .eq("workspace_id", context.workspace.id)
-      .order("display_name", { ascending: true }),
+      .order("display_name", { ascending: true })
+      .limit(WORKSPACE_CONNECTION_LIST_LIMIT),
     supabase.from("agent_connections").select("connection_id").eq("agent_id", agentId),
     supabase
       .from("knowledge_sources")
       .select(BUILDER_KNOWLEDGE_SOURCE_SELECT)
       .eq("workspace_id", context.workspace.id)
       .is("widget_session_id", null)
-      .order("updated_at", { ascending: false }),
+      .order("updated_at", { ascending: false })
+      .limit(WORKSPACE_KNOWLEDGE_SOURCE_LIST_LIMIT),
     supabase
       .from("agent_knowledge_sources")
       .select(`source:knowledge_sources(${BUILDER_KNOWLEDGE_SOURCE_SELECT})`)
@@ -166,7 +168,8 @@ export async function loadAgentBuilderBootstrap(
       .from("knowledge_folders")
       .select(KNOWLEDGE_FOLDER_WITH_SOURCES_SELECT)
       .eq("workspace_id", context.workspace.id)
-      .order("updated_at", { ascending: false }),
+      .order("updated_at", { ascending: false })
+      .limit(WORKSPACE_KNOWLEDGE_FOLDER_LIST_LIMIT),
     supabase
       .from("agent_automations")
       .select(AUTOMATION_RECORD_SELECT)

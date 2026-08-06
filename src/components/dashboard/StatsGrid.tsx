@@ -32,9 +32,9 @@ function StatCard({ item, isLoading }: StatCardProps) {
   const Icon = item.icon;
 
   return (
-    <article className="app-card group relative transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:bg-surface-container-low/60 hover:shadow-md">
+    <article className="group relative rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-surface-container-low/70 hover:shadow-xs">
       <div className="flex items-start justify-between gap-4">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110 ${item.tone}`}>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105 ${item.tone}`}>
           <Icon className="h-5 w-5" strokeWidth={2.1} />
         </div>
         <span className="rounded-full border border-outline-variant/15 bg-surface-container-low px-2.5 py-1 text-xs font-semibold text-on-surface-variant transition-colors group-hover:border-primary/20 group-hover:text-on-surface">
@@ -42,7 +42,7 @@ function StatCard({ item, isLoading }: StatCardProps) {
         </span>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-4">
         <div className="flex min-h-9 items-baseline gap-2">
           <span className="font-headline text-3xl font-extrabold tabular-nums text-on-surface tracking-tight">
             {isLoading ? (
@@ -53,7 +53,7 @@ function StatCard({ item, isLoading }: StatCardProps) {
         <h2 className="mt-1 text-sm font-semibold tracking-normal text-on-surface">
           {item.label}
         </h2>
-        <p className="mt-2 min-h-10 text-sm leading-5 text-on-surface-variant/70">
+        <p className="mt-1.5 text-xs leading-relaxed text-on-surface-variant">
           {item.description}
         </p>
       </div>

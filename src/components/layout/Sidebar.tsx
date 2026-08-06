@@ -241,10 +241,10 @@ export function Sidebar({
                     strokeWidth={isActive ? 2.5 : 2}
                   />
                   {hasAttention && isCollapsed && !mobile ? (
-                    <span
-                      className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-orange-500 shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-surface-container-low)_85%,transparent)] ring-1 ring-orange-300/80"
-                      aria-hidden="true"
-                    />
+                    <span className="absolute right-2.5 top-2.5 flex h-2.5 w-2.5" aria-hidden="true">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-500 ring-1 ring-orange-300/80" />
+                    </span>
                   ) : null}
                   {hasBadge && isCollapsed && !mobile ? (
                     <span
@@ -271,10 +271,10 @@ export function Sidebar({
                     </span>
                   )}
                   {hasAttention && (!isCollapsed || mobile) ? (
-                    <span
-                      className="ml-2 h-2.5 w-2.5 shrink-0 rounded-full bg-orange-500 shadow-[0_0_0_4px_color-mix(in_srgb,var(--color-orange-500)_14%,transparent)] ring-1 ring-orange-300/80"
-                      aria-hidden="true"
-                    />
+                    <span className="ml-2 flex h-2.5 w-2.5 shrink-0 relative" aria-hidden="true">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-500 ring-1 ring-orange-300/80" />
+                    </span>
                   ) : null}
                   {hasBadge && (!isCollapsed || mobile) ? (
                     <span

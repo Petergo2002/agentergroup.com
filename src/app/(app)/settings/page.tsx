@@ -128,7 +128,8 @@ export default function SettingsPage() {
       }
 
       showToast(t('settings.workspaceDeleted'), 'success');
-      window.location.assign('/dashboard');
+      router.replace('/dashboard');
+      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : t('settings.deleteWorkspaceError');

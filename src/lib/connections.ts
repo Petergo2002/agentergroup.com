@@ -80,3 +80,32 @@ export function sortConnectedItemsFirst<T extends { status: string }>(items: T[]
     (a, b) => Number(b.status === "connected") - Number(a.status === "connected"),
   );
 }
+
+export function shouldRefreshConnections(
+  connections: Array<{ last_synced_at: string | null }>,
+  options?: {
+    now?: number;
+    minSyncIntervalMs?: number;
+  },
+): boolean {
+  if (connections.length === 0) {
+    return true;
+  }
+
+  const latestSyncTime = connections.reduce((latest, connection) => {
+    if (!connection.last_synced_at) {
+      return latest;
+    }
+
+    const syncedAt = new Date(connection.last_synced_at).getTime();
+    return Number.isFinite(syncedAt) ? Math.max(latest, syncedAt) : latest;
+  }, 0);
+
+  if (latestSyncTime === 0) {
+    return true;
+  }
+
+  const now = options?.now ?? Date.now();
+  const minSyncIntervalMs = options?.minSyncIntervalMs ?? 60_000;
+  return now - latestSyncTime >= minSyncIntervalMs;
+}

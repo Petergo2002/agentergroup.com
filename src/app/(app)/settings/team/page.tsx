@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
@@ -9,6 +10,7 @@ import type { WorkspaceMemberWithProfile, WorkspaceInviteRecord, ExpandedWorkspa
 import { Mail, Copy, X, Info } from 'lucide-react';
 
 export default function TeamSettingsPage() {
+  const router = useRouter();
   const { workspace, membership, subscription, user } = useAppContext();
   const { t } = useLanguage();
   const { showToast } = useToast();
@@ -346,7 +348,7 @@ export default function TeamSettingsPage() {
                   {t('common.decline') || 'Decline'}
                 </button>
                 <button
-                  onClick={() => window.location.href = `/invite/accept?token=${invite.token}`}
+                  onClick={() => router.push(`/invite/accept?token=${invite.token}`)}
                   className="app-primary-button min-h-10 flex-1 rounded-full px-5 sm:flex-none"
                 >
                   {t('common.accept') || 'Accept'}

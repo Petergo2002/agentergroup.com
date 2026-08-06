@@ -1,10 +1,10 @@
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { getAppRequestContext } from "@/lib/app/request-context";
 import {
   countFlywheelQuestions,
   listFlywheelQuestions,
 } from "@/lib/flywheel/server";
-import { createClient } from "@/lib/supabase/server";
 import type { FlywheelQuestionListItem } from "@/lib/types";
+import { WORKSPACE_AGENT_LIST_LIMIT, WORKSPACE_WIDGET_LIST_LIMIT } from "@/lib/query-limits";
 import QuestionsPageClient from "./QuestionsPageClient";
 
 interface QuestionAgentOption {
@@ -18,16 +18,12 @@ interface QuestionWidgetOption {
 }
 
 async function loadQuestionsPageData() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, context } = await getAppRequestContext();
 
-  if (!user) {
+  if (!user || !context) {
     throw new Error("Unauthorized");
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
   const [questions, counts, agentsResult, widgetsResult] = await Promise.all([
     listFlywheelQuestions(supabase as never, {
       workspaceId: context.workspace.id,
@@ -41,12 +37,14 @@ async function loadQuestionsPageData() {
       .from("agents")
       .select("id, name")
       .eq("workspace_id", context.workspace.id)
-      .order("name", { ascending: true }),
+      .order("name", { ascending: true })
+      .limit(WORKSPACE_AGENT_LIST_LIMIT),
     supabase
       .from("widgets")
       .select("id, name")
       .eq("workspace_id", context.workspace.id)
-      .order("name", { ascending: true }),
+      .order("name", { ascending: true })
+      .limit(WORKSPACE_WIDGET_LIST_LIMIT),
   ]);
 
   if (agentsResult.error) {

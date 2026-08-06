@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { Modal } from '@/components/ui/Modal';
@@ -11,6 +12,7 @@ interface CreateWorkspaceModalProps {
 }
 
 export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalProps) {
+  const router = useRouter();
   const { t } = useLanguage();
   const { showToast } = useToast();
   
@@ -41,9 +43,9 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
       }
 
       showToast(t('settings.workspaceSaved') || 'Workspace created successfully', 'success');
-      
-      // Force a hard reload to ensure all app contexts are completely fresh
-      window.location.href = '/dashboard';
+      onClose();
+      router.replace('/dashboard');
+      router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : t('settings.saveError') || 'An error occurred';
       showToast(message, 'error');

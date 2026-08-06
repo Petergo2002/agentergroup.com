@@ -130,7 +130,7 @@ export function AgentCard({
         <h3 className="truncate text-[15px] font-bold leading-5 tracking-tight text-on-surface transition-colors group-hover:text-primary">
           {agent.name}
         </h3>
-        <p className="mt-1 line-clamp-2 max-w-3xl text-sm leading-relaxed text-on-surface-variant/75">
+        <p className="mt-1 line-clamp-2 max-w-3xl text-sm leading-relaxed text-on-surface-variant">
           {agent.description || t("agents.noInstructions")}
         </p>
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -140,7 +140,7 @@ export function AgentCard({
             <SurfaceIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
             {typeBadge.label}
           </span>
-          <span className="inline-flex h-6 items-center rounded-full bg-surface-container px-2.5 text-xs font-semibold text-on-surface-variant ring-1 ring-outline-variant/10">
+          <span className="inline-flex h-6 items-center rounded-full bg-surface-container px-2.5 text-xs font-semibold text-on-surface-variant ring-1 ring-outline-variant/10 dark:ring-white/10">
             {stateLabel}
           </span>
         </div>
@@ -195,10 +195,10 @@ export function AgentCard({
         {showPreviewAction ? (
           <Link
             href={`/agents/${agent.id}/preview`}
-            className="depth-button flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-lowest text-on-surface-variant transition-all hover:border-primary/20 hover:bg-surface-container-low hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="depth-button group/prev flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-lowest text-on-surface-variant transition-all hover:border-primary/20 hover:bg-surface-container-low hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             title={t("agents.preview")}
           >
-            <ExternalLink className="h-3.5 w-3.5" />
+            <ExternalLink className="h-3.5 w-3.5 transition-transform duration-200 group-hover/prev:scale-110" />
           </Link>
         ) : null}
 

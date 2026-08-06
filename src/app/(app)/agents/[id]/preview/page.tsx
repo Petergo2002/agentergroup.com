@@ -411,42 +411,51 @@ export default function AgentPreviewPage() {
     turnInFlightRef.current = true;
     clearPreviewInactivityTimer();
     setIsSubmitting(true);
-    let optimisticMessageId = '';
-    let streamingAssistantId = '';
+    const optimisticMessageId = `optimistic-${Date.now()}`;
+    const streamingAssistantId = `streaming-assistant-${Date.now()}`;
     let requestAccepted = false;
     let resolvedThreadId = activeThreadId ?? null;
     let resolvedRunId: string | null = null;
     let sessionCompleted = false;
+    const optimisticMessage: MessageRecord = {
+      id: optimisticMessageId,
+      thread_id: activeThreadId ?? 'pending',
+      workspace_id: workspace.id,
+      role: 'user',
+      content,
+      tool_name: null,
+      tool_call_id: null,
+      metadata: {},
+      created_by: user.id,
+      created_at: new Date().toISOString(),
+    };
 
-    try {
-      const threadId =
-        activeThreadId ?? (await createThread(agent?.name, { resetMessages: false }));
-      const optimisticMessage: MessageRecord = {
-        id: `optimistic-${Date.now()}`,
-        thread_id: threadId,
+    setMessages((current) => [
+      ...current,
+      optimisticMessage,
+      {
+        id: streamingAssistantId,
+        thread_id: activeThreadId ?? 'pending',
         workspace_id: workspace.id,
-        role: 'user',
-        content,
+        role: 'assistant',
+        content: '',
         tool_name: null,
         tool_call_id: null,
         metadata: {},
-        created_by: user.id,
+        created_by: null,
         created_at: new Date().toISOString(),
-      };
+      },
+    ]);
+    setDraftMessage('');
 
-      optimisticMessageId = optimisticMessage.id;
-      streamingAssistantId = `streaming-assistant-${Date.now()}`;
-      resolvedThreadId = threadId;
-      setMessages((current) => [...current, optimisticMessage]);
-      setDraftMessage('');
-
+    try {
       const response = await fetch(`/api/agents/${agentId}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          threadId,
+          threadId: activeThreadId ?? undefined,
           message: content,
         }),
       });
@@ -456,21 +465,6 @@ export default function AgentPreviewPage() {
       }
 
       requestAccepted = true;
-      setMessages((current) => [
-        ...current,
-        {
-          id: streamingAssistantId,
-          thread_id: resolvedThreadId ?? 'pending',
-          workspace_id: workspace.id,
-          role: 'assistant',
-          content: '',
-          tool_name: null,
-          tool_call_id: null,
-          metadata: {},
-          created_by: null,
-          created_at: new Date().toISOString(),
-        },
-      ]);
 
       await consumeChatStream(response, (event) => {
         if (event.type === 'meta') {
@@ -542,7 +536,11 @@ export default function AgentPreviewPage() {
     } catch (error) {
       if (!requestAccepted) {
         setMessages((current) =>
-          current.filter((message) => message.id !== optimisticMessageId),
+          current.filter(
+            (message) =>
+              message.id !== optimisticMessageId &&
+              message.id !== streamingAssistantId,
+          ),
         );
       } else {
         if (resolvedThreadId) {

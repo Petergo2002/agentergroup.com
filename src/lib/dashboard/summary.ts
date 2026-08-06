@@ -2,7 +2,11 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { listRecentDashboardConversations } from "@/lib/dashboard/analytics";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { AgentRecord, DashboardSummaryResponse } from "@/lib/types";
+import type {
+  AgentRecord,
+  AppWorkspaceContext,
+  DashboardSummaryResponse,
+} from "@/lib/types";
 
 type SupabaseLike = Pick<SupabaseClient, "from">;
 
@@ -14,6 +18,13 @@ export async function loadDashboardSummary(
   user: User,
 ): Promise<DashboardSummaryResponse> {
   const context = await ensureWorkspaceContext(supabase as never, user);
+
+  return loadDashboardSummaryForContext(context);
+}
+
+export async function loadDashboardSummaryForContext(
+  context: AppWorkspaceContext,
+): Promise<DashboardSummaryResponse> {
   const admin = createAdminClient();
 
   const [

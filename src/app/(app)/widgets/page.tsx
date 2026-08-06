@@ -1,19 +1,14 @@
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { createClient } from "@/lib/supabase/server";
+import { getAppRequestContext } from "@/lib/app/request-context";
 import { getWidgetNeedsRedeploy, loadAllWidgetsWithAgents } from "@/lib/widgets/server";
 import WidgetsPageClient from "./WidgetsPageClient";
 
 async function loadWidgetsPageData() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, context } = await getAppRequestContext();
 
-  if (!user) {
+  if (!user || !context) {
     throw new Error("Unauthorized");
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
   const allWidgets = await loadAllWidgetsWithAgents(supabase as never, context.workspace.id);
 
   return allWidgets.map((loaded) => {

@@ -49,15 +49,16 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
           <div
             key={toast.id}
             className={`
-              pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl glass-panel border border-outline-variant/20
+              relative pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl glass-panel border border-outline-variant/20 overflow-hidden
               animate-in fade-in slide-in-from-right-4 duration-300
             `}
           >
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
             <div className={`
-              w-8 h-8 rounded-full flex items-center justify-center
-              ${toast.type === 'success' ? 'bg-emerald-500/10 text-emerald-600' : ''}
+              w-8 h-8 rounded-full flex items-center justify-center shrink-0
+              ${toast.type === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : ''}
               ${toast.type === 'error' ? 'bg-error/10 text-error' : ''}
-              ${toast.type === 'warning' ? 'bg-amber-500/10 text-amber-600' : ''}
+              ${toast.type === 'warning' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : ''}
               ${toast.type === 'info' ? 'bg-primary/10 text-primary' : ''}
             `}>
               <AppIcon
@@ -73,21 +74,21 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                 className="h-[18px] w-[18px]"
               />
             </div>
-            <div>
-              <p className="text-[13px] font-bold text-on-surface">
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-on-surface leading-tight">
                 {toast.type === 'success' ? t('toast.success') : ''}
                 {toast.type === 'error' ? t('toast.error') : ''}
                 {toast.type === 'warning' ? t('toast.warning') : ''}
                 {toast.type === 'info' ? t('toast.notice') : ''}
               </p>
-              <p className="text-[11px] text-on-surface-variant font-medium">
+              <p className="text-[11px] text-on-surface-variant font-medium mt-0.5 leading-snug">
                 {toast.message}
               </p>
             </div>
             <button 
               onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
               aria-label={t('common.close')}
-              className="ml-2 text-on-surface-variant/40 hover:text-on-surface"
+              className="ml-2 flex h-7 w-7 items-center justify-center rounded-lg text-on-surface-variant/60 hover:bg-surface-container-high hover:text-on-surface transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               <AppIcon name="close" className="h-4 w-4" />
             </button>

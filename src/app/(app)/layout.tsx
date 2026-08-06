@@ -1,9 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { getAppRequestContext } from "@/lib/app/request-context";
 import { hasSupabaseEnv } from "@/lib/env";
-import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({
   children,
@@ -14,16 +13,11 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, context } = await getAppRequestContext();
 
-  if (!user) {
+  if (!user || !context) {
     redirect("/login");
   }
-
-  const context = await ensureWorkspaceContext(supabase as never, user);
 
   // Enforce billing onboarding for owners
   const headerList = await headers();

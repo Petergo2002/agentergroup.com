@@ -103,7 +103,7 @@ export function AgentStatusList({
               <Link
                 key={agent.id}
                 href={`/agents/${agent.id}/builder`}
-                className="group flex items-center justify-between gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-3.5 py-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-surface-container-low/60 hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="group flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 hover:bg-surface-container-low/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 border-b border-outline-variant/10 last:border-b-0"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/10 group-hover:text-primary">
@@ -113,7 +113,7 @@ export function AgentStatusList({
                     <h3 className="truncate text-sm font-semibold tracking-normal text-on-surface transition-colors group-hover:text-primary">
                       {agent.name}
                     </h3>
-                    <p className="mt-0.5 text-xs font-medium text-on-surface-variant/65">
+                    <p className="mt-0.5 text-xs font-medium text-on-surface-variant/80">
                       {`${t("common.updated")} ${formatRelativeDate(agent.updated_at, language)}`}
                     </p>
                   </div>

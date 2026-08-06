@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
@@ -12,6 +13,7 @@ import {
   getWorkspaceLimitForPlan,
 } from '@/lib/workspace-limits';
 import { SELF_SERVE_BILLING_ENABLED } from '@/lib/billing-mode';
+import { useToast } from '@/components/ui/ToastProvider';
 
 interface WorkspaceSwitcherProps {
   isCollapsed: boolean;
@@ -20,8 +22,10 @@ interface WorkspaceSwitcherProps {
 }
 
 export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: WorkspaceSwitcherProps) {
+  const router = useRouter();
   const { workspace, workspaces, membership, subscription, user } = useAppContext();
   const { t } = useLanguage();
+  const { showToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -61,6 +65,10 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    setIsSwitching(false);
+  }, [workspace.id]);
+
   const handleSwitchWorkspace = async (targetWorkspaceId: string) => {
     if (targetWorkspaceId === workspace.id || isSwitching) return;
     
@@ -74,13 +82,20 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
         body: JSON.stringify({ workspaceId: targetWorkspaceId }),
       });
 
-      if (response.ok) {
-        // Force a hard reload to ensure all app contexts are completely fresh
-        window.location.assign('/dashboard');
-      } else {
-        setIsSwitching(false);
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to switch workspace.');
       }
-    } catch {
+
+      onNavigate?.();
+      router.replace('/dashboard');
+      router.refresh();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to switch workspace.',
+        'error',
+      );
       setIsSwitching(false);
     }
   };
@@ -195,7 +210,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
                 SELF_SERVE_BILLING_ENABLED &&
                 subscription?.plan_tier !== 'premium'
               ) {
-                window.location.assign('/settings/billing');
+                router.push('/settings/billing');
               }
             }}
             disabled={

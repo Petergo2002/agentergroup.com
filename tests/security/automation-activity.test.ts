@@ -39,7 +39,7 @@ test("automation activity displays an operational event timeline and readiness f
 
 test("automation builder removes chat-only controls and uses automation language", () => {
   const builderSource = readFileSync(
-    "src/app/(app)/agents/[id]/builder/page.tsx",
+    "src/app/(app)/agents/[id]/builder/AgentBuilderClient.tsx",
     "utf8",
   );
 

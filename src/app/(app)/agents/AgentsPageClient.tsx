@@ -155,13 +155,13 @@ export default function AgentsPageClient({
 
   return (
     <div className="app-page app-page-compact">
-      <header className="app-section-header relative transition-all duration-300">
+      <header className="relative pb-2 pt-1 transition-all duration-300">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
             <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-on-surface sm:text-3xl">
               {t('agents.headline')}
             </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">
               {t('agents.description')}
             </p>
           </div>
@@ -190,7 +190,7 @@ export default function AgentsPageClient({
               onClick={() => setFilter(tab)}
               className={`h-8 flex-1 whitespace-nowrap rounded-lg px-4 text-xs font-semibold transition-all duration-150 md:flex-none ${
                 filter === tab
-                  ? "bg-primary/12 text-primary font-bold ring-1 ring-primary/20 shadow-xs"
+                  ? "bg-primary/12 text-primary font-bold ring-1 ring-primary/20 dark:bg-primary/20 dark:text-orange-400 shadow-xs"
                   : "text-on-surface-variant hover:bg-surface-container/60 hover:text-on-surface"
               }`}
             >

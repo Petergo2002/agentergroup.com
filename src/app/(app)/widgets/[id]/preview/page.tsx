@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { getAppRequestContext } from "@/lib/app/request-context";
 import { getAppUrl, getWidgetAppUrl } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import {
   loadWidgetById,
   loadWidgetPreviewDraft,
@@ -23,16 +22,12 @@ export default async function WidgetDraftPreviewPage({
   const { revision, preview_token: previewToken } = await searchParams;
   const language = await getServerLanguage();
   const messages = await getMessages(language);
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, context } = await getAppRequestContext();
 
-  if (!user) {
+  if (!user || !context) {
     return null;
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
   const loaded = await loadWidgetById(supabase as never, id);
 
   if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {

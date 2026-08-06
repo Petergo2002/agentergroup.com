@@ -92,7 +92,7 @@ export function SourceTable({
         <h3 className="mt-4 text-base font-semibold tracking-normal text-on-surface">
           {emptyTitle ?? t("knowledge.noSourcesFound")}
         </h3>
-        <p className="mt-2 max-w-sm text-sm leading-6 text-on-surface-variant/70 text-balance">
+        <p className="mt-2 max-w-sm text-sm leading-6 text-on-surface-variant text-balance">
           {emptyDescription ?? t("knowledge.connectDriveStatus")}
         </p>
       </div>
@@ -100,21 +100,20 @@ export function SourceTable({
   }
 
   return (
-    <div className="group/table relative overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
-      <div className="overflow-x-auto font-label">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-surface-container-low text-xs font-semibold text-on-surface-variant/80">
+    <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm font-headline">
+          <thead className="border-b border-outline-variant/10 bg-surface-container-low/50 text-xs font-semibold text-on-surface-variant">
+            <tr>
               {selectable ? (
                 <th className="w-12 px-6 py-5">
                   <input
                     ref={selectAllRef}
                     type="checkbox"
                     checked={allVisibleSourcesSelected}
-                    disabled={sources.length === 0}
                     onChange={(event) => onToggleAllSources?.(event.target.checked)}
-                    className="h-4 w-4 rounded border-outline-variant/40 text-primary focus:ring-primary/30 disabled:opacity-40"
                     aria-label={t("knowledge.selectAllSources")}
+                    className="h-4 w-4 rounded-md border-outline-variant/20 bg-surface-container-low text-primary focus:ring-primary/20"
                   />
                 </th>
               ) : null}
@@ -132,7 +131,7 @@ export function SourceTable({
               return (
                 <tr
                   key={`folder-${folder.id}`}
-                  className="group/row transition-colors hover:bg-surface-container-low/60 active:bg-surface-container-high/20"
+                  className="group/row transition-colors hover:bg-surface-container-low/70 active:bg-surface-container-high/20"
                 >
                   {selectable ? <td className="px-6 py-4" /> : null}
                   <td className="px-6 py-4">
@@ -149,7 +148,7 @@ export function SourceTable({
                         <p className="truncate text-sm font-semibold tracking-normal text-on-surface">
                           {folder.name}
                         </p>
-                        <p className="mt-0.5 truncate text-[11px] text-on-surface-variant/60">
+                        <p className="mt-0.5 truncate text-[11px] text-on-surface-variant">
                           {folder.description || t("knowledge.noFolderDescription")}
                         </p>
                       </div>

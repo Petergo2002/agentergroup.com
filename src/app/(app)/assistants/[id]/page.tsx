@@ -215,7 +215,23 @@ export default function AssistantDetailPage() {
       current
         ? {
             ...current,
-            messages: [...current.messages, optimisticMessage],
+            messages: [
+              ...current.messages,
+              optimisticMessage,
+              {
+                id: streamingAssistantId,
+                threadId: activeThreadId ?? 'pending',
+                role: 'assistant',
+                content: '',
+                toolName: null,
+                toolCallId: null,
+                metadata: {},
+                createdBy: null,
+                createdAt: new Date().toISOString(),
+                senderName: current.assistant.name ?? null,
+                downloads: [],
+              },
+            ],
           }
         : current,
     );
@@ -241,30 +257,6 @@ export default function AssistantDetailPage() {
       }
 
       requestAccepted = true;
-      setDetail((current) =>
-        current
-          ? {
-              ...current,
-              messages: [
-                ...current.messages,
-                {
-                  id: streamingAssistantId,
-                  threadId: resolvedThreadId ?? 'pending',
-                  role: 'assistant',
-                  content: '',
-                  toolName: null,
-                  toolCallId: null,
-                  metadata: {},
-                  createdBy: null,
-                  createdAt: new Date().toISOString(),
-                  senderName: current.assistant.name ?? null,
-                  downloads: [],
-                },
-              ],
-            }
-          : current,
-      );
-
       await consumeChatStream(response, (event) => {
         if (event.type === 'meta') {
           resolvedThreadId = event.threadId;
@@ -318,7 +310,9 @@ export default function AssistantDetailPage() {
             ? {
                 ...current,
                 messages: current.messages.filter(
-                  (message) => message.id !== optimisticMessage.id,
+                  (message) =>
+                    message.id !== optimisticMessage.id &&
+                    message.id !== streamingAssistantId,
                 ),
               }
             : current,

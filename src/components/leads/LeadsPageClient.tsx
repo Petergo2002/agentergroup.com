@@ -17,7 +17,7 @@ import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
 import { formatLocaleDateTime } from "@/lib/i18n";
-import { jsonFetcher } from "@/lib/json-fetcher";
+import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
 import type { LeadConversationSummary, WidgetLeadListItem } from "@/lib/types";
 import { formatRelativeDate } from "@/lib/utils";
 
@@ -299,7 +299,7 @@ export default function LeadsPageClient({
   workspaceId,
   workspaceName,
 }: LeadsPageClientProps) {
-  const { workspace } = useAppContext();
+  const { user, workspace } = useAppContext();
   const { language, t } = useLanguage();
   const [search, setSearch] = useState("");
   const [selectedLead, setSelectedLead] = useState<WidgetLeadListItem | null>(null);
@@ -311,10 +311,14 @@ export default function LeadsPageClient({
     isLoading,
     isValidating,
     mutate,
-  } = useSWR<WidgetLeadListItem[]>(leadsUrl, jsonFetcher, {
-    keepPreviousData: true,
-    refreshInterval: 60_000,
-  });
+  } = useSWR<WidgetLeadListItem[]>(
+    workspaceSWRKey(user.id, workspace.id, leadsUrl),
+    jsonFetcher,
+    {
+      keepPreviousData: true,
+      refreshInterval: 60_000,
+    },
+  );
   const hasSearch = Boolean(deferredSearch.trim());
   const displayedWorkspaceName =
     workspace.id === workspaceId ? workspace.name : workspaceName;

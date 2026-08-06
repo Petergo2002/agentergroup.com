@@ -10,7 +10,22 @@ export class JsonFetchError extends Error {
   }
 }
 
-export async function jsonFetcher<T>(url: string): Promise<T> {
+export type WorkspaceSWRKey = readonly [
+  userId: string,
+  workspaceId: string,
+  url: string,
+];
+
+export function workspaceSWRKey(
+  userId: string,
+  workspaceId: string,
+  url: string | null | undefined,
+): WorkspaceSWRKey | null {
+  return url ? [userId, workspaceId, url] : null;
+}
+
+export async function jsonFetcher<T>(key: string | WorkspaceSWRKey): Promise<T> {
+  const url = typeof key === "string" ? key : key[2];
   const response = await fetch(url);
   const payload = await response.json().catch(() => null);
 

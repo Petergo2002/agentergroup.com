@@ -22,10 +22,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
+import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatLocaleDateTime } from "@/lib/i18n";
-import { jsonFetcher } from "@/lib/json-fetcher";
+import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
 import type {
   FlywheelQuestionDetail,
   FlywheelQuestionCounts,
@@ -282,6 +283,7 @@ export default function QuestionsPageClient({
   widgets,
   workspaceName,
 }: QuestionsPageClientProps) {
+  const { user, workspace } = useAppContext();
   const { language } = useLanguage();
   const text = language === "sv" ? copy.sv : copy.en;
   const { showToast } = useToast();
@@ -309,11 +311,15 @@ export default function QuestionsPageClient({
     isLoading,
     isValidating,
     mutate,
-  } = useSWR<QuestionsResponse>(questionsUrl, jsonFetcher, {
-    fallbackData: { questions: initialQuestions, counts: initialCounts },
-    keepPreviousData: true,
-    refreshInterval: 45_000,
-  });
+  } = useSWR<QuestionsResponse>(
+    workspaceSWRKey(user.id, workspace.id, questionsUrl),
+    jsonFetcher,
+    {
+      fallbackData: { questions: initialQuestions, counts: initialCounts },
+      keepPreviousData: true,
+      refreshInterval: 45_000,
+    },
+  );
   const questions = useMemo(() => response?.questions ?? [], [response?.questions]);
   const counts = useMemo(
     () => response?.counts ?? initialCounts,
@@ -333,9 +339,11 @@ export default function QuestionsPageClient({
     data: detailResponse,
     isLoading: isDetailLoading,
     mutate: mutateDetail,
-  } = useSWR<{ question: FlywheelQuestionDetail }>(detailUrl, jsonFetcher, {
-    keepPreviousData: true,
-  });
+  } = useSWR<{ question: FlywheelQuestionDetail }>(
+    workspaceSWRKey(user.id, workspace.id, detailUrl),
+    jsonFetcher,
+    { keepPreviousData: true },
+  );
   const selectedQuestion = detailResponse?.question ?? selectedFromList;
   const selectedQuestionIdForDraft = selectedQuestion?.id ?? null;
   const selectedVerifiedFactId = selectedQuestion?.verified_fact?.id ?? null;
@@ -425,7 +433,7 @@ export default function QuestionsPageClient({
       ? buildQuestionsUrl("all", selectedAgentId, "", 200)
       : null;
   const { data: duplicateOptionsResponse } = useSWR<QuestionsResponse>(
-    duplicateOptionsUrl,
+    workspaceSWRKey(user.id, workspace.id, duplicateOptionsUrl),
     jsonFetcher,
     { keepPreviousData: true },
   );

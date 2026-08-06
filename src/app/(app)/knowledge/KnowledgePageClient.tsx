@@ -799,10 +799,10 @@ export default function KnowledgePageClient({
     value: string | number,
     colorClass: string,
   ) => (
-    <div className="flex min-w-24 flex-col gap-1 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3 shadow-sm">
+    <div className="flex min-w-24 flex-col gap-1 rounded-xl border border-outline-variant/10 bg-surface-container-low/50 px-4 py-3 shadow-xs transition-all hover:border-primary/20">
       <div className="flex items-center gap-1.5">
         <Icon className={`h-[15px] w-[15px] ${colorClass}`} />
-        <span className="text-xs font-medium text-on-surface-variant/70">{label}</span>
+        <span className="text-xs font-semibold text-on-surface-variant">{label}</span>
       </div>
       <span className="text-2xl font-bold tabular-nums text-on-surface">{value}</span>
     </div>
@@ -820,7 +820,7 @@ export default function KnowledgePageClient({
             <label className="text-sm font-medium text-on-surface-variant">
               {t("knowledge.targetFolder")}
             </label>
-            <p className="mt-1 text-xs text-on-surface-variant/60">
+            <p className="mt-1 text-xs text-on-surface-variant">
               {t("knowledge.targetFolderDescription")}
             </p>
           </div>
@@ -857,20 +857,20 @@ export default function KnowledgePageClient({
 
   return (
     <div className="app-page">
-      <header className="app-section-header">
+      <header className="relative pb-2 pt-1 transition-all duration-300">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
             <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
               {t("knowledge.title")}
             </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">
               {t("knowledge.description")}
             </p>
 
             <div className="mt-5 max-w-sm space-y-2">
-              <div className="flex items-center justify-between text-xs font-medium text-on-surface-variant/70">
+              <div className="flex items-center justify-between text-xs font-semibold text-on-surface-variant">
                 <span className="flex items-center gap-1.5">
-                  <Database className="h-3 w-3" />
+                  <Database className="h-3 w-3 text-primary" />
                   Knowledge Storage
                 </span>
                 <span>{storageStats.usedMB} MB / {storageStats.limitMB} MB</span>

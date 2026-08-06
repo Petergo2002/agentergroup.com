@@ -213,29 +213,30 @@ export async function POST(
           runId: run.id,
         });
 
-        await createAuditLog(admin as never, {
-          workspaceId: assistant.workspace_id,
-          agentId: assistant.id,
-          runId: run.id,
-          actorId: user.id,
-          action: "assistant.run.started",
-          summary: "Started an internal assistant run.",
-          metadata: {
-            threadId: thread.id,
-            model: assistant.model,
-            source: "assistant",
-          },
-        });
-
-        const persistUserStep = await createRunStep(admin as never, {
-          runId: run.id,
-          workspaceId: assistant.workspace_id,
-          agentId: assistant.id,
-          stepKey: "message.persist",
-          stepType: "message",
-          title: "Record user message",
-          detail: "Persisting the incoming assistant message before runtime execution.",
-        });
+        const [, persistUserStep] = await Promise.all([
+          createAuditLog(admin as never, {
+            workspaceId: assistant.workspace_id,
+            agentId: assistant.id,
+            runId: run.id,
+            actorId: user.id,
+            action: "assistant.run.started",
+            summary: "Started an internal assistant run.",
+            metadata: {
+              threadId: thread.id,
+              model: assistant.model,
+              source: "assistant",
+            },
+          }),
+          createRunStep(admin as never, {
+            runId: run.id,
+            workspaceId: assistant.workspace_id,
+            agentId: assistant.id,
+            stepKey: "message.persist",
+            stepType: "message",
+            title: "Record user message",
+            detail: "Persisting the incoming assistant message before runtime execution.",
+          }),
+        ]);
 
         const { error: userMessageError } = await admin.from("messages").insert({
           thread_id: thread.id,
@@ -264,21 +265,23 @@ export async function POST(
           { messageLength: input.length },
         );
 
-        const historyStep = await createRunStep(admin as never, {
-          runId: run.id,
-          workspaceId: assistant.workspace_id,
-          agentId: assistant.id,
-          stepKey: "context.load",
-          stepType: "context",
-          title: "Load conversation context",
-          detail: "Loading the assistant thread history.",
-        });
-
-        const { data: history, error: historyError } = await admin
-          .from("messages")
-          .select("*")
-          .eq("thread_id", thread.id)
-          .order("created_at", { ascending: true });
+        const [historyStep, { data: history, error: historyError }] =
+          await Promise.all([
+            createRunStep(admin as never, {
+              runId: run.id,
+              workspaceId: assistant.workspace_id,
+              agentId: assistant.id,
+              stepKey: "context.load",
+              stepType: "context",
+              title: "Load conversation context",
+              detail: "Loading the assistant thread history.",
+            }),
+            admin
+              .from("messages")
+              .select("*")
+              .eq("thread_id", thread.id)
+              .order("created_at", { ascending: true }),
+          ]);
 
         if (historyError) {
           throw historyError;
@@ -319,6 +322,7 @@ export async function POST(
           endChatPolicy,
           gmailRecipientPolicy,
           enabledToolsByToolkit,
+          abortSignal: request.signal,
           onToken: (token) => {
             send({
               type: "delta",

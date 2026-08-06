@@ -1,28 +1,24 @@
 import type { ConnectionRecord, KnowledgeFolderWithSources, KnowledgeSourceRecord } from "@/lib/types";
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { syncConnectedAccountsToDatabase } from "@/lib/composio";
+import { getAppRequestContext } from "@/lib/app/request-context";
 import { getEffectiveConnectionStatus } from "@/lib/connections";
 import { SUPPORTED_INTEGRATIONS } from "@/lib/integrations";
 import {
   toKnowledgeFolderWithSources,
   type KnowledgeFolderJoinRow,
 } from "@/lib/knowledge-folders";
-import { createClient } from "@/lib/supabase/server";
+import {
+  WORKSPACE_CONNECTION_LIST_LIMIT,
+  WORKSPACE_KNOWLEDGE_FOLDER_LIST_LIMIT,
+  WORKSPACE_KNOWLEDGE_SOURCE_LIST_LIMIT,
+} from "@/lib/query-limits";
 import KnowledgePageClient from "./KnowledgePageClient";
 
 async function loadKnowledgePageData() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, context } = await getAppRequestContext();
 
-  if (!user) {
+  if (!user || !context) {
     throw new Error("Unauthorized");
   }
-
-  const context = await ensureWorkspaceContext(supabase as never, user);
-
-  await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id);
 
   const [
     { data: sourcesData, error: sourcesError },
@@ -37,19 +33,22 @@ async function loadKnowledgePageData() {
         )
         .eq("workspace_id", context.workspace.id)
         .is("widget_session_id", null)
-        .order("updated_at", { ascending: false }),
+        .order("updated_at", { ascending: false })
+        .limit(WORKSPACE_KNOWLEDGE_SOURCE_LIST_LIMIT),
       supabase
         .from("knowledge_folders")
         .select("*, sources:knowledge_folder_sources(knowledge_source_id)")
         .eq("workspace_id", context.workspace.id)
-        .order("updated_at", { ascending: false }),
+        .order("updated_at", { ascending: false })
+        .limit(WORKSPACE_KNOWLEDGE_FOLDER_LIST_LIMIT),
       supabase
         .from("connections")
         .select(
           "id, workspace_id, provider, toolkit_slug, display_name, status, external_id, account_label, toolkit_data, created_by, last_synced_at, created_at, updated_at",
         )
         .eq("workspace_id", context.workspace.id)
-        .order("display_name", { ascending: true }),
+        .order("display_name", { ascending: true })
+        .limit(WORKSPACE_CONNECTION_LIST_LIMIT),
     ]);
 
   if (sourcesError) {

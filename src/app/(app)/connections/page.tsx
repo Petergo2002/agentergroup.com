@@ -1,31 +1,23 @@
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
-import { syncConnectedAccountsToDatabase } from "@/lib/composio";
+import { getAppRequestContext } from "@/lib/app/request-context";
 import { getEffectiveConnectionStatus, sortConnectedItemsFirst } from "@/lib/connections";
 import { SUPPORTED_INTEGRATIONS } from "@/lib/integrations";
-import { createClient } from "@/lib/supabase/server";
 import { isWorkspaceAdminRole } from "@/lib/workspace-security";
 import type { ConnectionAuthLinkRecord, ConnectionRecord } from "@/lib/types";
 import { SELF_SERVE_BILLING_ENABLED } from "@/lib/billing-mode";
+import { WORKSPACE_CONNECTION_LIST_LIMIT } from "@/lib/query-limits";
 import ConnectionsPageClient from "./ConnectionsPageClient";
 
 async function loadConnectionsPageData() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, context } = await getAppRequestContext();
 
-  if (!user) {
+  if (!user || !context) {
     throw new Error("Unauthorized");
   }
-
-  const context = await ensureWorkspaceContext(supabase as never, user);
 
   if (!context.subscription?.integrations_enabled) {
     const { redirect } = await import("next/navigation");
     redirect(SELF_SERVE_BILLING_ENABLED ? "/settings/billing" : "/dashboard");
   }
-
-  await syncConnectedAccountsToDatabase(supabase as never, context.workspace.id, user.id);
 
   const { data: storedConnections, error } = await supabase
     .from("connections")
@@ -33,7 +25,8 @@ async function loadConnectionsPageData() {
       "id, workspace_id, provider, toolkit_slug, display_name, status, external_id, account_label, toolkit_data, created_by, last_synced_at, created_at, updated_at",
     )
     .eq("workspace_id", context.workspace.id)
-    .order("display_name", { ascending: true });
+    .order("display_name", { ascending: true })
+    .limit(WORKSPACE_CONNECTION_LIST_LIMIT);
 
   if (error) {
     throw error;

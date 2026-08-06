@@ -12,9 +12,10 @@ import {
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
+import { useAppContext } from "@/components/app/AppContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
-import { jsonFetcher } from "@/lib/json-fetcher";
+import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
 import { formatRelativeDate } from "@/lib/utils";
 import type {
   DashboardAnalyticsAppliedFilters,
@@ -27,9 +28,16 @@ import type {
 import {
   Activity,
   AlertCircle,
+  BarChart3,
+  Bot,
   Bug,
   ChevronRight,
   MessageSquare,
+  MessagesSquare,
+  Paperclip,
+  UserCheck,
+  Workflow,
+  X,
 } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
@@ -162,7 +170,7 @@ function ConversationAttachments({
             rel="noopener noreferrer"
             className="flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 text-xs font-medium shadow-sm transition-colors hover:bg-black/20"
           >
-            <span className="material-symbols-outlined text-[14px]">attachment</span>
+            <Paperclip className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="max-w-[120px] truncate">{attachment.name}</span>
           </a>
         )
@@ -301,8 +309,8 @@ function ConversationRow({
       onClick={onClick}
       className={`group relative w-full border-b border-outline-variant/10 px-5 py-4 text-left transition-colors ${
         selected
-          ? "bg-surface-container-lowest"
-          : "hover:bg-surface-container-low/60"
+          ? "bg-primary/[0.08] dark:bg-primary/15 shadow-xs"
+          : "hover:bg-surface-container-low/70"
       }`}
     >
       {selected && (
@@ -323,13 +331,13 @@ function ConversationRow({
             <p className="truncate text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
               {identityDisplay.primary}
             </p>
-            <span className="shrink-0 text-xs font-medium text-on-surface-variant/60">
+            <span className="shrink-0 text-xs font-medium text-on-surface-variant/70">
               {formatRelativeDate(conversation.lastActivityAt, language)}
             </span>
           </div>
 
           <div className="mt-0.5 flex min-w-0 items-center gap-2">
-            <p className="truncate text-xs font-medium text-on-surface-variant/70">
+            <p className="truncate text-xs font-medium text-on-surface-variant">
               {identityDisplay.secondary}
             </p>
             <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${presenceDisplay.className}`}>
@@ -341,7 +349,7 @@ function ConversationRow({
             )}
           </div>
 
-          <p className="mt-2 line-clamp-2 text-sm leading-5 text-on-surface-variant/75">
+          <p className="mt-2 line-clamp-2 text-sm leading-5 text-on-surface-variant">
             {conversation.latestSnippet || t("analytics.monitoringSession")}
           </p>
           
@@ -358,7 +366,7 @@ function ConversationRow({
               </div>
               {conversation.hasLead && (
                 <div className="flex items-center gap-1 text-primary">
-                  <span className="material-symbols-outlined text-[14px]">person_check</span>
+                  <UserCheck className="h-3.5 w-3.5" aria-hidden="true" />
                   <span className="text-xs font-semibold">{t("analytics.leadCaptured")}</span>
                 </div>
               )}
@@ -410,7 +418,7 @@ function ConversationInboxPane({
         ) : conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-10 py-20 text-center">
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant/55 ring-1 ring-outline-variant/15">
-              <span className="material-symbols-outlined">analytics</span>
+              <BarChart3 className="h-5 w-5" aria-hidden="true" />
             </div>
             <p className="text-sm font-medium text-on-surface">{t("analytics.noConversations")}</p>
             <p className="mt-1.5 text-[12px] text-on-surface-variant">{t("analytics.awaitingConversations")}</p>
@@ -511,7 +519,7 @@ function ConversationDetail({
                 aria-label="Close conversation detail"
                 className="rounded-xl bg-surface-container-low p-2.5 transition-colors hover:bg-surface-container-high lg:hidden"
               >
-                <span className="material-symbols-outlined text-on-surface-variant">close</span>
+                <X className="h-5 w-5 text-on-surface-variant" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -565,7 +573,7 @@ function ConversationDetail({
       ) : !detail ? (
         <div className="flex flex-1 flex-col items-center justify-center p-12 text-center">
           <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant/55 ring-1 ring-outline-variant/15">
-            <span className="material-symbols-outlined text-3xl">analytics</span>
+            <BarChart3 className="h-7 w-7" aria-hidden="true" />
           </div>
           <h3 className="text-base font-semibold tracking-normal text-on-surface">{t("analytics.noSessionSelected")}</h3>
           <p className="mt-2 text-sm text-on-surface-variant max-w-xs leading-relaxed">
@@ -591,7 +599,7 @@ function ConversationDetail({
 
           {detail.transcript.length === 0 ? (
             <div className="flex flex-col items-center py-20 text-on-surface-variant/40">
-              <span className="material-symbols-outlined text-4xl mb-4">forum</span>
+              <MessagesSquare className="mb-4 h-10 w-10" aria-hidden="true" />
               <p className="text-sm italic">{t("analytics.waitingInitialMessage")}</p>
             </div>
           ) : (
@@ -612,7 +620,7 @@ function ConversationDetail({
                   >
                     {message.role === "user"
                       ? (identityDisplay?.initials || "U")
-                      : <span className="material-symbols-outlined text-sm">smart_toy</span>}
+                      : <Bot className="h-4 w-4" aria-hidden="true" />}
                   </div>
 
                   <div className={`space-y-2 ${message.role === "user" ? "text-right" : ""}`}>
@@ -899,7 +907,7 @@ function AutomationPerformancePanel({
       ) : !automation || automation.totalEvents === 0 ? (
         <div className="flex min-h-[28rem] flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant/25 bg-surface-container-lowest px-6 py-16 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant/55 ring-1 ring-outline-variant/15">
-            <span className="material-symbols-outlined" aria-hidden="true">automation</span>
+            <Workflow className="h-5 w-5" aria-hidden="true" />
           </div>
           <h2 className="text-base font-semibold text-on-surface">No automation events in this range</h2>
           <p className="mt-2 max-w-md text-sm leading-6 text-on-surface-variant/70">
@@ -1040,6 +1048,7 @@ function AutomationPerformancePanel({
 }
 
 export function AnalyticsWorkspaceView() {
+  const { user, workspace } = useAppContext();
   const { t, language } = useLanguage();
   const { showToast } = useToast();
   const searchParams = useSearchParams();
@@ -1081,7 +1090,11 @@ export function AnalyticsWorkspaceView() {
     data: analyticsData,
     error: analyticsError,
     isLoading: isAnalyticsLoading,
-  } = useSWR<DashboardAnalyticsResponse>(analyticsUrl, jsonFetcher);
+  } = useSWR<DashboardAnalyticsResponse>(
+    workspaceSWRKey(user.id, workspace.id, analyticsUrl),
+    jsonFetcher,
+    { keepPreviousData: true },
+  );
 
   useEffect(() => {
     detailCacheRef.current = state.detailCache;

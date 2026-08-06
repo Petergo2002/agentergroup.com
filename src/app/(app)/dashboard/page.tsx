@@ -1,18 +1,15 @@
-import { loadDashboardSummary } from "@/lib/dashboard/summary";
-import { createClient } from "@/lib/supabase/server";
+import { getAppRequestContext } from "@/lib/app/request-context";
+import { loadDashboardSummaryForContext } from "@/lib/dashboard/summary";
 import DashboardPageClient from "./DashboardPageClient";
 
 async function loadDashboardPageData() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, context } = await getAppRequestContext();
 
-  if (!user) {
+  if (!user || !context) {
     throw new Error("Unauthorized");
   }
 
-  return loadDashboardSummary(supabase as never, user);
+  return loadDashboardSummaryForContext(context);
 }
 
 export default async function DashboardPage() {

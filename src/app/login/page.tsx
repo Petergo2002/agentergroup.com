@@ -191,7 +191,7 @@ COMPOSIO_API_KEY=`}
         {/* Right Column: Hero Image */}
         <section className="hidden lg:block w-1/2 relative bg-slate-50 border-l border-slate-100">
           <Image
-            src="/stocksnap-robot-2587571.jpg"
+            src="/login-robot-hero.jpg"
             alt="Hero Image"
             fill
             sizes="50vw"

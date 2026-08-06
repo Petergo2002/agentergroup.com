@@ -225,29 +225,30 @@ export async function POST(
           runId: run.id,
         });
 
-        await createAuditLog(runtimeAdmin as never, {
-          workspaceId: agent.workspace_id,
-          agentId: agent.id,
-          runId: run.id,
-          actorId: user.id,
-          action: "run.started",
-          summary: "Started a conversational run.",
-          metadata: {
-            threadId,
-            model: agent.model,
-            source: "preview",
-          },
-        });
-
-        const persistUserStep = await createRunStep(runtimeAdmin as never, {
-          runId: run.id,
-          workspaceId: agent.workspace_id,
-          agentId: agent.id,
-          stepKey: "message.persist",
-          stepType: "message",
-          title: "Record user message",
-          detail: "Persisting the incoming user message before runtime execution.",
-        });
+        const [, persistUserStep] = await Promise.all([
+          createAuditLog(runtimeAdmin as never, {
+            workspaceId: agent.workspace_id,
+            agentId: agent.id,
+            runId: run.id,
+            actorId: user.id,
+            action: "run.started",
+            summary: "Started a conversational run.",
+            metadata: {
+              threadId,
+              model: agent.model,
+              source: "preview",
+            },
+          }),
+          createRunStep(runtimeAdmin as never, {
+            runId: run.id,
+            workspaceId: agent.workspace_id,
+            agentId: agent.id,
+            stepKey: "message.persist",
+            stepType: "message",
+            title: "Record user message",
+            detail: "Persisting the incoming user message before runtime execution.",
+          }),
+        ]);
 
         const { error: userMessageError } = await runtimeAdmin.from("messages").insert({
           thread_id: threadId,
@@ -276,21 +277,23 @@ export async function POST(
           { messageLength: input.length },
         );
 
-        const historyStep = await createRunStep(runtimeAdmin as never, {
-          runId: run.id,
-          workspaceId: agent.workspace_id,
-          agentId: agent.id,
-          stepKey: "context.load",
-          stepType: "context",
-          title: "Load conversation context",
-          detail: "Loading existing preview thread history.",
-        });
-
-        const { data: history, error: historyError } = await runtimeAdmin
-          .from("messages")
-          .select("*")
-          .eq("thread_id", threadId)
-          .order("created_at", { ascending: true });
+        const [historyStep, { data: history, error: historyError }] =
+          await Promise.all([
+            createRunStep(runtimeAdmin as never, {
+              runId: run.id,
+              workspaceId: agent.workspace_id,
+              agentId: agent.id,
+              stepKey: "context.load",
+              stepType: "context",
+              title: "Load conversation context",
+              detail: "Loading existing preview thread history.",
+            }),
+            runtimeAdmin
+              .from("messages")
+              .select("*")
+              .eq("thread_id", threadId)
+              .order("created_at", { ascending: true }),
+          ]);
 
         if (historyError) {
           throw historyError;
@@ -331,6 +334,7 @@ export async function POST(
           endChatPolicy,
           gmailRecipientPolicy,
           enabledToolsByToolkit,
+          abortSignal: request.signal,
           onToken: (token) => {
             send({
               type: "delta",

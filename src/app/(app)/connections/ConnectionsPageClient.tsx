@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CalendarDays, Cloud, Copy, Hash, Link2, Mail, Network, RefreshCw, ShoppingBag } from 'lucide-react';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { SimpleIcon } from '@/components/icons/SimpleIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import { shouldRefreshConnections } from '@/lib/connections';
 import type { ConnectionAuthLinkRecord, ConnectionRecord } from '@/lib/types';
 
 interface ConnectionToolkitCard {
@@ -78,6 +79,7 @@ export default function ConnectionsPageClient({
   const [revokingAuthLinkId, setRevokingAuthLinkId] = useState<string | null>(null);
   const [generatedAuthLink, setGeneratedAuthLink] = useState<GeneratedAuthLink | null>(null);
   const [isAuthLinksOpen, setIsAuthLinksOpen] = useState(false);
+  const hasStartedInitialSync = useRef(false);
 
   const formatDateTime = useCallback(
     (value: string) => new Date(value).toLocaleString(language === 'sv' ? 'sv-SE' : 'en-US'),
@@ -120,7 +122,9 @@ export default function ConnectionsPageClient({
 
       setToolkits(payload.toolkits ?? []);
       setConnections(payload.connections ?? []);
-      await loadAuthLinks();
+      if (force) {
+        await loadAuthLinks();
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : t('connections.loadError');
@@ -129,6 +133,19 @@ export default function ConnectionsPageClient({
       setIsSyncing(false);
     }
   }, [loadAuthLinks, showToast, t]);
+
+  useEffect(() => {
+    if (
+      hasStartedInitialSync.current ||
+      !shouldRefreshConnections(initialConnections)
+    ) {
+      return;
+    }
+
+    hasStartedInitialSync.current = true;
+    setIsSyncing(true);
+    void load();
+  }, [initialConnections, load]);
 
   const handleConnect = useCallback(async (toolkit: ConnectionToolkitCard) => {
     try {

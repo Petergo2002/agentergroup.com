@@ -13,6 +13,7 @@ import type {
   ThreadRecord,
   WorkspaceMemberRecord,
 } from "@/lib/types";
+import { WORKSPACE_ASSISTANT_LIST_LIMIT } from "@/lib/query-limits";
 
 interface AssistantThreadLockRow {
   thread_id: string | null;
@@ -48,6 +49,7 @@ interface AdminQueryBuilder extends PromiseLike<AdminQueryResult> {
     column: string,
     options?: { ascending?: boolean },
   ) => AdminQueryBuilder;
+  limit: (count: number) => AdminQueryBuilder;
   maybeSingle: () => Promise<AdminQueryResult>;
   single: () => Promise<AdminQueryResult>;
 }
@@ -124,7 +126,8 @@ export async function listWorkspaceAssistants(
     .eq("surface", "assistant")
     .is("archived_at", null)
     .neq("status", "draft")
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(WORKSPACE_ASSISTANT_LIST_LIMIT);
 
   throwOnError(error, "Failed to load assistants.");
 

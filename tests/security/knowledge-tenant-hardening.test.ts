@@ -24,7 +24,7 @@ const knowledgeSourcesRoute = readFileSync(
 );
 const assistantServer = readFileSync("src/lib/assistants/server.ts", "utf8");
 const builderPage = readFileSync(
-  "src/app/(app)/agents/[id]/builder/page.tsx",
+  "src/app/(app)/agents/[id]/builder/AgentBuilderClient.tsx",
   "utf8",
 );
 

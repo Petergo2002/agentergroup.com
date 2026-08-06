@@ -1,25 +1,22 @@
 import type { AgentRecord } from "@/lib/types";
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { getAppRequestContext } from "@/lib/app/request-context";
 import { DASHBOARD_AGENT_SELECT } from "@/lib/dashboard/summary";
-import { createClient } from "@/lib/supabase/server";
+import { WORKSPACE_AGENT_LIST_LIMIT } from "@/lib/query-limits";
 import AgentsPageClient from "./AgentsPageClient";
 
 async function loadAgentsPageData() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, context } = await getAppRequestContext();
 
-  if (!user) {
+  if (!user || !context) {
     throw new Error("Unauthorized");
   }
 
-  const context = await ensureWorkspaceContext(supabase as never, user);
   const { data, error } = await supabase
     .from("agents")
     .select(DASHBOARD_AGENT_SELECT)
     .eq("workspace_id", context.workspace.id)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(WORKSPACE_AGENT_LIST_LIMIT);
 
   if (error) {
     throw error;

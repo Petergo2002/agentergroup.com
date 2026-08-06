@@ -158,6 +158,7 @@ export interface AgentRuntimeResult {
 }
 
 const MAX_TOOL_ITERATIONS = 6;
+const KNOWLEDGE_SEARCH_TIMEOUT_MS = 8_000;
 const EMPTY_ASSISTANT_RESPONSE_FALLBACK =
   "Sorry, I had trouble answering that. Please try again.";
 const OMITTED_ASSISTANT_HISTORY_MESSAGES = new Set([
@@ -585,6 +586,7 @@ async function retrieveKnowledgeMatches({
   knowledgeAccessToken,
   widgetPublicKey,
   widgetSessionId,
+  abortSignal,
 }: {
   supabase: RuntimeSupabaseLike;
   workspaceId: string;
@@ -593,6 +595,7 @@ async function retrieveKnowledgeMatches({
   knowledgeAccessToken?: string | null;
   widgetPublicKey?: string | null;
   widgetSessionId?: string | null;
+  abortSignal?: AbortSignal;
 }) {
   void supabase;
 
@@ -614,9 +617,14 @@ async function retrieveKnowledgeMatches({
     }
   }
 
+  const timeoutSignal = AbortSignal.timeout(KNOWLEDGE_SEARCH_TIMEOUT_MS);
+  const searchSignal = abortSignal
+    ? AbortSignal.any([abortSignal, timeoutSignal])
+    : timeoutSignal;
   const response = await fetch(`${url}/functions/v1/search-knowledge`, {
     method: "POST",
     headers,
+    signal: searchSignal,
     body: JSON.stringify({
       workspaceId,
       agentId,
@@ -790,6 +798,7 @@ export async function runAgentChat({
         knowledgeAccessToken,
         widgetPublicKey,
         widgetSessionId,
+        abortSignal,
       });
 
       const knowledgeContext = buildKnowledgeContext(knowledgeMatches);
@@ -798,6 +807,10 @@ export async function runAgentChat({
         systemInstructionBlocks.push(knowledgeContext);
       }
     } catch (error) {
+      if (abortSignal?.aborted) {
+        throw error;
+      }
+
       console.error("Knowledge retrieval failed; continuing without knowledge.", {
         agentId: agent.id,
         workspaceId: agent.workspace_id,

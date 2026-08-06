@@ -108,11 +108,12 @@ export function LeadAiSummaryCard({
   return (
     <section
       aria-labelledby={titleId}
-      className="rounded-2xl border border-outline-variant/15 bg-surface p-5 shadow-sm sm:p-6"
+      className="relative overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm sm:p-6 transition-all duration-200 hover:border-primary/20"
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary via-orange-400 to-amber-300" />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pt-0.5">
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-on-surface-variant/60">
+          <p className="text-xs font-bold text-primary">
             {t("leads.aiSummary.kicker")}
           </p>
           <h3 id={titleId} className="mt-1 text-base font-semibold tracking-normal text-on-surface">

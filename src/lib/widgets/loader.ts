@@ -5,6 +5,7 @@ import type {
   WidgetOrderedSelectBuilder,
 } from "./server-types";
 import type { WidgetAgentWithAgent } from "@/lib/widgets";
+import { WORKSPACE_WIDGET_LIST_LIMIT } from "@/lib/query-limits";
 
 interface WorkspacePlanTierRow {
   plan_tier: string | null;
@@ -170,7 +171,8 @@ export async function loadAllWidgetsWithAgents(
     .from("widgets")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .order("updated_at", { ascending: false }) as unknown as Promise<{ data: WidgetRecord[] | null; error: { message: string } | null }>);
+    .order("updated_at", { ascending: false })
+    .limit(WORKSPACE_WIDGET_LIST_LIMIT) as unknown as Promise<{ data: WidgetRecord[] | null; error: { message: string } | null }>);
 
   if (widgetsError) {
     throw new Error(widgetsError.message);
