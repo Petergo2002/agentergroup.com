@@ -37,3 +37,10 @@ Use dark or error-specific buttons only when the action is not a normal primary 
 - Use one dominant primary action per header when possible.
 - Keep tables and work queues dense but separated with clear row hover and selected states.
 - Use empty states with a clear title, short explanation, and an action when the user can do something next.
+
+## Accessible Overlays and Feedback
+
+- Use the shared `Modal` component for modal workflows. It provides dialog naming, focus placement and containment, Escape handling, focus restoration, and body-scroll restoration.
+- Keep the mobile navigation drawer inert and hidden from assistive technology while it is closed.
+- Use `ToastProvider` for transient outcomes. Errors are announced assertively; success, warning, and informational notices use a polite status announcement.
+- Preserve `focus-visible` styles and provide an accessible name for icon-only controls.

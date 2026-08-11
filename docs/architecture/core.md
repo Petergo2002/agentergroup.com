@@ -2181,6 +2181,8 @@ Download hardening:
 - DNS resolution happens before fetch and blocks private, loopback, and link-local destinations
 - redirect destinations are re-validated against the same rules
 - local file-path reads and arbitrary remote URLs are rejected
+- remote reads have a 30-second timeout and are streamed through the workspace's remaining storage allowance, so an oversized provider response is stopped before the entire file is buffered
+- provider payloads and signed URL candidates are not written to application logs
 
 ### Important architectural rule
 
@@ -2381,6 +2383,7 @@ The core environment contract is:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_EXTRA_CREDITS_500_PRICE_ID`
+- `NEXT_PUBLIC_SELF_SERVE_BILLING_ENABLED` (optional; managed-plan mode unless exactly `true`)
 - `SUPABASE_SECRET_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `WIDGET_APP_URL`
@@ -2408,6 +2411,16 @@ The knowledge Edge Functions accept current `sb_secret_...` keys through
 the `apikey` header. Because those keys are not JWTs, `search-knowledge`
 and `process-knowledge-source` run with `verify_jwt = false` and perform
 their own internal-key or user-token authorization in the handler.
+
+`process-knowledge-source` resolves user calls through a user-scoped client
+before privileged mutations, rejects the retired unauthenticated widget-upload
+path, restricts website crawls to the selected origin and page limit, derives
+plan limits on the server, and reserves storage atomically. The production
+bundle must include the matching files under `supabase/functions/_shared`.
+
+The production-generated public schema types are committed at
+`src/lib/supabase/database.types.ts`. Regenerate that file after approved
+migrations and review the diff before deploying application code.
 
 ## Observability and Debugging
 

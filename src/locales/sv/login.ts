@@ -39,6 +39,10 @@ export const login = {
   legalAnd: "och",
   privacyPolicy: "Integritetspolicy",
   termsOfService: "Användarvillkor",
+  signupConsentPrefix: "Jag godkänner",
+  signupConsentAnd: "och bekräftar",
+  signupConsentRequired:
+    "Du måste godkänna användarvillkoren och bekräfta integritetspolicyn för att skapa ett konto.",
   logoAlt: "Agentergroup-logotyp",
   continueWithGoogle: "Fortsätt med Google",
   orContinueWith: "eller fortsätt med e-post",

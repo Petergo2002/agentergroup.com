@@ -221,6 +221,8 @@ export function AppShell({ children, context, user }: AppShellProps) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="mobile-navigation-title"
+                aria-hidden={!isSidebarOpen}
+                inert={!isSidebarOpen}
                 tabIndex={-1}
                 className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transition-transform duration-200 lg:hidden ${
                   isSidebarOpen ? "translate-x-0" : "-translate-x-full"

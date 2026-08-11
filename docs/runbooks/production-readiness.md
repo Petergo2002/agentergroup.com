@@ -1,6 +1,6 @@
 # Production Readiness And Manual Steps
 
-Last updated: 2026-06-24
+Last updated: 2026-08-08
 
 This document covers the launch-hardening changes that require coordinated
 database, Edge Function, dashboard, and widget deployment. It is not evidence
@@ -23,36 +23,23 @@ non-production project and then repeated in production.
 Service-role and secret keys must remain server-only. Never expose them through
 `NEXT_PUBLIC_*`, widget configuration, logs, or client responses.
 
-## Required Migrations
+## Migration Status
 
-Apply these local migrations in order:
-
-1. `20260531160122_folder_sources_in_widget_session_search.sql`
-2. `20260611203002_production_hardening_security_billing_uploads.sql`
-3. `20260611203129_secure_widget_attachments.sql`
-4. `20260611203154_stripe_webhook_reliability.sql`
-5. `20260612175729_allow_phone_only_widget_leads.sql`
-6. `20260617210341_fix_replace_agent_connections_helper.sql`
-7. `20260618120959_lead_conversation_ai_summaries.sql`
-
-The linked production migration history was not identical to the local
-directory during the June 11 review. Before applying anything:
+As of August 8, 2026, all 93 local migration versions and names exactly match
+the linked production history. The audit did not identify a schema migration
+that needed to be applied. Before any future database change, verify that this
+remains true:
 
 ```bash
 supabase migration list --linked
 supabase db push --linked --dry-run
 ```
 
-Resolve migration-history drift before `supabase db push --linked`. Do not mark
-local migrations as applied unless their SQL is already present and verified in
-production.
+Resolve any migration-history drift before `supabase db push --linked`. Do not
+mark local migrations as applied unless their SQL is already present and
+verified in production.
 
-The linked project was verified on June 18 with migrations
-`20260617210341` and `20260618120959` applied. The lead-summary table has RLS,
-an authenticated workspace-member read policy, no anonymous grants, and
-service-role-only writes.
-
-After migration, verify:
+After any future migration, verify:
 
 - authenticated users cannot insert, update, or delete `audit_logs`, `runs`,
   `run_steps`, or `messages`
@@ -74,6 +61,10 @@ The function performs its own authentication because it accepts both
 user-scoped JWT calls and trusted internal calls. Confirm the project has the
 Supabase publishable key, a server secret key, and `FIRECRAWL_API_KEY` configured
 as function secrets. Do not print their values during verification.
+
+Production version 13 was deployed and source-compared on August 8, 2026. Its
+entrypoint and both shared dependencies matched the repository exactly after
+deployment.
 
 ## Widget Attachment Rollout
 
@@ -144,7 +135,7 @@ npx tsc --noEmit
 npm test
 npm run build
 npm run widget:build
-npm audit --audit-level=high
+npm audit --audit-level=moderate
 npm --prefix apps/widget-v2 audit --audit-level=moderate
 ```
 
@@ -159,17 +150,18 @@ Version `19.2.3` has incomplete React Server Components security fixes.
 ## Deployment Checklist
 
 1. Confirm a current Supabase backup and tested restore path.
-2. Reconcile linked migration history and apply migrations in staging.
-3. Deploy and test the knowledge Edge Function in staging.
+2. Confirm linked migration history still matches the repository.
+3. Deploy approved database or Edge Function changes in staging before production.
 4. Resolve the legacy widget attachment decision.
-5. Apply production migrations.
+5. Apply only reviewed, pending production migrations.
 6. Deploy the dashboard and widget runtime together.
 7. Verify `/api/health`, authentication, assistant privacy, upload, retention,
    checkout, webhook replay, cancellation, renewal, and unknown-price handling.
 8. Verify the Composio webhook subscription includes `composio.trigger.message`,
    `composio.connected_account.expired`, and `composio.trigger.disabled`; test one
    Gmail automation event through Activity and Analytics.
-9. Enable Supabase leaked-password protection in Auth settings.
+9. Confirm the intended Auth password policy. Leaked-password protection is
+   currently intentionally disabled and is not a release blocker.
 10. Review `stripe_webhook_events` for `failed` or `requires_review` rows.
 11. Monitor logs and storage growth during the first customer rollout.
 
@@ -180,9 +172,11 @@ Version `19.2.3` has incomplete React Server Components security fixes.
   partially succeed across separate requests.
 - Admin overview queries still aggregate broad result sets in application code.
   Move them to reviewed SQL aggregates before unrestricted self-service scale.
-- The root dependency audit currently reports an upstream moderate PostCSS advisory
-  from Next.js. Do not use npm's proposed forced downgrade; update to a fixed,
-  supported Next.js release when available and rerun the full release gate.
-- Earlier migration-history drift still needs reconciliation before using a
-  broad linked `supabase db push`; the two June 17–18 migrations listed above
-  are already applied and verified on the linked project.
+- The committed `src/lib/supabase/database.types.ts` matches production, but
+  shared Supabase clients are not yet globally parameterized. Existing domain
+  models need reviewed JSON and enum adapters before that can be enabled
+  without broad casts.
+- Protected mutation routes rely on the Supabase cookie/session model and
+  SameSite behavior rather than a single application-wide Origin/CSRF guard.
+  Introducing a global guard needs an inventory of non-browser callers and
+  explicit production-behavior approval.

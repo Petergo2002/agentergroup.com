@@ -32,7 +32,9 @@ export class SafeFetchError extends Error {
     | "HOST_NOT_ALLOWED"
     | "DNS_RESOLUTION_FAILED"
     | "TOO_MANY_REDIRECTS"
-    | "INVALID_REDIRECT";
+    | "INVALID_REDIRECT"
+    | "RESPONSE_TOO_LARGE"
+    | "REQUEST_TIMEOUT";
 
   constructor(
     code: SafeFetchError["code"],
@@ -204,21 +206,99 @@ export async function fetchSafeRemoteResource(
 
 export async function fetchSafeDownloadBytes(
   urlString: string,
-  options?: {
+  options: {
     fetchImpl?: typeof fetch;
     lookupImpl?: LookupFunction;
     maxRedirects?: number;
+    maxBytes: number;
+    signal?: AbortSignal;
+    timeoutMs?: number;
   },
 ) {
-  const response = await fetchSafeRemoteResource(urlString, {
-    fetchImpl: options?.fetchImpl,
-    lookupImpl: options?.lookupImpl,
-    maxRedirects: options?.maxRedirects,
-  });
-
-  if (!response.ok) {
-    throw new Error("Remote download returned an unreadable file URL.");
+  if (!Number.isSafeInteger(options.maxBytes) || options.maxBytes < 1) {
+    throw new RangeError("Remote download maxBytes must be a positive integer.");
   }
 
-  return new Uint8Array(await response.arrayBuffer());
+  if (
+    options.timeoutMs !== undefined &&
+    (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 1)
+  ) {
+    throw new RangeError("Remote download timeoutMs must be a positive integer.");
+  }
+
+  const timeoutSignal = options.timeoutMs
+    ? AbortSignal.timeout(options.timeoutMs)
+    : undefined;
+  const signal =
+    options.signal && timeoutSignal
+      ? AbortSignal.any([options.signal, timeoutSignal])
+      : options.signal ?? timeoutSignal;
+
+  try {
+    const response = await fetchSafeRemoteResource(urlString, {
+      fetchImpl: options.fetchImpl,
+      lookupImpl: options.lookupImpl,
+      maxRedirects: options.maxRedirects,
+      signal,
+    });
+
+    if (!response.ok) {
+      throw new Error("Remote download returned an unreadable file URL.");
+    }
+
+    const contentLength = Number(response.headers.get("content-length"));
+    if (Number.isFinite(contentLength) && contentLength > options.maxBytes) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new SafeFetchError(
+        "RESPONSE_TOO_LARGE",
+        "Remote download exceeds the permitted size.",
+      );
+    }
+
+    if (!response.body) {
+      return new Uint8Array();
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > options.maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new SafeFetchError(
+          "RESPONSE_TOO_LARGE",
+          "Remote download exceeds the permitted size.",
+        );
+      }
+
+      chunks.push(value);
+    }
+
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+
+    return bytes;
+  } catch (error) {
+    if (error instanceof SafeFetchError) {
+      throw error;
+    }
+
+    if (timeoutSignal?.aborted && !options.signal?.aborted) {
+      throw new SafeFetchError(
+        "REQUEST_TIMEOUT",
+        "Remote download timed out.",
+      );
+    }
+
+    throw error;
+  }
 }

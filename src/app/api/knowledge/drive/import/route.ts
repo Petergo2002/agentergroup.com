@@ -18,8 +18,10 @@ import {
 } from "@/lib/drive-connections";
 import { KNOWLEDGE_BUCKET } from "@/lib/knowledge";
 import { getDriveImportMimeTypes } from "@/lib/integrations";
-import { fetchSafeDownloadBytes } from "@/lib/safe-fetch";
+import { SafeFetchError, fetchSafeDownloadBytes } from "@/lib/safe-fetch";
 import type { ConnectionRecord } from "@/lib/types";
+
+const DRIVE_DOWNLOAD_TIMEOUT_MS = 30_000;
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
@@ -72,7 +74,14 @@ async function linkSourceToFolder(
   }
 }
 
-async function getFilePayloadBytes(payload: Record<string, unknown>) {
+function storageLimitError(storageLimit: number) {
+  return `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.`;
+}
+
+async function getFilePayloadBytes(
+  payload: Record<string, unknown>,
+  maxBytes: number,
+) {
   try {
     const nestedCandidates = [
       getNestedRecord(payload.downloaded_file_content),
@@ -91,12 +100,25 @@ async function getFilePayloadBytes(payload: Record<string, unknown>) {
       ]),
     ].filter(Boolean) as string[];
 
-    for (const url of urlCandidates) {
+    for (const [candidateIndex, url] of urlCandidates.entries()) {
       try {
-        const bytes = await fetchSafeDownloadBytes(url);
+        const bytes = await fetchSafeDownloadBytes(url, {
+          maxBytes,
+          timeoutMs: DRIVE_DOWNLOAD_TIMEOUT_MS,
+        });
         if (bytes) return bytes;
       } catch (err) {
-        console.warn("[knowledge/drive/import] Failed to fetch from URL candidate:", url, err);
+        if (
+          err instanceof SafeFetchError &&
+          err.code === "RESPONSE_TOO_LARGE"
+        ) {
+          throw err;
+        }
+
+        console.warn("[knowledge/drive/import] URL candidate failed", {
+          candidateIndex,
+          code: err instanceof SafeFetchError ? err.code : "DOWNLOAD_FAILED",
+        });
         continue;
       }
     }
@@ -107,14 +129,20 @@ async function getFilePayloadBytes(payload: Record<string, unknown>) {
       null;
 
     if (inlineContent) {
-      return new TextEncoder().encode(inlineContent);
+      const bytes = new TextEncoder().encode(inlineContent);
+      if (bytes.byteLength > maxBytes) {
+        throw new SafeFetchError(
+          "RESPONSE_TOO_LARGE",
+          "Remote download exceeds the permitted size.",
+        );
+      }
+      return bytes;
     }
 
-    console.error("[knowledge/drive/import] Could not find readable content in payload:", JSON.stringify(payload).slice(0, 500));
     throw new Error("Google Drive download did not return readable file content.");
   } catch (err) {
+    if (err instanceof SafeFetchError) throw err;
     if (err instanceof Error && err.message.includes("readable file content")) throw err;
-    console.error("[knowledge/drive/import] getFilePayloadBytes error:", err);
     throw new Error("Failed to process Google Drive file content.");
   }
 }
@@ -139,6 +167,7 @@ export async function POST(request: NextRequest) {
   const overrideName = String(body.name ?? "").trim();
   const connectionId = String(body.connectionId ?? "").trim();
   const folderId = String(body.folderId ?? "").trim();
+  const storageLimit = context.subscription?.storage_limit_bytes ?? 10485760;
 
   if (!fileId) {
     return NextResponse.json({ error: "fileId is required." }, { status: 400 });
@@ -201,7 +230,13 @@ export async function POST(request: NextRequest) {
     }
 
     const currentTotalBytes = (usageData ?? []).reduce((acc, curr) => acc + (curr.file_size_bytes ?? 0), 0);
-    const storageLimit = context.subscription?.storage_limit_bytes ?? 10485760; // Default to 10MB
+    const remainingStorageBytes = storageLimit - currentTotalBytes;
+    if (remainingStorageBytes <= 0) {
+      return NextResponse.json(
+        { error: storageLimitError(storageLimit) },
+        { status: 402 },
+      );
+    }
 
     const isGoogleDoc = metadata.mimeType === "application/vnd.google-apps.document";
     
@@ -211,11 +246,14 @@ export async function POST(request: NextRequest) {
       connectedAccountId,
     );
 
-    const fileBytes = await getFilePayloadBytes(downloadPayload);
+    const fileBytes = await getFilePayloadBytes(
+      downloadPayload,
+      remainingStorageBytes,
+    );
 
     if (currentTotalBytes + fileBytes.byteLength > storageLimit) {
       return NextResponse.json(
-        { error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.` },
+        { error: storageLimitError(storageLimit) },
         { status: 402 }
       );
     }
@@ -275,7 +313,7 @@ export async function POST(request: NextRequest) {
       ) {
         return NextResponse.json(
           {
-            error: `Storage limit exceeded. Your current plan allows ${storageLimit / 1024 / 1024}MB total knowledge base storage.`,
+            error: storageLimitError(storageLimit),
           },
           { status: 402 },
         );
@@ -354,7 +392,20 @@ export async function POST(request: NextRequest) {
       processStatus: "processing",
     });
   } catch (error) {
-    console.error("[knowledge/drive/import] Critical error:", error);
+    if (
+      error instanceof SafeFetchError &&
+      error.code === "RESPONSE_TOO_LARGE"
+    ) {
+      return NextResponse.json(
+        { error: storageLimitError(storageLimit) },
+        { status: 402 },
+      );
+    }
+
+    console.error("[knowledge/drive/import] Import failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      code: error instanceof SafeFetchError ? error.code : "IMPORT_FAILED",
+    });
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to import Google Drive file.",

@@ -44,13 +44,15 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {/* Toast Container */}
-      <div className="fixed bottom-6 right-6 z-[60] flex flex-col gap-3 pointer-events-none">
+      <div className="pointer-events-none fixed inset-x-4 bottom-4 z-[60] flex flex-col items-end gap-3 sm:inset-x-auto sm:bottom-6 sm:right-6">
         {toasts.map((toast) => (
           <div
             key={toast.id}
+            role={toast.type === 'error' ? 'alert' : 'status'}
+            aria-atomic="true"
             className={`
-              relative pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl glass-panel border border-outline-variant/20 overflow-hidden
-              animate-in fade-in slide-in-from-right-4 duration-300
+              relative pointer-events-auto flex w-full max-w-sm items-center gap-3 overflow-hidden rounded-2xl border border-outline-variant/20 px-5 py-3 shadow-2xl glass-panel
+              animate-in fade-in slide-in-from-right-4 duration-300 motion-reduce:animate-none
             `}
           >
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -86,6 +88,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               </p>
             </div>
             <button 
+              type="button"
               onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
               aria-label={t('common.close')}
               className="ml-2 flex h-7 w-7 items-center justify-center rounded-lg text-on-surface-variant/60 hover:bg-surface-container-high hover:text-on-surface transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"

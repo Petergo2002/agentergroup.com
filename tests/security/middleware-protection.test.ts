@@ -11,6 +11,18 @@ test("middleware protects matched routes by default", () => {
   assert.match(source, /PUBLIC_PATH_PREFIXES/);
 });
 
+test("authentication redirects preserve Supabase cookie refreshes and removals", () => {
+  const source = readFileSync("src/lib/supabase/proxy.ts", "utf8");
+
+  const cookieReadIndex = source.indexOf("supabaseResponse.cookies.getAll()");
+  const cookieWriteIndex = source.indexOf("redirectResponse.cookies.set(cookie)");
+  const redirectReturnIndex = source.indexOf("return redirectResponse");
+
+  assert.ok(cookieReadIndex >= 0);
+  assert.ok(cookieWriteIndex > cookieReadIndex);
+  assert.ok(redirectReturnIndex > cookieWriteIndex);
+});
+
 test("unauthenticated webhook routes remain explicitly public", () => {
   const source = readFileSync("src/lib/supabase/proxy.ts", "utf8");
 

@@ -150,7 +150,19 @@ export async function updateSession(request: NextRequest) {
       "redirectTo",
       sanitizePostAuthRedirectTo(`${request.nextUrl.pathname}${request.nextUrl.search}`),
     );
-    return withSecurityHeaders(NextResponse.redirect(url), contentSecurityPolicy);
+    const redirectResponse = withSecurityHeaders(
+      NextResponse.redirect(url),
+      contentSecurityPolicy,
+    );
+
+    // Preserve token refreshes and stale-session deletions queued by the
+    // Supabase client. Returning a new redirect response without these cookies
+    // causes dead refresh tokens to be retried on every request.
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie);
+    });
+
+    return redirectResponse;
   }
 
   return supabaseResponse;

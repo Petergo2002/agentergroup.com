@@ -7,6 +7,7 @@ import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUrl } from "@/lib/env";
+import { createLegalConsentToken } from "@/lib/legal-consent";
 
 function getCredentials(formData: FormData) {
   return {
@@ -25,6 +26,7 @@ function buildLoginRedirectUrl(args: {
   error?: string;
   notice?: string;
   redirectTo?: string;
+  view?: "login" | "signup";
 }) {
   const params = new URLSearchParams();
 
@@ -34,6 +36,10 @@ function buildLoginRedirectUrl(args: {
 
   if (args.notice) {
     params.set("notice", args.notice);
+  }
+
+  if (args.view === "signup") {
+    params.set("view", "signup");
   }
 
   const redirectTo = sanitizePostAuthRedirectTo(args.redirectTo);
@@ -47,12 +53,17 @@ function buildLoginRedirectUrl(args: {
 
 function buildCompleteSignupRedirectUrl(args: {
   error?: string;
+  legalConsent?: string;
   redirectTo?: string;
 }) {
   const params = new URLSearchParams();
 
   if (args.error) {
     params.set("error", args.error);
+  }
+
+  if (args.legalConsent) {
+    params.set("legalConsent", args.legalConsent);
   }
 
   const redirectTo = sanitizePostAuthRedirectTo(args.redirectTo, "/onboarding");
@@ -90,18 +101,33 @@ export async function login(formData: FormData) {
 export async function signup(formData: FormData) {
   const supabase = await createClient();
   const email = String(formData.get("email") ?? "").trim();
+  const legalConsentAccepted = formData.get("legalConsent") === "on";
   const redirectTo = sanitizePostAuthRedirectTo(String(formData.get("redirectTo") ?? "/dashboard"));
   const messages = await getLoginMessages();
 
   if (!email) {
-    redirect(buildLoginRedirectUrl({ error: "Email is required.", redirectTo }));
+    redirect(buildLoginRedirectUrl({
+      error: "Email is required.",
+      redirectTo,
+      view: "signup",
+    }));
   }
+
+  if (!legalConsentAccepted) {
+    redirect(buildLoginRedirectUrl({
+      error: messages.signupConsentRequired,
+      redirectTo,
+      view: "signup",
+    }));
+  }
+
+  const legalConsent = createLegalConsentToken("email_signup");
 
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       emailRedirectTo: `${getAppUrl()}/auth/confirm?next=${encodeURIComponent(
-        buildCompleteSignupRedirectUrl({ redirectTo }),
+        buildCompleteSignupRedirectUrl({ legalConsent, redirectTo }),
       )}`,
     },
   });
@@ -111,6 +137,7 @@ export async function signup(formData: FormData) {
       buildLoginRedirectUrl({
         error: messages.createAccountError,
         redirectTo,
+        view: "signup",
       }),
     );
   }

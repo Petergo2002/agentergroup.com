@@ -37,4 +37,4 @@ Public-facing legal and auth pages:
 - `/invite/accept` — Public workspace invite acceptance page (unauthenticated-friendly; moved from the `(app)` route group)
 
 ---
-*Last updated: July 30, 2026.*
+*Last updated: August 8, 2026.*

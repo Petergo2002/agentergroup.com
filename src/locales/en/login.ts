@@ -39,6 +39,10 @@ export const login = {
   legalAnd: "and",
   privacyPolicy: "Privacy Policy",
   termsOfService: "Terms of Service",
+  signupConsentPrefix: "I agree to the",
+  signupConsentAnd: "and acknowledge the",
+  signupConsentRequired:
+    "You must agree to the Terms of Service and acknowledge the Privacy Policy to create an account.",
   logoAlt: "Agentergroup logo",
   continueWithGoogle: "Continue with Google",
   orContinueWith: "or continue with email",

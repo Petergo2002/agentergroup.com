@@ -23,7 +23,7 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 
 - Widget specialist settings are durable across save, preview, bootstrap, and deploy. Saved widget-agent labels, quick-action visibility, and quick actions are now treated as the runtime source of truth.
 - Google Drive imports are account-specific. If a workspace has multiple connected Drive accounts, operators must select which account to browse and import from.
-- Public remote downloads are SSRF-hardened. Assistant downloads and Drive imports only allow vetted `http/https` hosts, reject private/loopback destinations, and re-validate redirects.
+- Public remote downloads are SSRF-hardened. Assistant downloads and Drive imports only allow vetted `http/https` hosts, reject private/loopback destinations, and re-validate redirects. Drive imports also time out and stop reading as soon as they exceed the workspace's remaining knowledge-storage allowance.
 - DSAR email lookups use normalized exact matching, not wildcard matching. Session ids used in export filenames are sanitized before being written into headers.
 - Production chat persistence does not store raw debug traces or raw tool payloads. Conversation-detail debug traces are only returned to workspace owners/admins.
 - Automation activity is event-centered rather than conversational. Each run stores a versioned operational decision, generated-message preview, summary, missing-information list, and tool outcomes; successful actions require successful tool evidence, and production persistence excludes raw tool payloads.
@@ -80,10 +80,12 @@ Root app variables:
 | `COMPOSIO_SHOPIFY_SCOPES` | No | Optional Shopify OAuth scope override |
 | `NEXT_PUBLIC_APP_URL` | No | Dashboard origin, defaults to `http://localhost:3000` |
 | `NEXT_PUBLIC_WIDGET_APP_URL` | No | Hosted widget origin, defaults to `http://localhost:5173` |
+| `NEXT_PUBLIC_SELF_SERVE_BILLING_ENABLED` | No | Enables customer-facing Stripe checkout only when set to `true`; managed plan activation is the default |
 | `WIDGET_APP_URL` | No | Legacy fallback alias for the hosted widget origin |
 | `WIDGET_ACCESS_SECRET` | Yes | Secret used to sign public widget access tokens |
 | `WIDGET_PREVIEW_SECRET` | Yes | Secret used to sign widget preview tokens |
 | `RATE_LIMIT_SECRET` | Yes in production | Dedicated secret used to hash public rate-limit identities |
+| `LEGAL_CONSENT_SECRET` | Recommended in production | Dedicated secret for short-lived signup consent tokens; falls back to `RATE_LIMIT_SECRET` or `WIDGET_ACCESS_SECRET` |
 | `GDPR_RETENTION_CRON_SECRET` | Yes for retention job | Secret for the internal privacy retention route |
 | `STRIPE_SECRET_KEY` | Yes for billing | Stripe secret key used lazily by billing routes |
 | `STRIPE_WEBHOOK_SECRET` | Yes for billing webhooks | Stripe webhook signing secret |
@@ -140,6 +142,13 @@ npm run widget:load-test -- --help
 ├── public/                     # Static assets served by the dashboard app
 └── middleware.ts               # Request middleware; delegates auth/session handling to src/lib/supabase/proxy.ts
 ```
+
+The live Supabase schema snapshot is generated into
+`src/lib/supabase/database.types.ts`. Refresh it after an approved migration
+with `npx supabase gen types typescript --linked >
+src/lib/supabase/database.types.ts`, then run the type check and full release
+gate. The shared clients remain intentionally unparameterized while legacy
+domain JSON adapters are introduced incrementally.
 
 ## Important Routes
 
@@ -232,9 +241,8 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - Internal assistants become usable after the first normal builder save; publish remains widget-only in v1.
 - `scripts/widget-load-test.mjs` exercises bootstrap/chat flows and the same-session lock path.
 - The security regression suite lives under `tests/security/*.test.ts` and covers auth redirects, automation event claiming, billing guards, connection rebinding, Composio failures/cache behavior, knowledge folders and session search, quota enforcement, middleware defaults, widget CORS/headers/validation, SSRF, privacy sanitization, and workspace ownership.
-- `apps/widget-v2` currently passes `npm audit --audit-level=moderate`. The root
-  audit has no high-severity findings after patch updates, but reports the
-  upstream moderate PostCSS advisory bundled by Next.js; see
+- The root app and `apps/widget-v2` currently pass
+  `npm audit --audit-level=moderate` with zero reported vulnerabilities; see
   `docs/runbooks/production-readiness.md`.
 - The top-level `/data-processing` and `/subprocessors` routes are compatibility redirects into `/settings/...`.
 - Self-service password reset is available from `/login/forgot-password` and authenticated Settings. The backup/restore and deploy verification runbook lives in `docs/runbooks/operations.md`.

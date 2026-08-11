@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
@@ -16,6 +16,10 @@ interface ModalProps {
 
 export const Modal = ({ isOpen, onClose, title, description, children, size = 'lg' }: ModalProps) => {
   const { t } = useLanguage();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+  const descriptionId = useId();
 
   const sizeClasses = {
     lg: 'max-w-lg',
@@ -28,20 +32,90 @@ export const Modal = ({ isOpen, onClose, title, description, children, size = 'l
     full: 'max-w-[calc(100vw-2rem)]',
   }[size];
 
-  // Handle escape key
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const previousBodyOverflow = document.body.style.overflow;
+    const focusableSelector = [
+      'a[href]',
+      'button:not([disabled])',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      "[contenteditable='true']",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(',');
+    const getFocusableElements = () =>
+      Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) =>
+          !element.hidden &&
+          element.getAttribute('aria-hidden') !== 'true' &&
+          element.getAttribute('inert') === null,
+      );
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      const autoFocusElement = dialog.querySelector<HTMLElement>('[autofocus]');
+      (autoFocusElement ?? getFocusableElements()[0] ?? dialog).focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+
+      if (
+        event.shiftKey &&
+        (document.activeElement === first || document.activeElement === dialog)
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last || !dialog.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'hidden';
-    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+
     return () => {
-      window.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'unset';
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+
+      if (previouslyFocused?.isConnected) {
+        previouslyFocused.focus();
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -49,12 +123,19 @@ export const Modal = ({ isOpen, onClose, title, description, children, size = 'l
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       {/* Backdrop */}
       <div 
+        aria-hidden="true"
         className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
       
       {/* Modal Container */}
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
         className={`relative flex max-h-[calc(100vh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl border border-outline-variant/20 glass-panel shadow-2xl animate-in fade-in-50 zoom-in-95 duration-200 sm:max-h-[calc(100vh-2rem)] ${sizeClasses}`}
       >
         {/* Physical Top-Light Detail */}
@@ -63,16 +144,17 @@ export const Modal = ({ isOpen, onClose, title, description, children, size = 'l
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-4 px-6 pb-2 pt-6 sm:px-8 sm:pt-8">
           <div className="min-w-0 flex-1">
-            <h3 className="text-xl sm:text-2xl font-headline font-bold text-on-surface tracking-tight">
+            <h3 id={titleId} className="text-xl sm:text-2xl font-headline font-bold text-on-surface tracking-tight">
               {title || t('modals.defaultTitle')}
             </h3>
             {description && (
-              <p className="mt-1 text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+              <p id={descriptionId} className="mt-1 text-xs sm:text-sm text-on-surface-variant leading-relaxed">
                 {description}
               </p>
             )}
           </div>
           <button 
+            type="button"
             onClick={onClose}
             aria-label={t('common.close')}
             className="w-9 h-9 flex items-center justify-center rounded-xl text-on-surface-variant/70 hover:bg-surface-container-high hover:text-on-surface transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"

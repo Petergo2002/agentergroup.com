@@ -197,6 +197,8 @@ Each delete action writes an audit log using `privacy.dsar.delete`.
   - private, loopback, and link-local addresses are blocked after DNS resolution
   - redirect destinations are re-validated
   - downloads are restricted to vetted object-download hosts
+  - Drive imports have a bounded timeout and stop reading when the workspace's remaining knowledge-storage allowance is exhausted
+  - signed provider URLs and raw download payloads are not logged
 
 ## Incident Escalation
 

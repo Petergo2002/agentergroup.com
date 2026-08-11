@@ -52,9 +52,9 @@ export default function ForgotPasswordPage() {
           <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-[#ff5c00]">
             ACCOUNT RECOVERY
           </p>
-          <h2 className="text-4xl xl:text-5xl font-headline font-extrabold text-white tracking-tight leading-tight max-w-lg">
+          <p className="text-4xl xl:text-5xl font-headline font-extrabold text-white tracking-tight leading-tight max-w-lg">
             Reset your password
-          </h2>
+          </p>
           <p className="text-base text-[#9d948a] font-medium leading-relaxed max-w-md">
             Enter your email and we&apos;ll send you a secure link to set a new password.
           </p>
@@ -94,9 +94,9 @@ export default function ForgotPasswordPage() {
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#ff5c00]">
               ACCOUNT RECOVERY
             </p>
-            <h2 className="font-headline text-3xl font-extrabold tracking-tight text-white">
+            <h1 className="font-headline text-3xl font-extrabold tracking-tight text-white">
               Forgot password?
-            </h2>
+            </h1>
             <p className="text-xs font-semibold text-[#9d948a]/80">
               No worries — we&apos;ll email you a reset link.
             </p>
@@ -105,7 +105,11 @@ export default function ForgotPasswordPage() {
           {sent ? (
             /* Success state */
             <div className="space-y-6">
-              <div className="rounded-[2px] border border-[#ff5c00]/20 bg-[#ff5c00]/5 px-5 py-5 text-sm text-[#f5f1eb]">
+              <div
+                role="status"
+                aria-live="polite"
+                className="rounded-[2px] border border-[#ff5c00]/20 bg-[#ff5c00]/5 px-5 py-5 text-sm text-[#f5f1eb]"
+              >
                 <p className="font-bold text-[#ff5c00] mb-1">Check your inbox ✓</p>
                 <p className="text-[#9d948a] leading-relaxed">
                   We sent a reset link to <strong>{email}</strong>. It may take a minute to arrive.
@@ -122,17 +126,23 @@ export default function ForgotPasswordPage() {
             /* Form state */
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <div className="rounded-[2px] border border-error/20 bg-error-container/10 px-4 py-3 text-xs text-error font-semibold animate-shake">
+                <div
+                  role="alert"
+                  className="rounded-[2px] border border-error/20 bg-error-container/10 px-4 py-3 text-xs text-error font-semibold animate-shake"
+                >
                   {error}
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75">
+                <label htmlFor="recovery-email" className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75">
                   Email address
                 </label>
                 <input
+                  id="recovery-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"

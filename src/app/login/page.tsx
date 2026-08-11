@@ -81,9 +81,9 @@ COMPOSIO_API_KEY=`}
             {/* Header */}
             <div className="flex flex-col items-center text-center space-y-3 mb-8">
               <BrandLogo className="h-8 w-auto text-slate-900 mb-4" />
-              <h2 className="text-[22px] font-bold tracking-tight text-slate-900">
+              <h1 className="text-[22px] font-bold tracking-tight text-slate-900">
                 {view === "login" ? "Log in to Agentergroup" : "Get started with Agentergroup"}
-              </h2>
+              </h1>
               <p className="text-[13px] leading-relaxed text-slate-500">
                 Start managing your work, stay organized, and keep your team moving forward.
               </p>
@@ -115,6 +115,7 @@ COMPOSIO_API_KEY=`}
                   className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition-colors hover:border-slate-300 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none placeholder:text-slate-400"
                   name="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="Enter your email"
                   required
                 />
@@ -138,12 +139,57 @@ COMPOSIO_API_KEY=`}
                     className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition-colors hover:border-slate-300 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none placeholder:text-slate-400"
                     name="password"
                     type="password"
+                    autoComplete="current-password"
                     placeholder="Enter your password"
                     minLength={6}
                     required
                   />
                 </div>
               )}
+
+              {view === "signup" ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3">
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="legalConsent"
+                      name="legalConsent"
+                      type="checkbox"
+                      required
+                      aria-labelledby="legalConsentPrefix legalConsentTerms legalConsentAnd legalConsentPrivacy"
+                      className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-[#ff5c00] focus:ring-2 focus:ring-[#ff5c00]/30 focus:ring-offset-1"
+                    />
+                    <p className="text-[12px] font-medium leading-5 text-slate-600">
+                      <label
+                        id="legalConsentPrefix"
+                        htmlFor="legalConsent"
+                        className="cursor-pointer"
+                      >
+                        {messages.login.signupConsentPrefix}
+                      </label>{" "}
+                      <Link
+                        id="legalConsentTerms"
+                        href="/terms-of-service"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-bold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-700"
+                      >
+                        {messages.login.termsOfService}
+                      </Link>{" "}
+                      <span id="legalConsentAnd">{messages.login.signupConsentAnd}</span>{" "}
+                      <Link
+                        id="legalConsentPrivacy"
+                        href="/privacy-policy"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-bold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-700"
+                      >
+                        {messages.login.privacyPolicy}
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="pt-2">
                 <EmailAuthSubmitButton
@@ -167,6 +213,8 @@ COMPOSIO_API_KEY=`}
             <GoogleSignInButton
               label={messages.login.continueWithGoogle}
               redirectTo={redirectTo}
+              requireLegalConsent={view === "signup"}
+              consentRequiredMessage={messages.login.signupConsentRequired}
             />
 
             <p className="text-center text-[12px] font-medium text-slate-500 mt-6">
@@ -181,18 +229,20 @@ COMPOSIO_API_KEY=`}
           </div>
 
           {/* Footer Terms */}
-          <div className="mt-8 text-center lg:mt-auto pt-8">
-            <p className="text-[10px] font-medium text-slate-400">
-              By continuing, you agree to Agentergroup&apos;s <Link href="/terms-of-service" className="font-bold text-slate-600 hover:text-slate-900 transition-colors">Terms of Service</Link> and <Link href="/privacy-policy" className="font-bold text-slate-600 hover:text-slate-900 transition-colors">Privacy Policy</Link>
-            </p>
-          </div>
+          {view === "login" ? (
+            <div className="mt-8 text-center lg:mt-auto pt-8">
+              <p className="text-[10px] font-medium text-slate-400">
+                By continuing, you agree to Agentergroup&apos;s <Link href="/terms-of-service" className="font-bold text-slate-600 hover:text-slate-900 transition-colors">Terms of Service</Link> and <Link href="/privacy-policy" className="font-bold text-slate-600 hover:text-slate-900 transition-colors">Privacy Policy</Link>
+              </p>
+            </div>
+          ) : null}
         </section>
 
         {/* Right Column: Hero Image */}
         <section className="hidden lg:block w-1/2 relative bg-slate-50 border-l border-slate-100">
           <Image
             src="/login-robot-hero.jpg"
-            alt="Hero Image"
+            alt=""
             fill
             sizes="50vw"
             className="object-cover"
