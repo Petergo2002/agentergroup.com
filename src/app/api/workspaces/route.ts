@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { createWorkspaceForUser, ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import {
+  createWorkspaceForUser,
+  ensureWorkspaceContext,
+  invalidateWorkspaceContextCache,
+} from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 import {
   canCreateWorkspace,
@@ -71,6 +75,8 @@ export async function POST(request: Request) {
     name,
     description,
   });
+
+  invalidateWorkspaceContextCache(user.id);
 
   const response = NextResponse.json({
     workspace: createdWorkspace.workspace,

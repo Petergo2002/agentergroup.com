@@ -25,14 +25,14 @@ import type {
 
 type AdminSupabase = Pick<SupabaseClient, "from" | "storage">;
 
-interface AnalyticsWidgetRow {
+export interface AnalyticsWidgetRow {
   id: string;
   name: string;
   status: "draft" | "deployed";
   widget_public_key: string;
 }
 
-interface AnalyticsAgentRow {
+export interface AnalyticsAgentRow {
   id: string;
   name: string;
   surface: string;
@@ -803,12 +803,14 @@ export async function listRecentDashboardConversations(
     workspaceId: string;
     range?: DashboardAnalyticsRange;
     limit: number;
+    widgets?: AnalyticsWidgetRow[];
+    agents?: AnalyticsAgentRow[];
   },
 ) {
   const { startIso } = getAnalyticsDateRange(input.range ?? "30d");
   const [widgets, agents] = await Promise.all([
-    listWorkspaceWidgetsForAnalytics(supabase, input.workspaceId),
-    listWorkspaceAgentsForAnalytics(supabase, input.workspaceId),
+    input.widgets ? Promise.resolve(input.widgets) : listWorkspaceWidgetsForAnalytics(supabase, input.workspaceId),
+    input.agents ? Promise.resolve(input.agents) : listWorkspaceAgentsForAnalytics(supabase, input.workspaceId),
   ]);
 
   if (widgets.length === 0) {
@@ -1132,6 +1134,21 @@ async function countRecentWorkspaceLeads(
   return leadsResult.count ?? 0;
 }
 
+interface CachedLatestActivity {
+  payload: DashboardLatestActivityResponse;
+  expiresAt: number;
+}
+const latestActivityCache = new Map<string, CachedLatestActivity>();
+const LATEST_ACTIVITY_TTL_MS = 15_000;
+
+export function invalidateLatestActivityCache(workspaceId?: string) {
+  if (!workspaceId) {
+    latestActivityCache.clear();
+    return;
+  }
+  latestActivityCache.delete(workspaceId);
+}
+
 /**
  * Returns the newest conversation summary and recent lead count for sidebar attention states.
  */
@@ -1139,6 +1156,11 @@ export async function getDashboardLatestActivity(
   supabase: AdminSupabase,
   workspaceId: string,
 ): Promise<DashboardLatestActivityResponse> {
+  const cached = latestActivityCache.get(workspaceId);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.payload;
+  }
+
   const [recentConversations, newLeadCount] = await Promise.all([
     listRecentDashboardConversations(supabase, {
       workspaceId,
@@ -1149,23 +1171,28 @@ export async function getDashboardLatestActivity(
   ]);
   const [latest] = recentConversations;
 
-  if (!latest) {
-    return { latestConversation: null, newLeadCount };
-  }
+  const payload: DashboardLatestActivityResponse = !latest
+    ? { latestConversation: null, newLeadCount }
+    : {
+        latestConversation: {
+          widgetSessionId: latest.widgetSessionId,
+          widgetId: latest.widgetId,
+          widgetName: latest.widgetName,
+          agentId: latest.agentId,
+          agentName: latest.agentName,
+          agentLabel: latest.agentLabel,
+          latestSnippet: latest.latestSnippet,
+          lastActivityAt: latest.lastActivityAt,
+        },
+        newLeadCount,
+      };
 
-  return {
-    latestConversation: {
-      widgetSessionId: latest.widgetSessionId,
-      widgetId: latest.widgetId,
-      widgetName: latest.widgetName,
-      agentId: latest.agentId,
-      agentName: latest.agentName,
-      agentLabel: latest.agentLabel,
-      latestSnippet: latest.latestSnippet,
-      lastActivityAt: latest.lastActivityAt,
-    },
-    newLeadCount,
-  };
+  latestActivityCache.set(workspaceId, {
+    payload,
+    expiresAt: Date.now() + LATEST_ACTIVITY_TTL_MS,
+  });
+
+  return payload;
 }
 
 async function loadWidgetAgentsForWidgets(

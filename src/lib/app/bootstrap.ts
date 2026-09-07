@@ -328,12 +328,50 @@ async function resolveActiveWorkspace(
   );
 }
 
+interface CachedWorkspaceContext {
+  context: AppWorkspaceContext;
+  expiresAt: number;
+}
+
+const WORKSPACE_CONTEXT_TTL_MS = 30_000;
+const workspaceContextCache = new Map<string, CachedWorkspaceContext>();
+
+export function invalidateWorkspaceContextCache(userId?: string, workspaceId?: string) {
+  if (!userId && !workspaceId) {
+    workspaceContextCache.clear();
+    return;
+  }
+  for (const [key, value] of Array.from(workspaceContextCache.entries())) {
+    if (userId && key.startsWith(`${userId}:`)) {
+      workspaceContextCache.delete(key);
+    } else if (workspaceId && value.context.workspace.id === workspaceId) {
+      workspaceContextCache.delete(key);
+    }
+  }
+}
+
 export async function ensureWorkspaceContext(
   supabase: SupabaseLike,
   user: User,
 ): Promise<AppWorkspaceContext> {
-  const profile = await syncUserProfile(supabase, user);
-  const workspaces = await getOrCreateUserWorkspaces(supabase, user);
+  let requestedWorkspaceId: string | null = null;
+  try {
+    const cookieStore = await cookies();
+    requestedWorkspaceId = cookieStore.get("active_workspace_id")?.value ?? null;
+  } catch {
+    // Cookies may be inaccessible in non-request contexts
+  }
+
+  const cacheKey = `${user.id}:${requestedWorkspaceId || "default"}`;
+  const cached = workspaceContextCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.context;
+  }
+
+  const [profile, workspaces] = await Promise.all([
+    syncUserProfile(supabase, user),
+    getOrCreateUserWorkspaces(supabase, user),
+  ]);
   const activeWorkspace = await resolveActiveWorkspace(workspaces);
 
   const subscriptionResult = await supabase
@@ -346,11 +384,19 @@ export async function ensureWorkspaceContext(
     throw subscriptionResult.error;
   }
 
-  return {
+  const context: AppWorkspaceContext = {
     profile,
     workspace: activeWorkspace.workspace,
     membership: activeWorkspace.membership,
     workspaces,
     subscription: subscriptionResult.data as WorkspaceSubscriptionRecord,
   };
+
+  workspaceContextCache.set(cacheKey, {
+    context,
+    expiresAt: Date.now() + WORKSPACE_CONTEXT_TTL_MS,
+  });
+
+  return context;
 }
+

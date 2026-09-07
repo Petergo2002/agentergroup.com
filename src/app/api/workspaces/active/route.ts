@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { ensureWorkspaceContext, invalidateWorkspaceContextCache } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
@@ -27,6 +27,8 @@ export async function POST(request: Request) {
   if (!selectedWorkspace) {
     return NextResponse.json({ error: "Workspace not found." }, { status: 403 });
   }
+
+  invalidateWorkspaceContextCache(user.id);
 
   const response = NextResponse.json({
     workspace: selectedWorkspace.workspace,

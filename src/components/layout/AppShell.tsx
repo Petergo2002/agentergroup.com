@@ -42,6 +42,9 @@ export function AppShell({ children, context, user }: AppShellProps) {
     jsonFetcher,
     {
       refreshInterval: 60_000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30_000,
     },
   );
   const [lastSeenAnalyticsActivityAt, setLastSeenAnalyticsActivityAt] = useState<string | null>(

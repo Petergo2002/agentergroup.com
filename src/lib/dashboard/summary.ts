@@ -27,19 +27,8 @@ export async function loadDashboardSummaryForContext(
 ): Promise<DashboardSummaryResponse> {
   const admin = createAdminClient();
 
-  const [
-    recentConversations,
-    agentsResult,
-    widgetsResult,
-    connectedAppsResult,
-    knowledgeSourcesResult,
-    unansweredQuestionsResult,
-  ] = await Promise.all([
-    listRecentDashboardConversations(admin, {
-      workspaceId: context.workspace.id,
-      range: "30d",
-      limit: 4,
-    }),
+  // 1. Fetch agents and widgets first in parallel
+  const [agentsResult, widgetsResult] = await Promise.all([
     admin
       .from("agents")
       .select(DASHBOARD_AGENT_SELECT)
@@ -48,8 +37,41 @@ export async function loadDashboardSummaryForContext(
       .order("updated_at", { ascending: false }),
     admin
       .from("widgets")
-      .select("id, status")
+      .select("id, name, status, widget_public_key")
       .eq("workspace_id", context.workspace.id),
+  ]);
+
+  if (agentsResult.error) {
+    throw agentsResult.error;
+  }
+  if (widgetsResult.error) {
+    throw widgetsResult.error;
+  }
+
+  const rawAgents = (agentsResult.data ?? []) as AgentRecord[];
+  const rawWidgets = (widgetsResult.data ?? []) as Array<{
+    id: string;
+    name: string;
+    status: "draft" | "deployed";
+    widget_public_key: string;
+  }>;
+  const widgetIds = rawWidgets.map((widget) => widget.id);
+
+  // 2. Fetch conversations and all counts in parallel without duplicate widget/agent queries
+  const [
+    recentConversations,
+    connectedAppsResult,
+    knowledgeSourcesResult,
+    unansweredQuestionsResult,
+    leadsResult,
+  ] = await Promise.all([
+    listRecentDashboardConversations(admin, {
+      workspaceId: context.workspace.id,
+      range: "30d",
+      limit: 4,
+      widgets: rawWidgets,
+      agents: rawAgents,
+    }),
     admin
       .from("connections")
       .select("id", { count: "exact", head: true })
@@ -64,54 +86,40 @@ export async function loadDashboardSummaryForContext(
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", context.workspace.id)
       .eq("status", "open"),
+    widgetIds.length > 0
+      ? admin
+          .from("widget_leads")
+          .select("id", { count: "exact", head: true })
+          .in("widget_id", widgetIds)
+      : Promise.resolve({ data: null, count: 0, error: null }),
   ]);
 
   const errors = [
-    agentsResult.error,
-    widgetsResult.error,
     connectedAppsResult.error,
     knowledgeSourcesResult.error,
     unansweredQuestionsResult.error,
+    leadsResult.error,
   ].filter(Boolean);
 
   if (errors.length > 0) {
     throw errors[0];
   }
 
-  const agents = ((agentsResult.data ?? []) as AgentRecord[]).filter(
+  const agents = rawAgents.filter(
     (agent) =>
       (context.workspace.internal_assistants_enabled || agent.surface !== "assistant") &&
       (context.workspace.automations_enabled || agent.surface !== "automation"),
   );
-  const widgets = (widgetsResult.data ?? []) as Array<{
-    id: string;
-    status: "draft" | "deployed";
-  }>;
-  const widgetIds = widgets.map((widget) => widget.id);
-  let leadsCount = 0;
-
-  if (widgetIds.length > 0) {
-    const leadsResult = await admin
-      .from("widget_leads")
-      .select("id", { count: "exact", head: true })
-      .in("widget_id", widgetIds);
-
-    if (leadsResult.error) {
-      throw leadsResult.error;
-    }
-
-    leadsCount = leadsResult.count ?? 0;
-  }
 
   return {
     recentConversations,
     agents,
     workspaceSummary: {
-      totalWidgets: widgets.length,
-      liveWidgets: widgets.filter((widget) => widget.status === "deployed").length,
+      totalWidgets: rawWidgets.length,
+      liveWidgets: rawWidgets.filter((widget) => widget.status === "deployed").length,
       connectedApps: connectedAppsResult.count ?? 0,
       knowledgeSources: knowledgeSourcesResult.count ?? 0,
-      leads: leadsCount,
+      leads: leadsResult.count ?? 0,
       unansweredQuestions: unansweredQuestionsResult.count ?? 0,
     },
   };
