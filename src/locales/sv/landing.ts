@@ -2,9 +2,9 @@ import type { Messages } from "../en";
 
 export const landing = {
   metadata: {
-    title: "Milo — Din AI-medarbetare på webben | Agentergroup",
+    title: "Milo — Din AI-medarbetare på webben | Avenro",
     description:
-      "Förvandla webbplatsbesök till hjälpsamma samtal, kvalificerade leads och tydliga nästa steg med Milo, din AI-medarbetare från Agentergroup.",
+      "Förvandla webbplatsbesök till hjälpsamma samtal, kvalificerade leads och tydliga nästa steg med Milo, din AI-medarbetare från Avenro.",
   },
   nav: {
     product: "Produkt",
@@ -121,7 +121,7 @@ export const landing = {
     eyebrow: "Ett komplett kundflöde",
     title: "Mer än en chattbot. Ett system som blir bättre.",
     description:
-      "Alla delar i Agentergroup samverkar kring en och samma Milo—från första svaret till uppföljningen och nästa förbättring.",
+      "Alla delar i Avenro samverkar kring en och samma Milo—från första svaret till uppföljningen och nästa förbättring.",
     features: [
       {
         title: "Kunskap",
@@ -203,7 +203,7 @@ export const landing = {
       {
         question: "Vad är Milo?",
         answer:
-          "Milo är din kundnära AI-medarbetare i Agentergroup. Milo använder kunskapen och verktygen du godkänner för att hjälpa besökare via Webbchatt.",
+          "Milo är din kundnära AI-medarbetare i Avenro. Milo använder kunskapen och verktygen du godkänner för att hjälpa besökare via Webbchatt.",
       },
       {
         question: "Hur lär sig Milo om min verksamhet?",
@@ -213,7 +213,7 @@ export const landing = {
       {
         question: "Kan Milo använda våra befintliga verktyg?",
         answer:
-          "Ja. Agentergroup har anslutningar för kommunikation, bokning, CRM, handel, marknadsföring och kunskapsflöden. Du bestämmer vilka anslutna verktyg Milo får använda.",
+          "Ja. Avenro har anslutningar för kommunikation, bokning, CRM, handel, marknadsföring och kunskapsflöden. Du bestämmer vilka anslutna verktyg Milo får använda.",
       },
       {
         question: "Kan jag lägga Webbchatt på en befintlig webbplats?",
@@ -237,7 +237,7 @@ export const landing = {
   },
   footer: {
     description:
-      "Agentergroup hjälper småföretag att göra webbplatssamtal till svar, leads och handling med Milo.",
+      "Avenro hjälper småföretag att göra webbplatssamtal till svar, leads och handling med Milo.",
     product: "Produkt",
     company: "Företag",
     legal: "Juridik",

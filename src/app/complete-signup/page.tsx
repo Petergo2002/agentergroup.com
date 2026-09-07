@@ -1,5 +1,6 @@
-import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { BrandLogo } from "@/components/BrandLogo";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -36,14 +37,9 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
 
       <div className="relative z-10 w-full max-w-md space-y-10 bg-[#0d0d0d] p-12 rounded-[2px] border border-[#161616] shadow-2xl">
         <div className="flex justify-center mb-8">
-          <Image
-            src="/dashboardlogo.svg"
-            alt="Agentergroup"
-            width={840}
-            height={279}
-            priority
-            className="h-10 w-auto opacity-90 object-contain"
-          />
+          <Link href="/" title="Avenro Home">
+            <BrandLogo className="h-10 w-auto text-white" textColor="#ffffff" />
+          </Link>
         </div>
 
         <div className="space-y-3 text-center">
@@ -89,7 +85,7 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
                   className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
                   name="companyName"
                   type="text"
-                  placeholder="Agentergroup AB"
+                  placeholder="Avenro AB"
                   required
                 />
               </div>

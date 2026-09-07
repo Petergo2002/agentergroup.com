@@ -142,7 +142,7 @@ export const settings = {
   deleteData: "Radera data",
   languageSection: "Plattformsspråk",
   languageDescription:
-    "Välj språket som används i Agentergroup. Ditt val sparas på den här enheten.",
+    "Välj språket som används i Avenro. Ditt val sparas på den här enheten.",
   languageHelp: "Det valda språket tillämpas direkt.",
   workspaceCreated: "Workspace skapades.",
   workspaceNamePlaceholder: "Acme Tandklinik",

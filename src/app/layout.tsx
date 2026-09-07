@@ -21,14 +21,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteOrigin()),
   title: {
-    default: "Agentergroup",
-    template: "%s | Agentergroup",
+    default: "Avenro",
+    template: "%s | Avenro",
   },
-  description: "Build, manage, and deploy Agentergroup AI agents and widgets.",
+  description: "Build, manage, and deploy Avenro AI agents and widgets.",
   openGraph: {
-    title: "Agentergroup",
-    description: "Build, manage, and deploy Agentergroup AI agents and widgets.",
-    siteName: "Agentergroup",
+    title: "Avenro",
+    description: "Build, manage, and deploy Avenro AI agents and widgets.",
+    siteName: "Avenro",
   },
   icons: {
     icon: "/2.svg",

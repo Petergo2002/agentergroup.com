@@ -45,7 +45,7 @@ export const connections = {
   publicAuth: {
     title: "Connect account",
     description:
-      "{workspace} is asking you to connect a {integration} account. You do not need an Agentergroup login.",
+      "{workspace} is asking you to connect a {integration} account. You do not need an Avenro login.",
     request: "Request",
     connectButton: "Connect {integration}",
     starting: "Starting...",
@@ -73,6 +73,6 @@ export const connections = {
       "We could not confirm the connected account yet. Tell the workspace admin to sync connection status.",
     errorTitle: "Could not verify connection",
     errorDescription:
-      "The provider flow returned, but Agentergroup could not sync the account status yet.",
+      "The provider flow returned, but Avenro could not sync the account status yet.",
   },
 };

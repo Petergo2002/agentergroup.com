@@ -13,6 +13,7 @@ import {
   createTranslator,
   DEFAULT_PLATFORM_LANGUAGE,
   getMessages,
+  LEGACY_PLATFORM_LANGUAGE_STORAGE_KEY,
   PLATFORM_LANGUAGE_COOKIE,
   PLATFORM_LANGUAGE_COOKIE_MAX_AGE,
   PLATFORM_LANGUAGE_STORAGE_KEY,
@@ -50,10 +51,10 @@ export function LanguageProvider({
       return initialLanguage;
     }
 
-    return (
-      resolvePlatformLanguage(window.localStorage.getItem(PLATFORM_LANGUAGE_STORAGE_KEY)) ||
-      initialLanguage
-    );
+    const stored =
+      window.localStorage.getItem(PLATFORM_LANGUAGE_STORAGE_KEY) ||
+      window.localStorage.getItem(LEGACY_PLATFORM_LANGUAGE_STORAGE_KEY);
+    return resolvePlatformLanguage(stored) || initialLanguage;
   });
   const [messages, setMessages] = useState<Messages>(initialMessages);
   const languageRequestRef = useRef(0);
@@ -114,7 +115,10 @@ export function LanguageProvider({
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
-      if (event.key !== PLATFORM_LANGUAGE_STORAGE_KEY) {
+      if (
+        event.key !== PLATFORM_LANGUAGE_STORAGE_KEY &&
+        event.key !== LEGACY_PLATFORM_LANGUAGE_STORAGE_KEY
+      ) {
         return;
       }
 

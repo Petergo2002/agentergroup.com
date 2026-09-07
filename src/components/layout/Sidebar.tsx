@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -28,6 +27,8 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { SELF_SERVE_BILLING_ENABLED } from "@/lib/billing-mode";
 import { isMiloMode, isMiloNavItemActive } from "@/lib/milo/experience";
 import { MiloLogo } from "@/components/brand/MiloLogo";
+import { BrandLogo } from "@/components/BrandLogo";
+import { AvenroIcon } from "@/components/brand/AvenroIcon";
 
 interface AnalyticsActivitySummary {
   agentName: string | null;
@@ -163,21 +164,16 @@ export function Sidebar({
       <div className={`px-4 pt-6 pb-4 flex flex-col items-center transition-all duration-300 ${isCollapsed && !mobile ? 'gap-6' : 'gap-5'}`}>
         <Link
           href="/"
-          title="Agentergroup - Back to landing page"
-          aria-label="Agentergroup - Back to landing page"
+          title="Avenro - Back to landing page"
+          aria-label="Avenro - Back to landing page"
           className="group relative flex flex-col items-center shrink-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <div className="flex items-center justify-center shrink-0">
-            <Image
-              src="/svgfavicon.svg"
-              alt="Agentergroup"
-              width={isCollapsed && !mobile ? 48 : 80}
-              height={isCollapsed && !mobile ? 48 : 80}
-              priority
-              className={`shrink-0 object-contain transition-all duration-300 group-hover:scale-105 ${
-                isCollapsed && !mobile ? 'h-12 w-12' : 'h-20 w-20'
-              }`}
-            />
+            {isCollapsed && !mobile ? (
+              <AvenroIcon size={34} className="shrink-0 transition-transform duration-200 group-hover:scale-105" />
+            ) : (
+              <BrandLogo className="h-8 w-auto text-on-surface transition-transform duration-200 group-hover:scale-105" />
+            )}
           </div>
         </Link>
         

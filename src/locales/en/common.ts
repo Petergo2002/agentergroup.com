@@ -1,5 +1,5 @@
 export const common = {
-  appName: "Agentergroup",
+  appName: "Avenro",
   save: "Save",
   saveChanges: "Save Changes",
   saving: "Saving...",

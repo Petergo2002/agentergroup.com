@@ -1,6 +1,6 @@
 # Agentergroup Operations Runbook
 
-Last updated: 2026-08-24
+Last updated: 2026-09-07
 
 ## Purpose
 
@@ -28,6 +28,8 @@ Stripe verification, and production drift checks, use
 [`production-readiness.md`](./production-readiness.md).
 
 For a Milo release, also read [`../guides/milo-experience.md`](../guides/milo-experience.md). The required schema change is `20260811221031_milo_primary_workspace_resources.sql`; deploy it before code depends on primary workspace resources.
+
+For production domain, Vercel, one.com DNS, and email setup under `avenro.se`, use [`avenro-domain-setup.md`](./avenro-domain-setup.md).
 
 ## Health Check
 
@@ -63,6 +65,7 @@ After deploying the dashboard app:
 9. Confirm a hosted and embedded Website Chat opens directly into Milo without a specialist chooser.
 10. Confirm Leads, Analytics, and Improve Milo still resolve records from the active workspace only.
 11. In Website Chat preview, change the theme/colors after opening a conversation and confirm the live preview updates without resetting chat; then save again after token rotation and confirm preview chat still succeeds.
+12. Confirm canonical domain routing: `https://avenro.se` serves the Next.js app, `https://www.avenro.se` redirects to `https://avenro.se`, and `https://widget.avenro.se` serves Widget V2.
 
 ## Widget Runtime Deployment
 

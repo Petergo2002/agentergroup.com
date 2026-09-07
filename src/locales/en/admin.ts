@@ -1,5 +1,5 @@
 export const admin = {
-  sidebarTitle: "Agentergroup Admin",
+  sidebarTitle: "Avenro Admin",
   internal: "Internal",
   internalDashboard: "Internal dashboard",
   webVersion: "web v{version}",

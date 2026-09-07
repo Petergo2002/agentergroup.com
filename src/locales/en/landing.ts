@@ -1,8 +1,8 @@
 export const landing = {
   metadata: {
-    title: "Milo — Your AI employee for the web | Agentergroup",
+    title: "Milo — Your AI employee for the web | Avenro",
     description:
-      "Turn website visits into helpful conversations, qualified leads, and clear next steps with Milo, your AI employee from Agentergroup.",
+      "Turn website visits into helpful conversations, qualified leads, and clear next steps with Milo, your AI employee from Avenro.",
   },
   nav: {
     product: "Product",
@@ -119,7 +119,7 @@ export const landing = {
     eyebrow: "A complete customer loop",
     title: "More than a chatbot. A system that gets better.",
     description:
-      "Every part of Agentergroup works together around one Milo—from the first answer to the follow-up and the next improvement.",
+      "Every part of Avenro works together around one Milo—from the first answer to the follow-up and the next improvement.",
     features: [
       {
         title: "Knowledge",
@@ -201,7 +201,7 @@ export const landing = {
       {
         question: "What is Milo?",
         answer:
-          "Milo is your customer-facing AI employee inside Agentergroup. It uses the knowledge and tools you approve to help visitors through Website Chat.",
+          "Milo is your customer-facing AI employee inside Avenro. It uses the knowledge and tools you approve to help visitors through Website Chat.",
       },
       {
         question: "How does Milo learn about my business?",
@@ -211,7 +211,7 @@ export const landing = {
       {
         question: "Can Milo use our existing tools?",
         answer:
-          "Yes. Agentergroup supports connections for communication, scheduling, CRM, commerce, marketing, and knowledge workflows. You decide which connected tools Milo may use.",
+          "Yes. Avenro supports connections for communication, scheduling, CRM, commerce, marketing, and knowledge workflows. You decide which connected tools Milo may use.",
       },
       {
         question: "Can I add Website Chat to an existing site?",
@@ -235,7 +235,7 @@ export const landing = {
   },
   footer: {
     description:
-      "Agentergroup helps small businesses turn website conversations into answers, leads, and action with Milo.",
+      "Avenro helps small businesses turn website conversations into answers, leads, and action with Milo.",
     product: "Product",
     company: "Company",
     legal: "Legal",

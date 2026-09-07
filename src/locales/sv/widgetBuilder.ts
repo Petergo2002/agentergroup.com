@@ -41,10 +41,10 @@ export const widgetBuilder = {
     interactionDescription:
       "Styr hur widgeten beter sig när en användare först interagerar med den.",
     primaryLanguage: "Primärt språk",
-    showBranding: "Visa Agentergroup-branding",
-    brandingDescription: 'Växla sidfoten "Powered by Agentergroup".',
+    showBranding: "Visa Avenro-branding",
+    brandingDescription: 'Växla sidfoten "Powered by Avenro".',
     brandingPremiumDescription:
-      'Premium-workspaces kan dölja sidfoten "Powered by Agentergroup".',
+      'Premium-workspaces kan dölja sidfoten "Powered by Avenro".',
     homeCopywriting: "Copy för hemskärm",
     homeCopywritingDescription:
       "Den första texten som visas i väljarvyn när flera specialister är aktiva.",
@@ -107,7 +107,7 @@ export const widgetBuilder = {
     noLogo: "Ingen logotyp",
     change: "Ändra",
     brandName: "Varumärkesnamn",
-    brandNamePlaceholder: "t.ex. Agentergroup",
+    brandNamePlaceholder: "t.ex. Avenro",
     uploadImage: "Ladda upp bild",
     optimizedLogo:
       "Optimerad för PNG eller SVG med transparent bakgrund.",

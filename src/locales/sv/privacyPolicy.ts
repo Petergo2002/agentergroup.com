@@ -1,11 +1,11 @@
 export const privacyPolicy = {
-  metadataTitle: "Integritetspolicy | Agentergroup",
+  metadataTitle: "Integritetspolicy | Avenro",
   metadataDescription:
-    "Publik integritetspolicy för Agentergroup och Agentergroup-drivna widgets.",
+    "Publik integritetspolicy för Avenro och Avenro-drivna widgets.",
   badge: "Publik juridisk sida",
   title: "Integritetspolicy",
   intro:
-    "Den här sidan är publik och kräver ingen inloggning. Den är tänkt att länkas från Agentergroup-drivna widgets och relaterade produktytor så att besökare kan förstå hur data kan behandlas.",
+    "Den här sidan är publik och kräver ingen inloggning. Den är tänkt att länkas från Avenro-drivna widgets och relaterade produktytor så att besökare kan förstå hur data kan behandlas.",
   lastUpdated: "Senast uppdaterad: 23 mars 2026",
   backToSignIn: "Tillbaka till inloggning",
   languageLabel: "Språk",
@@ -17,7 +17,7 @@ export const privacyPolicy = {
     {
       title: "Vad den här policyn omfattar",
       body: [
-        "Den här integritetspolicyn förklarar hur Agentergroup hanterar personuppgifter när någon använder Agentergroups plattform, loggar in i workspace-appen eller interagerar med en Agentergroup-driven widget på en webbplats.",
+        "Den här integritetspolicyn förklarar hur Avenro hanterar personuppgifter när någon använder Avenros plattform, loggar in i workspace-appen eller interagerar med en Avenro-driven widget på en webbplats.",
         "Den gäller workspace-användare, webbplatsbesökare som chattar med widgets, leads som skickas via widgets och relaterad användningsdata som skapas när tjänsten används.",
       ],
     },
@@ -39,14 +39,14 @@ export const privacyPolicy = {
     {
       title: "Underbiträden och infrastruktur",
       body: [
-        "Agentergroup använder tredjepartsinfrastruktur och underbiträden för att leverera tjänsten. Detta inkluderar för närvarande Supabase för databas, auth och lagring, OpenRouter för LLM-routing och modellåtkomst, samt Composio för auth av anslutna verktyg och tool execution.",
+        "Avenro använder tredjepartsinfrastruktur och underbiträden för att leverera tjänsten. Detta inkluderar för närvarande Supabase för databas, auth och lagring, OpenRouter för LLM-routing och modellåtkomst, samt Composio för auth av anslutna verktyg och tool execution.",
         "Dessa leverantörer kan behandla personuppgifter för vår räkning i den utsträckning som krävs för att leverera tjänsten. Ytterligare leverantörsdetaljer finns tillgängliga för inloggade kunder inne i plattformen.",
       ],
     },
     {
       title: "Information om publika widgets",
       body: [
-        "Om du använder en webbplatswidget som drivs av Agentergroup är webbplatsägaren normalt personuppgiftsansvarig för den data som samlas in via widgeten, medan Agentergroup agerar som personuppgiftsbiträde eller underbiträde för tjänsteinfrastrukturen.",
+        "Om du använder en webbplatswidget som drivs av Avenro är webbplatsägaren normalt personuppgiftsansvarig för den data som samlas in via widgeten, medan Avenro agerar som personuppgiftsbiträde eller underbiträde för tjänsteinfrastrukturen.",
         "Om du inte vill att personuppgifter ska ingå i en widgetkonversation bör du undvika att skriva in känsliga uppgifter om inte webbplatsägaren tydligt har efterfrågat det och angett en laglig grund för behandlingen.",
       ],
     },
@@ -60,7 +60,7 @@ export const privacyPolicy = {
     {
       title: "Lagringstid",
       body: [
-        "Agentergroup tillämpar för närvarande en standardiserad lagringstid på 180 dagar för widget-sessioner, widgetmeddelanden, widget-leads och aktivitetsmetadata för publika widgets.",
+        "Avenro tillämpar för närvarande en standardiserad lagringstid på 180 dagar för widget-sessioner, widgetmeddelanden, widget-leads och aktivitetsmetadata för publika widgets.",
         "Importerade kunskapskällor och lagrade kunskapsfiler ligger kvar tills workspacet raderar dem manuellt. När ett workspace eller en widget raderas kan tillhörande data också tas bort, med förbehåll för operativa begränsningar, backuper och rättsliga lagringskrav.",
       ],
     },
@@ -68,7 +68,7 @@ export const privacyPolicy = {
       title: "Dina rättigheter",
       body: [
         "Beroende på var du befinner dig kan du ha rätt att begära tillgång, rättelse, radering, begränsning, invändning eller dataportabilitet för dina personuppgifter.",
-        "Om din data samlades in via en kundwidget är det oftast snabbast att först kontakta webbplatsägaren. Du kan också kontakta Agentergroup för plattformsrelaterade integritetsfrågor och stöd kring publik widgetdata.",
+        "Om din data samlades in via en kundwidget är det oftast snabbast att först kontakta webbplatsägaren. Du kan också kontakta Avenro för plattformsrelaterade integritetsfrågor och stöd kring publik widgetdata.",
       ],
     },
     {
@@ -81,7 +81,7 @@ export const privacyPolicy = {
     {
       title: "Kontakt",
       body: [
-        "För integritetsfrågor, begäran om tillgång eller radering, kontakta Agentergroup support på info@avenro.se eller via webbplatsen där tjänsten tillhandahölls.",
+        "För integritetsfrågor, begäran om tillgång eller radering, kontakta Avenro support på info@avenro.se eller via webbplatsen där tjänsten tillhandahölls.",
         "Den här policyn kan uppdateras över tid när produkten, leverantörerna och de rättsliga kraven utvecklas.",
       ],
     },

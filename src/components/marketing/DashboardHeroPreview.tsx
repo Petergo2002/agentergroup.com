@@ -65,7 +65,7 @@ export function DashboardHeroPreview() {
               <span className="h-3 w-3 rounded-full bg-[#27c93f] shadow-xs inline-block" />
             </div>
             <div className="ml-3 hidden sm:flex items-center gap-2 text-[11px] font-medium text-black/50">
-              <span className="font-semibold text-black/75">Agentergroup</span>
+              <span className="font-semibold text-black/75">Avenro</span>
               <span>/</span>
               <span className="text-black/80 font-bold">Dashboard</span>
             </div>
@@ -101,7 +101,7 @@ export function DashboardHeroPreview() {
               </div>
             </div>
 
-            {/* Navigation (Matches exact Agentergroup structure) */}
+            {/* Navigation (Matches exact Avenro structure) */}
             <div className="flex-1 space-y-3 sm:space-y-4 p-1.5 sm:p-3">
               <div>
                 <p className="hidden sm:block px-2.5 mb-1 text-[10px] font-bold uppercase tracking-wider text-black/40">

@@ -10,7 +10,7 @@ import { LegalLayout } from "@/components/legal/LegalLayout";
 export const metadata: Metadata = {
   title: "Terms of Service",
   description:
-    "Public terms of service for Agentergroup and Agentergroup-powered widgets.",
+    "Public terms of service for Avenro and Avenro-powered widgets.",
 };
 
 export default async function TermsOfServicePage({

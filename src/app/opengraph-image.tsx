@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Agentergroup — Meet Milo, your AI employee for the web";
+export const alt = "Avenro — Meet Milo, your AI employee for the web";
 export const size = {
   width: 1200,
   height: 630,
@@ -61,10 +61,10 @@ export default function OpenGraphImage() {
                 fontSize: 28,
               }}
             >
-              A
+              a
             </div>
             <div style={{ display: "flex", fontSize: 27, fontWeight: 800, letterSpacing: -1 }}>
-              AGENTERGROUP
+              AVENRO
             </div>
           </div>
 

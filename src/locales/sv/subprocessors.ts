@@ -2,7 +2,7 @@ export const subprocessors = {
   badge: "Kundefterlevnad",
   title: "Underbiträden",
   description:
-    "Den här sidan är avsedd för inloggade kunder som behöver en överblick över de aktuella underbiträden som används för att leverera Agentergroup och Agentergroup-drivna widgets.",
+    "Den här sidan är avsedd för inloggade kunder som behöver en överblick över de aktuella underbiträden som används för att leverera Avenro och Avenro-drivna widgets.",
   lastUpdated: "Senast uppdaterad: 23 mars 2026",
   backToSettings: "Tillbaka till inställningar",
   dataProcessing: "Databehandling",

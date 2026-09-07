@@ -1,54 +1,34 @@
-'use client';
+import Link from "next/link";
+import { forgotPasswordAction } from "@/app/login/actions";
+import { BrandLogo } from "@/components/BrandLogo";
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+interface ForgotPasswordPageProps {
+  searchParams: Promise<{
+    error?: string;
+    success?: string;
+  }>;
+}
 
-export default function ForgotPasswordPage() {
-  const supabase = createClient();
-  const [email, setEmail] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSending(true);
-    setError('');
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
-      });
-      if (error) throw error;
-      setSent(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-    } finally {
-      setIsSending(false);
-    }
-  };
+export default async function ForgotPasswordPage({
+  searchParams,
+}: ForgotPasswordPageProps) {
+  const { error, success } = await searchParams;
 
   return (
-    <main className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-[#050505] font-body text-[#f5f1eb]">
+    <main className="relative min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-[#050505] font-body text-[#f5f1eb] selection:bg-[#ff5c00] selection:text-white">
 
       {/* Left Column: Symmetrical, Pristine Minimalist Typographic Branding */}
       <section className="relative hidden lg:flex bg-[#050505] text-[#f5f1eb] p-16 xl:p-24 flex-col justify-between overflow-hidden border-r border-[#161616] h-full">
         <div className="relative z-10 flex items-center justify-between">
           <Link
             href="/"
-            title="Agentergroup Home"
+            title="Avenro Home"
             aria-label="Back to landing page"
             className="group inline-flex items-center transition-all duration-200 hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5c00] rounded-xl"
           >
-            <Image
-              src="/dashboardlogo.svg"
-              alt="Agentergroup"
-              width={840}
-              height={279}
-              priority
-              className="h-20 lg:h-24 xl:h-28 w-auto object-contain object-left max-w-full transition-transform duration-200 group-hover:scale-[1.02]"
+            <BrandLogo
+              className="h-10 w-auto text-white transition-transform duration-200 group-hover:scale-[1.02]"
+              textColor="#ffffff"
             />
           </Link>
         </div>
@@ -81,17 +61,13 @@ export default function ForgotPasswordPage() {
         <div className="flex lg:hidden items-center justify-between mb-12">
           <Link
             href="/"
-            title="Agentergroup Home"
+            title="Avenro Home"
             aria-label="Back to landing page"
             className="group inline-flex items-center transition-all duration-200 hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5c00] rounded-xl"
           >
-            <Image
-              src="/dashboardlogo.svg"
-              alt="Agentergroup"
-              width={840}
-              height={279}
-              priority
-              className="h-12 w-auto object-contain object-left transition-transform duration-200 group-hover:scale-[1.02]"
+            <BrandLogo
+              className="h-8 w-auto text-white transition-transform duration-200 group-hover:scale-[1.02]"
+              textColor="#ffffff"
             />
           </Link>
           <div className="rounded-[2px] bg-[#111] border border-[#222] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.15em] text-[#9d948a]/80">
@@ -108,74 +84,82 @@ export default function ForgotPasswordPage() {
               ACCOUNT RECOVERY
             </p>
             <h1 className="font-headline text-3xl font-extrabold tracking-tight text-white">
-              Forgot password?
+              Reset Password
             </h1>
-            <p className="text-xs font-semibold text-[#9d948a]/80">
-              No worries — we&apos;ll email you a reset link.
+            <p className="text-xs text-[#9d948a] font-medium leading-relaxed">
+              We will send a password reset link to your email address.
             </p>
           </div>
 
-          {sent ? (
-            /* Success state */
+          {/* Dynamic Flash Notifications (Error or Success) */}
+          {error && (
+            <div
+              role="alert"
+              className="rounded-[2px] border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs text-red-400 font-semibold text-center animate-shake"
+            >
+              {error}
+            </div>
+          )}
+
+          {success ? (
             <div className="space-y-6">
               <div
                 role="status"
                 aria-live="polite"
-                className="rounded-[2px] border border-[#ff5c00]/20 bg-[#ff5c00]/5 px-5 py-5 text-sm text-[#f5f1eb]"
+                className="rounded-[2px] border border-emerald-500/20 bg-emerald-500/10 p-5 text-center space-y-2"
               >
-                <p className="font-bold text-[#ff5c00] mb-1">Check your inbox ✓</p>
-                <p className="text-[#9d948a] leading-relaxed">
-                  We sent a reset link to <strong>{email}</strong>. It may take a minute to arrive.
+                <p className="text-sm font-bold text-emerald-400">
+                  Reset link sent
+                </p>
+                <p className="text-xs text-[#9d948a] leading-relaxed">
+                  Check your inbox for instructions to reset your password.
                 </p>
               </div>
+
               <Link
                 href="/login"
-                className="block text-center text-xs font-bold text-[#ff5c00] uppercase tracking-widest hover:underline"
+                className="w-full inline-flex items-center justify-center rounded-[2px] border border-[#222] bg-[#111] px-4 py-3 text-xs font-bold text-white hover:bg-[#1a1a1a] transition-colors"
               >
-                ← Back to login
+                Back to Sign In
               </Link>
             </div>
           ) : (
-            /* Form state */
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-[2px] border border-error/20 bg-error-container/10 px-4 py-3 text-xs text-error font-semibold animate-shake"
-                >
-                  {error}
+            <form action={forgotPasswordAction} className="space-y-6">
+              <div className="space-y-5">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="recovery-email"
+                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1"
+                  >
+                    Email Address
+                  </label>
+                  <input
+                    id="recovery-email"
+                    className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
+                    name="email"
+                    type="email"
+                    placeholder="name@company.com"
+                    required
+                    autoComplete="email"
+                  />
                 </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label htmlFor="recovery-email" className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75">
-                  Email address
-                </label>
-                <input
-                  id="recovery-email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
-                  required
-                  className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#0d0d0d] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
-                />
               </div>
 
-              <div className="space-y-4 pt-2">
-                <button
-                  type="submit"
-                  disabled={isSending}
-                  className="w-full flex h-11 items-center justify-center rounded-[2px] bg-[#ff5c00] hover:bg-[#e05100] text-white text-[11px] font-bold uppercase tracking-widest active:scale-[0.98] transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSending ? 'Sending…' : 'Send Reset Link'}
-                </button>
-                <p className="text-center text-xs text-[#9d948a] font-medium">
-                  Remember your password?{' '}
-                  <Link href="/login" className="text-[#ff5c00] font-bold hover:underline">
-                    Sign in
+              <button
+                type="submit"
+                className="w-full rounded-[2px] bg-[#ff5c00] py-3.5 px-4 text-xs font-bold uppercase tracking-[0.2em] text-white transition-all duration-150 hover:bg-[#ff6d1a] active:scale-[0.99] shadow-lg shadow-[#ff5c00]/20 cursor-pointer"
+              >
+                Send Reset Link
+              </button>
+
+              <div className="text-center pt-2">
+                <p className="text-xs text-[#9d948a]">
+                  Remember your password?{" "}
+                  <Link
+                    href="/login"
+                    className="text-white hover:text-[#ff5c00] transition-colors font-semibold underline underline-offset-4 decoration-white/20 hover:decoration-[#ff5c00]"
+                  >
+                    Back to Sign In
                   </Link>
                 </p>
               </div>
@@ -185,7 +169,7 @@ export default function ForgotPasswordPage() {
 
         {/* Footer info panel */}
         <div className="mt-8 pt-6 border-t border-[#161616] flex flex-col sm:flex-row items-center justify-between text-[10px] text-[#9d948a]/30 font-medium gap-2 text-center sm:text-left">
-          <span>&copy; 2026 Agentergroup AB. All rights reserved.</span>
+          <span>&copy; 2026 Avenro AB. All rights reserved.</span>
           <div className="flex gap-4">
             <span className="hover:text-white transition-colors cursor-pointer">Status</span>
             <span className="hover:text-white transition-colors cursor-pointer">Contact</span>

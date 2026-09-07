@@ -197,3 +197,24 @@ export async function updatePassword(formData: FormData) {
   revalidatePath("/", "layout");
   redirect(redirectTo);
 }
+
+export async function forgotPasswordAction(formData: FormData) {
+  const supabase = await createClient();
+  const email = String(formData.get("email") ?? "").trim();
+  const appUrl = getAppUrl();
+  const redirectTo = `${appUrl}/auth/callback?next=/complete-signup`;
+
+  if (!email) {
+    redirect("/login/forgot-password?error=Please+enter+your+email+address.");
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+
+  if (error) {
+    redirect(`/login/forgot-password?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect("/login/forgot-password?success=1");
+}

@@ -8,7 +8,7 @@ export function hasEmailEnv(): boolean {
 
 /** Returns the configured "from" address for transactional emails. */
 function getFromAddress(): string {
-  return process.env.EMAIL_FROM_ADDRESS ?? "Agentergroup <noreply@avenro.se>";
+  return process.env.EMAIL_FROM_ADDRESS ?? "Avenro <noreply@avenro.se>";
 }
 
 /** Creates a Resend client instance. */
@@ -40,7 +40,7 @@ export async function sendInviteEmail(options: {
     const { data, error } = await resend.emails.send({
       from: getFromAddress(),
       to: options.to,
-      subject: `You've been invited to ${options.workspaceName} on Agentergroup`,
+      subject: `You've been invited to ${options.workspaceName} on Avenro`,
       html: buildInviteHtml({
         workspaceName: options.workspaceName,
         inviterName: options.inviterName,
@@ -89,7 +89,7 @@ function buildInviteHtml(options: {
               </h1>
               <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #64748b;">
                 <strong style="color: #0f172a;">${escapeHtml(options.inviterName)}</strong> has invited you to join
-                <strong style="color: #0f172a;">${escapeHtml(options.workspaceName)}</strong> on Agentergroup.
+                <strong style="color: #0f172a;">${escapeHtml(options.workspaceName)}</strong> on Avenro.
               </p>
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
@@ -108,7 +108,7 @@ function buildInviteHtml(options: {
           <tr>
             <td style="padding: 16px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
               <p style="margin: 0; font-size: 11px; color: #94a3b8; text-align: center;">
-                Agentergroup · AI Agent Platform
+                Avenro · AI Agent Platform
               </p>
             </td>
           </tr>

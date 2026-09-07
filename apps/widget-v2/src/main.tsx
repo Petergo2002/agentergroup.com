@@ -14,7 +14,7 @@ const widgetPublicKey = widgetFromUrl || legacyWidgetId || "";
 
 if (!widgetFromUrl && legacyWidgetId) {
   widgetDebug.warn(
-    "[AgenterGroup Widget] '?id=' is deprecated. Use '?widget=' instead.",
+    "[Avenro Widget] '?id=' is deprecated. Use '?widget=' instead.",
   );
 }
 

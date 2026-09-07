@@ -5,7 +5,7 @@ export const login = {
     "Vi behöver bara koppla upp din databas. Lägg till dina Supabase-uppgifter i .env.local så är du igång på några sekunder.",
   headline: "Kontrollgränssnittet för AI-agenter.",
   subheadline:
-    "Agentergroup låter dig designa, driftsätta och övervaka produktionsklara agenter med hög precision.",
+    "Avenro låter dig designa, driftsätta och övervaka produktionsklara agenter med hög precision.",
   seamless: "Sömlös",
   architecture: "Arkitektur",
   scalable: "Skalbar",
@@ -13,7 +13,7 @@ export const login = {
   secure: "Säker",
   runtime: "Runtime",
   workspacePortal: "Workspace-portal",
-  signInTitle: "Logga in i Agentergroup",
+  signInTitle: "Logga in i Avenro",
   signInSubtitle: "Ange dina uppgifter nedan för att öppna ditt workspace.",
   emailAddress: "E-postadress",
   password: "Lösenord",
@@ -33,9 +33,9 @@ export const login = {
   finishSignup: "Slutför registrering",
   passwordsDoNotMatch: "Lösenorden matchar inte.",
   legal:
-    "Bygg framtiden med Agentergroup. När du loggar in godkänner du våra användarvillkor och vår integritetspolicy.",
+    "Bygg framtiden med Avenro. När du loggar in godkänner du våra användarvillkor och vår integritetspolicy.",
   legalPrefix:
-    "Bygg framtiden med Agentergroup. När du loggar in godkänner du våra",
+    "Bygg framtiden med Avenro. När du loggar in godkänner du våra",
   legalAnd: "och",
   privacyPolicy: "Integritetspolicy",
   termsOfService: "Användarvillkor",
@@ -43,7 +43,7 @@ export const login = {
   signupConsentAnd: "och bekräftar",
   signupConsentRequired:
     "Du måste godkänna användarvillkoren och bekräfta integritetspolicyn för att skapa ett konto.",
-  logoAlt: "Agentergroup-logotyp",
+  logoAlt: "Avenro-logotyp",
   continueWithGoogle: "Fortsätt med Google",
   orContinueWith: "eller fortsätt med e-post",
 };

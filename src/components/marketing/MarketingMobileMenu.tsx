@@ -49,8 +49,8 @@ export function MarketingMobileMenu({ copy, serverLanguage }: MarketingMobileMen
   }, [open]);
 
   const links = [
-    { href: "#product", label: copy.product },
     { href: "#how-it-works", label: copy.howItWorks },
+    { href: "#product", label: copy.product },
     { href: "#use-cases", label: copy.useCases },
     { href: "#faq", label: copy.faq },
   ];

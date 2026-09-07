@@ -1203,7 +1203,7 @@ export default function Widget({
                     : "0px 1px 1px rgba(255,255,255,0.8), 0px -1px 0.5px rgba(0,0,0,0.1)",
               }}
             >
-              {config.brand.name || "AgenterGroup"}
+              {config.brand.name || "Avenro"}
             </span>
           </div>
 
@@ -1299,7 +1299,7 @@ export default function Widget({
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-widget-muted transition-colors hover:text-widget-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-widget-primary/40"
             >
-              Powered by Agentergroup
+              Powered by Avenro
             </a>
           </div>
         ) : null}

@@ -142,7 +142,7 @@ export const settings = {
   deleteData: "Delete data",
   languageSection: "Platform language",
   languageDescription:
-    "Choose the language used across Agentergroup. Your choice is saved on this device.",
+    "Choose the language used across Avenro. Your choice is saved on this device.",
   languageHelp: "The selected language applies immediately.",
   workspaceCreated: "Workspace created.",
   workspaceNamePlaceholder: "Acme Dental",

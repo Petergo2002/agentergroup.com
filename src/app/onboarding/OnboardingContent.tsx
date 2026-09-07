@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { AvenroIcon } from "@/components/BrandLogo";
 import {
   Check,
   Clock3,
@@ -52,17 +52,10 @@ export default function OnboardingContent({
         <div className="border-b border-white/8 px-6 py-5 sm:px-8">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Image
-                src="/svgfavicon.svg"
-                alt="Agentergroup"
-                width={42}
-                height={42}
-                priority
-                className="h-10 w-10 object-contain"
-              />
+              <AvenroIcon size={38} />
               <div>
                 <p className="text-sm font-bold tracking-tight text-white">
-                  Agentergroup
+                  Avenro
                 </p>
                 <p className="text-xs text-white/45">Managed pilot access</p>
               </div>

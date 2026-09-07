@@ -13,7 +13,7 @@ export function slugify(value: string) {
 
 export function titleFromEmail(email?: string | null) {
   if (!email) {
-    return "Agentergroup";
+    return "Avenro";
   }
 
   const [prefix] = email.split("@");

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CalendarDays, Cloud, Copy, Hash, Link2, Mail, Network, RefreshCw, ShoppingBag } from 'lucide-react';
+import { AlertCircle, CalendarDays, Cloud, Copy, Hash, Link2, Mail, Network, RefreshCw, ShoppingBag, X } from 'lucide-react';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { SimpleIcon } from '@/components/icons/SimpleIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
@@ -31,6 +31,153 @@ interface GeneratedAuthLink {
   expiresAt: string;
 }
 
+const MAX_SETUP_INCOMPLETE_AGE_MS = 10 * 60 * 1000; // 10 minutes
+const DISMISSED_ERRORS_STORAGE_KEY = 'avenro_dismissed_connection_errors';
+
+function getConnectionErrorTimestamp(connection: ConnectionRecord | null): number | null {
+  if (!connection) return null;
+  const data = connection.toolkit_data ?? {};
+  const lastExpiryEvent = data.lastExpiryEvent;
+  const eventTime =
+    lastExpiryEvent && typeof lastExpiryEvent === 'object'
+      ? (lastExpiryEvent as Record<string, unknown>).receivedAt
+      : null;
+
+  const rawTime =
+    (typeof eventTime === 'string' && eventTime) ||
+    (typeof data.receivedAt === 'string' && data.receivedAt) ||
+    (typeof data.timestamp === 'string' && data.timestamp) ||
+    connection.updated_at ||
+    connection.created_at;
+
+  if (!rawTime) return null;
+  const time = new Date(rawTime).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+function isConnectionSetupIncomplete(reason: string): boolean {
+  const normalized = reason.toLowerCase();
+  return (
+    normalized.includes('did not complete') ||
+    normalized.includes('within 10 minutes') ||
+    normalized.includes('setup was not completed') ||
+    normalized.includes('slutfördes inte')
+  );
+}
+
+function isErrorStale(connection: ConnectionRecord | null, reason: string): boolean {
+  if (!isConnectionSetupIncomplete(reason)) {
+    return false;
+  }
+  const timestamp = getConnectionErrorTimestamp(connection);
+  if (!timestamp) {
+    return true;
+  }
+  return Date.now() - timestamp > MAX_SETUP_INCOMPLETE_AGE_MS;
+}
+
+function getStoredDismissedErrors(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_ERRORS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return new Set(parsed);
+    if (typeof parsed === 'object' && parsed !== null) return new Set(Object.keys(parsed));
+    return new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function storeDismissedError(slug: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredDismissedErrors();
+    current.add(slug);
+    window.localStorage.setItem(
+      DISMISSED_ERRORS_STORAGE_KEY,
+      JSON.stringify(Array.from(current)),
+    );
+  } catch {
+    // Ignore quota errors
+  }
+}
+
+function removeStoredDismissedError(slug: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredDismissedErrors();
+    current.delete(slug);
+    window.localStorage.setItem(
+      DISMISSED_ERRORS_STORAGE_KEY,
+      JSON.stringify(Array.from(current)),
+    );
+  } catch {
+    // Ignore
+  }
+}
+
+function ConnectionStatusAlert({
+  toolkitSlug,
+  humanizedReason,
+  isSetupIncomplete,
+  onDismiss,
+}: {
+  toolkitSlug: string;
+  humanizedReason: string;
+  isSetupIncomplete: boolean;
+  onDismiss: (slug: string) => void;
+}) {
+  const [isFadingOut, setIsFadingOut] = useState(false);
+
+  useEffect(() => {
+    // Automatically dismiss incomplete setup message after 10 seconds so it does not get stuck
+    if (isSetupIncomplete) {
+      const timer = setTimeout(() => {
+        setIsFadingOut(true);
+        setTimeout(() => {
+          onDismiss(toolkitSlug);
+        }, 300);
+      }, 10_000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isSetupIncomplete, onDismiss, toolkitSlug]);
+
+  const handleManualDismiss = () => {
+    setIsFadingOut(true);
+    setTimeout(() => {
+      onDismiss(toolkitSlug);
+    }, 200);
+  };
+
+  return (
+    <div
+      role="alert"
+      className={`mt-4 flex items-start justify-between gap-2.5 rounded-xl border border-error/20 bg-error/8 dark:bg-error/15 px-3.5 py-3 text-xs leading-relaxed text-error shadow-xs transition-all duration-300 ${
+        isFadingOut
+          ? 'opacity-0 scale-95 pointer-events-none -translate-y-1'
+          : 'opacity-100 scale-100 animate-in fade-in duration-200'
+      }`}
+    >
+      <div className="flex items-start gap-2.5 min-w-0">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <p className="font-medium break-words">{humanizedReason}</p>
+      </div>
+      <button
+        type="button"
+        onClick={handleManualDismiss}
+        className="shrink-0 rounded-lg p-1 text-error/70 transition-colors hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-1 focus-visible:ring-error cursor-pointer"
+        aria-label="Dismiss error"
+        title="Dismiss"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function resolveToolkitIcon(icon: string) {
   if (icon === 'mail') return <Mail className="h-7 w-7" />;
   if (icon === 'event') return <CalendarDays className="h-7 w-7" />;
@@ -54,7 +201,16 @@ function readConnectionStatusReason(connection: ConnectionRecord | null) {
       : null;
   const reason = data.statusReason ?? data.status_reason ?? lastExpiryReason;
 
-  return typeof reason === 'string' && reason.trim() ? reason.trim() : null;
+  if (typeof reason !== 'string' || !reason.trim()) {
+    return null;
+  }
+
+  const trimmed = reason.trim();
+  if (isErrorStale(connection, trimmed)) {
+    return null;
+  }
+
+  return trimmed;
 }
 
 export default function ConnectionsPageClient({
@@ -85,6 +241,26 @@ export default function ConnectionsPageClient({
   const [generatedAuthLink, setGeneratedAuthLink] = useState<GeneratedAuthLink | null>(null);
   const [isAuthLinksOpen, setIsAuthLinksOpen] = useState(false);
   const hasStartedInitialSync = useRef(false);
+  const [dismissedErrors, setDismissedErrors] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setDismissedErrors(getStoredDismissedErrors());
+  }, []);
+
+  const handleDismissError = useCallback((slug: string) => {
+    storeDismissedError(slug);
+    setDismissedErrors((prev) => new Set(prev).add(slug));
+  }, []);
+
+  const handleUndismissError = useCallback((slug: string) => {
+    removeStoredDismissedError(slug);
+    setDismissedErrors((prev) => {
+      const next = new Set(prev);
+      next.delete(slug);
+      return next;
+    });
+  }, []);
+
 
   const formatDateTime = useCallback(
     (value: string) =>
@@ -174,6 +350,7 @@ export default function ConnectionsPageClient({
   }, [initialConnections, load]);
 
   const handleConnect = useCallback(async (toolkit: ConnectionToolkitCard) => {
+    handleUndismissError(toolkit.slug);
     try {
       if (toolkit.status === 'connected') {
         showToast(
@@ -204,7 +381,7 @@ export default function ConnectionsPageClient({
         error instanceof Error ? error.message : t('connections.startFlowError');
       showToast(message, 'error');
     }
-  }, [showToast, t]);
+  }, [handleUndismissError, showToast, t]);
 
   const handleDisconnect = async (connectionId: string) => {
     setDisconnectingConnectionId(connectionId);
@@ -236,6 +413,7 @@ export default function ConnectionsPageClient({
   };
 
   const handleCreateAuthLink = async (toolkitSlug: string) => {
+    handleUndismissError(toolkitSlug);
     setCreatingAuthLinkSlug(toolkitSlug);
 
     try {
@@ -375,7 +553,9 @@ export default function ConnectionsPageClient({
               />
             ))
           : toolkits.map((toolkit) => {
-              const statusReason = readConnectionStatusReason(toolkit.connection);
+              const rawStatusReason = readConnectionStatusReason(toolkit.connection);
+              const isDismissed = dismissedErrors.has(toolkit.slug);
+              const statusReason = !isDismissed ? rawStatusReason : null;
 
               return (
                 <div
@@ -424,10 +604,12 @@ export default function ConnectionsPageClient({
                         : t('connections.worksWithWebsiteChat')}
                     </p>
                     {statusReason && toolkit.status !== 'connected' ? (
-                      <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-error/20 bg-error/8 dark:bg-error/15 px-3.5 py-3 text-xs leading-relaxed text-error shadow-xs">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                        <p className="font-medium">{humanizeStatusReason(statusReason)}</p>
-                      </div>
+                      <ConnectionStatusAlert
+                        toolkitSlug={toolkit.slug}
+                        humanizedReason={humanizeStatusReason(statusReason)}
+                        isSetupIncomplete={isConnectionSetupIncomplete(statusReason)}
+                        onDismiss={handleDismissError}
+                      />
                     ) : null}
                   </div>
 

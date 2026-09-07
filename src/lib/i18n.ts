@@ -1,7 +1,9 @@
 import type { Messages } from "@/locales/en";
 
-export const PLATFORM_LANGUAGE_STORAGE_KEY = "agentergroup.platform_language";
-export const PLATFORM_LANGUAGE_COOKIE = "agentergroup_platform_language";
+export const PLATFORM_LANGUAGE_STORAGE_KEY = "avenro.platform_language";
+export const PLATFORM_LANGUAGE_COOKIE = "avenro_platform_language";
+export const LEGACY_PLATFORM_LANGUAGE_STORAGE_KEY = "agentergroup.platform_language";
+export const LEGACY_PLATFORM_LANGUAGE_COOKIE = "agentergroup_platform_language";
 export const PLATFORM_LANGUAGE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 export const PLATFORM_LANGUAGES = ["en", "sv"] as const;
 export type PlatformLanguage = (typeof PLATFORM_LANGUAGES)[number];

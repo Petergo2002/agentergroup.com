@@ -45,7 +45,7 @@ export const connections = {
   publicAuth: {
     title: "Anslut konto",
     description:
-      "{workspace} ber dig att ansluta ett {integration}-konto. Du behöver ingen Agentergroup-inloggning.",
+      "{workspace} ber dig att ansluta ett {integration}-konto. Du behöver ingen Avenro-inloggning.",
     request: "Förfrågan",
     connectButton: "Anslut {integration}",
     starting: "Startar...",
@@ -73,6 +73,6 @@ export const connections = {
       "Vi kunde inte bekräfta det anslutna kontot ännu. Be workspace-admin synka anslutningsstatus.",
     errorTitle: "Kunde inte verifiera anslutningen",
     errorDescription:
-      "Leverantörsflödet kom tillbaka, men Agentergroup kunde inte synka kontostatus ännu.",
+      "Leverantörsflödet kom tillbaka, men Avenro kunde inte synka kontostatus ännu.",
   },
 };

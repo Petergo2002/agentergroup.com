@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "/",
       title,
       description,
-      siteName: "Agentergroup",
+      siteName: "Avenro",
       locale: language === "sv" ? "sv_SE" : "en_US",
       alternateLocale: language === "sv" ? ["en_US"] : ["sv_SE"],
     },

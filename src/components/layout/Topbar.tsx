@@ -26,7 +26,7 @@ export function Topbar({
         </button>
         <Link
           href="/"
-          title="Agentergroup Home"
+          title="Avenro Home"
           aria-label="Back to landing page"
           className="group inline-flex items-center rounded-xl p-1 transition-all duration-200 hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >

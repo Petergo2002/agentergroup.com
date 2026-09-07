@@ -10,7 +10,7 @@ import { LegalLayout } from "@/components/legal/LegalLayout";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Public privacy policy for Agentergroup and Agentergroup-powered widgets.",
+    "Public privacy policy for Avenro and Avenro-powered widgets.",
 };
 
 export default async function PrivacyPolicyPage({

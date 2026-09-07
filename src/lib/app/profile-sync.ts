@@ -10,7 +10,7 @@ interface DatabaseError {
 
 function titleFromEmail(email?: string | null) {
   if (!email) {
-    return "Agentergroup";
+    return "Avenro";
   }
 
   const [prefix] = email.split("@");

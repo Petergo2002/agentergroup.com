@@ -530,3 +530,23 @@ function flattenEventTypeItems(items: unknown[]): CalEventType[] {
 ```
 
 This pattern is implemented in the Cal.com extractor. Follow it for all future integrations.
+
+---
+
+## Connection Expiry & Incomplete Setup Staleness Protocol
+
+When an OAuth initiation attempt is abandoned or times out, Composio fires an expiry event with `statusReason: "Initiation did not complete within 10 minutes"`. In the database, this reason is written to `connections.toolkit_data.statusReason` and `lastExpiryEvent`.
+
+To ensure connection error banners never get stuck indefinitely in the UI:
+
+1. **Staleness Filtering on Initial Load (`isErrorStale`):**
+   In `src/app/(app)/connections/ConnectionsPageClient.tsx`, `readConnectionStatusReason` extracts the event timestamp (`lastExpiryEvent.receivedAt`, `data.receivedAt`, `updated_at`, or `created_at`). If an incomplete setup error is older than 10 minutes (`MAX_SETUP_INCOMPLETE_AGE_MS`), it is considered stale and filtered out (`return null`). Stale errors from previous sessions are never displayed.
+2. **Auto-Dismissal Timer:**
+   For fresh incomplete setup errors occurring in the active session, `<ConnectionStatusAlert>` automatically dismisses the banner after 10 seconds with a smooth CSS fade-out transition.
+3. **Manual Dismissal:**
+   Users can immediately close any error banner via the accessible `✕` button.
+4. **Storage Persistence:**
+   Dismissed toolkit slugs are stored in browser `localStorage` under `avenro_dismissed_connection_errors`, ensuring errors remain hidden across page reloads.
+5. **Flow Retry Reset:**
+   When a user clicks **Connect** or **Create Auth Link** to retry, the dismissed error state is cleared for that toolkit so genuine new errors will be surfaced.
+

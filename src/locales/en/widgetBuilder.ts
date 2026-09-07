@@ -41,10 +41,10 @@ export const widgetBuilder = {
     interactionDescription:
       "Control how the widget behaves when a user first interacts with it.",
     primaryLanguage: "Primary Language",
-    showBranding: "Show Agentergroup branding",
-    brandingDescription: 'Toggle the "Powered by Agentergroup" footer.',
+    showBranding: "Show Avenro branding",
+    brandingDescription: 'Toggle the "Powered by Avenro" footer.',
     brandingPremiumDescription:
-      'Premium workspaces can hide the "Powered by Agentergroup" footer.',
+      'Premium workspaces can hide the "Powered by Avenro" footer.',
     homeCopywriting: "Home Screen Copywriting",
     homeCopywritingDescription:
       "The initial text shown in the home chooser screen when multiple specialists are active.",
@@ -107,7 +107,7 @@ export const widgetBuilder = {
     noLogo: "No Logo",
     change: "Change",
     brandName: "Brand Name",
-    brandNamePlaceholder: "e.g. Agentergroup",
+    brandNamePlaceholder: "e.g. Avenro",
     uploadImage: "Upload Image",
     optimizedLogo:
       "Optimized for PNG or SVG with transparent background.",

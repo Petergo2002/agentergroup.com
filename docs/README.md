@@ -1,10 +1,10 @@
-# Agentergroup Documentation
+# Avenro Documentation
 
-Welcome to the technical documentation for Agentergroup. This directory contains the architectural blueprints and guides for maintaining and extending the platform.
+Welcome to the technical documentation for Avenro. This directory contains the architectural blueprints and guides for maintaining and extending the platform.
 
 ## Current Product Model
 
-Agentergroup is Milo-first. A Milo workspace presents one AI employee and one Website Chat rather than separate agent and widget inventories.
+Avenro is Milo-first. A Milo workspace presents one AI employee and one Website Chat rather than separate agent and widget inventories.
 
 ```text
 Milo
@@ -54,4 +54,4 @@ Public-facing legal and auth pages:
 - `/invite/accept` — Public workspace invite acceptance page (unauthenticated-friendly; moved from the `(app)` route group)
 
 ---
-*Last updated: August 24, 2026.*
+*Last updated: September 7, 2026.*

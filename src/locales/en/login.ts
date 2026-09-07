@@ -5,7 +5,7 @@ export const login = {
     "We just need to wire up your database. Add your Supabase credentials to .env.local and you'll be live in seconds.",
   headline: "The control interface for AI Agents.",
   subheadline:
-    "Agentergroup lets you architect, deploy, and monitor production-ready agents with effortless precision.",
+    "Avenro lets you architect, deploy, and monitor production-ready agents with effortless precision.",
   seamless: "Seamless",
   architecture: "Architecture",
   scalable: "Scalable",
@@ -13,7 +13,7 @@ export const login = {
   secure: "Secure",
   runtime: "Runtime",
   workspacePortal: "Workspace Portal",
-  signInTitle: "Sign in to Agentergroup",
+  signInTitle: "Sign in to Avenro",
   signInSubtitle: "Enter your credentials below to access your workspace.",
   emailAddress: "Email Address",
   password: "Password",
@@ -33,9 +33,9 @@ export const login = {
   finishSignup: "Finish Signup",
   passwordsDoNotMatch: "Passwords do not match.",
   legal:
-    "Build your future with Agentergroup. By signing in, you agree to our Terms of Service and Privacy Policy.",
+    "Build your future with Avenro. By signing in, you agree to our Terms of Service and Privacy Policy.",
   legalPrefix:
-    "Build your future with Agentergroup. By signing in, you agree to our",
+    "Build your future with Avenro. By signing in, you agree to our",
   legalAnd: "and",
   privacyPolicy: "Privacy Policy",
   termsOfService: "Terms of Service",
@@ -43,7 +43,7 @@ export const login = {
   signupConsentAnd: "and acknowledge the",
   signupConsentRequired:
     "You must agree to the Terms of Service and acknowledge the Privacy Policy to create an account.",
-  logoAlt: "Agentergroup logo",
+  logoAlt: "Avenro logo",
   continueWithGoogle: "Continue with Google",
   orContinueWith: "or continue with email",
 };

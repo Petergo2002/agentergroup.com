@@ -1,5 +1,5 @@
 /**
- * AgenterGroup Widget Loader
+ * Avenro Widget Loader
  *
  * This script is loaded by customers on their websites.
  * It creates an iframe containing the widget and handles open/close state.
@@ -70,7 +70,7 @@
     currentScript?.getAttribute("data-id")
   ) {
     debugLogger.warn(
-      "[AgenterGroup Widget] 'data-id' is deprecated. Use 'data-widget' instead.",
+      "[Avenro Widget] 'data-id' is deprecated. Use 'data-widget' instead.",
     );
   }
   const previewFlagRaw = currentScript?.getAttribute("data-preview") || "";
@@ -119,7 +119,7 @@
   }
 
   if (!widgetPublicKey) {
-    debugLogger.error("[AgenterGroup Widget] Missing data-widget attribute");
+    debugLogger.error("[Avenro Widget] Missing data-widget attribute");
     return;
   }
 
@@ -517,7 +517,7 @@
       applyWidgetTheme();
       postBootstrapToIframe();
     } catch (error) {
-      debugLogger.error("[AgenterGroup Widget] Bootstrap refresh failed", error);
+      debugLogger.error("[Avenro Widget] Bootstrap refresh failed", error);
       postBootstrapErrorToIframe(
         error instanceof Error
           ? error.message
@@ -1197,7 +1197,7 @@
         container.style.setProperty("--ag-widget-primary-fg", bubbleTextColor);
       }
     } catch (error) {
-      debugLogger.warn("[AgenterGroup Widget] Failed to load theme", error);
+      debugLogger.warn("[Avenro Widget] Failed to load theme", error);
     } finally {
       if (container) {
         container.classList.add("ag-widget-ready");
@@ -1302,7 +1302,7 @@
     try {
       await ensureRuntimeReady();
     } catch (error) {
-      debugLogger.error("[AgenterGroup Widget] Bootstrap failed", error);
+      debugLogger.error("[Avenro Widget] Bootstrap failed", error);
       if (bubble) {
         bubble.disabled = false;
         bubble.removeAttribute("aria-busy");

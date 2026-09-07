@@ -1,10 +1,10 @@
 # Milo single-agent experience
 
-Last updated: 2026-08-24
+Last updated: 2026-09-07
 
 ## Product contract
 
-Milo is the primary customer-facing product model for Agentergroup. A Milo workspace presents one AI employee and one Website Chat. Customers improve that same Milo instead of creating and prompting multiple separate chat agents.
+Milo is the primary customer-facing product model for Avenro. A Milo workspace presents one AI employee and one Website Chat. Customers improve that same Milo instead of creating and prompting multiple separate chat agents.
 
 Milo is a product facade, not a destructive database rewrite. The existing `agents`, drafts, versions, widgets, widget-agent links, OpenRouter model selection, and Widget V2 runtime remain authoritative underneath. This keeps the change small, preserves historical data, and allows the backend to make Milo smarter without forcing customers to rebuild it.
 
@@ -93,6 +93,8 @@ Its header includes a Back control to `/dashboard`. The focused shell is scoped 
 ## Milo Builder
 
 Milo reuses the existing flow-based Agent Builder. The Milo presentation changes customer language while keeping the runtime and persistence model intact.
+
+The top header includes an elevated **Liquid Glass Segmented Switch** (`AgentViewTabs`) that seamlessly toggles between **BUILDER** (`/agents/[id]/builder`) and **TEST MILO** (`/agents/[id]/preview`) with instant optimistic click feedback and hardware-accelerated spring animations.
 
 Customers can still configure:
 

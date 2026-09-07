@@ -79,7 +79,7 @@ COMPOSIO_API_KEY=`}
         <header className="flex items-center justify-between w-full mb-6 sm:mb-8">
           <Link
             href="/"
-            title="Agentergroup Home"
+            title="Avenro Home"
             aria-label="Back to landing page"
             className="group inline-flex items-center gap-2 rounded-xl py-1 text-slate-900 transition-all duration-200 hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5c00]"
           >
@@ -96,19 +96,18 @@ COMPOSIO_API_KEY=`}
           </Link>
         </header>
 
-        {/* Center Container: Main Form */}
-        <div className="w-full max-w-[390px] mx-auto my-auto py-6 sm:py-8 space-y-6 animate-in fade-in zoom-in-95 duration-300">
-          
-          {/* Segmented Tab Switcher */}
-          <div className="grid grid-cols-2 p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 select-none shadow-xs">
+        {/* Main Content Area */}
+        <div className="w-full max-w-md mx-auto my-auto space-y-6 sm:space-y-7">
+          {/* View Toggle Tabs */}
+          <div className="flex rounded-xl p-1 bg-slate-100 border border-slate-200/80 max-w-[280px]">
             <Link
               href={`/login?${new URLSearchParams({
                 ...(redirectTo && redirectTo !== "/dashboard" ? { redirectTo } : {}),
                 view: "login",
               }).toString()}`}
-              className={`flex items-center justify-center py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
+              className={`flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
                 view === "login"
-                  ? "bg-white text-slate-900 shadow-sm"
+                  ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -119,9 +118,9 @@ COMPOSIO_API_KEY=`}
                 ...(redirectTo && redirectTo !== "/dashboard" ? { redirectTo } : {}),
                 view: "signup",
               }).toString()}`}
-              className={`flex items-center justify-center py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
+              className={`flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
                 view === "signup"
-                  ? "bg-white text-slate-900 shadow-sm"
+                  ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -132,7 +131,7 @@ COMPOSIO_API_KEY=`}
           {/* Heading Block */}
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-              {view === "login" ? "Welcome back" : "Get started with Agentergroup"}
+              {view === "login" ? "Welcome back" : "Get started with Avenro"}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
               {view === "login"
@@ -298,7 +297,7 @@ COMPOSIO_API_KEY=`}
             <ShieldCheck className="h-4 w-4 text-slate-400" />
             <span>Enterprise-grade security & privacy</span>
           </div>
-          <p>© 2026 Agentergroup AB</p>
+          <p>© 2026 Avenro AB</p>
         </footer>
       </section>
 
@@ -359,7 +358,7 @@ COMPOSIO_API_KEY=`}
 
         {/* Bottom Bar on Visual Side */}
         <div className="relative z-10 flex items-center justify-between text-xs text-white/40 pt-6 border-t border-white/[0.07]">
-          <span>Agentergroup Intelligence</span>
+          <span>Avenro Intelligence</span>
           <span className="inline-flex items-center gap-1.5 text-white/40">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             All Systems Operational

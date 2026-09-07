@@ -1,6 +1,6 @@
 # Production Readiness And Manual Steps
 
-Last updated: 2026-08-24
+Last updated: 2026-09-07
 
 This document covers the launch-hardening changes that require coordinated
 database, Edge Function, dashboard, and widget deployment. It is not evidence
@@ -125,7 +125,9 @@ supabase db reset
 Required production categories include Supabase URL/publishable/server keys,
 Stripe secret/webhook/price IDs, OpenRouter, `RATE_LIMIT_SECRET`,
 `WIDGET_ACCESS_SECRET`, Firecrawl for website knowledge, and the configured
-public dashboard/widget origins.
+public dashboard/widget origins (`NEXT_PUBLIC_APP_URL=https://avenro.se`,
+`NEXT_PUBLIC_WIDGET_APP_URL=https://widget.avenro.se`, and `EMAIL_FROM_ADDRESS="Agentergroup <noreply@avenro.se>"`).
+For DNS, Vercel, and Resend setup, see [`avenro-domain-setup.md`](./avenro-domain-setup.md).
 
 Set `NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED=false` only when intentionally restoring classic UI. The default Milo experience is enabled when the variable is absent or not `false`.
 
@@ -161,7 +163,7 @@ Version `19.2.3` has incomplete React Server Components security fixes.
 3. Deploy approved database or Edge Function changes in staging before production.
 4. Resolve the legacy widget attachment decision.
 5. Apply only reviewed, pending production migrations.
-6. Deploy the dashboard and widget runtime together.
+6. Deploy the dashboard and widget runtime together (configured for `https://avenro.se` and `https://widget.avenro.se`; follow [`avenro-domain-setup.md`](./avenro-domain-setup.md)).
 7. Verify `/api/health`, authentication, assistant privacy, upload, retention,
    checkout, webhook replay, cancellation, renewal, and unknown-price handling.
 8. Verify the Composio webhook subscription includes `composio.trigger.message`,

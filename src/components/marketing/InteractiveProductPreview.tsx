@@ -1,21 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BookOpenCheck,
-  Bot,
   CalendarCheck2,
   ChevronLeft,
   ChevronRight,
   Lock,
+  Paperclip,
+  RotateCcw,
   RotateCw,
   Send,
-  ShieldCheck,
   Sparkles,
   Star,
   UserRoundCheck,
-  Zap,
+  X,
 } from "lucide-react";
 import { MiloLogo } from "@/components/brand/MiloLogo";
 import type { Messages } from "@/locales/en";
@@ -25,87 +24,41 @@ interface InteractiveProductPreviewProps {
   copy: Messages["landing"]["preview"];
 }
 
-interface Scenario {
-  readonly id: string;
-  readonly chip: string;
-  readonly visitorMessage: string;
-  readonly miloMessage: string;
-  readonly status: string;
-  readonly action?: string;
-}
-
 export function InteractiveProductPreview({ copy }: InteractiveProductPreviewProps) {
-  const scenarios: readonly Scenario[] =
+  const isSv = copy.lead === "Lead sparat" || copy.browserLabel?.includes("webbplats");
+
+  const scenario =
     copy.scenarios && copy.scenarios.length > 0
-      ? copy.scenarios
-      : [
-          {
-            id: "qualify",
-            chip: "Qualify Lead",
-            visitorMessage: copy.visitorMessage,
-            miloMessage: copy.miloMessage,
-            status: copy.lead,
-            action: copy.nextStep,
-          },
-        ];
+      ? copy.scenarios[0]
+      : {
+          id: "qualify",
+          chip: isSv ? "Kvalificera lead" : "Qualify Lead",
+          visitorMessage: copy.visitorMessage,
+          miloMessage: copy.miloMessage,
+          status: copy.lead,
+          action: copy.nextStep,
+        };
 
-  const [activeScenarioId, setActiveScenarioId] = useState<string>(scenarios[0].id);
-  const [isSimulatingTyping, setIsSimulatingTyping] = useState<boolean>(false);
-
-  const currentScenario =
-    scenarios.find((s) => s.id === activeScenarioId) || scenarios[0];
-
-  const handleSelectScenario = (scenario: Scenario) => {
-    if (scenario.id === activeScenarioId) return;
-    setActiveScenarioId(scenario.id);
-    setIsSimulatingTyping(true);
-  };
-
-  useEffect(() => {
-    if (!isSimulatingTyping) return;
-    const timer = setTimeout(() => {
-      setIsSimulatingTyping(false);
-    }, 320);
-    return () => clearTimeout(timer);
-  }, [isSimulatingTyping, activeScenarioId]);
-
-  const getStatusCards = (scenario: Scenario) => {
-    switch (scenario.id) {
-      case "knowledge":
-        return [
-          { id: "card-knowledge", icon: BookOpenCheck, label: copy.knowledge },
-          { id: "card-status", icon: ShieldCheck, label: scenario.status || "Verified source" },
-          { id: "card-action", icon: Zap, label: scenario.action || "Answered in <1s" },
-        ];
-      case "booking": {
-        const bookingAction =
-          scenario.action && scenario.action !== "Ready to book" && scenario.action !== "Redo att boka"
-            ? scenario.action
-            : copy.nextStep && copy.nextStep !== "Ready to book" && copy.nextStep !== "Redo att boka"
-              ? copy.nextStep
-              : copy.lead === "Lead sparat"
-                ? "Mötestider föreslagna"
-                : "Calendar slots proposed";
-        return [
-          { id: "card-knowledge", icon: BookOpenCheck, label: copy.knowledge },
-          { id: "card-status", icon: UserRoundCheck, label: copy.lead || "Lead captured" },
-          { id: "card-action", icon: CalendarCheck2, label: bookingAction },
-        ];
-      }
-      case "qualify":
-      default:
-        return [
-          { id: "card-knowledge", icon: BookOpenCheck, label: copy.knowledge },
-          { id: "card-status", icon: UserRoundCheck, label: copy.lead || "Lead captured" },
-          { id: "card-action", icon: CalendarCheck2, label: scenario.action || "Synced to CRM" },
-        ];
-    }
-  };
-
-  const statusCards = getStatusCards(currentScenario);
+  const statusCards = [
+    {
+      id: "card-knowledge",
+      icon: BookOpenCheck,
+      label: copy.knowledge || (isSv ? "Godkänd kunskap användes" : "Verified source used"),
+    },
+    {
+      id: "card-status",
+      icon: UserRoundCheck,
+      label: scenario.status || copy.lead || (isSv ? "Lead sparat" : "Lead captured"),
+    },
+    {
+      id: "card-action",
+      icon: CalendarCheck2,
+      label: scenario.action || copy.nextStep || (isSv ? "Mötestider föreslagna" : "Calendar slots proposed"),
+    },
+  ];
 
   return (
-    <div className="relative mx-auto w-full max-w-6xl">
+    <div className="relative mx-auto w-full max-w-6xl select-none pointer-events-none">
       {/* Outer Glow & Window Container */}
       <div
         className={`${styles.previewGlow} relative overflow-hidden rounded-2xl md:rounded-[2rem] border border-[var(--mkt-border)] p-2 sm:p-3.5 shadow-[var(--mkt-shadow-lg)]`}
@@ -138,10 +91,12 @@ export function InteractiveProductPreview({ copy }: InteractiveProductPreviewPro
               </span>
             </div>
 
-            {/* Right: Interactive Badge */}
+            {/* Right: Live Preview Badge */}
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--mkt-orange-text)] sm:text-xs">
-              <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-              <span className="hidden sm:inline">Interactive Demo</span>
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">
+                {isSv ? "Widget v2 Förhandsvisning" : "Widget v2 Preview"}
+              </span>
             </div>
           </div>
 
@@ -255,97 +210,90 @@ export function InteractiveProductPreview({ copy }: InteractiveProductPreviewPro
                 </div>
               </div>
 
-              {/* Right Column: Floating Interactive Chat with Milo Widget */}
+              {/* Right Column: Exact Widget v2 Replica (State after receiving message) */}
               <div className="flex justify-center lg:justify-end">
                 <div
-                  className={`${styles.demoChat} w-full max-w-[23.5rem] sm:max-w-[25rem] overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_24px_64px_-24px_rgba(24,24,24,0.35)]`}
+                  className={`${styles.demoChat} w-full max-w-[20.5rem] sm:max-w-[21.75rem] overflow-hidden rounded-[1.75rem] border border-black/10 bg-white shadow-[0_24px_64px_-16px_rgba(0,0,0,0.22),0_4px_16px_rgba(0,0,0,0.06)] flex flex-col`}
                 >
-                  {/* Chat Header */}
-                  <div className="flex items-center justify-between border-b border-black/7 bg-white px-4 py-3.5">
+                  {/* Widget v2 Header */}
+                  <div className="relative flex h-14 items-center justify-between border-b border-black/6 bg-white px-4">
+                    {/* Left: Avatar & Identity */}
                     <div className="flex items-center gap-2.5">
-                      <span className={`${styles.miloPulse} rounded-full`}>
-                        <MiloLogo size={30} className="h-[30px] w-[30px]" />
-                      </span>
-                      <div>
-                        <p className="text-xs font-bold text-[var(--mkt-ink)]">{copy.chatTitle}</p>
-                        <p className="mt-0.5 flex items-center gap-1.5 text-[9px] font-semibold text-[var(--mkt-success)]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[var(--mkt-success)] animate-pulse" aria-hidden="true" />
-                          {copy.online}
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-xs ring-1 ring-black/8">
+                        <MiloLogo size={20} color="#ff5c00" className="h-5 w-5" />
+                      </div>
+                      <div className="leading-tight">
+                        <p className="text-xs font-bold text-black">Milo</p>
+                        <p className="text-[10px] text-black/50 font-medium">
+                          {isSv ? "AI-medarbetare" : "AI Employee"}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded-md bg-[var(--mkt-warm)] px-2 py-0.5 text-[9px] font-bold text-[var(--mkt-orange-text)]">
-                        AI Active
-                      </span>
-                      <Bot className="h-4 w-4 text-[var(--mkt-tertiary)]" aria-hidden="true" />
+
+                    {/* Right: Reset and Close action buttons */}
+                    <div className="flex items-center gap-1 text-black/45">
+                      <div className="rounded-lg p-1.5">
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="rounded-lg p-1.5">
+                        <X className="h-4 w-4" />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Scenario quick selector chips */}
-                  {scenarios.length > 1 && (
-                    <div className="flex items-center gap-1.5 overflow-x-auto border-b border-black/6 bg-[var(--mkt-soft)]/60 px-3 py-2 scrollbar-none">
-                      {scenarios.map((scenario) => {
-                        const isSelected = scenario.id === activeScenarioId;
-                        return (
-                          <button
-                            key={scenario.id}
-                            type="button"
-                            onClick={() => handleSelectScenario(scenario)}
-                            className={`whitespace-nowrap rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all ${
-                              isSelected
-                                ? "bg-[var(--mkt-ink)] text-white shadow-xs"
-                                : "bg-white text-[var(--mkt-muted)] border border-black/8 hover:text-[var(--mkt-ink)] hover:border-black/20"
-                            }`}
-                          >
-                            {scenario.chip}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {/* Widget v2 Messages Canvas */}
+                  <div className="flex-1 space-y-4 bg-white p-4 sm:p-5 min-h-[22rem] sm:min-h-[24rem] flex flex-col justify-between">
+                    <div className="space-y-4">
+                      {/* User message: Floating right in brand orange pill with rounded-2xl rounded-br-sm */}
+                      <div className="flex justify-end">
+                        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-[#ff5c00] px-4 py-2.5 text-white shadow-xs">
+                          <p className="text-[13px] sm:text-[13.5px] leading-relaxed font-medium">
+                            {scenario.visitorMessage}
+                          </p>
+                        </div>
+                      </div>
 
-                  {/* Chat messages */}
-                  <div className="space-y-3 bg-[#fdfcfb] px-4 py-4 min-h-[13rem]">
-                    <div className={`${styles.demoVisitor} ml-auto max-w-[86%]`}>
-                      <p className="mb-1 text-right text-[9px] font-semibold text-[var(--mkt-tertiary)]">
-                        {copy.visitor}
-                      </p>
-                      <p className="rounded-2xl rounded-br-md bg-[var(--mkt-ink)] px-3.5 py-2.5 text-[11px] leading-4 text-white sm:text-xs sm:leading-5 shadow-xs transition-opacity duration-200">
-                        {currentScenario.visitorMessage}
-                      </p>
-                    </div>
+                      {/* Milo message (Exact post-reception look from Widget v2 ChatView): NO bubble container, clean structured typography */}
+                      <div className="flex flex-col gap-2 pl-0.5">
+                        <div className="space-y-2">
+                          <p className="text-[13px] sm:text-[13.5px] leading-relaxed text-[#0b0b0b] font-normal">
+                            {scenario.miloMessage}
+                          </p>
 
-                    <div className={`${styles.demoMilo} flex max-w-[94%] items-start gap-2`}>
-                      <MiloLogo size={22} className="mt-1 h-[22px] w-[22px] shrink-0" />
-                      {isSimulatingTyping ? (
-                        <div className="rounded-2xl rounded-bl-md border border-[var(--mkt-border)] bg-white px-4 py-3 shadow-xs">
-                          <div className="flex items-center gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--mkt-orange)] animate-bounce [animation-delay:-0.3s]" />
-                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--mkt-orange)] animate-bounce [animation-delay:-0.15s]" />
-                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--mkt-orange)] animate-bounce" />
+                          {/* Milo conversation identity directly beneath text */}
+                          <div className="flex items-center gap-1.5 pt-1 text-[11px] text-[#71717a]">
+                            <MiloLogo size={15} color="#ff5c00" className="h-4 w-4" />
+                            <span>
+                              <span className="font-semibold text-[#0b0b0b]">Milo</span>{" "}
+                              <span aria-hidden="true">•</span> {isSv ? "AI-Agent" : "AI Agent"}
+                            </span>
                           </div>
                         </div>
-                      ) : (
-                        <p className="rounded-2xl rounded-bl-md border border-[var(--mkt-border)] bg-white px-3.5 py-2.5 text-[11px] leading-4 text-[var(--mkt-ink)] sm:text-xs sm:leading-5 shadow-xs animate-fadeIn">
-                          {currentScenario.miloMessage}
-                        </p>
-                      )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Chat input footer */}
-                  <div className="flex items-center gap-2 border-t border-black/7 bg-white p-3">
-                    <div className="flex h-9 flex-1 items-center rounded-xl bg-[var(--mkt-soft)] px-3 text-[10px] text-[var(--mkt-tertiary)] font-medium">
-                      {copy.inputPlaceholder}
+                    {/* Widget v2 Input Shell & Disclaimers */}
+                    <div className="mt-auto space-y-2 pt-3">
+                      {/* .widget-input-shell */}
+                      <div className="flex items-center gap-2 rounded-2xl border border-[#e4e4e7] bg-[#f9fafb] px-3.5 py-2.5 shadow-xs">
+                        <Paperclip className="h-4 w-4 text-[#71717a] shrink-0" />
+                        <span className="flex-1 text-xs text-[#71717a] font-normal truncate">
+                          {copy.inputPlaceholder || (isSv ? "Skriv ett meddelande…" : "Enter your message...")}
+                        </span>
+                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#ff5c00] text-white shadow-2xs">
+                          <Send className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+
+                      {/* Disclaimer */}
+                      <div className="text-center pt-0.5">
+                        <p className="text-[10px] text-[#71717a] leading-tight">
+                          {isSv
+                            ? "Chattmeddelanden kan behandlas automatiskt."
+                            : "Chat messages may be processed automatically."}
+                        </p>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      aria-label="Send message"
-                      className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--mkt-orange)] text-[var(--mkt-ink)] shadow-xs transition-transform hover:scale-105 active:scale-95"
-                    >
-                      <Send className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -365,7 +313,9 @@ export function InteractiveProductPreview({ copy }: InteractiveProductPreviewPro
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--mkt-success-soft)] text-[var(--mkt-success)]">
               <Icon className="h-4 w-4" aria-hidden="true" />
             </span>
-            <span className="text-xs sm:text-sm font-bold leading-tight text-[var(--mkt-ink)]">{label}</span>
+            <span className="text-xs sm:text-sm font-bold leading-tight text-[var(--mkt-ink)]">
+              {label}
+            </span>
           </div>
         ))}
       </div>

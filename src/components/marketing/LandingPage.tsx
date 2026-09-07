@@ -19,7 +19,7 @@ import {
   UserRoundPlus,
   UsersRound,
 } from "lucide-react";
-import { BrandLogo } from "@/components/BrandLogo";
+import { AvenroLogo } from "@/components/brand/AvenroLogo";
 import { MiloLogo } from "@/components/brand/MiloLogo";
 import { SimpleIcon, type SimpleIconKey } from "@/components/icons/SimpleIcon";
 import type { PlatformLanguage } from "@/lib/i18n";
@@ -118,14 +118,18 @@ export function LandingPage({ copy, language }: LandingPageProps) {
           <div className={styles.scrollProgressBar} />
         </div>
         <div className="mx-auto flex h-[4.75rem] max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
-          <Link href="/" aria-label="Agentergroup" className={`${styles.brandLink} shrink-0 rounded-lg`}>
-            <BrandLogo className="h-9 w-auto text-[var(--mkt-ink)] sm:h-10" />
+          <Link
+            href="/"
+            aria-label="Avenro"
+            className={`${styles.brandLink} shrink-0 items-center rounded-xl`}
+          >
+            <AvenroLogo className="h-9 w-auto text-[var(--mkt-ink)] sm:h-10 transition-transform duration-200 hover:scale-[1.02]" />
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary">
             {[
-              ["#product", "product", copy.nav.product],
               ["#how-it-works", "how-it-works", copy.nav.howItWorks],
+              ["#product", "product", copy.nav.product],
               ["#use-cases", "use-cases", copy.nav.useCases],
               ["#faq", "faq", copy.nav.faq],
             ].map(([href, sectionId, label]) => (
@@ -133,7 +137,7 @@ export function LandingPage({ copy, language }: LandingPageProps) {
                 key={href}
                 href={href}
                 data-nav={sectionId}
-                className={`${styles.navLink} rounded-lg px-3.5 py-2.5 text-sm font-semibold text-[var(--mkt-muted)]`}
+                className={`${styles.navLink} whitespace-nowrap rounded-lg px-3.5 py-2.5 text-sm font-semibold text-[var(--mkt-muted)]`}
               >
                 {label}
               </a>
@@ -457,7 +461,13 @@ export function LandingPage({ copy, language }: LandingPageProps) {
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-10 lg:grid-cols-[1.5fr_0.7fr_0.8fr] lg:gap-16">
             <div>
-              <BrandLogo className="h-10 w-auto text-[var(--mkt-ink)]" />
+              <Link
+                href="/"
+                aria-label="Avenro"
+                className="inline-flex items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mkt-orange)]"
+              >
+                <AvenroLogo className="h-9 sm:h-10 w-auto text-[var(--mkt-ink)] transition-transform duration-200 hover:scale-[1.02]" />
+              </Link>
               <p className="mt-5 max-w-md text-sm leading-7 text-[var(--mkt-muted)]">{copy.footer.description}</p>
               <div className="mt-6">
                 <MarketingLanguageSwitcher label={copy.nav.language} serverLanguage={language} />
@@ -467,8 +477,8 @@ export function LandingPage({ copy, language }: LandingPageProps) {
             <div>
               <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mkt-ink)]">{copy.footer.product}</h2>
               <div className="mt-5 grid gap-3 text-sm text-[var(--mkt-muted)]">
-                <a href="#product" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.product}</a>
                 <a href="#how-it-works" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.howItWorks}</a>
+                <a href="#product" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.product}</a>
                 <a href="#use-cases" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.useCases}</a>
                 <Link href="/login" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.login}</Link>
               </div>
@@ -487,7 +497,7 @@ export function LandingPage({ copy, language }: LandingPageProps) {
           </div>
 
           <div className="mt-12 flex flex-col gap-3 border-t border-[var(--mkt-border)] pt-6 text-xs text-[var(--mkt-muted)] sm:flex-row sm:items-center sm:justify-between">
-            <p>© {currentYear} Agentergroup. {copy.footer.rights}</p>
+            <p>© {currentYear} Avenro. {copy.footer.rights}</p>
             <p className="flex items-center gap-2">
               <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
               info@avenro.se

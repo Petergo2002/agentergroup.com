@@ -2,7 +2,7 @@ export const subprocessors = {
   badge: "Customer Compliance",
   title: "Subprocessors",
   description:
-    "This page is intended for signed-in customers who need an overview of the current subprocessors used to deliver Agentergroup and Agentergroup-powered widgets.",
+    "This page is intended for signed-in customers who need an overview of the current subprocessors used to deliver Avenro and Avenro-powered widgets.",
   lastUpdated: "Last updated: March 23, 2026",
   backToSettings: "Back to settings",
   dataProcessing: "Data processing",

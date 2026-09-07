@@ -1,6 +1,6 @@
 # Demo Tester Release Checklist
 
-Last updated: August 25, 2026
+Last updated: September 7, 2026
 
 ## Reminder
 
@@ -108,7 +108,7 @@ Agentergroup is ready to be offered as a small, managed pilot. It is not yet rea
 - [ ] Remove the “Internal Leads node” instruction from Milo-mode Leads copy.
 - [ ] Fix duplicated brand text in legal page browser titles.
 - [ ] Align documentation with the actual authentication behavior of compliance routes.
-- [ ] Update hardcoded dashboard, widget, privacy, and branding URLs when the new domain is selected.
+- [x] Update hardcoded dashboard, widget, privacy, and branding URLs to `avenro.se` (migrated 2026-09-07; see [avenro-domain-setup.md](./avenro-domain-setup.md)).
 - [ ] Run keyboard, focus, contrast, mobile, and automated accessibility checks on authenticated screens.
 
 ## Required Before Accepting Paid Customers

@@ -44,3 +44,22 @@ Use dark or error-specific buttons only when the action is not a normal primary 
 - Keep the mobile navigation drawer inert and hidden from assistive technology while it is closed.
 - Use `ToastProvider` for transient outcomes. Errors are announced assertively; success, warning, and informational notices use a polite status announcement.
 - Preserve `focus-visible` styles and provide an accessible name for icon-only controls.
+
+## Liquid Glass Controls & Segmented Switches
+
+For elevated navigation switches (e.g. `AgentViewTabs` switching between **BUILDER** and **TEST MILO**), use the **Liquid Glass Segmented Control** pattern:
+
+- **Frosted Glass Container:** Rounded pill tray (`rounded-full p-1 isolate`) with `backdrop-blur-xl`, subtle border opacity (`border-outline-variant/15 dark:border-white/10`), and multi-layer specular inner inset highlights.
+- **Sliding Liquid Glass Thumb:** Floating indicator pill with multi-stop refractive gradient (`from-white/95 via-white/85 to-white/70` in light, obsidian glass in dark mode), 2.5D top refraction sheen arc, and ambient brand liquid warmth.
+- **Hardware-Accelerated Fluid Physics:** Uses GPU-accelerated `translate3d` transforms with Apple's `cubic-bezier(0.16, 1, 0.3, 1)` spring curve over 300ms for fluid sliding motion with zero layout shifts.
+- **Optimistic Immediate Feedback:** Active tab state updates immediately on click (`setActiveTab`) to start gliding instantly before Next.js client-side route transitions complete.
+- **No Purple/Violet:** Strictly adheres to curated warm amber/coral brand accents and neutral translucent glass.
+
+## Brand Assets & Vector Identity
+
+Use the official SVG brand components from `src/components/brand/` instead of raw image tags:
+
+- `<AvenroLogo />` (`src/components/brand/AvenroLogo.tsx` or `BrandLogo.tsx`) for the full wordmark.
+- `<AvenroIcon />` (`src/components/brand/AvenroIcon.tsx`) for compact, square, or collapsed sidebar icon states.
+- All brand references use **Avenro AB** and **Avenro** across auth, layout, metadata, email, and locales.
+

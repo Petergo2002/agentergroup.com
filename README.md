@@ -1,6 +1,6 @@
-# Agentergroup
+# Avenro
 
-Agentergroup is a Milo-first, multi-workspace AI employee platform. In the default customer experience, each workspace operates one Milo and one Website Chat. Milo can use workspace Knowledge, connected business tools, capture Leads, learn from unanswered Questions, and improve over time.
+Avenro is a Milo-first, multi-workspace AI employee platform. In the default customer experience, each workspace operates one Milo and one Website Chat. Milo can use workspace Knowledge, connected business tools, capture Leads, learn from unanswered Questions, and improve over time.
 
 The simpler product is implemented as a compatibility facade over the existing agent and Widget V2 architecture. The underlying schema still supports versioned agents, widgets, Automation Agents, Internal Assistants, and classic multi-agent workspaces; those implementation resources are not exposed as inventories in Milo mode.
 
@@ -65,7 +65,7 @@ Root app variables:
 | `OPENROUTER_REQUIRE_ZDR` | No | Enables OpenRouter ZDR preference when truthy |
 | `FIRECRAWL_API_KEY` | Yes for website knowledge | Firecrawl API key for page mapping and ingestion |
 | `RESEND_API_KEY` | Yes for invite email delivery | Resend API key; invite creation still works without delivery |
-| `EMAIL_FROM_ADDRESS` | No | Invite-email sender, defaults to `Agentergroup <noreply@avenro.se>` |
+| `EMAIL_FROM_ADDRESS` | No | Invite-email sender, defaults to `Avenro <noreply@avenro.se>` |
 | `COMPOSIO_API_KEY` | Yes for tool integrations | Composio API key |
 | `COMPOSIO_WEBHOOK_SECRET` | Yes for automations | Secret used to verify Composio trigger webhooks |
 | `COMPOSIO_TOOLKIT_VERSION_GMAIL` | No | Gmail toolkit version override |
@@ -270,4 +270,4 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 
 ## License
 
-Private repository. All rights reserved. Agentergroup © 2026.
+Private repository. All rights reserved. Avenro © 2026.
