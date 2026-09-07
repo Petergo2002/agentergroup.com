@@ -31,9 +31,12 @@ export const metadata: Metadata = {
     siteName: "Avenro",
   },
   icons: {
-    icon: "/2.svg",
+    icon: [
+      { url: "/2.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
     shortcut: "/2.svg",
-    apple: "/2.svg",
+    apple: "/apple-touch-icon.png",
   },
 };
 
