@@ -208,7 +208,7 @@ export function DashboardHeroPreview() {
                     <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-lg sm:rounded-xl bg-orange-50 text-[var(--mkt-orange-text)]">
                       <MiloLogo size={20} className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5 shrink-0" />
                     </div>
-                    <span className="rounded-full bg-surface-container-low border border-black/6 px-1.5 py-0.5 sm:px-2 text-[8px] sm:text-[9px] font-semibold text-black/60">
+                    <span className="rounded-full bg-[#f4f2ee] border border-black/6 px-1.5 py-0.5 sm:px-2 text-[8px] sm:text-[9px] font-semibold text-black/60">
                       Active
                     </span>
                   </div>
@@ -224,7 +224,7 @@ export function DashboardHeroPreview() {
                     <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                       <Users className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5" />
                     </div>
-                    <span className="rounded-full bg-surface-container-low border border-black/6 px-1.5 py-0.5 sm:px-2 text-[8px] sm:text-[9px] font-semibold text-black/60">
+                    <span className="rounded-full bg-[#f4f2ee] border border-black/6 px-1.5 py-0.5 sm:px-2 text-[8px] sm:text-[9px] font-semibold text-black/60">
                       This Week
                     </span>
                   </div>
@@ -240,7 +240,7 @@ export function DashboardHeroPreview() {
                     <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
                       <MessageSquare className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5" />
                     </div>
-                    <span className="rounded-full bg-surface-container-low border border-black/6 px-1.5 py-0.5 sm:px-2 text-[8px] sm:text-[9px] font-semibold text-black/60">
+                    <span className="rounded-full bg-[#f4f2ee] border border-black/6 px-1.5 py-0.5 sm:px-2 text-[8px] sm:text-[9px] font-semibold text-black/60">
                       Live
                     </span>
                   </div>
@@ -256,7 +256,7 @@ export function DashboardHeroPreview() {
                     <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                       <Network className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5" />
                     </div>
-                    <span className="rounded-full bg-surface-container-low border border-black/6 px-1.5 py-0.5 sm:px-2 text-[8px] sm:text-[9px] font-semibold text-black/60">
+                    <span className="rounded-full bg-[#f4f2ee] border border-black/6 px-1.5 py-0.5 sm:px-2 text-[8px] sm:text-[9px] font-semibold text-black/60">
                       Synced
                     </span>
                   </div>
@@ -325,7 +325,7 @@ export function DashboardHeroPreview() {
                 {/* Right: Milo Attention + Overview Section (matching DashboardPageClient.tsx) */}
                 <div className="space-y-3 sm:space-y-4">
                   {/* Milo status card */}
-                  <div className="rounded-2xl border border-black/8 bg-surface-container-lowest p-3.5 sm:p-4 shadow-xs">
+                  <div className="rounded-2xl border border-black/8 bg-white p-3.5 sm:p-4 shadow-xs">
                     <h2 className="text-xs sm:text-sm font-semibold text-black">
                       Milo is up to date
                     </h2>
@@ -333,11 +333,11 @@ export function DashboardHeroPreview() {
                       All visitor questions are answered from your approved knowledge base.
                     </p>
                     <div className="mt-3 grid gap-1.5 sm:gap-2">
-                      <div className="flex items-center gap-2 rounded-xl bg-black/[0.03] px-3 py-1.5 sm:py-2 text-xs font-semibold text-black">
+                      <div className="flex items-center gap-2 rounded-xl bg-[#f4f2ee] px-3 py-1.5 sm:py-2 text-xs font-semibold text-black">
                         <CircleHelp className="h-4 w-4 text-[var(--mkt-orange-text)]" />
                         <span>Improve Milo</span>
                       </div>
-                      <div className="flex items-center gap-2 rounded-xl bg-black/[0.03] px-3 py-1.5 sm:py-2 text-xs font-semibold text-black">
+                      <div className="flex items-center gap-2 rounded-xl bg-[#f4f2ee] px-3 py-1.5 sm:py-2 text-xs font-semibold text-black">
                         <MessageSquare className="h-4 w-4 text-[var(--mkt-orange-text)]" />
                         <span>Website Chat</span>
                       </div>
@@ -345,9 +345,9 @@ export function DashboardHeroPreview() {
                   </div>
 
                   {/* Overview Card (matching real DashboardPageClient.tsx) */}
-                  <div className="hidden sm:block rounded-2xl border border-black/8 bg-surface-container-lowest p-4 shadow-xs">
+                  <div className="hidden sm:block rounded-2xl border border-black/8 bg-white p-4 shadow-xs">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[var(--mkt-orange-text)]">
                         <Compass className="h-4.5 w-4.5 text-[var(--mkt-orange-text)]" strokeWidth={2} />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -361,11 +361,11 @@ export function DashboardHeroPreview() {
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      <div className="flex items-center gap-2 rounded-xl border border-black/6 bg-black/[0.02] px-3 py-2 text-xs font-semibold text-black">
+                      <div className="flex items-center gap-2 rounded-xl border border-black/6 bg-[#f4f2ee] px-3 py-2 text-xs font-semibold text-black">
                         <MiloLogo size={16} className="h-4 w-4" />
                         <span>Milo</span>
                       </div>
-                      <div className="flex items-center gap-2 rounded-xl border border-black/6 bg-black/[0.02] px-3 py-2 text-xs font-semibold text-black">
+                      <div className="flex items-center gap-2 rounded-xl border border-black/6 bg-[#f4f2ee] px-3 py-2 text-xs font-semibold text-black">
                         <Database className="h-4 w-4 text-[var(--mkt-orange-text)]" />
                         <span>Knowledge</span>
                       </div>

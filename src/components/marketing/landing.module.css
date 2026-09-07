@@ -1,17 +1,17 @@
 .site {
-  /* Marketing aliases keep the public site aligned with the product UI. */
-  --mkt-bg: var(--surface-page);
-  --mkt-card: var(--surface-card);
-  --mkt-ink: var(--text-primary);
-  --mkt-muted: var(--text-secondary);
-  --mkt-tertiary: var(--text-secondary);
-  --mkt-border: var(--border-subtle);
-  --mkt-border-strong: var(--border-strong);
-  --mkt-soft: var(--surface-muted);
-  --mkt-warm: var(--brand-primary-soft);
-  --mkt-orange: var(--brand-primary);
-  --mkt-orange-hover: var(--brand-primary-hover);
-  --mkt-orange-text: var(--brand-primary-strong);
+  /* Marketing aliases ensure the public site remains a pristine, warm light presentation regardless of user dashboard theme */
+  --mkt-bg: #fafaf9;
+  --mkt-card: #ffffff;
+  --mkt-ink: #181818;
+  --mkt-muted: #667085;
+  --mkt-tertiary: #98a2b3;
+  --mkt-border: #e7e1db;
+  --mkt-border-strong: #d6d0c8;
+  --mkt-soft: #f6f2ee;
+  --mkt-warm: #fff4ec;
+  --mkt-orange: #ff5c02;
+  --mkt-orange-hover: #e14d0e;
+  --mkt-orange-text: #b93800;
   --mkt-success: #12805c;
   --mkt-success-soft: #eaf7f1;
   --mkt-radius-control: 0.75rem;
