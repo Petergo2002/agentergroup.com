@@ -8,6 +8,7 @@ import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { shouldRefreshConnections } from '@/lib/connections';
 import type { ConnectionAuthLinkRecord, ConnectionRecord } from '@/lib/types';
+import { useAppContext } from '@/components/app/AppContext';
 
 interface ConnectionToolkitCard {
   slug: string;
@@ -68,6 +69,10 @@ export default function ConnectionsPageClient({
   canManageAuthLinks: boolean;
 }) {
   const { language, t } = useLanguage();
+  const { workspace } = useAppContext();
+  const miloMode =
+    workspace.product_experience === 'milo' &&
+    process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== 'false';
   const { showToast } = useToast();
   const [toolkits, setToolkits] = useState<ConnectionToolkitCard[]>(initialToolkits);
   const [connections, setConnections] = useState<ConnectionRecord[]>(initialConnections);
@@ -82,8 +87,29 @@ export default function ConnectionsPageClient({
   const hasStartedInitialSync = useRef(false);
 
   const formatDateTime = useCallback(
-    (value: string) => new Date(value).toLocaleString(language === 'sv' ? 'sv-SE' : 'en-US'),
+    (value: string) =>
+      new Intl.DateTimeFormat(language === 'sv' ? 'sv-SE' : 'en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(value)),
     [language],
+  );
+
+  const humanizeStatusReason = useCallback(
+    (reason: string) => {
+      const normalized = reason.toLowerCase();
+
+      if (normalized.includes('token refresh') || normalized.includes('permanent auth')) {
+        return t('connections.connectionExpired');
+      }
+
+      if (normalized.includes('did not complete') || normalized.includes('within 10 minutes')) {
+        return t('connections.connectionSetupIncomplete');
+      }
+
+      return t('connections.connectionNeedsAttention');
+    },
+    [t],
   );
 
   const getToolkitName = useCallback(
@@ -388,15 +414,19 @@ export default function ConnectionsPageClient({
                       {toolkit.displayName}
                     </p>
                     <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/80">
-                      {toolkit.description}
+                      {miloMode
+                        ? toolkit.description.replace(/^Used by agents to /, 'Milo can ')
+                        : toolkit.description}
                     </p>
                     <p className="mt-3 text-xs font-semibold text-primary/80 tracking-tight">
-                      {toolkit.category} · {toolkit.surface}
+                      {toolkit.surface === 'knowledge'
+                        ? t('connections.usedForKnowledge')
+                        : t('connections.worksWithWebsiteChat')}
                     </p>
                     {statusReason && toolkit.status !== 'connected' ? (
                       <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-error/20 bg-error/8 dark:bg-error/15 px-3.5 py-3 text-xs leading-relaxed text-error shadow-xs">
                         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                        <p className="font-medium">{t('connections.statusReason', { value: statusReason })}</p>
+                        <p className="font-medium">{humanizeStatusReason(statusReason)}</p>
                       </div>
                     ) : null}
                   </div>

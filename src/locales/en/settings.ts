@@ -96,11 +96,12 @@ export const settings = {
   activeWorkspace: "Active Workspace",
   workspaceSlug: "Workspace Slug",
   workspaceDescription: "Workspace Description",
+  miloWorkspaceDescription: "Primary workspace for Milo, Website Chat, connections, and knowledge.",
   accessCanEdit: "{role} access · Can edit company settings",
   accessViewOnly: "{role} access · View only",
   deleteWorkspace: "Delete workspace",
   deleteWorkspaceDescription:
-    "This permanently removes the workspace and all agents, knowledge, connections, chats, and runs inside it.",
+    "This permanently removes Milo, Website Chat, knowledge, connections, conversations, and leads in this workspace.",
   ownerRequired: "Owner access required",
   createAnotherBeforeDelete:
     "Create another workspace before deleting this one",
@@ -108,7 +109,7 @@ export const settings = {
   privacyCompliance: "Privacy & Compliance",
   retention: "Retention",
   retentionDescription:
-    "Widget sessions, widget messages, and widget leads are removed after 180 days. Imported knowledge stays in place until your workspace deletes it manually.",
+    "Website Chat conversations, messages, and leads are removed after 180 days. Imported knowledge stays until your workspace deletes it manually.",
   privacyPolicy: "Privacy policy",
   subprocessors: "Subprocessors",
   dataProcessing: "Data processing",
@@ -141,8 +142,8 @@ export const settings = {
   deleteData: "Delete data",
   languageSection: "Platform language",
   languageDescription:
-    "Choose the language used across the platform interface. This preference is stored on this device and mirrored to the browser for server-rendered pages.",
-  languageHelp: "The selected language applies immediately and persists across reloads.",
+    "Choose the language used across Agentergroup. Your choice is saved on this device.",
+  languageHelp: "The selected language applies immediately.",
   workspaceCreated: "Workspace created.",
   workspaceNamePlaceholder: "Acme Dental",
   privacyEmailPlaceholder: "person@example.com",

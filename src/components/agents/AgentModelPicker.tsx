@@ -22,6 +22,7 @@ interface AgentModelPickerProps {
   source: 'openrouter' | 'fallback' | null;
   onChange: (value: string) => void;
   onKeyDown?: (event: ReactKeyboardEvent<HTMLElement>) => void;
+  milo?: boolean;
 }
 
 function getSectionCopy(
@@ -65,6 +66,7 @@ export function AgentModelPicker({
   source,
   onChange,
   onKeyDown,
+  milo = false,
 }: AgentModelPickerProps) {
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -103,7 +105,7 @@ export function AgentModelPicker({
     <div ref={containerRef} className="relative">
       <div className="mb-2.5 ml-1 flex items-center justify-between gap-4">
         <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
-          {t('agentBuilder.cognitiveModel')}
+          {milo ? t('agentBuilder.miloModel') : t('agentBuilder.cognitiveModel')}
         </label>
         <div className="flex items-center gap-2 rounded-full border border-outline-variant/10 bg-surface-container-low px-3 py-1">
           <span

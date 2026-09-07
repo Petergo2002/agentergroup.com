@@ -1,27 +1,93 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder } from './WidgetBuilderContext';
 import { getAppUrl } from '@/lib/env';
 import { ExternalLink, MessageSquare } from 'lucide-react';
+
+const PREVIEW_UPDATE_MESSAGE_TYPE = 'ag:widget-preview:update-config';
+const PREVIEW_AUTH_UPDATE_MESSAGE_TYPE = 'ag:widget-preview:update-auth';
+
+interface WidgetPreviewOverrideMessage {
+  type: typeof PREVIEW_UPDATE_MESSAGE_TYPE;
+  payload: {
+    widget: {
+      primaryColor: string;
+      secondaryColor: string;
+      theme: 'dark' | 'light';
+    };
+  };
+}
 
 type WidgetLoaderWindow = Window &
   typeof globalThis & {
     __AG_WIDGET_LOADER_INSTANCE__?: {
       destroy?: () => void;
     };
+    __AG_WIDGET_PREVIEW_OVERRIDE__?: WidgetPreviewOverrideMessage;
   };
 
 export function WidgetDevicePreview() {
   const { t } = useLanguage();
-  const { summary, draftPreview, previewStatus } = useWidgetBuilder();
+  const { summary, form, draftPreview, previewStatus } = useWidgetBuilder();
+  const draftPreviewRef = useRef(draftPreview);
+  const hostedUrl = summary?.hostedUrl ?? null;
+  const widgetPublicKey = summary?.widget.widget_public_key ?? null;
+  const previewRevision = draftPreview?.previewRevision ?? null;
+
+  useEffect(() => {
+    draftPreviewRef.current = draftPreview;
+  }, [draftPreview]);
+
+  // Keep the outer launcher and the iframe in sync immediately while editing.
+  useEffect(() => {
+    if (!form || !draftPreview) return;
+
+    const previewOverride: WidgetPreviewOverrideMessage = {
+      type: PREVIEW_UPDATE_MESSAGE_TYPE,
+      payload: {
+        widget: {
+          primaryColor: form.primaryColor,
+          secondaryColor: form.secondaryColor,
+          theme: form.theme,
+        },
+      },
+    };
+    const loaderWindow = window as WidgetLoaderWindow;
+
+    loaderWindow.__AG_WIDGET_PREVIEW_OVERRIDE__ = previewOverride;
+    window.postMessage(previewOverride, window.location.origin);
+  }, [draftPreview, form]);
+
+  useEffect(() => {
+    return () => {
+      delete (window as WidgetLoaderWindow).__AG_WIDGET_PREVIEW_OVERRIDE__;
+    };
+  }, []);
+
+  // Refresh preview credentials without rebuilding the iframe or losing chat state.
+  useEffect(() => {
+    if (!draftPreview) return;
+
+    window.postMessage(
+      {
+        type: PREVIEW_AUTH_UPDATE_MESSAGE_TYPE,
+        payload: {
+          previewToken: draftPreview.previewToken,
+          previewRevision: draftPreview.previewRevision,
+        },
+      },
+      window.location.origin,
+    );
+  }, [draftPreview]);
 
   // Inject loader.js into the host page so it displays a true floating bubble
   useEffect(() => {
-    if (!summary || !draftPreview || !summary.hostedUrl) return;
+    const currentDraftPreview = draftPreviewRef.current;
+    if (!currentDraftPreview || !hostedUrl || !widgetPublicKey) return;
 
-    const widgetOrigin = new URL(summary.hostedUrl).origin;
+    const widgetOrigin = new URL(hostedUrl).origin;
     
     // Check if script already exists to avoid duplicates
     const scriptId = 'ag-widget-preview-loader';
@@ -33,14 +99,22 @@ export function WidgetDevicePreview() {
 
     const script = document.createElement('script');
     script.id = scriptId;
-    script.src = `${widgetOrigin}/loader.js`;
+    script.src = `${widgetOrigin}/loader.js?preview_revision=${encodeURIComponent(
+      currentDraftPreview.previewRevision,
+    )}`;
     script.crossOrigin = "anonymous";
-    script.setAttribute('data-widget', summary.widget.widget_public_key);
+    script.setAttribute('data-widget', widgetPublicKey);
     script.setAttribute('data-preview', '1');
-    script.setAttribute('data-preview-token', draftPreview.previewToken);
+    script.setAttribute('data-preview-token', currentDraftPreview.previewToken);
     script.setAttribute('data-preview-source', 'widget_preview');
-    script.setAttribute('data-preview-revision', draftPreview.previewRevision);
-    script.setAttribute('data-parent-origin', getAppUrl());
+    script.setAttribute('data-preview-revision', currentDraftPreview.previewRevision);
+    script.setAttribute('data-parent-origin', window.location.origin);
+
+    const initialOverride = (window as WidgetLoaderWindow).__AG_WIDGET_PREVIEW_OVERRIDE__;
+    if (initialOverride) {
+      script.setAttribute('data-primary-color', initialOverride.payload.widget.primaryColor);
+      script.setAttribute('data-theme-mode', initialOverride.payload.widget.theme);
+    }
     
     document.body.appendChild(script);
 
@@ -58,7 +132,7 @@ export function WidgetDevicePreview() {
         loaderWindow.__AG_WIDGET_LOADER_INSTANCE__.destroy();
       }
     };
-  }, [summary, draftPreview]);
+  }, [hostedUrl, previewRevision, widgetPublicKey]);
 
   if (!summary) return null;
 
@@ -75,11 +149,11 @@ export function WidgetDevicePreview() {
       : null;
 
   return (
-    <div className="sticky top-[160px] flex w-full flex-col gap-5 rounded-[2rem] border border-outline-variant/10 bg-surface-container-low p-8 shadow-[0_24px_60px_rgba(15,23,42,0.06)]">
+    <div className="sticky top-[112px] flex w-full flex-col gap-4 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
       
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <MessageSquare className="h-5 w-5" />
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <MessageSquare className="h-4 w-4" />
         </div>
         <div>
           <h3 className="text-sm font-bold text-on-surface">{t('widgetBuilder.devicePreviewTitle')}</h3>
@@ -89,7 +163,7 @@ export function WidgetDevicePreview() {
         </div>
       </div>
 
-      <div className="rounded-xl bg-surface-container-lowest p-4 border border-outline-variant/5">
+      <div className="rounded-xl border border-outline-variant/10 bg-surface-container-low p-3.5">
         <p className="text-[13px] leading-relaxed text-on-surface-variant">
           {t('widgetBuilder.devicePreviewBody')}
         </p>
@@ -103,12 +177,12 @@ export function WidgetDevicePreview() {
       )}
 
       {widgetPreviewUrl && (
-        <div className="pt-2">
+        <div>
           <a
             href={widgetPreviewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-outline-variant/20 bg-background px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-on-surface hover:bg-surface-container-high transition-colors"
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-outline-variant/20 bg-background px-3.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
             title={t('widgetBuilder.openRawWidget')}
           >
             <ExternalLink className="h-3.5 w-3.5" />

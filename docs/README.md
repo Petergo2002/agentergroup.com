@@ -2,15 +2,31 @@
 
 Welcome to the technical documentation for Agentergroup. This directory contains the architectural blueprints and guides for maintaining and extending the platform.
 
+## Current Product Model
+
+Agentergroup is Milo-first. A Milo workspace presents one AI employee and one Website Chat rather than separate agent and widget inventories.
+
+```text
+Milo
+├── Builder: instructions, model, Knowledge, tools, and testing
+├── Website Chat: appearance, visitor copy, behavior, preview, and publishing
+├── Leads + Analytics: customer outcomes and conversation history
+└── Improve Milo: owner-reviewed answers that become verified Knowledge
+```
+
+This is a customer-facing facade over the existing versioned agent and Widget V2 architecture. Classic multi-agent workspaces, Automation Agents, and Internal Assistants remain supported implementation capabilities. The future Agent Site/native website is a roadmap and is not part of the current Website Chat release.
+
 ## 🏗️ [Architecture](./architecture/core.md)
 Detailed overview of the system design, database schema, and agent orchestration flow.
 
 ## 🧭 Product Vision & Roadmap
-- **[Agent-Native Websites](./roadmap/agent-native-websites.md)** - Industry-neutral product vision for a Website Agent that powers a standalone Agent Site and embedded Chat Widget. Phase 0 selects the first niche and outcome; the existing Builder and Connections remain shared platform capabilities.
-- **[Agent-Native Websites: Implementation Plan](./roadmap/agent-native-websites-implementation-plan.md)** - Dependency-ordered work packages that prioritize Website Agent, preserve Automation Agent behavior, defer new Internal Assistant work, and define release gates, rollback paths, and compatibility rules.
+- **[Milo Single-Agent Implementation Plan](./roadmap/milo-single-agent-experience-implementation-plan.md)** - Implemented product contract, migration phases, verification, compatibility, and rollback.
+- **[Agent-Native Websites](./roadmap/agent-native-websites.md)** - Proposed future Agent Site/native website delivery mode for the same Milo that currently powers Website Chat.
+- **[Agent-Native Websites: Implementation Plan](./roadmap/agent-native-websites-implementation-plan.md)** - Dependency-ordered future work that extends the existing Milo and Widget V2 foundation without creating a second agent or conversation runtime.
 
 ## 📘 Guides
 Practical instructions for common tasks:
+- **[Milo Single-Agent Experience](./guides/milo-experience.md)** - Product facade, provisioning, stable routes, invariants, rollout, and rollback.
 - **[Agent Builder](./guides/agent-builder.md)** - How the flow-based builder works.
 - **[Agent Library](./guides/agent-builder.md#agent-library)** - How verified agent templates are submitted, reviewed, and imported.
 - **[Automation Agents](./guides/automation-agents.md)** - How external triggers, activation, Activity, and tool execution work.
@@ -27,6 +43,7 @@ Practical instructions for common tasks:
 - **[Widget Security](./guides/widget-embed-security.md)** - Security protocols for public embeds.
 - **[Privacy Operations](./guides/privacy-operations.md)** - GDPR and data processing details.
 - **[Operations Runbook](./runbooks/operations.md)** - Release verification, health checks, backup/restore, and widget-runtime deploy notes.
+- **[avenro.se: Vercel och one.com](./runbooks/avenro-domain-setup.md)** - Domäner, DNS, Widget V2, inloggning och e-post vid domänbytet.
 - **[Production Readiness](./runbooks/production-readiness.md)** - Hardening migration order, RLS verification, billing/upload rollout, and known manual steps.
 
 ## 🔑 Key Pages
@@ -37,4 +54,4 @@ Public-facing legal and auth pages:
 - `/invite/accept` — Public workspace invite acceptance page (unauthenticated-friendly; moved from the `(app)` route group)
 
 ---
-*Last updated: August 8, 2026.*
+*Last updated: August 24, 2026.*

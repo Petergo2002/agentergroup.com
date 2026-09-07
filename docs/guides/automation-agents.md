@@ -398,12 +398,12 @@ Required for live automations:
 
 - `COMPOSIO_API_KEY`
 - `COMPOSIO_WEBHOOK_SECRET`
-- `NEXT_PUBLIC_APP_URL=https://dashboard.agentergroup.com` in production
+- `NEXT_PUBLIC_APP_URL=https://avenro.se` in production
 
 The production Composio project must have a V3 webhook subscription pointing directly to
-`https://dashboard.agentergroup.com/api/composio/webhook`. Do not use the marketing domain
-(`agentergroup.com`) because it redirects to a separate static deployment that does not host app
-API routes. Enable at least
+`https://avenro.se/api/composio/webhook`. The avenro.se domain must serve the Next.js
+project, which includes both the landing page and app API routes. Do not point it at
+the old separate static marketing deployment or the Widget V2 project. Enable at least
 `composio.trigger.message` and `composio.connected_account.expired`; also enable
 `composio.trigger.disabled` so provider-side polling failures are reflected in the dashboard.
 

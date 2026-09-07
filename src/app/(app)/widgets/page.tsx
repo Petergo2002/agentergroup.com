@@ -1,6 +1,9 @@
 import { getAppRequestContext } from "@/lib/app/request-context";
 import { getWidgetNeedsRedeploy, loadAllWidgetsWithAgents } from "@/lib/widgets/server";
 import WidgetsPageClient from "./WidgetsPageClient";
+import { redirect } from "next/navigation";
+import { isMiloExperienceEnabled } from "@/lib/env";
+import { isMiloMode } from "@/lib/milo/experience";
 
 async function loadWidgetsPageData() {
   const { supabase, user, context } = await getAppRequestContext();
@@ -25,6 +28,8 @@ async function loadWidgetsPageData() {
 }
 
 export default async function WidgetsPage() {
+  const { context } = await getAppRequestContext();
+  if (context && isMiloMode(context.workspace, isMiloExperienceEnabled())) redirect("/website-chat");
   const initialWidgets = await loadWidgetsPageData();
   return <WidgetsPageClient initialWidgets={initialWidgets} />;
 }

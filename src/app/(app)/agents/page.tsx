@@ -3,6 +3,9 @@ import { getAppRequestContext } from "@/lib/app/request-context";
 import { DASHBOARD_AGENT_SELECT } from "@/lib/dashboard/summary";
 import { WORKSPACE_AGENT_LIST_LIMIT } from "@/lib/query-limits";
 import AgentsPageClient from "./AgentsPageClient";
+import { redirect } from "next/navigation";
+import { isMiloExperienceEnabled } from "@/lib/env";
+import { isMiloMode } from "@/lib/milo/experience";
 
 async function loadAgentsPageData() {
   const { supabase, user, context } = await getAppRequestContext();
@@ -30,6 +33,8 @@ async function loadAgentsPageData() {
 }
 
 export default async function AgentsPage() {
+  const { context } = await getAppRequestContext();
+  if (context && isMiloMode(context.workspace, isMiloExperienceEnabled())) redirect("/milo");
   const initialAgents = await loadAgentsPageData();
   return <AgentsPageClient initialAgents={initialAgents} />;
 }

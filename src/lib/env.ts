@@ -118,6 +118,11 @@ export function hasOpenRouterEnv(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY);
 }
 
+/** Global, reversible switch for the Milo customer experience. */
+export function isMiloExperienceEnabled(): boolean {
+  return parseBooleanEnv(process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED, true);
+}
+
 export interface OpenRouterProviderPreferences {
   data_collection: "allow" | "deny";
   zdr?: boolean;

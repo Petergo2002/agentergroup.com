@@ -2,8 +2,9 @@
 
 import type { ComponentType } from "react";
 import { useMemo } from "react";
-import { Bot, Activity, BarChart3, Database } from "lucide-react";
+import { Activity, BarChart3, Bot, CircleHelp, Database, Users } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { useAppContext } from "@/components/app/AppContext";
 
 interface StatsGridProps {
   stats: {
@@ -12,6 +13,8 @@ interface StatsGridProps {
     liveWidgets: number;
     connectedApps: number;
     knowledgeSources: number;
+    leads: number;
+    unansweredQuestions: number;
   };
   isLoading: boolean;
 }
@@ -63,30 +66,32 @@ function StatCard({ item, isLoading }: StatCardProps) {
 
 export function StatsGrid({ stats, isLoading }: StatsGridProps) {
   const { t } = useLanguage();
+  const { workspace } = useAppContext();
+  const miloMode = workspace.product_experience === "milo" && process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false";
   const statItems = useMemo(
     () => [
       {
-        label: t("dashboard.totalAgents"),
-        value: stats.totalAgents,
-        icon: Bot,
+        label: miloMode ? t("dashboard.leads") : t("dashboard.totalAgents"),
+        value: miloMode ? stats.leads : stats.totalAgents,
+        icon: miloMode ? Users : Bot,
         tone: "bg-primary/10 text-primary",
-        description: t("dashboard.agentsDescription", { active: stats.activeAgents }),
-        meta: t("dashboard.activeAgentsMetric", { count: stats.activeAgents }),
+        description: miloMode ? t("dashboard.leadsDescription") : t("dashboard.agentsDescription", { active: stats.activeAgents }),
+        meta: miloMode ? t("dashboard.capturedMetric") : t("dashboard.activeAgentsMetric", { count: stats.activeAgents }),
       },
       {
-        label: t("dashboard.liveWidgets"),
-        value: stats.liveWidgets,
-        icon: Activity,
+        label: miloMode ? t("dashboard.improveMilo") : t("dashboard.liveWidgets"),
+        value: miloMode ? stats.unansweredQuestions : stats.liveWidgets,
+        icon: miloMode ? CircleHelp : Activity,
         tone: "bg-success-container text-success",
-        description: t("dashboard.widgetsDescription"),
-        meta: t("common.live"),
+        description: miloMode ? t("dashboard.improveMiloDescription") : t("dashboard.widgetsDescription"),
+        meta: miloMode ? t("dashboard.openMetric") : t("common.live"),
       },
       {
-        label: t("dashboard.connectedApps"),
+        label: miloMode ? t("dashboard.connections") : t("dashboard.connectedApps"),
         value: stats.connectedApps,
         icon: BarChart3,
         tone: "bg-surface-container text-on-surface",
-        description: t("dashboard.appsDescription"),
+        description: miloMode ? t("dashboard.miloAppsDescription") : t("dashboard.appsDescription"),
         meta: t("common.connected"),
       },
       {
@@ -94,7 +99,7 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
         value: stats.knowledgeSources,
         icon: Database,
         tone: "bg-primary/10 text-primary",
-        description: t("dashboard.knowledgeDescription"),
+        description: miloMode ? t("dashboard.miloKnowledgeDescription") : t("dashboard.knowledgeDescription"),
         meta: t("dashboard.sourcesMetric"),
       },
     ],
@@ -102,8 +107,11 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
       stats.activeAgents,
       stats.connectedApps,
       stats.knowledgeSources,
+      stats.leads,
       stats.liveWidgets,
       stats.totalAgents,
+      stats.unansweredQuestions,
+      miloMode,
       t,
     ],
   );

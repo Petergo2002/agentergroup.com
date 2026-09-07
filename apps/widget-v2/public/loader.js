@@ -5,17 +5,17 @@
  * It creates an iframe containing the widget and handles open/close state.
  *
  * Usage:
- * <script src="https://widget.agentergroup.com/loader.js" data-widget="YOUR_WIDGET_PUBLIC_KEY"></script>
+ * <script src="https://widget.avenro.se/loader.js" data-widget="YOUR_WIDGET_PUBLIC_KEY" data-api-url="https://avenro.se"></script>
  *
  * Preview usage (dashboard/internal):
  * <script
- *   src="https://widget.agentergroup.com/loader.js"
+ *   src="https://widget.avenro.se/loader.js"
  *   data-widget="YOUR_WIDGET_PUBLIC_KEY"
  *   data-preview="1"
  *   data-preview-token="SIGNED_TOKEN"
  *   data-preview-source="builder_widget_tab"
  *   data-preview-revision="1732112000000"
- *   data-parent-origin="https://dashboard.agentergroup.com"
+ *   data-parent-origin="https://avenro.se"
  * ></script>
  */
 
@@ -24,6 +24,7 @@
   const MOBILE_WIDGET_BREAKPOINT = 640;
   const PREVIEW_OVERRIDE_WINDOW_KEY = "__AG_WIDGET_PREVIEW_OVERRIDE__";
   const PREVIEW_UPDATE_MESSAGE_TYPE = "ag:widget-preview:update-config";
+  const PREVIEW_AUTH_UPDATE_MESSAGE_TYPE = "ag:widget-preview:update-auth";
   const PREVIEW_RESET_MESSAGE_TYPE = "ag:widget-preview:reset-chat";
   const PREVIEW_REQUEST_MESSAGE_TYPE = "ag:widget-preview:request-config";
   const BOOTSTRAP_MESSAGE_TYPE = "ag:widget-bootstrap";
@@ -76,10 +77,10 @@
   const previewEnabled = ["1", "true", "yes"].includes(
     previewFlagRaw.toLowerCase(),
   );
-  const previewToken = currentScript?.getAttribute("data-preview-token") || "";
+  let previewToken = currentScript?.getAttribute("data-preview-token") || "";
   const previewSource =
     currentScript?.getAttribute("data-preview-source") || "builder_widget_tab";
-  const previewRevision =
+  let previewRevision =
     currentScript?.getAttribute("data-preview-revision") || "";
   const apiBaseUrlInput =
     currentScript?.getAttribute("data-api-url") ||
@@ -93,13 +94,13 @@
     currentScript?.getAttribute("data-theme-mode") || "dark";
   const scriptUrl = currentScript?.src
     ? new URL(currentScript.src, window.location.href)
-    : new URL("https://widget.agentergroup.com/loader.js");
+    : new URL("https://widget.avenro.se/loader.js");
   const widgetBaseUrl = scriptUrl.origin;
 
   // API base URL - always use the main app (where API routes are), not widget-v2
-  // In production: https://dashboard.agentergroup.com
+  // In production: https://avenro.se
   // For local development: http://localhost:3000
-  let apiBaseUrl = "https://dashboard.agentergroup.com";
+  let apiBaseUrl = "https://avenro.se";
   const scriptApiBaseUrl = normalizeHttpBaseUrl(apiBaseUrlInput);
   if (typeof window !== "undefined") {
     // Per-script override is preferred when embedding the loader in other local repos.
@@ -349,6 +350,24 @@
     return { type: PREVIEW_REQUEST_MESSAGE_TYPE };
   }
 
+  function parsePreviewAuthUpdateMessage(data) {
+    if (!isObjectRecord(data)) return null;
+    if (data.type !== PREVIEW_AUTH_UPDATE_MESSAGE_TYPE) return null;
+    if (!isObjectRecord(data.payload)) return null;
+    if (typeof data.payload.previewToken !== "string") return null;
+
+    return {
+      type: PREVIEW_AUTH_UPDATE_MESSAGE_TYPE,
+      payload: {
+        previewToken: data.payload.previewToken,
+        previewRevision:
+          typeof data.payload.previewRevision === "string"
+            ? data.payload.previewRevision
+            : "",
+      },
+    };
+  }
+
   function parseCloseRequestMessage(data) {
     if (!isObjectRecord(data)) return null;
     if (data.type !== WIDGET_CLOSE_REQUEST_MESSAGE_TYPE) return null;
@@ -404,14 +423,10 @@
     );
   }
 
-  function escapeHtml(unsafe) {
-    return (unsafe || "")
-      .toString()
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+  function pickVisibleIconColor(primaryColor) {
+    return contrastRatio(primaryColor, "#ffffff") >= 1.5
+      ? primaryColor
+      : "#111111";
   }
 
   function applyPreviewBubbleTheme(message) {
@@ -440,36 +455,15 @@
 
       container.style.setProperty("--ag-widget-primary", nextPrimaryColor);
       container.style.setProperty(
+        "--ag-widget-icon-color",
+        pickVisibleIconColor(nextPrimaryColor),
+      );
+      container.style.setProperty(
         "--ag-widget-primary-fg",
         nextBubbleTextColor,
       );
     }
 
-    const brandSettings =
-      payload?.brand && typeof payload.brand === "object"
-        ? payload.brand
-        : null;
-    if (brandSettings) {
-      if (typeof brandSettings.name === "string") {
-        const textEl = container.querySelector(".ag-widget-bubble-text");
-        if (textEl) textEl.textContent = brandSettings.name || "Agent";
-      }
-      if (typeof brandSettings.logoUrl !== "undefined") {
-        const logoIconEl = container.querySelector(
-          ".ag-widget-bubble-logo-icon",
-        );
-        if (logoIconEl) {
-          if (brandSettings.logoUrl) {
-            logoIconEl.innerHTML =
-              '<img src="' +
-              escapeHtml(brandSettings.logoUrl) +
-              '" alt="" loading="lazy" decoding="async" />';
-          } else {
-            logoIconEl.innerHTML = chatIconSvg;
-          }
-        }
-      }
-    }
   }
 
   function forwardMessageToIframe(message) {
@@ -624,6 +618,8 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --ag-widget-primary: #ff5c00;
       --ag-widget-primary-fg: #ffffff;
+      --ag-widget-icon-color: #ff5c00;
+      --ag-widget-icon-surface: rgba(255, 255, 255, 0.96);
       opacity: 0;
       transition: opacity 0.15s ease;
       overflow: visible;
@@ -691,7 +687,7 @@
       border: none;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.94);
-      color: rgba(17, 17, 17, 0.92);
+      color: var(--ag-widget-icon-color);
       box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
       opacity: 0;
       visibility: hidden;
@@ -723,6 +719,7 @@
       max-width: 56px;
       border-radius: 50%;
       justify-content: center;
+      background: var(--ag-widget-icon-surface);
     }
 
     .ag-widget-bubble-content {
@@ -772,6 +769,9 @@
       justify-content: center;
       overflow: hidden;
       flex-shrink: 0;
+      color: var(--ag-widget-icon-color);
+      background: var(--ag-widget-icon-surface);
+      box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.08);
     }
 
     .ag-widget-bubble-logo-icon img {
@@ -781,19 +781,17 @@
     }
 
     .ag-widget-bubble-logo-icon svg {
-      width: 24px;
-      height: 24px;
-      fill: none;
-      stroke: var(--ag-widget-primary-fg);
-      stroke-width: 1.5;
+      display: block;
+      width: 36px;
+      height: 36px;
     }
 
     .ag-widget-bubble-close svg {
       width: 26px;
       height: 26px;
       fill: none;
-      stroke: var(--ag-widget-primary-fg);
-      stroke-width: 1.5;
+      stroke: var(--ag-widget-icon-color);
+      stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
     }
@@ -934,7 +932,7 @@
         border-radius: 0;
         background: transparent;
         box-shadow: none;
-        color: rgba(17, 17, 17, 0.92);
+        color: var(--ag-widget-icon-color);
       }
 
       .ag-widget-close-button.open {
@@ -949,11 +947,30 @@
     }
   `;
 
-  // Widget brand icon - matches the in-widget mark
-  const chatIconSvg = `
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
-      <path d="M5.636 5.636a9 9 0 1 0 12.728 12.728a9 9 0 0 0 -12.728 -12.728"/>
-      <path d="M16.243 7.757a6 6 0 0 0 -8.486 0"/>
+  // Compact derivative of the canonical Milo artwork for the launcher.
+  const miloMarkSvg = `
+    <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
+      <defs>
+        <clipPath id="milo-loader-orbit-clip">
+          <circle cx="80" cy="80" r="68" />
+        </clipPath>
+      </defs>
+      <circle cx="80" cy="80" r="68" fill="currentColor" opacity="0.08" />
+      <g clip-path="url(#milo-loader-orbit-clip)" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+        <path opacity="0.26" d="M8 29 C39 16 57 30 77 44 C98 59 120 45 152 24" />
+        <path opacity="0.32" d="M5 38 C36 23 56 36 76 50 C98 65 121 51 155 30" />
+        <path opacity="0.38" d="M3 48 C34 30 55 41 75 56 C98 73 123 59 157 36" />
+        <path opacity="0.46" d="M1 58 C31 39 53 47 74 62 C98 80 125 68 159 43" />
+        <path opacity="0.56" d="M0 68 C29 49 51 53 73 68 C98 86 127 77 160 51" />
+        <path opacity="0.72" d="M-1 78 C26 61 49 60 72 74 C98 91 129 87 161 61" />
+        <path opacity="0.92" d="M-2 88 C23 74 47 68 72 80 C99 94 132 98 162 73" />
+        <path opacity="0.82" d="M-1 98 C22 89 46 78 72 86 C101 96 134 109 161 86" />
+        <path opacity="0.66" d="M0 108 C23 103 47 89 73 92 C102 96 135 119 160 100" />
+        <path opacity="0.54" d="M2 118 C26 117 49 101 75 98 C104 95 134 128 158 114" />
+        <path opacity="0.44" d="M5 128 C31 132 53 113 77 105 C105 96 132 136 155 128" />
+        <path opacity="0.34" d="M10 138 C37 146 58 124 79 113 C104 100 128 142 150 140" />
+      </g>
+      <circle cx="80" cy="80" r="68" stroke="currentColor" stroke-width="4" opacity="0.2" />
     </svg>
   `;
 
@@ -986,22 +1003,13 @@
   }
 
   function getBubbleMarkup() {
-    const brandName = bootstrapPayload?.config?.brand?.name || "Chat";
-    const logoUrl = bootstrapPayload?.config?.brand?.logoUrl;
-
     return `
       <div class="ag-widget-bubble-content">
         <div class="ag-widget-bubble-logo-icon">
-          ${
-            logoUrl
-              ? `<img src="${escapeHtml(
-                  logoUrl,
-                )}" alt="" loading="lazy" decoding="async" />`
-              : chatIconSvg
-          }
+          ${miloMarkSvg}
         </div>
         <div class="ag-widget-bubble-divider"></div>
-        <span class="ag-widget-bubble-text">${escapeHtml(brandName)}</span>
+        <span class="ag-widget-bubble-text">Milo</span>
       </div>
       <div class="ag-widget-bubble-close">
         ${closeIconSvg}
@@ -1180,6 +1188,10 @@
       const bubbleTextColor = pickReadableTextColor(primaryColor, textColor);
       if (container && primaryColor) {
         container.style.setProperty("--ag-widget-primary", primaryColor);
+        container.style.setProperty(
+          "--ag-widget-icon-color",
+          pickVisibleIconColor(primaryColor),
+        );
       }
       if (container) {
         container.style.setProperty("--ag-widget-primary-fg", bubbleTextColor);
@@ -1215,6 +1227,10 @@
     container = document.createElement("div");
     container.className = "ag-widget-container";
     container.style.setProperty("--ag-widget-primary", initialPrimaryColor);
+    container.style.setProperty(
+      "--ag-widget-icon-color",
+      pickVisibleIconColor(initialPrimaryColor),
+    );
     container.style.setProperty(
       "--ag-widget-primary-fg",
       initialBubbleTextColor,
@@ -1437,6 +1453,17 @@
       return;
     }
 
+    const previewAuthUpdate =
+      previewEnabled && isTrustedParentMessage(event)
+        ? parsePreviewAuthUpdateMessage(event.data)
+        : null;
+    if (previewAuthUpdate) {
+      previewToken = previewAuthUpdate.payload.previewToken;
+      previewRevision = previewAuthUpdate.payload.previewRevision;
+      forwardMessageToIframe(previewAuthUpdate);
+      return;
+    }
+
     const previewReset =
       previewEnabled && isTrustedParentMessage(event)
         ? parsePreviewResetMessage(event.data)
@@ -1455,7 +1482,9 @@
   window.addEventListener("keydown", keydownListener);
 
   focusListener = (event) => {
-    if (!isOpen || !container) return;
+    // The dashboard preview is an editor surface, not a true modal. Avoid
+    // pulling focus back from its iframe while the builder is updating.
+    if (previewEnabled || !isOpen || !container) return;
     const target = event.target;
     if (target && container.contains(target)) {
       return;

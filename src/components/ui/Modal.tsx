@@ -122,12 +122,12 @@ export const Modal = ({ isOpen, onClose, title, description, children, size = 'l
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       {/* Backdrop */}
-      <div 
+      <div
         aria-hidden="true"
         className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
-      
+
       {/* Modal Container */}
       <div
         ref={dialogRef}
@@ -140,7 +140,7 @@ export const Modal = ({ isOpen, onClose, title, description, children, size = 'l
       >
         {/* Physical Top-Light Detail */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-        
+
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-4 px-6 pb-2 pt-6 sm:px-8 sm:pt-8">
           <div className="min-w-0 flex-1">
@@ -153,16 +153,21 @@ export const Modal = ({ isOpen, onClose, title, description, children, size = 'l
               </p>
             )}
           </div>
-          <button 
-            type="button"
-            onClick={onClose}
-            aria-label={t('common.close')}
-            className="w-9 h-9 flex items-center justify-center rounded-xl text-on-surface-variant/70 hover:bg-surface-container-high hover:text-on-surface transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          >
-            <AppIcon name="close" className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <kbd className="hidden sm:inline-flex h-6 items-center rounded-md border border-outline-variant/20 bg-surface-container-low px-2 text-[10px] font-mono font-medium text-on-surface-variant/60 shadow-xs">
+              ESC
+            </kbd>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t('common.close')}
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-on-surface-variant/70 hover:bg-surface-container-high hover:text-on-surface transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              <AppIcon name="close" className="h-5 w-5" />
+            </button>
+          </div>
         </div>
-        
+
         {/* Content */}
         <div className="min-h-0 overflow-y-auto p-5 sm:p-6">
           {children}

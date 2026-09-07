@@ -1,8 +1,8 @@
 # Questions / Data Flywheel
 
-Last updated: 2026-07-08
+Last updated: 2026-08-12
 
-The Questions tab is the operator surface for unanswered public widget questions. It turns real visitor misses into verified agent knowledge without adding another model call to the chat path.
+Improve Milo is the Milo-mode operator surface for unanswered Website Chat questions. It turns real visitor misses into verified Milo Knowledge without adding another model call to the chat path. The route remains `/questions`, and classic workspaces retain generic Questions/agent language.
 
 ## Current Flow
 
@@ -12,7 +12,7 @@ The Questions tab is the operator surface for unanswered public widget questions
 4. Preview widget chats return before capture. Preview traffic must not create Questions rows.
 5. `detectUnansweredQueryCandidate()` in `src/lib/flywheel/detection.ts` decides whether the user message is a concrete missed question.
 6. `createUnansweredQueryCandidate()` in `src/lib/flywheel/server.ts` inserts or updates an `unanswered_queries` row through the admin Supabase client.
-7. The authenticated `/questions` page lists rows from `GET /api/flywheel/unanswered`.
+7. The authenticated `/questions` page lists rows from `GET /api/flywheel/unanswered`; Milo mode presents this as Improve Milo and removes redundant agent/widget filters.
 8. When an operator publishes an answer, `POST /api/flywheel/unanswered/[id]/answer` creates a `verified_facts` row, creates a text `knowledge_sources` row, places it in the agent's auto-managed verified answers folder, queues `process-knowledge-source`, and marks the question `answered`.
 
 ## Detection Rules
@@ -85,9 +85,18 @@ When an open duplicate is seen again, the existing row is updated instead of ins
 
 The open queue sorts by latest activity, so repeated unresolved misses resurface.
 
-## Questions Tab UI
+## Improve Milo / Questions UI
 
 The route is `/questions`.
+
+In Milo mode:
+
+- the sidebar label is Improve Milo
+- copy refers to Milo rather than a generic agent
+- publishing a verified answer is presented as teaching Milo
+- the primary agent and widget are implicit, so their inventory filters are hidden
+
+The APIs and stored foreign keys remain generic so classic workspaces and historical records stay compatible.
 
 The server page loads the initial open queue and status counts. The client then fetches:
 

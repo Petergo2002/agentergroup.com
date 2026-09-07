@@ -2,14 +2,14 @@ export const leads = {
   badge: "Lead Inbox",
   title: "Leads",
   pageDescription:
-    "Review every contact captured by your website widgets and move from conversation to follow-up without losing context.",
+    "Review every contact captured through Website Chat and move from conversation to follow-up without losing context.",
   capturedCount: "{count} captured",
   contactSearchPlaceholder: "Search by name, email, or phone",
   liveInbox: "Live inbox",
   refreshing: "Refreshing",
   noLeadsTitle: "No leads captured yet",
   noLeadsDescription:
-    "Leads will appear here when your widget is deployed and visitors share their contact details during a conversation.",
+    "Leads will appear here when Website Chat is live and visitors share their contact details during a conversation.",
   noSearchResultsTitle: "No matching leads",
   noSearchResultsDescription:
     "Try a different name, email address, or phone number.",

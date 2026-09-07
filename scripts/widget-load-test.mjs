@@ -10,9 +10,9 @@ function printHelp() {
   npm run widget:load-test -- --base-url <url> --widget-public-key <key> --widget-origin <origin> [options]
 
 Required:
-  --base-url <url>            Dashboard/API base URL, e.g. https://dashboard.agentergroup.com
+  --base-url <url>            Dashboard/API base URL, e.g. https://avenro.se
   --widget-public-key <key>   Public widget key to test
-  --widget-origin <origin>    Widget runtime origin, e.g. https://widget.agentergroup.com
+  --widget-origin <origin>    Widget runtime origin, e.g. https://widget.avenro.se
 
 Mode:
   --mode hosted|embedded      Test mode (default: hosted)

@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder } from '../WidgetBuilderContext';
 
-const fieldLabelClassName = 'text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1';
-const inputContainerClassName = 'space-y-3';
-const inputFieldClassName = 'w-full rounded-[14px] border border-outline-variant/10 bg-background px-5 py-3.5 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/20 placeholder:text-on-surface-variant/30';
+const fieldLabelClassName = 'text-xs font-semibold text-on-surface-variant';
+const inputContainerClassName = 'space-y-2';
+const inputFieldClassName = 'h-11 w-full rounded-xl border border-outline-variant/20 bg-background px-4 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/15 placeholder:text-on-surface-variant/35';
 const HEX_COLOR_PATTERN = /^#(?:[0-9A-F]{3}|[0-9A-F]{6})$/i;
 
 function normalizeHexColor(value: string) {
@@ -50,14 +50,14 @@ function ColorField({
   };
 
   return (
-    <label className="block space-y-4">
+    <label className="block space-y-3">
       <span className={fieldLabelClassName}>{label}</span>
-      <div className="flex items-center gap-4">
-        <div className="relative h-14 w-14 shrink-0">
+      <div className="flex items-center gap-3">
+        <div className="relative h-12 w-12 shrink-0">
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="h-full w-full rounded-2xl border border-outline-variant/15 shadow-sm transition-transform hover:scale-[1.03]"
+            className="h-full w-full rounded-xl border border-outline-variant/20 shadow-sm transition-transform hover:scale-[1.03]"
             style={{ backgroundColor: value }}
             aria-label={`Choose ${label.toLowerCase()}`}
           />
@@ -71,7 +71,7 @@ function ColorField({
           />
         </div>
 
-        <div className="flex-1 space-y-2">
+        <div className="flex-1">
           <input
             type="text"
             value={draft}
@@ -89,13 +89,6 @@ function ColorField({
             className={inputFieldClassName}
             spellCheck={false}
           />
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary transition-colors hover:text-on-surface"
-          >
-            Pick color
-          </button>
         </div>
       </div>
     </label>
@@ -120,27 +113,27 @@ export function AppearanceTab() {
   };
 
   return (
-    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
       {/* Branding Section */}
-      <section className="space-y-6">
+      <section className="space-y-4">
         <div className="space-y-1.5">
           <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.appearance.identityBranding')}</h2>
           <p className="text-sm text-on-surface-variant/60">{t('widgetBuilder.appearance.identityDescription')}</p>
         </div>
 
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-premium">
-          <div className="grid gap-10 md:grid-cols-2">
+        <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm">
+          <div className="grid gap-6 md:grid-cols-2 md:items-center">
             {/* Logo Upload */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <span className={fieldLabelClassName}>{t('widgetBuilder.appearance.brandLogo')}</span>
-              <div className="flex items-center gap-6">
-                <div className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-[1.6rem] border border-outline-variant/15 bg-surface-container-low transition-all hover:border-primary/30">
+              <div className="flex items-center gap-4">
+                <div className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-low transition-all hover:border-primary/30">
                   {form.logoUrl ? (
                     <Image
                       src={form.logoUrl}
                       alt={t('widgetBuilder.appearance.logoPreviewAlt')}
                       fill
-                      sizes="96px"
+                      sizes="80px"
                       className="object-cover"
                     />
                   ) : (
@@ -169,11 +162,11 @@ export function AppearanceTab() {
                   <button
                     onClick={() => logoInputRef.current?.click()}
                     disabled={isUploadingLogo}
-                    className="rounded-full border border-outline-variant/15 px-5 py-2 text-[11px] font-bold uppercase tracking-[0.2em] transition-all hover:bg-on-surface hover:text-background"
+                    className="h-9 rounded-lg border border-outline-variant/20 bg-background px-3.5 text-xs font-semibold transition-colors hover:bg-surface-container-low"
                   >
                     {isUploadingLogo ? t('common.uploading') : t('widgetBuilder.appearance.uploadImage')}
                   </button>
-                  <p className="text-[10px] text-on-surface-variant/40 leading-relaxed max-w-[160px]">
+                  <p className="max-w-[180px] text-xs leading-relaxed text-on-surface-variant/55">
                     {t('widgetBuilder.appearance.optimizedLogo')}
                   </p>
                 </div>
@@ -197,15 +190,15 @@ export function AppearanceTab() {
       </section>
 
       {/* Colors Section */}
-      <section className="space-y-6">
+      <section className="space-y-4">
         <div className="space-y-1.5">
           <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.appearance.visualTone')}</h2>
           <p className="text-sm text-on-surface-variant/60">{t('widgetBuilder.appearance.visualToneDescription')}</p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-premium">
-            <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm">
+            <div className="space-y-5">
               <ColorField
                 label={t('widgetBuilder.appearance.primarySignature')}
                 value={form.primaryColor}
@@ -220,17 +213,17 @@ export function AppearanceTab() {
             </div>
           </div>
 
-          <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-low p-8">
+          <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm">
             <span className={fieldLabelClassName}>{t('widgetBuilder.appearance.surfaceTheme')}</span>
-            <div className="mt-6 flex gap-4">
+            <div className="mt-4 flex gap-3">
               {(['light', 'dark'] as const).map((theme) => (
                 <button
                   key={theme}
                   onClick={() => setForm(c => c ? { ...c, theme } : c)}
-                  className={`flex-1 rounded-[1.4rem] border p-6 text-center transition-all ${
-                    form.theme === theme 
-                      ? 'border-primary bg-background shadow-lg' 
-                      : 'border-outline-variant/10 hover:border-outline-variant/30'
+                  className={`flex-1 rounded-xl border px-4 py-4 text-center transition-all ${
+                    form.theme === theme
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-outline-variant/15 hover:border-outline-variant/30 hover:bg-surface-container-low'
                   }`}
                 >
                   <span className={`text-[10px] font-bold uppercase tracking-[0.2em] ${form.theme === theme ? 'text-primary' : 'text-on-surface-variant/40'}`}>
@@ -239,7 +232,7 @@ export function AppearanceTab() {
                 </button>
               ))}
             </div>
-            <p className="mt-6 text-[11px] text-on-surface-variant/40 italic leading-relaxed text-center">
+            <p className="mt-4 text-xs leading-relaxed text-on-surface-variant/55">
               {t('widgetBuilder.appearance.themeDescription')}
             </p>
           </div>

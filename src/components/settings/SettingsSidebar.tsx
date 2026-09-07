@@ -36,7 +36,7 @@ export function SettingsSidebar() {
   const isGeneral = pathname?.startsWith("/settings") && !isTeam && !isBilling;
 
   return (
-    <nav className="flex flex-col gap-1 p-4 lg:w-64 lg:p-6 lg:border-r lg:border-outline-variant/10 min-h-[calc(100vh-64px)]">
+    <nav className="flex flex-col gap-1 p-4 lg:min-h-[calc(100vh-64px)] lg:w-64 lg:border-r lg:border-outline-variant/10 lg:p-6">
       <div className="mb-4 px-4 py-2">
         <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">
           {t("settings.title") || "Settings"}

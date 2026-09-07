@@ -74,6 +74,12 @@ export async function POST(
   }
 
   const templateRecord = template as unknown as TemplateJoinRow;
+  if (
+    context.workspace.product_experience === "milo" &&
+    templateRecord.surface === "widget"
+  ) {
+    return errorResponse("This workspace already has Milo.", 409);
+  }
   if (templateRecord.surface === "assistant" && !hasInternalAssistantsEnabled(context.workspace)) {
     return errorResponse("Internal assistants are not enabled for this workspace.", 403);
   }

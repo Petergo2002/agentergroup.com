@@ -81,7 +81,7 @@ export const privacyPolicy = {
     {
       title: "Kontakt",
       body: [
-        "För integritetsfrågor, begäran om tillgång eller radering, kontakta Agentergroup support på info@agentergroup.com eller via webbplatsen där tjänsten tillhandahölls.",
+        "För integritetsfrågor, begäran om tillgång eller radering, kontakta Agentergroup support på info@avenro.se eller via webbplatsen där tjänsten tillhandahölls.",
         "Den här policyn kan uppdateras över tid när produkten, leverantörerna och de rättsliga kraven utvecklas.",
       ],
     },

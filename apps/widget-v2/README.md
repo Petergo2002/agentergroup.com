@@ -37,15 +37,16 @@ npm run widget:build
 
 - deploy the dashboard app when public widget API routes or server logic change
 - deploy the widget runtime project when `apps/widget-v2` UI or runtime-client behavior changes
-- hosted URLs such as `https://widget.agentergroup.com/?widget=...` will keep serving the old frontend bundle until the widget runtime project is redeployed
+- hosted URLs such as `https://widget.avenro.se/?widget=...` will keep serving the old frontend bundle until the widget runtime project is redeployed
 
 ## Customer Integration
 
 Customers add this script to their website:
 
 ```html
-<script src="https://widget.agentergroup.com/loader.js" 
-        data-widget="CUSTOMER_WIDGET_PUBLIC_KEY"></script>
+<script src="https://widget.avenro.se/loader.js"
+        data-widget="CUSTOMER_WIDGET_PUBLIC_KEY"
+        data-api-url="https://avenro.se"></script>
 ```
 
 Use `data-widget`. `data-id` is still accepted for backward compatibility, but it is deprecated.
@@ -56,6 +57,8 @@ Use `data-widget`. `data-id` is still accepted for backward compatibility, but i
 - The widget access token currently uses a 15-minute TTL.
 - Widget styling is intentionally simplified to `theme`, `primaryColor`, and `secondaryColor`.
 - Runtime agent presentation comes from persisted widget-agent config supplied by the Next.js app, including specialist display labels, greetings, placeholders, quick-action visibility, and quick actions.
+- The public launcher, home identity, typing state, and assistant-message attribution use the Milo mark and product name. Configured widget-agent copy still controls greetings, descriptions, placeholders, quick actions, and the remaining presentation fields.
+- Assistant-message copy actions provide visible English/Swedish success feedback and fall back to selection-based copying when the Clipboard API is unavailable inside a restricted iframe.
 - Hosted standalone mode uses a dedicated desktop shell on large breakpoints instead of reusing the embedded/mobile card proportions.
 - Hosted widget requests refresh bootstrap directly when they get `WIDGET_ACCESS_TOKEN_INVALID`.
 - Embedded widget requests ask the loader to refetch bootstrap through the parent-page origin via `ag:widget-bootstrap:refresh`.
@@ -72,6 +75,17 @@ The widget runtime expects the public bootstrap/config payload to include:
 - `showQuickActions` plus `quickActions` for each specialist
 
 Preview and deployed runtime should now render the same saved specialist configuration.
+
+## Builder Preview Contract
+
+The authenticated Website Chat editor loads the real embed loader in preview mode. It communicates with the loader and iframe through origin-checked `postMessage` messages:
+
+- `ag:widget-preview:update-config` applies draft theme and color changes immediately.
+- `ag:widget-preview:update-auth` rotates the signed preview token and revision without rebuilding the iframe or resetting the active preview conversation.
+- `ag:widget-preview:reset-chat` explicitly clears preview session state when requested.
+- `ag:widget-preview:request-config` asks the parent editor to resend its current draft override.
+
+Preview mode does not trap focus inside the widget iframe because the surrounding dashboard remains an interactive editor surface. Live embedded mode retains the normal modal-like focus behavior.
 
 ## Load Testing
 
@@ -99,7 +113,7 @@ The harness exercises `bootstrap` and `chat`, records latency, and includes a sa
 <script>
   window.AG_WIDGET_API_URL = "http://localhost:3000";
 </script>
-<script src="https://widget.agentergroup.com/loader.js" data-widget="CUSTOMER_WIDGET_PUBLIC_KEY"></script>
+<script src="https://widget.avenro.se/loader.js" data-widget="CUSTOMER_WIDGET_PUBLIC_KEY" data-api-url="https://avenro.se"></script>
 ```
 
 ### Preferred localhost embed example for another repo
@@ -118,7 +132,11 @@ The harness exercises `bootstrap` and `chat`, records latency, and includes a sa
 src/
 ├── main.tsx          # Entry point
 ├── Widget.tsx        # Main widget component
-├── lib/api.ts        # Public widget API helpers and event transport
+├── components/
+│   └── MiloMark.tsx  # Shared in-widget Milo identity mark
+├── lib/
+│   ├── api.ts        # Public widget API helpers and event transport
+│   └── postmessage.ts # Validated loader/iframe message contracts
 ├── hooks/
 │   └── useSession.ts # Session persistence
 └── index.css         # Styles

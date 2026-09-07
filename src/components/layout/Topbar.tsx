@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { AppIcon } from "@/components/icons/AppIcon";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { BrandLogo } from "@/components/BrandLogo";
 
 interface TopbarProps {
   onOpenSidebar?: () => void;
@@ -22,10 +24,14 @@ export function Topbar({
         >
           <AppIcon name="menu" className="h-[22px] w-[22px]" />
         </button>
-        <div className="flex items-center gap-2">
-          <div className="depth-card h-6 w-6 rounded-lg border border-outline-variant/20 bg-surface-container-high" />
-          <span className="font-headline font-bold text-on-surface">Agentergroup</span>
-        </div>
+        <Link
+          href="/"
+          title="Agentergroup Home"
+          aria-label="Back to landing page"
+          className="group inline-flex items-center rounded-xl p-1 transition-all duration-200 hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <BrandLogo className="h-6 w-auto text-on-surface transition-transform duration-200 group-hover:scale-105" />
+        </Link>
       </div>
     </header>
   );

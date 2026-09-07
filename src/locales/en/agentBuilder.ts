@@ -98,6 +98,8 @@ export const agentBuilder = {
   deployBlueprint: "Publish Version",
   publishing: "Publishing...",
   loadingBuilder: "Loading builder...",
+  preparingMilo: "Getting Milo ready",
+  preparingMiloDescription: "Preparing your workspace and opening the builder…",
   nodeLibraryTitle: "Node Library",
   nodeLibraryDescription:
     "Keep the flow simple. Nodes connect automatically when you add them.",
@@ -110,6 +112,7 @@ export const agentBuilder = {
   triggerSetupDescription:
     "A trigger is the event that starts the flow. Use internal triggers for widget lifecycle events and external triggers for third-party app events.",
   triggerProviderInternal: "Internal",
+  triggerProviderWebsiteChat: "Website Chat",
   triggerProviderComposio: "External",
   agentSurface: "Agent type",
   automationReadiness: "Automation readiness",
@@ -312,6 +315,10 @@ export const agentBuilder = {
   identity: "Identity",
   contextualNote: "Contextual Note",
   cognitiveModel: "Cognitive Model",
+  miloModel: "AI model (via OpenRouter)",
+  miloBuilder: "Milo Builder",
+  saveMiloChanges: "Save changes",
+  updateMilo: "Update Milo",
   selectedModel: "Selected Model",
   modelCatalogLoading: "Loading catalog",
   modelCatalogLive: "Live from OpenRouter",

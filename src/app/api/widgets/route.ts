@@ -74,6 +74,12 @@ export async function POST(request: NextRequest) {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+  if (context.workspace.product_experience === "milo") {
+    return NextResponse.json(
+      { error: "This workspace already has a Website Chat.", code: "primary_widget_already_exists" },
+      { status: 409 },
+    );
+  }
   const body = await request.json().catch(() => ({}));
   const requestedName =
     typeof body.name === "string" && body.name.trim() ? body.name.trim() : "Untitled Widget";

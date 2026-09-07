@@ -105,6 +105,9 @@ export const knowledge = {
   title: "Bibliotek för kunskapskällor",
   description:
     "En central hubb för ditt workspaces egna data. Anslut och bearbeta dokument för att ge dina agenter djup domänexpertis.",
+  miloTitle: "Kunskap",
+  miloDescription:
+    "Lägg till informationen som Milo ska använda när kunder får svar.",
   total: "Totalt",
   ready: "Redo",
   syncing: "Synkar",
@@ -127,8 +130,8 @@ export const knowledge = {
   importDocument: "Importera dokument",
   driveSearchPlaceholder: "Sök bland Drive-filer...",
   activeKnowledgeSources: "Aktiva kunskapskällor",
-  totalSuffix: "{count} totalt",
-  filterPlaceholder: "Filtrera bibliotek...",
+  totalSuffix: "{count} objekt",
+  filterPlaceholder: "Sök i kunskap",
   clearFilter: "Rensa filter",
   deleteConfirm:
     'Radera "{name}"? Detta tar bort källan, dess chunkar och alla agentkopplingar.',

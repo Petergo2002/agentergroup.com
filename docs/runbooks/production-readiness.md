@@ -1,6 +1,6 @@
 # Production Readiness And Manual Steps
 
-Last updated: 2026-08-08
+Last updated: 2026-08-24
 
 This document covers the launch-hardening changes that require coordinated
 database, Edge Function, dashboard, and widget deployment. It is not evidence
@@ -25,10 +25,7 @@ Service-role and secret keys must remain server-only. Never expose them through
 
 ## Migration Status
 
-As of August 8, 2026, all 93 local migration versions and names exactly match
-the linked production history. The audit did not identify a schema migration
-that needed to be applied. Before any future database change, verify that this
-remains true:
+As of August 12, 2026, the repository contains 96 local migrations. The latest Milo migration, `20260811221031_milo_primary_workspace_resources.sql`, was applied to the connected Supabase project and verified. Before any future database change, verify that the complete local and linked histories still match:
 
 ```bash
 supabase migration list --linked
@@ -48,6 +45,9 @@ After any future migration, verify:
 - `widget_attachments` quota and scope triggers are active
 - `stripe_webhook_events` is service-role only
 - subscription events with older Stripe timestamps cannot overwrite newer state
+- `provision_workspace_milo_v1` is executable only by `service_role`
+- Milo primary-resource validation and protection triggers are active
+- ambiguous legacy multi-agent workspaces remain classic and unchanged
 
 ## Edge Function Deployment
 
@@ -127,17 +127,24 @@ Stripe secret/webhook/price IDs, OpenRouter, `RATE_LIMIT_SECRET`,
 `WIDGET_ACCESS_SECRET`, Firecrawl for website knowledge, and the configured
 public dashboard/widget origins.
 
+Set `NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED=false` only when intentionally restoring classic UI. The default Milo experience is enabled when the variable is absent or not `false`.
+
 ## Release Gate
 
 ```bash
 npm run lint
-npx tsc --noEmit
+npm run typecheck
 npm test
 npm run build
 npm run widget:build
 npm audit --audit-level=moderate
 npm --prefix apps/widget-v2 audit --audit-level=moderate
 ```
+
+`npm run widget:build` runs the widget application and Vite configuration type
+checks before bundling. Use `npm run widget:typecheck` to run those checks alone.
+CI also checks both packages for dependency advisories at moderate severity or
+higher. Root lint excludes the separate local workspaces under `.gemini/`.
 
 The source-level security tests do not replace live RLS integration tests.
 Before self-service launch, run a local or staging test with two real Supabase
@@ -163,7 +170,10 @@ Version `19.2.3` has incomplete React Server Components security fixes.
 9. Confirm the intended Auth password policy. Leaked-password protection is
    currently intentionally disabled and is not a release blocker.
 10. Review `stripe_webhook_events` for `failed` or `requires_review` rows.
-11. Monitor logs and storage growth during the first customer rollout.
+11. Verify `/milo` and `/website-chat` resolve only the active workspace's primary IDs.
+12. Verify Website Chat remains full-screen across loading, repair, and editing and that Back returns to `/dashboard`.
+13. Verify the Milo dashboard prioritizes Leads, Improve Milo, Connections, and Knowledge.
+14. Monitor logs and storage growth during the first customer rollout.
 
 ## Known Remaining Work
 

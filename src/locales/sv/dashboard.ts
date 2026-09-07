@@ -5,6 +5,8 @@ export const dashboard = {
   greetingEvening: "God kväll",
   overview:
     "Följ aktiva agenter, live-widgets, anslutna appar och kunskap från en operativ vy.",
+  miloOverview:
+    "Se hur det går för Milo, webbchatten, anslutningar och kunskap.",
   initializeAgent: "Skapa agent",
   createAgentTitle: "Skapa en agent",
   createAgentDescription:
@@ -17,9 +19,24 @@ export const dashboard = {
     "Nya kundkonversationer från publicerade widgets visas här.",
   liveWidgets: "Live-widgets",
   connectedApps: "Anslutna appar",
+  connections: "Anslutningar",
   knowledge: "Kunskap",
   inventory: "Inventering",
   totalAgents: "Totalt antal agenter",
+  miloStatus: "Milo-status",
+  miloStatusDescription: "Din AI-medarbetare är redo att lära sig och hjälpa kunder.",
+  websiteChatStatus: "Webbchatt",
+  websiteChatDescription: "Milos kundchatt på din webbplats.",
+  leads: "Leads",
+  leadsDescription: "Besökare som Milo har fångat via webbchatten.",
+  capturedMetric: "Fångade",
+  improveMilo: "Förbättra Milo",
+  improveMiloDescription: "Frågor som väntar på ditt svar.",
+  openMetric: "Öppna",
+  miloAttention: "Milo behöver din hjälp",
+  miloAttentionDescription: "Granska obesvarade frågor och håll webbchatten redo för kunder.",
+  miloUpToDate: "Milo är uppdaterad",
+  miloUpToDateDescription: "Det finns inga obesvarade kundfrågor just nu.",
   agentStatus: "Agentstatus",
   noAgentsYet: "Inga agenter ännu",
   noAgentsDescription:
@@ -31,6 +48,8 @@ export const dashboard = {
   activeAgentsMetric: "{count} aktiva",
   widgetsDescription: "Agenter som är publicerade på dina offentliga webbsidor.",
   appsDescription: "Integrationer som möjliggör datadrivna konversationer.",
+  miloAppsDescription: "Verktyg som Milo kan använda för att hjälpa kunder.",
   knowledgeDescription: "Egna källor som driver AI-förståelsen.",
+  miloKnowledgeDescription: "Information som Milo använder för att svara kunder.",
   sourcesMetric: "Källor",
 };

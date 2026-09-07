@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import {
+  CheckCircle2,
+  Copy,
   Mail,
   MessageSquareText,
   Phone,
@@ -15,6 +17,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import useSWR from "swr";
 import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { useToast } from "@/components/ui/ToastProvider";
 import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
 import { formatLocaleDateTime } from "@/lib/i18n";
 import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
@@ -68,11 +71,11 @@ function getLeadInitials(name: string) {
 function LeadsTableSkeleton() {
   return (
     <div className="app-card overflow-hidden p-0">
-      <div className="hidden h-14 animate-pulse border-b border-outline-variant/10 bg-surface-container-low md:block" />
+      <div className="hidden h-14 skeleton border-b border-outline-variant/10 md:block" />
       {Array.from({ length: 6 }).map((_, index) => (
         <div
           key={index}
-          className="h-[92px] animate-pulse border-b border-outline-variant/10 bg-surface-container-lowest last:border-b-0 md:h-[76px]"
+          className="h-[92px] skeleton border-b border-outline-variant/10 opacity-70 last:border-b-0 md:h-[76px]"
         />
       ))}
     </div>
@@ -323,7 +326,19 @@ export default function LeadsPageClient({
   const displayedWorkspaceName =
     workspace.id === workspaceId ? workspace.name : workspaceName;
 
+  const { showToast } = useToast();
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
   const closeLeadDetails = useCallback(() => setSelectedLead(null), []);
+
+  const handleCopy = (event: React.MouseEvent, text: string, fieldId: string) => {
+    event.stopPropagation();
+    event.preventDefault();
+    void navigator.clipboard.writeText(text);
+    setCopiedField(fieldId);
+    showToast(`Copied ${text}`, "success");
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   /**
    * Opens a lead while preserving native link behavior for row-level mail and phone links.
@@ -457,26 +472,56 @@ export default function LeadsPageClient({
                   </div>
 
                   {lead.email ? (
-                    <a
-                      href={`mailto:${lead.email}`}
-                      className="pointer-events-auto mt-4 flex min-w-0 items-center gap-2 text-sm text-on-surface-variant transition-colors hover:text-primary md:mt-0"
-                    >
-                      <Mail className="h-4 w-4 shrink-0 text-primary/55 md:hidden lg:block" />
-                      <span className="truncate">{lead.email}</span>
-                    </a>
+                    <div className="pointer-events-auto mt-4 flex min-w-0 items-center gap-1.5 md:mt-0">
+                      <a
+                        href={`mailto:${lead.email}`}
+                        className="flex min-w-0 items-center gap-2 text-sm text-on-surface-variant transition-colors hover:text-primary"
+                      >
+                        <Mail className="h-4 w-4 shrink-0 text-primary/55 md:hidden lg:block" />
+                        <span className="truncate">{lead.email}</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopy(e, lead.email!, `email-${lead.id}`)}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-on-surface-variant/50 transition-colors hover:bg-surface-container hover:text-on-surface"
+                        title="Copy email"
+                        aria-label="Copy email"
+                      >
+                        {copiedField === `email-${lead.id}` ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 animate-in zoom-in-75" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
                   ) : (
                     <span className="mt-4 text-sm text-on-surface-variant/35 md:mt-0">—</span>
                   )}
 
                   <div className="hidden min-w-0 lg:block">
                     {lead.phone ? (
-                      <a
-                        href={`tel:${lead.phone}`}
-                        className="pointer-events-auto flex items-center gap-2 truncate text-sm text-on-surface-variant transition-colors hover:text-primary"
-                      >
-                        <Phone className="h-4 w-4 shrink-0 text-primary/55" />
-                        {lead.phone}
-                      </a>
+                      <div className="pointer-events-auto flex items-center gap-1.5">
+                        <a
+                          href={`tel:${lead.phone}`}
+                          className="flex items-center gap-2 truncate text-sm text-on-surface-variant transition-colors hover:text-primary"
+                        >
+                          <Phone className="h-4 w-4 shrink-0 text-primary/55" />
+                          {lead.phone}
+                        </a>
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopy(e, lead.phone!, `phone-${lead.id}`)}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-on-surface-variant/50 transition-colors hover:bg-surface-container hover:text-on-surface"
+                          title="Copy phone"
+                          aria-label="Copy phone"
+                        >
+                          {copiedField === `phone-${lead.id}` ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 animate-in zoom-in-75" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
                     ) : (
                       <span className="text-sm text-on-surface-variant/35">—</span>
                     )}

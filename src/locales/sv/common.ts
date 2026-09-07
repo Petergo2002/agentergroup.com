@@ -6,6 +6,7 @@ export const common = {
   cancel: "Avbryt",
   close: "Stäng",
   open: "Öppna",
+  moreActions: "Fler åtgärder",
   collapse: "Minimera",
   expand: "Expandera",
   back: "Tillbaka",

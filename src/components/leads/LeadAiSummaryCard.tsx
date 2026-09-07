@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowRight,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { useId, useState } from "react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
@@ -147,10 +148,28 @@ export function LeadAiSummaryCard({
       ) : null}
 
       {!summary ? (
-        <div className="mt-5 rounded-xl border border-dashed border-outline-variant/20 px-4 py-5 text-sm text-on-surface-variant/70">
-          <p>{t("leads.aiSummary.notGenerated")}</p>
-          {!canRegenerate ? (
-            <p className="mt-2 text-xs">{t("leads.aiSummary.noConversation")}</p>
+        <div className="mt-5 flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant/25 bg-gradient-to-br from-primary/[0.03] via-surface-container-low/40 to-transparent p-6 text-center shadow-xs transition-all">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary ring-4 ring-primary/5">
+            <Sparkles className="h-5 w-5 animate-pulse" />
+          </div>
+          <p className="mt-3 text-sm font-semibold text-on-surface">
+            {t("leads.aiSummary.notGenerated")}
+          </p>
+          <p className="mt-1 max-w-sm text-xs leading-relaxed text-on-surface-variant/70">
+            {canRegenerate
+              ? t("leads.aiSummary.description")
+              : t("leads.aiSummary.noConversation")}
+          </p>
+          {canRegenerate ? (
+            <button
+              type="button"
+              onClick={() => void regenerate()}
+              disabled={isRegenerating}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm transition-all duration-200 hover:bg-primary/90 active:scale-[0.98] disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isRegenerating ? "animate-spin" : ""}`} />
+              {t("leads.aiSummary.generate")}
+            </button>
           ) : null}
         </div>
       ) : summary.status === "generating" || isRegenerating ? (

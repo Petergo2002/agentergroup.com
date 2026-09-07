@@ -53,6 +53,21 @@ export async function POST(
     ),
   );
 
+  const isPrimaryMiloWidget =
+    context.workspace.product_experience === "milo" &&
+    context.workspace.primary_widget_id === id;
+  if (
+    isPrimaryMiloWidget &&
+    (items.length !== 1 ||
+      requestedAgentIds.length !== 1 ||
+      requestedAgentIds[0] !== context.workspace.primary_customer_agent_id)
+  ) {
+    return NextResponse.json(
+      { error: "Website Chat must stay connected to Milo.", code: "milo_primary_link_protected" },
+      { status: 409 },
+    );
+  }
+
   const { data: agents, error: agentsError } = requestedAgentIds.length
       ? await supabase
         .from("agents")

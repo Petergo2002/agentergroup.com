@@ -33,6 +33,7 @@ export async function loadDashboardSummaryForContext(
     widgetsResult,
     connectedAppsResult,
     knowledgeSourcesResult,
+    unansweredQuestionsResult,
   ] = await Promise.all([
     listRecentDashboardConversations(admin, {
       workspaceId: context.workspace.id,
@@ -58,6 +59,11 @@ export async function loadDashboardSummaryForContext(
       .from("knowledge_sources")
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", context.workspace.id),
+    admin
+      .from("unanswered_queries")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", context.workspace.id)
+      .eq("status", "open"),
   ]);
 
   const errors = [
@@ -65,6 +71,7 @@ export async function loadDashboardSummaryForContext(
     widgetsResult.error,
     connectedAppsResult.error,
     knowledgeSourcesResult.error,
+    unansweredQuestionsResult.error,
   ].filter(Boolean);
 
   if (errors.length > 0) {
@@ -105,6 +112,7 @@ export async function loadDashboardSummaryForContext(
       connectedApps: connectedAppsResult.count ?? 0,
       knowledgeSources: knowledgeSourcesResult.count ?? 0,
       leads: leadsCount,
+      unansweredQuestions: unansweredQuestionsResult.count ?? 0,
     },
   };
 }

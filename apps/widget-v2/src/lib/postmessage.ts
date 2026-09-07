@@ -5,6 +5,7 @@ import type {
 } from "../types";
 
 export const PREVIEW_MESSAGE_TYPE = "ag:widget-preview:update-config";
+export const PREVIEW_AUTH_UPDATE_MESSAGE_TYPE = "ag:widget-preview:update-auth";
 export const PREVIEW_RESET_MESSAGE_TYPE = "ag:widget-preview:reset-chat";
 export const PREVIEW_REQUEST_MESSAGE_TYPE = "ag:widget-preview:request-config";
 export const BOOTSTRAP_MESSAGE_TYPE = "ag:widget-bootstrap";
@@ -38,6 +39,14 @@ export interface WidgetPreviewResetPayload {
   payload?: {
     previewRevision?: string | number;
     reason?: string;
+  };
+}
+
+export interface WidgetPreviewAuthUpdatePayload {
+  type: typeof PREVIEW_AUTH_UPDATE_MESSAGE_TYPE;
+  payload: {
+    previewToken: string;
+    previewRevision?: string;
   };
 }
 
@@ -98,6 +107,26 @@ export function parsePreviewOverrideMessage(
   }
 
   return next;
+}
+
+export function parsePreviewAuthUpdateMessage(
+  data: unknown,
+): WidgetPreviewAuthUpdatePayload | null {
+  if (!isObjectRecord(data)) return null;
+  if (data.type !== PREVIEW_AUTH_UPDATE_MESSAGE_TYPE) return null;
+  if (!isObjectRecord(data.payload)) return null;
+  if (typeof data.payload.previewToken !== "string") return null;
+
+  return {
+    type: PREVIEW_AUTH_UPDATE_MESSAGE_TYPE,
+    payload: {
+      previewToken: data.payload.previewToken,
+      previewRevision:
+        typeof data.payload.previewRevision === "string"
+          ? data.payload.previewRevision
+          : undefined,
+    },
+  };
 }
 
 export function parseWidgetStateMessage(

@@ -96,11 +96,12 @@ export const settings = {
   activeWorkspace: "Aktivt workspace",
   workspaceSlug: "Workspace-slug",
   workspaceDescription: "Workspace-beskrivning",
+  miloWorkspaceDescription: "Primärt workspace för Milo, webbchatten, anslutningar och kunskap.",
   accessCanEdit: "{role}-åtkomst · Kan redigera företagsinställningar",
   accessViewOnly: "{role}-åtkomst · Endast visning",
   deleteWorkspace: "Radera workspace",
   deleteWorkspaceDescription:
-    "Detta tar permanent bort workspacet och alla agenter, kunskap, anslutningar, chattar och körningar i det.",
+    "Detta tar permanent bort Milo, webbchatten, kunskap, anslutningar, konversationer och leads i workspacet.",
   ownerRequired: "Ägaråtkomst krävs",
   createAnotherBeforeDelete:
     "Skapa ett annat workspace innan du raderar detta",
@@ -108,7 +109,7 @@ export const settings = {
   privacyCompliance: "Integritet och efterlevnad",
   retention: "Lagringstid",
   retentionDescription:
-    "Widget-sessioner, widgetmeddelanden och widget-leads tas bort efter 180 dagar. Importerad kunskap ligger kvar tills ditt workspace tar bort den manuellt.",
+    "Webbchattens konversationer, meddelanden och leads tas bort efter 180 dagar. Importerad kunskap ligger kvar tills ditt workspace tar bort den manuellt.",
   privacyPolicy: "Integritetspolicy",
   subprocessors: "Underbiträden",
   dataProcessing: "Databehandling",
@@ -141,9 +142,8 @@ export const settings = {
   deleteData: "Radera data",
   languageSection: "Plattformsspråk",
   languageDescription:
-    "Välj språket som används i plattformens gränssnitt. Inställningen sparas på denna enhet och speglas till webbläsaren för server-renderade sidor.",
-  languageHelp:
-    "Det valda språket tillämpas direkt och ligger kvar mellan omladdningar.",
+    "Välj språket som används i Agentergroup. Ditt val sparas på den här enheten.",
+  languageHelp: "Det valda språket tillämpas direkt.",
   workspaceCreated: "Workspace skapades.",
   workspaceNamePlaceholder: "Acme Tandklinik",
   privacyEmailPlaceholder: "person@example.com",

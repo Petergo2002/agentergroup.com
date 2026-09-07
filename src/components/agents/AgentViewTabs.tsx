@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 import type { AgentSurface } from "@/lib/types";
+import { useAppContext } from "@/components/app/AppContext";
 
 type AgentViewTab = "builder" | "preview" | "activity";
 
@@ -15,6 +16,11 @@ interface AgentViewTabsProps {
 
 export function AgentViewTabs({ agentId, current, surface }: AgentViewTabsProps) {
   const { t } = useLanguage();
+  const { workspace } = useAppContext();
+  const isPrimaryMilo =
+    process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false" &&
+    workspace.product_experience === "milo" &&
+    workspace.primary_customer_agent_id === agentId;
   const tabs: Array<{ key: AgentViewTab; label: string }> =
     surface === "automation"
       ? [
@@ -23,7 +29,7 @@ export function AgentViewTabs({ agentId, current, surface }: AgentViewTabsProps)
         ]
       : [
           { key: "builder", label: t("agents.builder") },
-          { key: "preview", label: t("agents.preview") },
+          { key: "preview", label: isPrimaryMilo ? t("agents.testMilo") : t("agents.preview") },
         ];
 
   return (

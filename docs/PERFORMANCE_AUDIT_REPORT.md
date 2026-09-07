@@ -4,6 +4,8 @@ Date: 2026-08-05
 Application: Next.js 16.2.9 / React 19.2.4 / Supabase / Vercel  
 Repository: `/Users/petergorgees/Dev/Agentergroup/Agentergroup.com`
 
+Scope note: this is a point-in-time implementation report. The versions above describe the audited August 5 build; use `package.json` and `package-lock.json` for the current dependency inventory.
+
 ## 1. Executive summary
 
 The audit implemented seven small, separately verified performance phases. The largest authenticated rendering waterfall was removed by deduplicating user and workspace bootstrap work with request-scoped React `cache()`. Stored connection data now renders without waiting for third-party synchronization, connection snapshots persist in one batch, authenticated SWR caches are tenant-qualified, list loaders have defensive bounds, the Agent Builder's heavy flow editor is lazy-loaded, the login image and analytics icon font were reduced, chat paints immediately and propagates cancellation, and internal workspace navigation no longer discards the mounted application shell.

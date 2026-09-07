@@ -28,6 +28,7 @@ body,
   --widget-card: #f9fafb;
   --widget-border: #e4e4e7;
   --widget-brand-primary: #ff5c00;
+  --widget-milo-color: #ff5c00;
   --widget-primary: #ff5c00;
   --widget-primary-fg: #ffffff;
   --widget-muted: #71717a;
@@ -52,6 +53,7 @@ body,
   --widget-card: #0f0f0f;
   --widget-border: rgba(255, 255, 255, 0.07);
   --widget-brand-primary: #ff5500;
+  --widget-milo-color: #ff5500;
   --widget-primary: #ff5500;
   /* Default brand orange */
   --widget-primary-fg: #ffffff;

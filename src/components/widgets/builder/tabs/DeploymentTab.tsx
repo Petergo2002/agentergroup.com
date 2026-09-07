@@ -3,35 +3,38 @@
 import { useState } from 'react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { StatusToggle } from '@/components/ui/StatusToggle';
-import { ExternalLink, Copy } from 'lucide-react';
+import { ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
 import { useWidgetBuilder } from '../WidgetBuilderContext';
 import { useToast } from '@/components/ui/ToastProvider';
 
-const fieldLabelClassName = 'text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1';
-const sectionDescClassName = 'text-sm text-on-surface-variant/60 leading-relaxed max-w-2xl';
-const inputFieldClassName = 'w-full rounded-[14px] border border-outline-variant/10 bg-background px-5 py-3.5 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/20 placeholder:text-on-surface-variant/30';
+const fieldLabelClassName = 'text-xs font-semibold text-on-surface-variant';
+const sectionDescClassName = 'max-w-2xl text-sm leading-relaxed text-on-surface-variant/70';
+const inputFieldClassName = 'h-11 w-full rounded-xl border border-outline-variant/20 bg-background px-4 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/15 placeholder:text-on-surface-variant/35';
 
 export function DeploymentTab() {
   const { t } = useLanguage();
   const { summary, form, addOrigin, removeOrigin, setForm, isSaving, isUpdatingDeployment } = useWidgetBuilder();
   const { showToast } = useToast();
   const [localOriginInput, setLocalOriginInput] = useState('');
+  const [isSnippetCopied, setIsSnippetCopied] = useState(false);
 
   if (!summary || !form) return null;
 
   const handleCopy = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
+      setIsSnippetCopied(true);
       showToast(t('widgetBuilder.copySuccess', { label }), 'success');
+      setTimeout(() => setIsSnippetCopied(false), 2000);
     } catch {
       showToast(t('widgetBuilder.copyError', { label: label.toLowerCase() }), 'error');
     }
   };
 
   return (
-    <div className="max-w-4xl space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
       {/* Embed Code Section */}
-      <section className="space-y-6">
+      <section className="space-y-4">
         <div className="space-y-1.5">
           <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.deployment.accessConnectivity')}</h2>
           <p className={sectionDescClassName}>
@@ -41,22 +44,42 @@ export function DeploymentTab() {
 
         <div className="flex flex-col gap-6">
            {/* Embed Snippet */}
-           <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm space-y-6">
+           <div className="space-y-4 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm">
              <div className="flex items-center justify-between">
                 <span className={fieldLabelClassName}>{t('widgetBuilder.deployment.embedSnippet')}</span>
-                <button 
-                  onClick={() => handleCopy(summary.embedSnippet, t('widgetBuilder.deployment.embedSnippet'))}
-                  className="inline-flex items-center gap-2 rounded-xl bg-on-surface/5 px-4 py-2 text-xs font-semibold text-on-surface transition-all hover:bg-on-surface/10 active:scale-95 ring-1 ring-on-surface/5"
-                >
-                   <Copy className="h-3.5 w-3.5" strokeWidth={2.5} />
-                   {t('common.copy')}
-                </button>
+                <span className="rounded-md bg-surface-container px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60">
+                  Script Tag
+                </span>
              </div>
-             <div className="relative overflow-hidden rounded-[1.6rem] border border-outline-variant/15 bg-slate-900 p-6">
-               <pre className="overflow-x-auto text-[11px] leading-relaxed text-slate-300 font-mono">
-                 {summary.embedSnippet}
-               </pre>
-               <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-slate-900 to-transparent" />
+
+             <div className="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-md">
+               <div className="flex items-center justify-between border-b border-slate-800/80 bg-slate-900/90 px-4 py-2 text-[11px] font-mono text-slate-400">
+                 <span className="flex items-center gap-2">
+                   <span className="h-2 w-2 rounded-full bg-orange-500" />
+                   HTML / JavaScript Embed
+                 </span>
+                 <button
+                   onClick={() => void handleCopy(summary.embedSnippet, t('widgetBuilder.deployment.embedSnippet'))}
+                   className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-slate-700 active:scale-95"
+                 >
+                   {isSnippetCopied ? (
+                     <>
+                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 animate-in zoom-in-75" />
+                       Copied!
+                     </>
+                   ) : (
+                     <>
+                       <Copy className="h-3.5 w-3.5 text-slate-400" />
+                       Copy Snippet
+                     </>
+                   )}
+                 </button>
+               </div>
+               <div className="p-5 overflow-x-auto">
+                 <pre className="text-[11.5px] leading-relaxed text-slate-300 font-mono">
+                   {summary.embedSnippet}
+                 </pre>
+               </div>
              </div>
              <p className="text-[10px] text-on-surface-variant/40 italic leading-relaxed">
                 {t('widgetBuilder.deployment.embedDescription')}
@@ -64,7 +87,7 @@ export function DeploymentTab() {
            </div>
 
            {/* Hosted Endpoint */}
-           <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-low p-8 space-y-8">
+           <div className="space-y-6 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm">
              <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
                   <StatusToggle
@@ -104,7 +127,7 @@ export function DeploymentTab() {
                     <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
                     {t('common.open')}
                   </a>
-                  <button 
+                  <button
                      onClick={() => handleCopy(summary.hostedUrl, t('widgetBuilder.deployment.hostedEndpoint'))}
                      className="inline-flex items-center gap-2 rounded-xl bg-on-surface/5 px-4 py-2 text-xs font-semibold text-on-surface transition-all hover:bg-on-surface/10 active:scale-95 ring-1 ring-on-surface/10"
                   >
@@ -115,7 +138,7 @@ export function DeploymentTab() {
              </div>
 
              <div className="space-y-4">
-               <div className={`rounded-[1.6rem] border px-6 py-4 flex items-center justify-between gap-4 transition-all ${
+               <div className={`flex items-center justify-between gap-4 rounded-xl border px-5 py-3.5 transition-all ${
                  form.hostedEnabled
                    ? 'border-outline-variant/15 bg-background shadow-inner'
                    : 'border-outline-variant/5 bg-background/40 opacity-50'
@@ -124,7 +147,7 @@ export function DeploymentTab() {
                    {summary.hostedUrl}
                  </code>
                </div>
-               
+
                <div className="max-w-xl">
                  <p className="text-[11px] text-on-surface-variant/50 leading-relaxed italic">
                     {t('widgetBuilder.deployment.hostedDescription')}
@@ -139,7 +162,7 @@ export function DeploymentTab() {
       </section>
 
       {/* Allowed Domains Section */}
-      <section className="space-y-6 pt-6 border-t border-outline-variant/10">
+      <section className="space-y-4 border-t border-outline-variant/10 pt-6">
         <div className="space-y-1.5">
           <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.deployment.securityDomainAccess')}</h2>
           <p className={sectionDescClassName}>
@@ -147,8 +170,8 @@ export function DeploymentTab() {
           </p>
         </div>
 
-        <div className="rounded-[2.5rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
-          <div className="space-y-10">
+        <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm">
+          <div className="space-y-7">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
               <div className="flex-1 space-y-2">
                 <label className={fieldLabelClassName}>{t('widgetBuilder.deployment.addDomain')}</label>
@@ -189,17 +212,18 @@ export function DeploymentTab() {
                    </span>
                  )}
                </div>
-               
+
                {form.allowedOrigins.length > 0 ? (
                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                    {form.allowedOrigins.map((origin, idx) => (
-                     <div 
+                     <div
                         key={idx}
                         className="flex items-center justify-between rounded-xl border border-outline-variant/10 bg-surface-container-low/50 px-4 py-3 group hover:border-primary/30 transition-all hover:bg-surface-container-low"
                      >
                        <span className="truncate text-xs font-medium text-on-surface-variant/80">{origin}</span>
                        <button
                          onClick={() => removeOrigin(idx)}
+                         aria-label={t('widgetBuilder.deployment.removeDomain', { domain: origin })}
                          className="h-7 w-7 rounded-lg flex items-center justify-center text-on-surface-variant/20 group-hover:text-error/60 hover:bg-error/10 hover:text-error transition-all"
                        >
                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>

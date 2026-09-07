@@ -87,7 +87,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                 {toast.message}
               </p>
             </div>
-            <button 
+            <button
               type="button"
               onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
               aria-label={t('common.close')}
@@ -95,6 +95,16 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             >
               <AppIcon name="close" className="h-4 w-4" />
             </button>
+
+            {/* Auto-dismiss countdown bar */}
+            <div
+              aria-hidden="true"
+              className={`absolute bottom-0 left-0 h-0.5 animate-toast-progress opacity-80 ${
+                toast.type === 'success' ? 'bg-emerald-500' : ''
+              } ${toast.type === 'error' ? 'bg-error' : ''} ${
+                toast.type === 'warning' ? 'bg-amber-500' : ''
+              } ${toast.type === 'info' ? 'bg-primary' : ''}`}
+            />
           </div>
         ))}
       </div>

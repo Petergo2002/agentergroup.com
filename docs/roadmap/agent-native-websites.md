@@ -1,14 +1,16 @@
 # Agent Sites on Widget V2: Product and Architecture Roadmap
 
-Last updated: 2026-07-26
+Last updated: 2026-08-12
 
 Status: Proposed source of truth; awaiting approval; no application implementation has started from this roadmap
 
 Companion document: [Implementation Plan](./agent-native-websites-implementation-plan.md)
 
+Current-product relationship: the Milo single-agent experience and Website Chat are implemented. This roadmap is the proposed future native website/Agent Site delivery mode for that same Milo. It must not introduce a second Milo, duplicate Knowledge or Connections, or imply that Agent Site is already shipped.
+
 ## 1. Executive Decision
 
-Agentergroup will build its Agent Site product on top of the customer-facing system that already exists:
+Agentergroup will build its Agent Site product on top of the Milo customer-facing system that already exists:
 
 - the `widgets` deployment model in the main Next.js application
 - the independently deployed `apps/widget-v2` chat runtime
@@ -19,7 +21,7 @@ The product has two delivery modes:
 1. **Agent Site** — the primary product: a standalone, public, SEO-capable website centered on the AI conversation.
 2. **Chat Widget** — the secondary option: the same customer-facing experience embedded in an existing website.
 
-These are not separate agents and must not require duplicated instructions, knowledge, integrations, or analytics. They are two ways to deliver the same configured widget and its attached agent or agents.
+These are not separate Milos and must not require duplicated instructions, Knowledge, Connections, Leads, or Analytics. They are two ways to deliver the same primary Milo through the widget-owned delivery foundation. Classic multi-agent data may remain compatible underneath, but the Milo product journey stays singular.
 
 The current hosted Widget V2 experience is the foundation for Agent Site. It will be improved with a server-rendered public page shell, approved supporting content, SEO, custom domains, and clearer management UI. It will not be replaced by a second website runtime or a general-purpose page builder.
 
@@ -65,10 +67,10 @@ The following decisions are fixed for this roadmap:
 
 | Term | Meaning |
 | --- | --- |
-| Agent | Existing `agents` record configured in Builder and attached to a widget deployment |
-| Website & Widget | Proposed customer-facing name for the current Widget management area |
+| Milo | The workspace's primary customer-facing `agents` record, configured in Milo Builder |
+| Website Chat | Current hosted and embedded Widget V2 delivery and configuration surface |
 | Agent Site | Standalone public delivery mode of an existing widget configuration |
-| Chat Widget | Embedded delivery mode of the same widget configuration |
+| Chat Widget | Embedded delivery mode of the same Website Chat configuration |
 | Widget V2 | The shared chat interface/runtime in `apps/widget-v2` |
 | Platform URL | Agentergroup-hosted URL used before or without a custom domain |
 | Custom domain | Verified customer hostname routed to the Agent Site |
@@ -234,7 +236,7 @@ At minimum, the visitor must still see approved business identity, description, 
 
 ### 8.2 Operator experience
 
-The current `/widgets` area evolves into **Website & Widget** without requiring an application-wide navigation rewrite.
+The current full-screen **Website Chat** area evolves into **Website Chat & Agent Site** (or another final approved label) without reintroducing an agent/widget inventory.
 
 The widget list should eventually show:
 
@@ -690,7 +692,7 @@ Message count and generated content volume are diagnostics, not the product's de
 | 0. Confirm and protect the foundation | Freeze contracts, inventory live schema, and characterize current Widget behavior | Planning/internal |
 | 1. Shared delivery foundation | Establish safe Agent Site launch/channel contracts without changing the core agent model | Internal |
 | 2. SEO-ready Agent Site | Ship the server-rendered platform-hosted Agent Site with approved content and Widget V2 chat | Private alpha |
-| 3. Website & Widget management | Evolve the current Widget UI into clear Agent Site and Chat Widget management | Private beta |
+| 3. Website Chat & Agent Site management | Extend the current Website Chat UI with clear Agent Site delivery controls | Private beta |
 | 4. Custom domains | Add verified domain, TLS, routing, canonical, and removal lifecycle | Limited pilot |
 | 5. Analytics and governed improvement | Add clear channel reporting and public-FAQ promotion through approval/publication | Pilot expansion |
 | 6. Hardening and launch | Complete security, privacy, accessibility, performance, operations, and commercial validation | Limited availability |

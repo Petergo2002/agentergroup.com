@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "apps/**/dist/**",
     "apps/**/node_modules/**",
+    // Separate local agent workspaces have their own lint configuration.
+    ".gemini/**",
   ]),
 ]);
 

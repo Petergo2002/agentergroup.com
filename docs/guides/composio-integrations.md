@@ -78,7 +78,7 @@ Automation triggers use a different path:
 
 ```text
 Composio trigger
-  -> POST https://dashboard.agentergroup.com/api/composio/webhook
+  -> POST https://avenro.se/api/composio/webhook
   -> verifyWebhook(...) with COMPOSIO_WEBHOOK_SECRET
   -> lookup agent_automations by composio_trigger_id
   -> insert automation_events
@@ -94,10 +94,10 @@ interval; values below that are unsupported for managed auth and are clamped by
 `createComposioTrigger()`. The local binding endpoint also returns live provider health so the UI
 can distinguish "webhook configured" from "provider trigger active and polling".
 
-The webhook subscription must target the dashboard deployment directly. The apex/marketing domain
-does not host Next.js application API routes and must not be used for webhook delivery.
-The production dashboard deployment must also set
-`NEXT_PUBLIC_APP_URL=https://dashboard.agentergroup.com`.
+The webhook subscription must target the Next.js deployment directly. For avenro.se,
+the root domain serves both the landing page and application API routes; do not attach
+it to the old static marketing project or to Widget V2. The Next.js deployment must set
+`NEXT_PUBLIC_APP_URL=https://avenro.se`.
 
 Gmail action nodes support both new sends (`GMAIL_SEND_EMAIL`) and true thread replies
 (`GMAIL_REPLY_TO_THREAD`). Existing nodes preserve their saved action allow-list, so the reply tool

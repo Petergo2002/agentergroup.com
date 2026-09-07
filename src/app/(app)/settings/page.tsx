@@ -9,6 +9,9 @@ import type { PlatformLanguage } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/client';
 import type { PrivacySubjectLookupResponse } from '@/lib/types';
 
+const LEGACY_DEFAULT_WORKSPACE_DESCRIPTION =
+  'Primary workspace for managing agents, connections, and runs.';
+
 export default function SettingsPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -18,7 +21,10 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState(profile.full_name ?? '');
   const [companyName, setCompanyName] = useState(workspace.name);
   const [workspaceDescription, setWorkspaceDescription] = useState(
-    workspace.description ?? '',
+    workspace.product_experience === 'milo' &&
+      workspace.description === LEGACY_DEFAULT_WORKSPACE_DESCRIPTION
+      ? t('settings.miloWorkspaceDescription')
+      : workspace.description ?? '',
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false);

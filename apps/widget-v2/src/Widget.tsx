@@ -40,6 +40,7 @@ import {
   WIDGET_CLOSE_REQUEST_MESSAGE_TYPE,
   type SessionPresenceEvent,
   parsePreviewOverrideMessage,
+  parsePreviewAuthUpdateMessage,
   parseWidgetStateMessage,
   parsePreviewResetMessage,
   parseWidgetBootstrapMessage,
@@ -95,6 +96,7 @@ export default function Widget({
   const isEmbedded =
     typeof window !== "undefined" && window.parent !== window;
   const [config, setConfig] = useState<WidgetConfig | null>(null);
+  const configRef = useRef<WidgetConfig | null>(null);
   const [selectedWidgetAgentId, setSelectedWidgetAgentId] = useState<string | null>(
     null,
   );
@@ -119,6 +121,7 @@ export default function Widget({
   const [previewRevisionKey, setPreviewRevisionKey] = useState(
     previewRevision || "0",
   );
+  const [previewTokenKey, setPreviewTokenKey] = useState(previewToken);
   const embeddedParentOrigin = isEmbedded
     ? resolveEmbeddedParentOrigin(parentOrigin)
     : null;
@@ -134,7 +137,7 @@ export default function Widget({
 
   const bootstrapContext = useMemo<WidgetRequestContext>(
     () => ({
-      previewToken: previewMode ? previewToken : undefined,
+      previewToken: previewMode ? previewTokenKey : undefined,
       previewSource:
         previewMode ? previewSource || "widget_preview" : undefined,
       previewRevision: previewMode ? previewRevisionKey : undefined,
@@ -143,9 +146,17 @@ export default function Widget({
       previewMode,
       previewRevisionKey,
       previewSource,
-      previewToken,
+      previewTokenKey,
     ],
   );
+
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
+  useEffect(() => {
+    setPreviewTokenKey(previewToken);
+  }, [previewToken]);
   const requestContext = useMemo<WidgetRequestContext>(
     () => ({
       ...bootstrapContext,
@@ -402,8 +413,11 @@ export default function Widget({
       setActiveTab("home");
       setError(null);
       setAccessToken(null);
+      const currentConfig = configRef.current;
       setSelectedWidgetAgentId(
-        config?.home.mode === "single_auto" ? config.agents[0]?.widgetAgentId ?? null : null,
+        currentConfig?.home.mode === "single_auto"
+          ? currentConfig.agents[0]?.widgetAgentId ?? null
+          : null,
       );
 
       if (!previewMode) return;
@@ -414,7 +428,7 @@ export default function Widget({
           : fallbackRevision,
       );
     },
-    [clearInactivityTimer, config, previewMode, resetWidgetSession],
+    [clearInactivityTimer, previewMode, resetWidgetSession],
   );
 
   useEffect(() => {
@@ -690,6 +704,15 @@ export default function Widget({
       const resetSignal = parsePreviewResetMessage(event.data);
       if (resetSignal) {
         resetConversation(resetSignal.payload?.previewRevision);
+        return;
+      }
+
+      const authUpdate = parsePreviewAuthUpdateMessage(event.data);
+      if (authUpdate) {
+        setPreviewTokenKey(authUpdate.payload.previewToken);
+        if (authUpdate.payload.previewRevision !== undefined) {
+          setPreviewRevisionKey(authUpdate.payload.previewRevision);
+        }
         return;
       }
 
@@ -1085,6 +1108,7 @@ export default function Widget({
           "--widget-card": palette.card,
           "--widget-border": palette.border,
           "--widget-brand-primary": palette.primary,
+          "--widget-milo-color": palette.accentStrong,
           "--widget-primary": palette.accentStrong,
           "--widget-secondary": palette.secondary,
           "--widget-primary-rgb": primaryRgb,
@@ -1270,7 +1294,7 @@ export default function Widget({
         {config.widget.showBranding ? (
           <div className="shrink-0 px-6 pb-3 pt-2 text-center">
             <a
-              href="https://agentergroup.com"
+              href="https://avenro.se"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-widget-muted transition-colors hover:text-widget-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-widget-primary/40"

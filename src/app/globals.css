@@ -282,6 +282,7 @@
   }
 
   .app-card:hover {
+    transform: translateY(-1px);
     box-shadow: var(--shadow-tactile);
   }
 
@@ -743,6 +744,129 @@
 
 .animate-flow-pulse {
   animation: flow-pulse 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes milo-white-glow {
+  0%, 65%, 100% {
+    box-shadow: 0 0 0 0 transparent;
+    filter: drop-shadow(0 0 0px transparent);
+  }
+  80% {
+    box-shadow: 0 0 10px 1.5px rgba(255, 255, 255, 0.75), 0 0 14px 2px rgba(255, 92, 2, 0.2);
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.8));
+  }
+}
+
+@keyframes milo-dark-glow {
+  0%, 65%, 100% {
+    box-shadow: 0 0 0 0 transparent;
+    filter: drop-shadow(0 0 0px transparent);
+  }
+  80% {
+    box-shadow: 0 0 6px 1px rgba(255, 92, 2, 0.35);
+    filter: drop-shadow(0 0 4px rgba(255, 92, 2, 0.25));
+  }
+}
+
+@keyframes milo-sheen-sweep {
+  0%, 60%, 100% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    opacity: 0;
+  }
+  75% {
+    opacity: 1;
+  }
+  85% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+.animate-milo-glow {
+  animation: milo-white-glow 5s ease-in-out infinite;
+}
+
+:is(.dark *) .animate-milo-glow {
+  animation: milo-dark-glow 5s ease-in-out infinite;
+}
+
+.animate-milo-sheen {
+  background: linear-gradient(
+    135deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 80%
+  );
+  animation: milo-sheen-sweep 5s ease-in-out infinite;
+}
+
+@keyframes milo-wave-wobble {
+  0%, 100% {
+    transform: translate3d(-2.4px, 0.4px, 0) rotate(-1.25deg) scaleX(0.98);
+  }
+  25% {
+    transform: translate3d(0.7px, -3.2px, 0) rotate(0.75deg) scaleX(1.025);
+  }
+  50% {
+    transform: translate3d(2.7px, 0.6px, 0) rotate(1.4deg) scaleX(0.99);
+  }
+  75% {
+    transform: translate3d(-0.6px, 3px, 0) rotate(-0.7deg) scaleX(1.02);
+  }
+}
+
+.milo-logo-waves-active path {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: milo-wave-wobble 1.85s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform;
+}
+
+.milo-logo-waves-active path:nth-child(2) { animation-delay: -0.09s; }
+.milo-logo-waves-active path:nth-child(3) { animation-delay: -0.18s; }
+.milo-logo-waves-active path:nth-child(4) { animation-delay: -0.27s; }
+.milo-logo-waves-active path:nth-child(5) { animation-delay: -0.36s; }
+.milo-logo-waves-active path:nth-child(6) { animation-delay: -0.45s; }
+.milo-logo-waves-active path:nth-child(7) { animation-delay: -0.54s; }
+.milo-logo-waves-active path:nth-child(8) { animation-delay: -0.63s; }
+.milo-logo-waves-active path:nth-child(9) { animation-delay: -0.72s; }
+.milo-logo-waves-active path:nth-child(10) { animation-delay: -0.81s; }
+.milo-logo-waves-active path:nth-child(11) { animation-delay: -0.9s; }
+.milo-logo-waves-active path:nth-child(12) { animation-delay: -0.99s; }
+
+@keyframes builder-enter {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-builder-enter {
+  animation: builder-enter 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .milo-logo-waves-active path,
+  .animate-builder-enter {
+    animation: none;
+  }
+}
+
+@keyframes toastProgress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-toast-progress {
+  animation: toastProgress 3s linear forwards;
 }
 
 body {

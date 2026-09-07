@@ -99,6 +99,8 @@ export const agentBuilder = {
   deployBlueprint: "Publicera version",
   publishing: "Publicerar...",
   loadingBuilder: "Laddar builder...",
+  preparingMilo: "Gör Milo redo",
+  preparingMiloDescription: "Förbereder ditt workspace och öppnar byggaren…",
   nodeLibraryTitle: "Nodbibliotek",
   nodeLibraryDescription:
     "Håll flödet enkelt. Noder kopplas ihop automatiskt när du lägger till dem.",
@@ -111,6 +113,7 @@ export const agentBuilder = {
   triggerSetupDescription:
     "En trigger är händelsen som startar flödet. Använd interna triggers för widgetens händelser och externa triggers för apphändelser utanför systemet.",
   triggerProviderInternal: "Intern",
+  triggerProviderWebsiteChat: "Webbchatt",
   triggerProviderComposio: "Extern",
   agentSurface: "Agenttyp",
   automationReadiness: "Automationsstatus",
@@ -314,6 +317,10 @@ export const agentBuilder = {
   identity: "Identitet",
   contextualNote: "Kontextuell notering",
   cognitiveModel: "Kognitiv modell",
+  miloModel: "AI-modell (via OpenRouter)",
+  miloBuilder: "Milo-byggare",
+  saveMiloChanges: "Spara ändringar",
+  updateMilo: "Uppdatera Milo",
   selectedModel: "Vald modell",
   modelCatalogLoading: "Laddar katalog",
   modelCatalogLive: "Live från OpenRouter",

@@ -1,4 +1,5 @@
 export const agents = {
+  testMilo: "Test Milo",
   agentLibrary: "Agent Library",
   headline: "Deploy your intelligence.",
   description:

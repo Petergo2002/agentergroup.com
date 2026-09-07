@@ -104,6 +104,9 @@ export const knowledge = {
   title: "Knowledge Source Library",
   description:
     "A centralized hub for your workspace's proprietary data. Connect and process documents to provide your agents with deep domain expertise.",
+  miloTitle: "Knowledge",
+  miloDescription:
+    "Add the information Milo should use when answering customers.",
   total: "Total",
   ready: "Ready",
   syncing: "Syncing",
@@ -126,8 +129,8 @@ export const knowledge = {
   importDocument: "Import Document",
   driveSearchPlaceholder: "Search Drive files...",
   activeKnowledgeSources: "Active Knowledge Sources",
-  totalSuffix: "{count} Total",
-  filterPlaceholder: "Filter library...",
+  totalSuffix: "{count} items",
+  filterPlaceholder: "Search knowledge",
   clearFilter: "Clear filter",
   deleteConfirm:
     'Delete "{name}"? This will remove the source, its chunks, and any agent attachments.',

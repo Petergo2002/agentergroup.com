@@ -23,6 +23,7 @@ import { privacyPolicy } from "./en/privacyPolicy";
 import { termsOfService } from "./en/termsOfService";
 import { dataProcessing } from "./en/dataProcessing";
 import { subprocessors } from "./en/subprocessors";
+import { landing } from "./en/landing";
 
 export const en = {
   common,
@@ -50,6 +51,7 @@ export const en = {
   termsOfService,
   dataProcessing,
   subprocessors,
+  landing,
 } as const;
 
 type DeepWiden<T> =

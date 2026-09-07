@@ -5,6 +5,8 @@ export const dashboard = {
   greetingEvening: "Good evening",
   overview:
     "Monitor active agents, live widgets, connected apps, and knowledge from one operational view.",
+  miloOverview:
+    "See how Milo, Website Chat, Connections, and Knowledge are performing.",
   initializeAgent: "Create agent",
   createAgentTitle: "Create an agent",
   createAgentDescription:
@@ -17,9 +19,24 @@ export const dashboard = {
     "New customer conversations from deployed widgets will appear here.",
   liveWidgets: "Live Widgets",
   connectedApps: "Connected Apps",
+  connections: "Connections",
   knowledge: "Knowledge",
   inventory: "Inventory",
   totalAgents: "Total agents",
+  miloStatus: "Milo status",
+  miloStatusDescription: "Your AI employee is ready to learn and help customers.",
+  websiteChatStatus: "Website Chat",
+  websiteChatDescription: "Milo's customer-facing chat on your website.",
+  leads: "Leads",
+  leadsDescription: "Visitors captured by Milo through Website Chat.",
+  capturedMetric: "Captured",
+  improveMilo: "Improve Milo",
+  improveMiloDescription: "Questions waiting for your answer.",
+  openMetric: "Open",
+  miloAttention: "Milo needs your attention",
+  miloAttentionDescription: "Review unanswered questions and keep Website Chat ready for customers.",
+  miloUpToDate: "Milo is up to date",
+  miloUpToDateDescription: "There are no unanswered customer questions right now.",
   agentStatus: "Agent Status",
   noAgentsYet: "No agents yet",
   noAgentsDescription:
@@ -31,6 +48,8 @@ export const dashboard = {
   activeAgentsMetric: "{count} active",
   widgetsDescription: "Agents deployed to your public webpages.",
   appsDescription: "Integrations facilitating data-driven conversations.",
+  miloAppsDescription: "Tools Milo can use to help customers.",
   knowledgeDescription: "Proprietary sources powering AI comprehension.",
+  miloKnowledgeDescription: "Information Milo uses to answer customers.",
   sourcesMetric: "Sources",
 };

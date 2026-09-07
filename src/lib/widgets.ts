@@ -329,6 +329,11 @@ export function buildHostedWidgetUrl(widgetPublicKey: string) {
 }
 
 export function buildWidgetEmbedSnippet(widgetPublicKey: string) {
-  const widgetAppUrl = getWidgetAppUrl();
-  return `<script src="${widgetAppUrl}/loader.js" data-widget="${widgetPublicKey}"></script>`;
+  const widgetAppUrl = getWidgetAppUrl().replace(/\/$/, "");
+  const apiUrl = getAppUrl().replace(/\/$/, "");
+  // The static loader has its own API default. Make each installation explicit,
+  // including deployments that use a preview or local API origin.
+  const escapeAttribute = (value: string) =>
+    value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<script src="${escapeAttribute(widgetAppUrl)}/loader.js" data-widget="${escapeAttribute(widgetPublicKey)}" data-api-url="${escapeAttribute(apiUrl)}"></script>`;
 }

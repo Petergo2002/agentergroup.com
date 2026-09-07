@@ -94,7 +94,7 @@ export const termsOfService = {
     {
       title: "Kontakt",
       body: [
-        "Vid frågor om dessa villkor, kontakta Agentergroup på info@agentergroup.com.",
+        "Vid frågor om dessa villkor, kontakta Agentergroup på info@avenro.se.",
         "Vi kan uppdatera dessa villkor över tid när produkten, leverantörer eller juridiska krav utvecklas. Fortsatt användning av tjänsten efter en uppdatering innebär att du accepterar de uppdaterade villkoren.",
       ],
     },

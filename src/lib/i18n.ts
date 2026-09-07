@@ -29,14 +29,18 @@ export function resolvePlatformLanguage(value: unknown): PlatformLanguage {
 }
 
 export async function getMessages(language: PlatformLanguage) {
-  const cached = messageCache.get(language);
-  if (cached) {
-    return cached;
+  if (process.env.NODE_ENV === "production") {
+    const cached = messageCache.get(language);
+    if (cached) {
+      return cached;
+    }
+
+    const next = messageLoaders[language]();
+    messageCache.set(language, next);
+    return next;
   }
 
-  const next = messageLoaders[language]();
-  messageCache.set(language, next);
-  return next;
+  return messageLoaders[language]();
 }
 
 function resolveMessage(messages: Messages, key: string) {

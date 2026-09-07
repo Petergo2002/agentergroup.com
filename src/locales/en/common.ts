@@ -6,6 +6,7 @@ export const common = {
   cancel: "Cancel",
   close: "Close",
   open: "Open",
+  moreActions: "More actions",
   collapse: "Collapse",
   expand: "Expand",
   back: "Back",

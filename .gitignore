@@ -47,3 +47,6 @@ next-env.d.ts
 # local dev artifacts
 lint_output.txt
 .playwright-mcp/
+
+# Separate local project, not part of this repository
+/.gemini/Jenna/

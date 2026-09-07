@@ -43,6 +43,7 @@ import { SourceTable } from "@/components/knowledge/SourceTable";
 import { ViewSourceModal } from "@/components/modals/ViewSourceModal";
 import { ConfirmSimpleModal } from "@/components/modals/ConfirmSimpleModal";
 import { formatRelativeDate } from "@/lib/utils";
+import { useAppContext } from "@/components/app/AppContext";
 
 const ACCEPTED_FILE_TYPES = [...SUPPORTED_KNOWLEDGE_MIME_TYPES, ...SUPPORTED_KNOWLEDGE_EXTENSIONS].join(",");
 
@@ -70,6 +71,10 @@ export default function KnowledgePageClient({
   const [supabase] = useState(() => createClient());
   const { language, t } = useLanguage();
   const { showToast } = useToast();
+  const { workspace } = useAppContext();
+  const miloMode =
+    workspace.product_experience === "milo" &&
+    process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false";
   const [sources, setSources] = useState<KnowledgeSourceRecord[]>(initialSources);
   const [folders, setFolders] = useState<KnowledgeFolderWithSources[]>(initialFolders);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -861,10 +866,10 @@ export default function KnowledgePageClient({
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
             <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
-              {t("knowledge.title")}
+              {miloMode ? t("knowledge.miloTitle") : t("knowledge.title")}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">
-              {t("knowledge.description")}
+              {miloMode ? t("knowledge.miloDescription") : t("knowledge.description")}
             </p>
 
             <div className="mt-5 max-w-sm space-y-2">

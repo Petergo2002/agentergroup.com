@@ -1,6 +1,6 @@
 # Agentergroup Architecture
 
-Last updated: 2026-07-08
+Last updated: 2026-08-24
 
 ## Purpose
 
@@ -16,15 +16,17 @@ This document should be treated as the operational source of truth for future ma
 
 ## Product Scope
 
-The current product is a conversational AI agent platform with four core capabilities:
+The default customer experience is Milo: one primary AI employee and one Website Chat per opted-in workspace. This is a product facade, not a destructive schema collapse. The existing agents, drafts, versions, widgets, widget links, OpenRouter model choice, and Widget V2 execution remain authoritative underneath. See [Milo single-agent experience](../guides/milo-experience.md).
 
-1. Build and configure agents in a visual editor
-2. Run agents in a live preview chat
-3. Use internal assistants in shared authenticated workspace chats
-4. Let agents use:
-   - workspace knowledge stored in Supabase
-   - connected external tools through Composio
-5. Capture unanswered public widget questions, review them in `/questions`, and publish verified answers back into agent knowledge
+The current customer product is organized around one improvement loop:
+
+1. Configure and test Milo in the existing visual Builder.
+2. Give Milo workspace Knowledge and approved connected tools through Composio.
+3. Configure and publish one Website Chat as a hosted or embedded customer surface.
+4. Capture conversations and Leads and review them in Analytics.
+5. Review unanswered Website Chat questions in Improve Milo and publish verified answers back into Milo's Knowledge.
+
+The platform also retains separate Automation Agent and Internal Assistant capabilities. They share infrastructure with Milo where appropriate, but they are not presented as additional Milos and are not merged into the primary customer-facing runtime.
 
 The current MVP is intentionally narrow:
 
@@ -102,6 +104,7 @@ Browser (Next.js App Router UI)
 
 Important implementation docs:
 
+- `docs/guides/milo-experience.md`
 - `docs/guides/agent-builder.md`
 - `docs/guides/automation-agents.md`
 - `docs/guides/questions-data-flywheel.md`
@@ -113,6 +116,8 @@ Important implementation docs:
 - `src/app/layout.tsx`
 - `src/app/(app)/layout.tsx`
 - `src/app/(app)/dashboard/page.tsx`
+- `src/app/(app)/milo/page.tsx`
+- `src/app/(app)/website-chat/page.tsx`
 - `src/app/(app)/analytics/page.tsx`
 - `src/app/(app)/agents/page.tsx`
 - `src/app/(app)/agents/[id]/builder/page.tsx`
@@ -202,6 +207,7 @@ Important implementation docs:
 - `src/app/api/widgets/[id]/deploy/route.ts`
 - `src/app/api/widgets/[id]/preview/route.ts`
 - `src/app/api/widgets/[id]/status/route.ts`
+- `src/app/api/milo/provision/route.ts`
 - `src/app/api/public/widgets/[widgetPublicKey]/bootstrap/route.ts`
 - `src/app/api/public/widgets/[widgetPublicKey]/config/route.ts`
 - `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
@@ -216,6 +222,8 @@ Important implementation docs:
 
 - `src/lib/env.ts`
 - `src/lib/app/bootstrap.ts`
+- `src/lib/milo/experience.ts`
+- `src/lib/milo/server.ts`
 - `src/lib/app/profile-sync.ts`
 - `src/lib/supabase/server.ts`
 - `src/lib/supabase/client.ts`
@@ -238,25 +246,26 @@ Important implementation docs:
 
 ### Supabase
 
-- `supabase/migrations/20260313_phase_2_core_platform.sql`
-- `supabase/migrations/20260314_phase_3_runtime_controls.sql`
-- `supabase/migrations/20260314_phase_4_knowledge_base.sql`
-- `supabase/migrations/20260314_phase_4_storage_and_advisor_cleanup.sql`
-- `supabase/migrations/20260314_phase_4_widget_deployments.sql`
-- `supabase/migrations/20260315_phase_5_widgets_multi_agent.sql`
-- `supabase/migrations/20260315_phase_5_1_widget_preview_drafts.sql`
-- `supabase/migrations/20260315_phase_5_2_widget_agent_quick_prompts.sql`
-- `supabase/migrations/20260315_phase_5_3_widget_assets.sql`
-- `supabase/migrations/20260319_widget_hosted_access.sql`
-- `supabase/migrations/20260320_end_chat_sessions.sql`
-- `supabase/migrations/20260323_phase_7_privacy_retention_indexes.sql`
-- `supabase/migrations/20260325_widget_session_turn_locks.sql`
-- `supabase/migrations/20260325_widget_session_turn_locks_fix_status_ambiguity.sql`
-- `supabase/migrations/20260325_widget_session_turn_locks_fix_active_turn_ambiguity.sql`
-- `supabase/migrations/20260326_internal_assistants.sql`
-- `supabase/migrations/20260409_widget_rate_limits.sql`
-- `supabase/migrations/20260409163000_widget_rate_limit_window_conflict_fix.sql`
-- `supabase/migrations/20260416_team_invites.sql`
+- `supabase/migrations/20260313222641_phase_2_core_platform.sql`
+- `supabase/migrations/20260313231030_phase_3_runtime_controls.sql`
+- `supabase/migrations/20260313233842_phase_4_knowledge_base.sql`
+- `supabase/migrations/20260314000002_phase_4_storage_and_advisor_cleanup_v2.sql`
+- `supabase/migrations/20260314141610_phase_4_widget_deployments.sql`
+- `supabase/migrations/20260315144300_phase_5_widgets_multi_agent.sql`
+- `supabase/migrations/20260315151539_phase_5_1_widget_preview_drafts.sql`
+- `supabase/migrations/20260315172039_phase_5_2_widget_agent_quick_prompts.sql`
+- `supabase/migrations/20260315173831_phase_5_3_widget_assets.sql`
+- `supabase/migrations/20260319120301_widget_hosted_access.sql`
+- `supabase/migrations/20260319120337_widget_hosted_access.sql`
+- `supabase/migrations/20260320222759_end_chat_sessions.sql`
+- `supabase/migrations/20260323211612_phase_7_privacy_retention_indexes.sql`
+- `supabase/migrations/20260325100000_widget_session_turn_locks.sql`
+- `supabase/migrations/20260325194147_widget_session_turn_locks_fix_status_ambiguity.sql`
+- `supabase/migrations/20260325110000_widget_session_turn_locks_fix_active_turn_ambiguity.sql`
+- `supabase/migrations/20260326212532_internal_assistants.sql`
+- `supabase/migrations/20260409001015_widget_rate_limits.sql`
+- `supabase/migrations/20260409134218_widget_rate_limit_window_conflict_fix.sql`
+- `supabase/migrations/20260416120000_team_invites.sql`
 - `supabase/migrations/20260419110605_add_website_knowledge_source.sql`
 - `supabase/migrations/20260422183115_widget_attachments_bucket.sql`
 - `supabase/migrations/20260429114632_admin_extra_message_credits.sql`
@@ -266,11 +275,12 @@ Important implementation docs:
 - `supabase/migrations/20260512105825_connection_auth_links.sql`
 - `supabase/migrations/20260512113836_secure_security_definer_functions.sql`
 - `supabase/migrations/20260512114059_tighten_private_helper_function_grants.sql`
-- `supabase/migrations/20260518170742_agent_library_templates.sql`
+- `supabase/migrations/20260518172848_agent_library_templates.sql`
 - `supabase/migrations/20260520132303_knowledge_folders.sql`
-- `supabase/migrations/20260525210001_app_slow_query_tuning.sql`
+- `supabase/migrations/20260525210632_app_slow_query_tuning.sql`
 - `supabase/migrations/20260526212615_dashboard_performance_quick_wins.sql`
 - `supabase/migrations/20260526213651_dashboard_conversation_summaries.sql`
+- `supabase/migrations/20260811221031_milo_primary_workspace_resources.sql`
 - `supabase/functions/process-knowledge-source/index.ts`
 - `supabase/functions/search-knowledge/index.ts`
 - `supabase/functions/_shared/knowledge.ts`
@@ -322,16 +332,22 @@ It provides:
 - the main sidebar
 - the topbar
 
-Important exception:
+Focused-route exceptions:
 
-- `/agents/[id]/builder` intentionally renders without the global sidebar and topbar
-- the builder route still keeps app context and providers
-- this gives the editor a focused full-screen layout without breaking shared state
+- `/milo` and Milo's resolved `/agents/{primary_customer_agent_id}/builder` render without the global sidebar and topbar
+- `/website-chat` and Milo's resolved `/widgets/{primary_widget_id}` render without the global sidebar and topbar
+- Website Chat remains focused during redirect loading, widget data loading, setup/repair, and the loaded editor
+- the Website Chat header provides a Back control to `/dashboard`
+- the primary-widget exception is scoped to an effective Milo workspace; classic widget detail routes retain the normal shell
+- focused routes still keep app context, SWR, toast, and modal providers
+
+This prevents sidebar/topbar flashes during stable-route redirects while preserving shared authenticated state.
 
 Additional note:
 
 - internal assistant usage now lives under `/assistants`
-- widget management now lives under `/widgets`
+- Milo users enter the primary customer agent through `/milo` and the primary widget through `/website-chat`
+- classic widget management remains under `/widgets`
 - the legacy `/agents/[id]/widget` surface only redirects users into the widgets area
 - analytics lives at `/analytics` as a workspace-level operations surface for widget conversations and automation performance
 
@@ -355,7 +371,7 @@ Authentication is handled by Supabase Auth with a professional "Email-first" flo
 - **Verification**: The link directs users to `/auth/confirm`, which verifies the token and redirects to `/complete-signup`.
 - **Completion**: New users set their password on `/complete-signup` before being redirected to `/onboarding`.
 - **Legacy signup redirect**: `/signup` is a public route that redirects legacy signup links into the main login flow.
-- **SMTP**: External emails are delivered via **Resend** (SMTP) to ensure professional branding (`@agentergroup.com`) and high deliverability.
+- **SMTP**: External emails are delivered via **Resend** (SMTP) to ensure professional branding (`@avenro.se`) and high deliverability.
 - **Actions**: Login, signup, and password update actions live in `src/app/login/actions.ts`.
 - **Redirects**: Environment-agnostic redirects are managed via `getAppUrl()` in `src/lib/env.ts`.
 
@@ -385,11 +401,12 @@ Current behavior:
 1. Call `syncUserProfile()` to upsert the profile from Supabase Auth user metadata
 2. Load all workspace memberships for the user
 3. If none exist, attempt to create a default owner workspace (with concurrency protection)
-4. Resolve the active workspace using:
+4. After workspace membership exists, call the idempotent Milo provisioning service for a new eligible workspace
+5. Resolve the active workspace using:
    - `active_workspace_id` cookie if it still matches a valid membership
    - otherwise the first owner workspace
    - otherwise the first available membership
-5. Return:
+6. Return:
    - profile
    - active workspace
    - active membership
@@ -397,6 +414,8 @@ Current behavior:
    - subscription (automatic 'free' plan via DB trigger)
 
 This logic is important because almost all app data is workspace-scoped.
+
+Milo provisioning is transactional and service-owned. `src/lib/app/bootstrap.ts` calls `provisionWorkspaceMilo(...)`, which invokes `provision_workspace_milo_v1`. The RPC creates or adopts the primary customer agent, primary widget, and their link before setting `product_experience = 'milo'`. A partial failure must not expose a half-configured Milo workspace. Owners/admins can retry through `POST /api/milo/provision`.
 
 ### Active workspace selection
 
@@ -702,7 +721,7 @@ The system is easier to reason about if each layer has a clear ownership boundar
 
 ## Database Architecture
 
-The schema is organized into four main domains.
+The schema is organized into five main domains.
 
 ### 1. Identity and workspaces
 
@@ -720,6 +739,14 @@ Purpose:
 - let one operator manage multiple client workspaces
 - track subscription plan, billing cycle, and usage limits per workspace
 - manage team invites with pending/accepted/revoked lifecycle
+
+Milo identity is explicit workspace state:
+
+- `product_experience` selects `classic` or `milo`
+- `primary_customer_agent_id` points to the customer-facing Milo agent
+- `primary_widget_id` points to Website Chat
+
+The primary pointers are stable identifiers. Editable resource names are never used to resolve Milo. Validation and protection triggers from `20260811221031_milo_primary_workspace_resources.sql` keep both pointers workspace-owned and protect the primary resources while Milo mode is active.
 
 ### 2. Agents and builder state
 
@@ -877,6 +904,10 @@ Purpose:
 
 Important current behavior:
 
+- in effective Milo mode, `workspaces.primary_widget_id` identifies the one customer-facing Website Chat and `workspaces.primary_customer_agent_id` identifies its one attached Milo
+- Website Chat hides multi-specialist controls, while server routes and database guards prevent replacement or removal of the primary link
+- Widget V2 already resolves a one-agent deployment as `single_auto`, so visitors enter Milo directly
+- classic workspaces retain ordered multi-agent widget behavior for compatibility
 - live widget chat is bound to `widget_agents.published_version_id`, not the current mutable `agents` row
 - widget branding and surface configuration still come from the current `widgets` and `widget_agents` rows
 - specialist presentation config also comes from the current `widget_agents` row, including:
@@ -1559,7 +1590,9 @@ Current behavior:
 - the dashboard app sends baseline browser protections through CSP, HSTS, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`
 - dashboard CSP includes Supabase origins only when `NEXT_PUBLIC_SUPABASE_URL` is configured
 - widget appearance is configured through theme mode plus primary and secondary accent colors; base surfaces/text are derived in the runtime
-- preview mode uses a different signed preview token flow
+- the public launcher, home identity, typing state, and assistant-message attribution use the Milo mark and product name; editable widget-agent copy still controls greetings, descriptions, placeholders, quick actions, and contact behavior
+- assistant-message copy actions expose localized success state and fall back to selection-based copying when the Clipboard API is blocked inside an iframe
+- preview mode uses a different signed preview token flow and does not trap focus inside the iframe because the surrounding dashboard remains interactive
 - the widget runtime shows a lightweight first-message consent gate before the first real chat turn and links it to the public `/privacy-policy` route
 - consent is currently remembered client-side per widget public key so returning visitors are not blocked on every new session
 - widget session/activity data, widget messages, and widget leads are currently covered by a 180 day retention policy enforced by an internal purge route
@@ -1583,7 +1616,7 @@ Current deployment behavior is intentionally mixed:
 - live widget chat executes against the `published_version_id` snapshotted into each `widget_agent`
 - public config and branding still come from the current `widgets` and `widget_agents` rows
 - `needs_redeploy` is used to tell operators when the current widget config has drifted from the last deployment event
-- the public widget frontend is deployed separately from the Next.js dashboard app, so `apps/widget-v2` changes require their own widget-runtime deploy before `widget.agentergroup.com` updates
+- the public widget frontend is deployed separately from the Next.js dashboard app, so `apps/widget-v2` changes require their own widget-runtime deploy before `widget.avenro.se` updates
 
 This is not a fully immutable deployment model, but it prevents live widget chat from silently running an unpublished agent version.
 
@@ -1594,6 +1627,8 @@ Widget preview uses:
 - draft preview payloads
 - persisted preview-draft rows
 - signed preview tokens
+- origin-checked `ag:widget-preview:update-config` messages for immediate theme/color overrides
+- origin-checked `ag:widget-preview:update-auth` messages for rotating the preview token and revision without recreating the iframe or losing chat state
 
 Preview requests can resolve runtime config without deploying the widget publicly. The preview token only changes access and rate-limit behavior: it lets the operator load draft config and bypass public anonymous volumetric limits. Chat turns still use `/api/public/widgets/[widgetPublicKey]/chat`, still call `consumeWorkspaceMessageUsage()`, and still stop with `402 MESSAGE_LIMIT_REACHED` when the workspace allowance is exhausted.
 
@@ -1652,12 +1687,20 @@ It loads in parallel:
 - connected app count
 - knowledge source count
 - widget lead count
+- open unanswered-question count
 
-The dashboard home page renders stats cards, an agent status list, and a recent conversations activity panel.
+In Milo mode, the dashboard prioritizes outcome and improvement metrics in this order:
+
+1. Leads
+2. Improve Milo (open unanswered questions)
+3. Connections
+4. Knowledge
+
+It also renders recent conversations. Classic mode retains the inventory-oriented agent/widget summary where required for compatibility.
 
 ## Questions / Data Flywheel Architecture
 
-Questions/Data Flywheel is the closed loop from missed visitor questions to verified agent knowledge.
+Improve Milo is the Milo-mode product name for the existing Questions/Data Flywheel: the closed loop from missed visitor questions to verified Milo Knowledge. Classic mode retains generic agent terminology. The underlying routes, tables, dedupe, review, and processing APIs are shared.
 
 Main surfaces:
 
@@ -1761,7 +1804,7 @@ This is intentionally narrow. Unsupported marketplace-style integrations are not
 
 - Gmail
   - `GMAIL_NEW_GMAIL_MESSAGE`
-  - consumed through `https://dashboard.agentergroup.com/api/composio/webhook`
+  - consumed through `https://avenro.se/api/composio/webhook`
   - activates `surface = 'automation'` agents through `agent_automations`
   - stores incoming events in `automation_events`
   - runs the shared agent runtime with configured tools and knowledge
@@ -2198,13 +2241,23 @@ After import, the source behaves like any other workspace knowledge source.
 
 ## API Inventory
 
+### Milo APIs
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/milo/provision` | Owner/admin-only repair entrypoint that resolves the active workspace on the server and calls the idempotent service-role provisioning RPC; the browser does not choose primary IDs |
+
 ### Agent APIs
 
 | Route | Purpose |
 | --- | --- |
+| `POST /api/agents` | Idempotently create a widget, automation, or assistant agent through `create_agent_v1`, subject to workspace feature, plan, and Milo-primary guards |
+| `GET /api/agents/[id]/builder` | Load the authenticated builder bootstrap for a workspace-owned agent |
+| `DELETE /api/agents/[id]` | Permanently delete an authorized agent after confirmation and provider cleanup; rejects the active primary Milo |
 | `POST /api/agents/[id]/chat` | Main conversational runtime |
 | `GET /api/agents/[id]/knowledge` | Load agent knowledge attachments |
 | `POST /api/agents/[id]/knowledge` | Replace knowledge attachments |
+| `POST /api/agents/[id]/optimize-prompt` | Consume one message credit and generate an improved instruction draft through OpenRouter |
 | `GET /api/agents/[id]/automation` | Load automation definition, trigger binding, readiness, events, runs, and available trigger accounts |
 | `PUT /api/agents/[id]/automation` | Save or update the automation trigger binding while keeping activation separate |
 | `DELETE /api/agents/[id]/automation` | Delete the automation trigger binding and upstream provider trigger if present |
@@ -2214,6 +2267,17 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/agents/[id]/status` | Activate/pause normal agents; rejects automation agents |
 | `GET /api/agents/[id]/widget` | Legacy moved response pointing callers to `/widgets?agent=...` |
 | `POST /api/agents/[id]/widget` | Legacy moved response pointing callers to `/widgets?agent=...` |
+
+### Internal Assistant APIs
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/assistants` | List usable internal assistants for the active, feature-enabled workspace |
+| `GET /api/assistants/[id]` | Load one assistant, its available threads, selected thread, messages, and edit capability |
+| `PATCH /api/assistants/[id]` | Update authorized internal-assistant metadata and status |
+| `POST /api/assistants/[id]/threads` | Create a workspace-scoped assistant chat thread |
+| `POST /api/assistants/[id]/chat` | Run a serialized, credit-metered internal-assistant turn with persisted messages and tool outcomes |
+| `GET /api/assistants/[id]/downloads/[messageId]` | Validate and proxy an authorized assistant-generated download with SSRF and filename protections |
 
 ### Agent Library APIs
 
@@ -2243,6 +2307,15 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/billing/portal` | Create a Stripe billing portal session for payment method and subscription management |
 | `POST /api/billing/webhook` | Process Stripe subscription and extra credit checkout events |
 
+### Internal Admin Workspace APIs
+
+| Route | Purpose |
+| --- | --- |
+| `PATCH /api/admin/workspaces/[id]/plan` | Assign a managed plan, apply its limits, and activate a pending workspace without calling Stripe |
+| `POST /api/admin/workspaces/[id]/extra-credits` | Grant an audited fixed message-credit amount to a workspace subscription |
+| `PATCH /api/admin/workspaces/[id]/automations` | Toggle the workspace Automation Agents feature flag |
+| `PATCH /api/admin/workspaces/[id]/internal-assistants` | Toggle the workspace Internal Assistants feature flag |
+
 ### Connection APIs
 
 | Route | Purpose |
@@ -2254,7 +2327,9 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/connections/auth-links/[id]/revoke` | Revoke a pending external auth link |
 | `POST /api/public/connection-auth-links/[token]/start` | Public no-login endpoint that validates a bearer link and starts provider auth |
 | `POST /api/connections/disconnect` | Remove a local connection row, best-effort delete the upstream Composio connected account, and pause/error active automations using that connection |
+| `GET /api/connections/cal/event-types` | List Cal.com event types for an explicitly selected active connection |
 | `GET /api/connections/googlecalendar/calendars` | List selectable calendars for one connected Google Calendar account in the builder |
+| `GET /api/connections/toolkits/[toolkitSlug]/tools` | Return the allowed toolkit action catalog and recommended chat tools for Builder selection |
 
 ### Health API
 
@@ -2269,7 +2344,16 @@ After import, the source behaves like any other workspace knowledge source.
 | `GET /api/workspaces` | Return the active workspace id and all accessible workspaces |
 | `POST /api/workspaces` | Create a new owner workspace and make it active |
 | `POST /api/workspaces/active` | Switch the active workspace for the current session |
+| `PATCH /api/workspaces/[id]` | Update workspace name and description as an owner/admin |
 | `DELETE /api/workspaces/[id]` | Permanently delete an owned workspace, verify the delete actually happened, and move the active cookie to another workspace |
+| `GET /api/workspaces/[id]/members` | List members for a workspace the caller can access |
+| `DELETE /api/workspaces/[id]/members/[memberId]` | Remove a member under workspace role and last-owner protections |
+| `GET /api/workspaces/[id]/invites` | List workspace invites for authorized workspace operators |
+| `POST /api/workspaces/[id]/invites` | Create and optionally email a workspace invite |
+| `DELETE /api/workspaces/[id]/invites/[inviteId]` | Revoke a pending workspace invite |
+| `GET /api/invites/incoming` | List pending invites for the authenticated user's email |
+| `POST /api/invites/accept` | Accept a matching pending invite and create workspace membership |
+| `POST /api/invites/decline` | Decline a matching pending invite |
 | `POST /api/workspaces/[id]/privacy/dsar/lookup` | Owner-only subject-data preview for public widget records |
 | `POST /api/workspaces/[id]/privacy/dsar/export` | Owner-only JSON export for public widget subject data with sanitized export filename tokens |
 | `POST /api/workspaces/[id]/privacy/dsar/delete` | Owner-only subject-data deletion for public widget records |
@@ -2286,8 +2370,11 @@ After import, the source behaves like any other workspace knowledge source.
 | --- | --- |
 | `GET /api/knowledge/sources` | List workspace knowledge sources |
 | `POST /api/knowledge/sources` | Create a text source, scrape a website, or reserve file source upload |
+| `PATCH /api/knowledge/sources/[id]` | Atomically update editable text/website content within size and storage limits, then reprocess it |
 | `DELETE /api/knowledge/sources/[id]` | Delete a source and associated file/chunks |
+| `GET /api/knowledge/sources/[id]/content` | Return text content or a short-lived signed file URL for an authorized source |
 | `POST /api/knowledge/sources/[id]/process` | Reprocess an existing source |
+| `POST /api/knowledge/sources/map` | Map and normalize up to 500 same-origin website URLs for premium multi-page ingestion |
 | `GET /api/knowledge/folders` | List workspace knowledge folders and source membership |
 | `POST /api/knowledge/folders` | Create a folder and optional source membership |
 | `PATCH /api/knowledge/folders/[id]` | Rename, describe, or replace source membership for a folder |
@@ -2304,6 +2391,19 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/flywheel/unanswered/[id]/answer` | Publish an operator-approved answer into `verified_facts`, create/link a text knowledge source for the agent, queue processing, and mark the question answered |
 | `PATCH /api/flywheel/unanswered/[id]` | Dismiss, reopen, or mark an unanswered question as a duplicate |
 | `PATCH /api/flywheel/verified-facts/[id]` | Update a verified answer, change visibility, or retry linked knowledge-source processing |
+
+### Lead APIs
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/leads` | Return a bounded, searchable, workspace-scoped lead list with widget, agent, and conversation-summary metadata |
+| `POST /api/leads/[leadId]/summary` | Regenerate an authorized lead conversation summary and consume one message credit per attempt |
+
+### Model Catalog API
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/openrouter/models` | Return tool-capable OpenRouter models with a one-hour cache and a curated fallback catalog |
 
 ### Widget management APIs
 
@@ -2335,6 +2435,8 @@ After import, the source behaves like any other workspace knowledge source.
 
 | Route | Purpose |
 | --- | --- |
+| `GET /api/dashboard/summary` | Return the authenticated dashboard summary, including Milo attention metrics and classic compatibility fields |
+| `GET /api/dashboard/latest-activity` | Return the active workspace's recent conversation activity with a short private cache window |
 | `GET /api/dashboard/analytics` | Return workspace analytics overview, filters, paginated conversation inbox data, and automation summaries, trends, and failures |
 | `GET /api/dashboard/analytics/conversations/[widgetSessionId]` | Return one widget conversation detail transcript, lead info, and role-gated debug metadata |
 
@@ -2348,6 +2450,7 @@ The core environment contract is:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_APP_URL`
 - `NEXT_PUBLIC_WIDGET_APP_URL`
+- `NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED`
 - `NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID`
 - `NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID`
 
@@ -2372,6 +2475,7 @@ The core environment contract is:
 - `COMPOSIO_TOOLKIT_VERSION_SHOPIFY`
 - `COMPOSIO_TOOLKIT_VERSION_GOOGLEADS`
 - `COMPOSIO_TOOLKIT_VERSION_TEXT_TO_PDF`
+- `COMPOSIO_GMAIL_AUTH_CONFIG_ID` or `COMPOSIO_AUTH_CONFIG_GMAIL` (optional custom Gmail auth config; managed auth is used otherwise)
 - `COMPOSIO_GOOGLEADS_AUTH_CONFIG_ID` (optional real Composio auth config id)
 - `COMPOSIO_AUTH_CONFIG_GOOGLEADS` (optional alternate auth config id name)
 - `COMPOSIO_SHOPIFY_AUTH_CONFIG_ID` (optional real Composio auth config id)
@@ -2390,6 +2494,7 @@ The core environment contract is:
 - `WIDGET_ACCESS_SECRET`
 - `WIDGET_PREVIEW_SECRET`
 - `RATE_LIMIT_SECRET`
+- `LEGAL_CONSENT_SECRET`
 - `GDPR_RETENTION_CRON_SECRET`
 
 Billing and rate-limit env rules:
@@ -2476,6 +2581,10 @@ belong in Analytics, which links failed automation events back into Activity thr
 
 These are not bugs. They are current architectural decisions.
 
+### 0. Milo is a facade over composable resources
+
+The customer operates one Milo and one Website Chat, but the backend still uses explicit agent, draft, version, widget, and widget-agent records. Do not collapse these tables, infer primary records by name, or fork a second Milo-only runtime. Improve Milo by evolving the shared runtime, retrieval, tool policy, evaluation, and publishing paths.
+
 ### 1. Builder is a configuration editor, not a workflow engine
 
 The graph is intentionally limited. There are no condition nodes, loops, schedules, or approval branches in the active product flow. Automation v1 has external trigger execution, but the builder graph is still configuration for one agent run, not a general workflow canvas.
@@ -2511,6 +2620,21 @@ The database still contains approval-related tables from the phase 3 runtime con
 There is no Trigger.dev worker, queue, or scheduler for conversational or automation actions. Knowledge ingestion is triggered directly. Automation events are processed through Next.js `after()` and should be moved to durable retry/queue infrastructure before high-volume or strict-SLA usage.
 
 ## How to Extend the System Safely
+
+### If you change the Milo or Website Chat experience
+
+Update these layers together:
+
+1. effective-mode and stable-route helpers in `src/lib/milo/experience.ts`
+2. workspace bootstrap/provisioning and the primary-resource invariants
+3. Milo and Website Chat stable routes and loading states
+4. focused-route behavior in `AppShell`
+5. English and Swedish product copy
+6. classic-mode compatibility and kill-switch behavior
+7. `tests/milo/experience.test.ts`
+8. `docs/guides/milo-experience.md`
+
+Keep the focused Website Chat shell scoped to the active workspace's primary widget. A generic `/widgets/{id}` route must not lose the standard navigation solely because another workspace or classic widget happens to use that URL pattern.
 
 ### If you add a new live integration
 
@@ -2584,6 +2708,8 @@ When making major changes, verify all of the following:
 11. Widget-builder preview chat still consumes workspace credits before model execution even though preview-token traffic skips public rate limits
 12. Widget runtime changes still pass the load-test harness before shipping
 13. Questions/Data Flywheel capture still skips preview chats, records missed public widget questions after assistant persistence, dedupes open repeats, and keeps `/questions` status counts server-derived
+14. `/website-chat` and the resolved primary widget never reveal the sidebar/topbar during loading, redirect, setup, or editing, and Back returns to `/dashboard`
+15. Milo mode still exposes exactly one protected primary customer agent and primary Website Chat while classic mode remains recoverable through the kill switch
 
 ## Source Files Worth Reading First
 
@@ -2591,33 +2717,36 @@ For a new engineer joining this codebase, these are the most important files to 
 
 1. `src/app/(app)/layout.tsx`
 2. `src/lib/app/bootstrap.ts`
-3. `src/lib/app/profile-sync.ts`
-4. `src/app/api/agents/[id]/chat/route.ts`
-5. `src/lib/composio.ts`
-6. `src/lib/integrations.ts`
-7. `src/lib/knowledge.ts`
-8. `supabase/functions/process-knowledge-source/index.ts`
-9. `supabase/functions/search-knowledge/index.ts`
-10. `src/app/(app)/agents/[id]/builder/page.tsx`
-11. `src/app/(app)/agents/[id]/preview/page.tsx`
-12. `src/lib/widgets/server.ts`
-13. `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
-14. `apps/widget-v2/src/Widget.tsx`
-15. `src/lib/flywheel/detection.ts`
-16. `src/lib/flywheel/server.ts`
-17. `src/app/(app)/questions/QuestionsPageClient.tsx`
-18. `scripts/widget-load-test.mjs`
-19. `src/lib/dashboard/summary.ts`
+3. `src/lib/milo/experience.ts`
+4. `src/lib/milo/server.ts`
+5. `src/components/layout/AppShell.tsx`
+6. `src/lib/app/profile-sync.ts`
+7. `src/app/api/agents/[id]/chat/route.ts`
+8. `src/lib/composio.ts`
+9. `src/lib/integrations.ts`
+10. `src/lib/knowledge.ts`
+11. `supabase/functions/process-knowledge-source/index.ts`
+12. `supabase/functions/search-knowledge/index.ts`
+13. `src/app/(app)/agents/[id]/builder/page.tsx`
+14. `src/app/(app)/widgets/[id]/page.tsx`
+15. `src/lib/widgets/server.ts`
+16. `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
+17. `apps/widget-v2/src/Widget.tsx`
+18. `src/lib/flywheel/detection.ts`
+19. `src/lib/flywheel/server.ts`
+20. `src/app/(app)/questions/QuestionsPageClient.tsx`
+21. `scripts/widget-load-test.mjs`
+22. `src/lib/dashboard/summary.ts`
 
 ## Summary
 
-The current architecture is a focused full-stack agent platform built around one principle:
+The current architecture presents one continuously improving Milo while preserving composable resources underneath:
 
-- configure agents in Next.js
-- persist state in Supabase
-- retrieve knowledge from Supabase
-- use external actions through Composio
-- run the agent through a bounded multi-step tool loop
-- keep the end-user experience conversational and clean
+- configure Milo and Website Chat in Next.js
+- persist workspace, agent, widget, version, and conversation state in Supabase
+- retrieve Milo's approved Knowledge from Supabase
+- give Milo approved external actions through Composio
+- run Milo through the bounded multi-step tool loop
+- turn Leads, conversations, and unanswered questions into an owner-reviewed improvement cycle
 
-That gives the project a practical MVP foundation while keeping the core architecture extensible for future integrations and more capable agent behaviors.
+This gives customers a simple product while keeping the backend extensible for smarter retrieval, models, tools, evaluations, future private/authenticated chats, and the proposed Agent Site/native website delivery mode.

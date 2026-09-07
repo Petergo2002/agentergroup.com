@@ -32,6 +32,16 @@ export async function POST(
 
   const context = await ensureWorkspaceContext(supabase as never, user);
 
+  if (
+    context.workspace.product_experience === "milo" &&
+    context.workspace.primary_customer_agent_id === agentId
+  ) {
+    return NextResponse.json(
+      { error: "Milo cannot be archived while the Milo experience is active.", code: "milo_primary_agent_protected" },
+      { status: 409 },
+    );
+  }
+
   const body = await request.json().catch(() => ({}));
   const archived = Boolean(body.archived);
 

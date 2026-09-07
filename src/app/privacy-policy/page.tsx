@@ -8,7 +8,7 @@ import { getServerLanguage } from "@/lib/i18n-server";
 import { LegalLayout } from "@/components/legal/LegalLayout";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Agentergroup",
+  title: "Privacy Policy",
   description:
     "Public privacy policy for Agentergroup and Agentergroup-powered widgets.",
 };
@@ -33,4 +33,3 @@ export default async function PrivacyPolicyPage({
     />
   );
 }
-

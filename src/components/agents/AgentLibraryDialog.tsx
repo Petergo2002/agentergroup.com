@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Bot, CheckCircle2, Clock3, Database, Download, Plug, Search, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, CheckCircle2, Clock3, Database, Download, Plug, Search, X, XCircle } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { TemplateVariableSetup } from "@/components/agents/TemplateVariableSetup";
 import { SimpleIcon } from "@/components/icons/SimpleIcon";
@@ -403,8 +403,18 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search templates..."
-                  className="w-full rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/50 py-3.5 pl-12 pr-4 text-sm font-medium text-on-surface shadow-sm outline-none transition-all duration-300 placeholder:text-on-surface-variant/40 hover:bg-surface-container-lowest focus:border-primary/50 focus:bg-surface-container-lowest focus:ring-4 focus:ring-primary/10"
+                  className="w-full rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/50 py-3.5 pl-12 pr-10 text-sm font-medium text-on-surface shadow-sm outline-none transition-all duration-300 placeholder:text-on-surface-variant/40 hover:bg-surface-container-lowest focus:border-primary/50 focus:bg-surface-container-lowest focus:ring-4 focus:ring-primary/10"
                 />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-on-surface-variant/40 hover:text-on-surface"
+                    aria-label="Clear search query"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -418,13 +428,22 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
                   <button
                     key={item.id}
                     onClick={() => setActiveView(item.id)}
-                    className={`relative rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
+                    className={`relative flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
                       activeView === item.id
                         ? "bg-on-surface text-background shadow-md"
                         : "text-on-surface-variant hover:text-on-surface"
                     }`}
                   >
-                    {item.label} <span className={`ml-1 ${activeView === item.id ? "opacity-80" : "opacity-60"}`}>({item.count})</span>
+                    {item.label}
+                    <span
+                      className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                        activeView === item.id
+                          ? "bg-background/20 text-background"
+                          : "bg-surface-container-high text-on-surface-variant"
+                      }`}
+                    >
+                      {item.count}
+                    </span>
                   </button>
                 ))}
               </div>

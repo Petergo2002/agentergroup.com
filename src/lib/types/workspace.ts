@@ -16,6 +16,9 @@ export interface WorkspaceRecord {
   internal_assistants_enabled: boolean;
   automations_enabled: boolean;
   onboarding_completed: boolean;
+  product_experience: "classic" | "milo";
+  primary_customer_agent_id: string | null;
+  primary_widget_id: string | null;
 }
 
 export interface WorkspaceMemberRecord {

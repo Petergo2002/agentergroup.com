@@ -99,7 +99,7 @@ export function buildLocalizedPrivacyPolicyUrl(
 
   try {
     const base =
-      typeof window !== "undefined" ? window.location.href : "https://agentergroup.com";
+      typeof window !== "undefined" ? window.location.href : "https://avenro.se";
     const parsed = new URL(trimmed, base);
 
     if (parsed.pathname === "/privacy-policy") {

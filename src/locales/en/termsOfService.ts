@@ -94,7 +94,7 @@ export const termsOfService = {
     {
       title: "Contact",
       body: [
-        "For questions about these terms, contact Agentergroup at info@agentergroup.com.",
+        "For questions about these terms, contact Agentergroup at info@avenro.se.",
         "We may update these terms from time to time as the product, providers, or legal requirements evolve. Continued use of the service after an update means you accept the updated terms.",
       ],
     },

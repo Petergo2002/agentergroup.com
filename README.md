@@ -1,6 +1,10 @@
 # Agentergroup
 
-Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a public widget runtime, Supabase-backed storage/auth, OpenRouter model routing, and Composio-powered external actions.
+Agentergroup is a Milo-first, multi-workspace AI employee platform. In the default customer experience, each workspace operates one Milo and one Website Chat. Milo can use workspace Knowledge, connected business tools, capture Leads, learn from unanswered Questions, and improve over time.
+
+The simpler product is implemented as a compatibility facade over the existing agent and Widget V2 architecture. The underlying schema still supports versioned agents, widgets, Automation Agents, Internal Assistants, and classic multi-agent workspaces; those implementation resources are not exposed as inventories in Milo mode.
+
+Start with [Milo Single-Agent Experience](docs/guides/milo-experience.md) for the current product contract and [Core Architecture](docs/architecture/core.md) for the implementation details.
 
 ## Packages
 
@@ -9,19 +13,21 @@ Agentergroup is a multi-workspace AI agent platform with a Next.js dashboard, a 
 
 ## What The Platform Does
 
-- Build, configure, preview, publish, and archive AI agents.
-- Use internal assistants in authenticated workspace chat surfaces.
-- Attach knowledge sources and use them during agent conversations.
-- Connect external tools such as Gmail, Google Calendar, and Google Drive through Composio.
-- Create automation agents that start from external Composio triggers, beginning with Gmail new-message events, and then run the configured agent with selected tools and knowledge.
-- Deploy widgets for hosted usage or third-party site embedding.
-- Track widget sessions, transcripts, leads, and analytics inside each workspace.
-- Review unanswered visitor questions in the Questions queue and publish verified answers back into agent knowledge.
+- Configure and test one primary AI employee, Milo, through the existing visual Builder.
+- Give Milo approved workspace Knowledge and connected capabilities such as Gmail, Google Calendar, and HubSpot through Composio.
+- Configure one Website Chat, preview it, publish it, use its hosted link, or embed it on an existing website.
+- Track Website Chat conversations, Leads, and Analytics inside each workspace.
+- Review unanswered visitor questions in Improve Milo and publish verified answers back into Milo's Knowledge.
+- Retain separate Automation Agent and Internal Assistant capabilities where their feature flags and entitlements allow them.
 - Run owner-only privacy workflows for lookup, export, deletion, and retention cleanup.
+
+The future Agent Site/native website is documented as a roadmap, not a currently shipped delivery mode.
 
 ## Current Product Guarantees
 
 - Widget specialist settings are durable across save, preview, bootstrap, and deploy. Saved widget-agent labels, quick-action visibility, and quick actions are now treated as the runtime source of truth.
+- Widget V2 uses the Milo mark and product name for the launcher, home identity, typing state, and assistant-message attribution. Widget-owned greetings, descriptions, placeholders, quick actions, contact settings, theme, and colors remain configurable.
+- Website Chat preview applies theme/color edits immediately and can rotate its signed preview token and revision without rebuilding the iframe or discarding the current preview conversation.
 - Google Drive imports are account-specific. If a workspace has multiple connected Drive accounts, operators must select which account to browse and import from.
 - Public remote downloads are SSRF-hardened. Assistant downloads and Drive imports only allow vetted `http/https` hosts, reject private/loopback destinations, and re-validate redirects. Drive imports also time out and stop reading as soon as they exceed the workspace's remaining knowledge-storage allowance.
 - DSAR email lookups use normalized exact matching, not wildcard matching. Session ids used in export filenames are sanitized before being written into headers.
@@ -59,7 +65,7 @@ Root app variables:
 | `OPENROUTER_REQUIRE_ZDR` | No | Enables OpenRouter ZDR preference when truthy |
 | `FIRECRAWL_API_KEY` | Yes for website knowledge | Firecrawl API key for page mapping and ingestion |
 | `RESEND_API_KEY` | Yes for invite email delivery | Resend API key; invite creation still works without delivery |
-| `EMAIL_FROM_ADDRESS` | No | Invite-email sender, defaults to `Agentergroup <noreply@agentergroup.com>` |
+| `EMAIL_FROM_ADDRESS` | No | Invite-email sender, defaults to `Agentergroup <noreply@avenro.se>` |
 | `COMPOSIO_API_KEY` | Yes for tool integrations | Composio API key |
 | `COMPOSIO_WEBHOOK_SECRET` | Yes for automations | Secret used to verify Composio trigger webhooks |
 | `COMPOSIO_TOOLKIT_VERSION_GMAIL` | No | Gmail toolkit version override |
@@ -80,6 +86,7 @@ Root app variables:
 | `COMPOSIO_SHOPIFY_SCOPES` | No | Optional Shopify OAuth scope override |
 | `NEXT_PUBLIC_APP_URL` | No | Dashboard origin, defaults to `http://localhost:3000` |
 | `NEXT_PUBLIC_WIDGET_APP_URL` | No | Hosted widget origin, defaults to `http://localhost:5173` |
+| `NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED` | No | Milo UI kill switch. Milo is enabled unless this is explicitly set to `false`; classic navigation returns without deleting Milo mappings or data. |
 | `NEXT_PUBLIC_SELF_SERVE_BILLING_ENABLED` | No | Enables customer-facing Stripe checkout only when set to `true`; managed plan activation is the default |
 | `WIDGET_APP_URL` | No | Legacy fallback alias for the hosted widget origin |
 | `WIDGET_ACCESS_SECRET` | Yes | Secret used to sign public widget access tokens |
@@ -159,15 +166,17 @@ domain JSON adapters are introduced incrementally.
 | `/terms-of-service` | Public Terms of Service page |
 | `/invite/accept` | Public workspace invite acceptance (unauthenticated-friendly) |
 | `/dashboard` | Workspace overview with summary stats and recent conversations |
-| `/agents` | Agent list and lifecycle actions |
-| `/agents/[id]/builder` | Visual agent builder |
-| `/agents/[id]/preview` | Live chat preview for draft agents |
+| `/milo` | Stable Milo entry route; resolves to the workspace's primary Milo Builder |
+| `/website-chat` | Stable Website Chat entry route; resolves to the primary full-screen Website Chat editor |
+| `/agents` | Classic-mode agent inventory; redirects to `/milo` in effective Milo mode |
+| `/agents/[id]/builder` | Underlying full-screen visual Builder used by Milo and classic agents |
+| `/agents/[id]/preview` | Underlying live chat preview used by Milo and classic draft agents |
 | `/agents/[id]/activity` | Automation event timeline, operational decisions, action outcomes, and run diagnostics |
 | `/assistants` | Shared internal assistant list for the active workspace |
 | `/assistants/[id]` | Internal assistant chat surface with shared workspace threads |
-| `/widgets` | Widget list and management |
-| `/widgets/[id]` | Widget configuration, agents, appearance, and deployment state |
-| `/questions` | Review unanswered widget questions, publish verified answers, dismiss misses, and mark duplicates |
+| `/widgets` | Classic-mode widget inventory; redirects to `/website-chat` in effective Milo mode |
+| `/widgets/[id]` | Underlying widget editor; Milo's primary widget renders as full-screen Website Chat |
+| `/questions` | Improve Milo: review unanswered visitor questions and publish verified answers |
 | `/analytics` | Widget conversation analytics, transcript detail, and automation performance reporting |
 | `/connections` | Connected app authorization and status |
 | `/settings` | Workspace profile, compliance links, and admin settings |
@@ -178,15 +187,20 @@ The widget loader is built from `apps/widget-v2/public/loader.js` and expects a 
 
 ```html
 <script
-  src="https://widget.agentergroup.com/loader.js"
+  src="https://widget.avenro.se/loader.js"
   data-widget="YOUR_WIDGET_PUBLIC_KEY"
+  data-api-url="https://avenro.se"
   async
 ></script>
 ```
 
 The loader and hosted runtime talk to the public API routes under `/api/public/widgets/`.
 
-Hosted standalone links such as `https://widget.agentergroup.com/?widget=...` are served by the separate `apps/widget-v2` runtime deployment, not by the Next.js dashboard bundle itself.
+For the avenro.se migration, follow [the Vercel and one.com setup guide](docs/runbooks/avenro-domain-setup.md).
+The generated snippet includes `data-api-url` because the static loader has its own API default;
+`VITE_API_BASE` configures the React runtime, not `public/loader.js`.
+
+Hosted standalone links such as `https://widget.avenro.se/?widget=...` are served by the separate `apps/widget-v2` runtime deployment, not by the Next.js dashboard bundle itself.
 
 This embed stays intentionally simple for local-business customers: they paste the loader snippet into their site and do not need to run any backend code or generate customer-side auth tokens.
 
@@ -194,6 +208,8 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 
 ## Widget Configuration Model
 
+- A Milo workspace exposes one primary Website Chat linked to one primary Milo. It does not expose specialist attachment, detachment, creation, or ordering controls.
+- Website Chat uses the full-screen focused shell, including its loading and repair states, and provides a Back control to `/dashboard`.
 - `widgets` stores the surface-level widget identity, branding, deployment, and access settings.
 - `widget_agents` stores the ordered specialist list and the runtime-facing specialist configuration:
   - display label
@@ -205,6 +221,7 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
   - contact-form settings
 - Deploy snapshots `widget_agents.published_version_id` for chat execution, while current widget/widget-agent config remains the live source for branding and specialist presentation.
 - Internal widget preview uses `widget_preview_drafts` and signed preview tokens, but no longer rewrites specialist labels during preview generation.
+- Classic workspaces can still use the underlying multi-agent widget model; the Milo facade does not destructively remove it.
 
 ## Google Drive Imports
 
@@ -236,20 +253,20 @@ Embedded `allowed_origins` checks are a soft abuse-control for normal website in
 - OpenRouter-backed turns consume workspace message quota before model calls in public widget chat, widget-builder preview chat, internal assistant chat, agent preview chat, prompt optimization, and automation runs.
 - Middleware is explicit-public/default-auth: any matched route not listed as public in `src/lib/supabase/proxy.ts` requires a valid Supabase session.
 - Stripe billing config is required at route execution time and has no hardcoded price id fallbacks.
-- Changes under `apps/widget-v2` require a separate widget-runtime deploy; pushing or deploying only the dashboard app does not update `widget.agentergroup.com`.
+- Changes under `apps/widget-v2` require a separate widget-runtime deploy; pushing or deploying only the dashboard app does not update `widget.avenro.se`.
 - Internal assistant chat is serialized per `chat_threads` row; overlapping turns return `409 THREAD_BUSY`.
 - Internal assistants become usable after the first normal builder save; publish remains widget-only in v1.
 - `scripts/widget-load-test.mjs` exercises bootstrap/chat flows and the same-session lock path.
-- The security regression suite lives under `tests/security/*.test.ts` and covers auth redirects, automation event claiming, billing guards, connection rebinding, Composio failures/cache behavior, knowledge folders and session search, quota enforcement, middleware defaults, widget CORS/headers/validation, SSRF, privacy sanitization, and workspace ownership.
+- The root test command runs every `tests/**/*.test.ts` file. The suite includes the Milo experience contract plus security, authorization, automation, billing, connection, knowledge, performance, widget, privacy, and workspace regressions.
 - The root app and `apps/widget-v2` currently pass
   `npm audit --audit-level=moderate` with zero reported vulnerabilities; see
   `docs/runbooks/production-readiness.md`.
 - The top-level `/data-processing` and `/subprocessors` routes are compatibility redirects into `/settings/...`.
 - Self-service password reset is available from `/login/forgot-password` and authenticated Settings. The backup/restore and deploy verification runbook lives in `docs/runbooks/operations.md`.
 - Profile upsert on each authenticated request is optimized via `src/lib/app/profile-sync.ts`: the helper reads the existing profile first and skips the write when nothing has changed.
-- The dashboard home page (`/dashboard`) loads workspace summary stats (agents, widgets, connected apps, knowledge sources, leads, and recent conversations) server-side through `src/lib/dashboard/summary.ts`.
+- The dashboard home page (`/dashboard`) loads workspace summary data server-side through `src/lib/dashboard/summary.ts`, including Milo attention metrics, leads, unanswered questions, connections, Knowledge, recent conversations, and classic compatibility fields.
 - `dashboard_conversation_summaries` is a materialized Postgres table kept current by triggers on `widget_sessions`, `widget_session_messages`, and `widget_leads`. It powers the analytics inbox without per-request aggregations.
-- Performance indexes added in `20260525210001_app_slow_query_tuning.sql` and `20260526212615_dashboard_performance_quick_wins.sql` improve common dashboard and connection queries.
+- Performance indexes added in `20260525210632_app_slow_query_tuning.sql` and `20260526212615_dashboard_performance_quick_wins.sql` improve common dashboard and connection queries.
 
 ## License
 

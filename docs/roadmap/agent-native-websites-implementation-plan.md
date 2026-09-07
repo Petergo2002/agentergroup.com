@@ -1,10 +1,12 @@
 # Agent Sites on Widget V2: Implementation Plan
 
-Last updated: 2026-07-26
+Last updated: 2026-08-12
 
 Status: Proposed implementation sequence; awaiting approval; no application implementation is authorized by this document
 
 Parent roadmap: [Agent Sites on Widget V2](./agent-native-websites.md)
+
+Current-product relationship: Milo and Website Chat are already implemented. This proposed plan extends that same primary Milo into a native Agent Site delivery mode; it does not authorize a second agent, a second Website Chat, or a parallel conversation runtime.
 
 ## 1. Purpose
 
@@ -24,15 +26,15 @@ It must not create a parallel Agent Site product model.
 
 When the mandatory phases are complete, an operator can:
 
-1. open the existing Website & Widget area
-2. configure the current widget and its attached agent or agents
+1. open the existing Website Chat area
+2. configure Website Chat and its attached primary Milo
 3. enable an Agent Site, a Chat Widget, or both
 4. edit approved universal site content and SEO settings
 5. preview and publish safely
 6. use a platform URL
 7. optionally connect a verified custom domain
 8. see conversations, leads, analytics, and knowledge gaps by delivery channel
-9. improve the same agent intelligence for both delivery modes
+9. improve the same Milo intelligence for both delivery modes
 
 The public Agent Site will:
 
@@ -49,7 +51,7 @@ There are **seven mandatory phases**, numbered Phase 0 through Phase 6:
 0. Confirm and protect the foundation
 1. Shared delivery foundation
 2. SEO-ready Agent Site
-3. Website & Widget management UI
+3. Website Chat & Agent Site management UI
 4. Custom domains
 5. Analytics and governed improvement
 6. Hardening and limited launch
@@ -167,7 +169,7 @@ Phase 2
     -> WP-2E SEO, accessibility, and fallback gate
 
 Phase 3
-  WP-3A Website & Widget information architecture
+  WP-3A Website Chat & Agent Site information architecture
     -> WP-3B Agent Site and Content/SEO management
     -> WP-3C Chat Widget and shared configuration
     -> WP-3D Preview, publish, and deployment UX
@@ -637,7 +639,7 @@ Disable public site delivery and retain the current hosted Widget V2 URL accordi
 
 The platform-hosted Agent Site is production-like for an internal/private test widget before Phase 3 management UI is exposed.
 
-## 11. Phase 3 — Website & Widget Management UI
+## 11. Phase 3 — Website Chat & Agent Site Management UI
 
 ### Goal
 
@@ -647,7 +649,7 @@ Evolve the current Widget pages into a clear management experience for both deli
 
 #### Work
 
-- rename the customer-facing area to `Website & Widget` or the final approved label
+- extend the customer-facing `Website Chat` area with an `Agent Site` delivery section or use the final approved combined label
 - keep `/widgets` routes initially to avoid unnecessary redirects
 - update list cards to show Agent Site, Chat Widget, publication, and sync state
 - define detail navigation with one job per destination

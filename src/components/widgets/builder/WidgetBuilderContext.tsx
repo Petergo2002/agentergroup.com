@@ -14,6 +14,7 @@ import { useParams } from 'next/navigation';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { createClient } from '@/lib/supabase/client';
+import { useAppContext } from '@/components/app/AppContext';
 import type {
   AgentRecord,
   WidgetDraftPreviewInput,
@@ -101,6 +102,7 @@ interface WidgetBuilderContextValue {
   activeTab: WidgetBuilderTab;
   draftPreview: DraftPreviewState | null;
   previewStatus: 'idle' | 'loading' | 'ready' | 'error';
+  isPrimaryMiloWidget: boolean;
   
   // Setters
   setForm: React.Dispatch<React.SetStateAction<WidgetFormState | null>>;
@@ -296,7 +298,12 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
   const params = useParams<{ id: string }>();
   const { t } = useLanguage();
   const { showToast } = useToast();
+  const { workspace } = useAppContext();
   const widgetId = params.id;
+  const isPrimaryMiloWidget =
+    process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== 'false' &&
+    workspace.product_experience === 'milo' &&
+    workspace.primary_widget_id === widgetId;
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const draftPreviewRevisionRef = useRef<string | null>(null);
 
@@ -575,6 +582,7 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
     activeTab,
     draftPreview,
     previewStatus,
+    isPrimaryMiloWidget,
     setForm,
     setAttachedAgents,
     setActiveTab,

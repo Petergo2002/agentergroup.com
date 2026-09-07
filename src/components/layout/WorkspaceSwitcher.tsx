@@ -167,19 +167,24 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
                   key={ws.id}
                   onClick={() => handleSwitchWorkspace(ws.id)}
                   disabled={isActive || isSwitching}
-                  className={`depth-nav-item group/ws-item flex w-full items-center gap-2.5 rounded-lg border px-2 py-2 text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  className={`depth-nav-item group/ws-item flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     isActive
-                      ? 'depth-nav-item-active border-primary/15 bg-primary/[0.08] text-primary'
+                      ? 'depth-nav-item-active border-primary/20 border-l-2 border-l-primary bg-primary/[0.08] text-primary shadow-xs'
                       : 'border-transparent text-on-surface-variant hover:border-outline-variant/12 hover:bg-on-surface/[0.04] hover:text-on-surface'
                   }`}
                 >
-                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${isActive ? 'bg-primary/10' : 'bg-surface-container-high group-hover/ws-item:bg-surface-container-highest'}`}>
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${isActive ? 'bg-primary/15' : 'bg-surface-container-high group-hover/ws-item:bg-surface-container-highest'}`}>
                     <Building2 className={`h-3.5 w-3.5 transition-transform duration-200 ${isActive ? 'text-primary' : 'text-on-surface-variant group-hover/ws-item:text-on-surface'}`} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={`truncate text-[13px] transition-all duration-200 ${isActive ? 'font-semibold' : 'font-medium'}`}>{ws.name}</p>
+                    <p className={`truncate text-[13px] transition-all duration-200 ${isActive ? 'font-bold' : 'font-medium'}`}>{ws.name}</p>
                   </div>
-                  {isActive && <Check className="h-4 w-4 shrink-0 text-primary animate-in zoom-in-75 duration-300" />}
+                  {isActive ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary uppercase tracking-wider">
+                      <Check className="h-3 w-3 shrink-0 text-primary animate-in zoom-in-75 duration-300" />
+                      Active
+                    </span>
+                  ) : null}
                 </button>
               );
             })}

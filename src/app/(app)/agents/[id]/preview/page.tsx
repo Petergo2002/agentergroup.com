@@ -99,7 +99,12 @@ export default function AgentPreviewPage() {
   const { t, language } = useLanguage();
   const { showToast } = useToast();
   const agentId = params.id;
+  const isPrimaryMilo =
+    process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== 'false' &&
+    workspace.product_experience === 'milo' &&
+    workspace.primary_customer_agent_id === agentId;
   const [agent, setAgent] = useState<AgentRecord | null>(null);
+  const displayAgentName = isPrimaryMilo ? 'Milo' : agent?.name || t('assistants.agentFallback');
   const [, setConnections] = useState<ConnectionRecord[]>([]);
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceRecord[]>([]);
   const [, setThreads] = useState<ThreadRecord[]>([]);
@@ -590,11 +595,11 @@ export default function AgentPreviewPage() {
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/60">
-                {t('agentPreview.blueprint')}
+                {isPrimaryMilo ? t('agentBuilder.miloBuilder') : t('agentPreview.blueprint')}
               </span>
               <span className="text-on-surface-variant/20 text-[10px]">/</span>
               <h1 className="font-headline text-xl font-bold tracking-tight text-on-surface">
-                {agent?.name || t('assistants.agentFallback')}
+                {displayAgentName}
               </h1>
               {agent ? (
                 <div className="ml-3 flex items-center gap-1.5 rounded-full bg-primary/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
@@ -624,7 +629,7 @@ export default function AgentPreviewPage() {
           <div className="h-4 w-[1px] bg-outline-variant/20" />
 
           <button
-            onClick={() => void createThread(agent?.name)}
+            onClick={() => void createThread(displayAgentName)}
             className="h-10 px-6 rounded-2xl border border-outline-variant/15 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:bg-surface-container transition-all active:scale-95"
           >
             {t('agentPreview.newSession')}
@@ -654,7 +659,7 @@ export default function AgentPreviewPage() {
                 </h2>
                 <p className="text-on-surface-variant/60 leading-relaxed text-sm">
                   {t('agentPreview.startConversationDescription', {
-                    name: agent?.name || t('assistants.agentFallback'),
+                    name: displayAgentName,
                   })}
                 </p>
               </div>
@@ -761,7 +766,7 @@ export default function AgentPreviewPage() {
               <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
             </div>
             <h2 className="font-headline text-xl font-bold text-on-surface tracking-tight leading-tight">
-              {agent?.name || t('common.loading')}
+              {agent ? displayAgentName : t('common.loading')}
             </h2>
             <p className="mt-3 text-xs leading-relaxed text-on-surface-variant/70 min-h-[3em]">
               {agent?.description || t('analytics.monitoringSession')}

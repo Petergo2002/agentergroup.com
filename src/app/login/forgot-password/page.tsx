@@ -35,16 +35,22 @@ export default function ForgotPasswordPage() {
 
       {/* Left Column: Symmetrical, Pristine Minimalist Typographic Branding */}
       <section className="relative hidden lg:flex bg-[#050505] text-[#f5f1eb] p-16 xl:p-24 flex-col justify-between overflow-hidden border-r border-[#161616] h-full">
-        {/* Top Header Row - Massive Logo in natural beautiful color */}
         <div className="relative z-10 flex items-center justify-between">
-          <Image
-            src="/dashboardlogo.svg"
-            alt="Agentergroup"
-            width={840}
-            height={279}
-            priority
-            className="h-20 lg:h-24 xl:h-28 w-auto object-contain object-left max-w-full"
-          />
+          <Link
+            href="/"
+            title="Agentergroup Home"
+            aria-label="Back to landing page"
+            className="group inline-flex items-center transition-all duration-200 hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5c00] rounded-xl"
+          >
+            <Image
+              src="/dashboardlogo.svg"
+              alt="Agentergroup"
+              width={840}
+              height={279}
+              priority
+              className="h-20 lg:h-24 xl:h-28 w-auto object-contain object-left max-w-full transition-transform duration-200 group-hover:scale-[1.02]"
+            />
+          </Link>
         </div>
 
         {/* Super Simple Pure Typographic Headline Block with vast negative space */}
@@ -73,14 +79,21 @@ export default function ForgotPasswordPage() {
 
         {/* Mobile Header Banner - Uses clean natural logo matching unified dark theme */}
         <div className="flex lg:hidden items-center justify-between mb-12">
-          <Image
-            src="/dashboardlogo.svg"
-            alt="Agentergroup"
-            width={840}
-            height={279}
-            priority
-            className="h-12 w-auto object-contain object-left"
-          />
+          <Link
+            href="/"
+            title="Agentergroup Home"
+            aria-label="Back to landing page"
+            className="group inline-flex items-center transition-all duration-200 hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5c00] rounded-xl"
+          >
+            <Image
+              src="/dashboardlogo.svg"
+              alt="Agentergroup"
+              width={840}
+              height={279}
+              priority
+              className="h-12 w-auto object-contain object-left transition-transform duration-200 group-hover:scale-[1.02]"
+            />
+          </Link>
           <div className="rounded-[2px] bg-[#111] border border-[#222] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.15em] text-[#9d948a]/80">
             v2.4.0
           </div>

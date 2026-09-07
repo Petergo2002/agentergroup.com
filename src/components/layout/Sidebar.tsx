@@ -26,6 +26,8 @@ import { formatRelativeDate } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { SELF_SERVE_BILLING_ENABLED } from "@/lib/billing-mode";
+import { isMiloMode, isMiloNavItemActive } from "@/lib/milo/experience";
+import { MiloLogo } from "@/components/brand/MiloLogo";
 
 interface AnalyticsActivitySummary {
   agentName: string | null;
@@ -49,6 +51,7 @@ interface SidebarNavItem {
   name: string;
   href: string;
   icon: LucideIcon;
+  brandIcon?: "milo";
   beta?: boolean;
   hasAttention?: boolean;
   attentionSummary?: AnalyticsActivitySummary | null;
@@ -68,6 +71,10 @@ export function Sidebar({
   const { membership, workspace, subscription } = useAppContext();
   const { t, language } = useLanguage();
   const internalAssistantsEnabled = hasInternalAssistantsEnabled(workspace);
+  const miloMode = isMiloMode(
+    workspace,
+    process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false",
+  );
 
   // Defensive check for subscription
   const messagesUsed = subscription?.messages_used ?? 0;
@@ -78,7 +85,7 @@ export function Sidebar({
   );
   const isFreePlan = subscription?.plan_tier === "free";
 
-  const navGroups: Array<{ title: string; items: SidebarNavItem[] }> = [
+  const classicNavGroups: Array<{ title: string; items: SidebarNavItem[] }> = [
     {
       title: t("nav.groups.overview"),
       items: [
@@ -119,6 +126,29 @@ export function Sidebar({
       ],
     },
   ];
+  const miloNavGroups: Array<{ title: string; items: SidebarNavItem[] }> = [
+    {
+      title: t("nav.groups.main"),
+      items: [
+        { name: t("nav.dashboard"), href: "/dashboard", icon: LayoutGrid },
+        { name: t("nav.milo"), href: "/milo", icon: Bot, brandIcon: "milo" },
+        { name: t("nav.websiteChat"), href: "/website-chat", icon: MessageSquare },
+      ],
+    },
+    {
+      title: t("nav.groups.grow"),
+      items: [
+        { name: t("nav.knowledge"), href: "/knowledge", icon: Database },
+        { name: t("nav.leads"), href: "/leads", icon: Users, badgeCount: newLeadCount },
+        { name: t("nav.improveMilo"), href: "/questions", icon: CircleHelp },
+        { name: t("nav.analytics"), href: "/analytics", icon: BarChart3, hasAttention: analyticsHasNewActivity, attentionSummary: analyticsActivitySummary },
+      ],
+    },
+    ...(subscription?.integrations_enabled
+      ? [{ title: t("nav.groups.connect"), items: [{ name: t("nav.connections"), href: "/connections", icon: Network }] }]
+      : []),
+  ];
+  const navGroups = miloMode ? miloNavGroups : classicNavGroups;
 
   return (
     <aside
@@ -131,7 +161,12 @@ export function Sidebar({
       }`}
     >
       <div className={`px-4 pt-6 pb-4 flex flex-col items-center transition-all duration-300 ${isCollapsed && !mobile ? 'gap-6' : 'gap-5'}`}>
-        <Link href="/dashboard" className="group relative flex flex-col items-center shrink-0">
+        <Link
+          href="/"
+          title="Agentergroup - Back to landing page"
+          aria-label="Agentergroup - Back to landing page"
+          className="group relative flex flex-col items-center shrink-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
           <div className="flex items-center justify-center shrink-0">
             <Image
               src="/svgfavicon.svg"
@@ -191,7 +226,9 @@ export function Sidebar({
             )}
             
             {group.items.map((item) => {
-              const isActive = pathname?.startsWith(item.href);
+              const isActive = miloMode
+                ? isMiloNavItemActive(pathname ?? "", item.href, workspace)
+                : pathname?.startsWith(item.href);
               const Icon = item.icon;
               const hasAttention = Boolean(item.hasAttention && !isActive);
               const badgeCount = Math.max(0, item.badgeCount ?? 0);
@@ -236,10 +273,18 @@ export function Sidebar({
                       : "border-transparent text-on-surface-variant hover:border-outline-variant/12 hover:bg-on-surface/[0.04] hover:text-on-surface"
                   }`}
                 >
-                  <Icon
-                    className={`h-[1.125rem] w-[1.125rem] shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-primary scale-105" : "text-on-surface-variant/70 group-hover:text-on-surface"}`}
-                    strokeWidth={isActive ? 2.5 : 2}
-                  />
+                  {item.brandIcon === "milo" ? (
+                    <MiloLogo
+                      size={20}
+                      glowing
+                      className={`h-5 w-5 transition-transform duration-200 group-hover:scale-110 ${isActive ? "scale-105" : "opacity-85 group-hover:opacity-100"}`}
+                    />
+                  ) : (
+                    <Icon
+                      className={`h-[1.125rem] w-[1.125rem] shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-primary scale-105" : "text-on-surface-variant/70 group-hover:text-on-surface"}`}
+                      strokeWidth={isActive ? 2.5 : 2}
+                    />
+                  )}
                   {hasAttention && isCollapsed && !mobile ? (
                     <span className="absolute right-2.5 top-2.5 flex h-2.5 w-2.5" aria-hidden="true">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
@@ -301,7 +346,7 @@ export function Sidebar({
 
                   {/* Tooltip for collapsed mode */}
                   {isCollapsed && !mobile && (
-                    <div className="fixed left-[70px] max-w-[260px] rounded-md bg-on-surface px-3 py-2 text-xs font-bold text-background opacity-0 shadow-xl ring-1 ring-outline-variant pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 z-[9999]">
+                    <div className="fixed left-[68px] max-w-[260px] rounded-lg bg-on-surface/95 backdrop-blur-md px-3 py-2 text-xs font-bold text-background opacity-0 shadow-2xl ring-1 ring-outline-variant pointer-events-none transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1 group-focus-visible:opacity-100 z-[9999]">
                       <div className="whitespace-nowrap">
                         {item.name}
                         {item.beta && ` (${t("common.beta")})`}

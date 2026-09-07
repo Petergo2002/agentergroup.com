@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Circle,
+  CircleDot,
   Clock3,
   Copy,
   ExternalLink,
@@ -65,6 +66,8 @@ const copy = {
     title: "Questions",
     description: "Review visitor questions the agent could not answer confidently.",
     search: "Search questions, pages, agents",
+    miloDescription: "Review visitor questions Milo could not answer confidently.",
+    miloSearch: "Search questions or pages",
     status: "Status",
     agent: "Agent",
     widget: "Widget",
@@ -78,19 +81,24 @@ const copy = {
     lowestConfidence: "Lowest confidence",
     emptyTitle: "No open questions",
     emptyBody: "New unanswered visitor questions will appear here after the agent needs help.",
+    miloEmptyBody: "New unanswered visitor questions will appear here when Milo needs your help.",
     noResultsTitle: "No questions match these filters",
     noResultsBody: "Clear search or filters to return to the full queue.",
     clearFilters: "Clear filters",
     loadErrorTitle: "Questions could not be loaded",
     retry: "Retry",
+    refresh: "Refresh",
     selectedEmpty: "Select a question",
     selectedEmptyBody: "Choose a row to review details and publish a verified answer.",
     previousAnswer: "Assistant answer",
+    miloPreviousAnswer: "Milo's answer",
     details: "Details",
     verifiedAnswer: "Verified answer",
     answerPlaceholder: "Write the reusable, customer-approved answer...",
     publish: "Publish to agent",
+    miloPublish: "Teach Milo",
     updateAnswer: "Update answer",
+    miloUpdateAnswer: "Update Milo's answer",
     publishing: "Publishing",
     dismiss: "Dismiss",
     reopen: "Reopen",
@@ -107,9 +115,17 @@ const copy = {
     visibilityHelpLabel: "What do these options mean?",
     visibilityHelpAgentOnly: "Agent only: added to this agent's knowledge for future chats, but not marked as public copy.",
     visibilityHelpPublicReady: "Public ready: polished enough to reuse later in a public FAQ or help page. It still only publishes to the agent right now.",
+    miloVisibilityHelpAgentOnly: "Milo only: added to Milo's knowledge for future chats, but not marked as public copy.",
+    miloVisibilityHelpPublicReady: "Public ready: polished enough to reuse later in a public FAQ or help page. It still only teaches Milo right now.",
     agentOnly: "Agent only",
+    miloAgentOnly: "Milo only",
     publicReady: "Public ready",
     addedToKnowledge: "Added to agent knowledge",
+    miloAddedToKnowledge: "Added to Milo's knowledge",
+    statusOpen: "Open",
+    statusAnswered: "Answered",
+    statusDismissed: "Dismissed",
+    statusDuplicate: "Duplicate",
     draftKept: "Your draft stayed in the editor.",
     saved: "Saved",
     published: "Published",
@@ -122,6 +138,8 @@ const copy = {
     title: "Frågor",
     description: "Granska besökarfrågor som agenten inte kunde svara säkert på.",
     search: "Sök frågor, sidor, agenter",
+    miloDescription: "Granska besökarfrågor som Milo inte kunde svara säkert på.",
+    miloSearch: "Sök frågor eller sidor",
     status: "Status",
     agent: "Agent",
     widget: "Widget",
@@ -135,19 +153,24 @@ const copy = {
     lowestConfidence: "Lägst confidence",
     emptyTitle: "Inga öppna frågor",
     emptyBody: "Nya obesvarade besökarfrågor visas här när agenten behöver hjälp.",
+    miloEmptyBody: "Nya obesvarade besökarfrågor visas här när Milo behöver din hjälp.",
     noResultsTitle: "Inga frågor matchar filtren",
     noResultsBody: "Rensa sökningen eller filtren för att se hela kön.",
     clearFilters: "Rensa filter",
     loadErrorTitle: "Frågorna kunde inte laddas",
     retry: "Försök igen",
+    refresh: "Uppdatera",
     selectedEmpty: "Välj en fråga",
     selectedEmptyBody: "Välj en rad för att granska detaljer och publicera ett verifierat svar.",
     previousAnswer: "Agentens svar",
+    miloPreviousAnswer: "Milos svar",
     details: "Detaljer",
     verifiedAnswer: "Verifierat svar",
     answerPlaceholder: "Skriv det återanvändbara, kundgodkända svaret...",
     publish: "Publicera till agent",
+    miloPublish: "Lär Milo",
     updateAnswer: "Uppdatera svar",
+    miloUpdateAnswer: "Uppdatera Milos svar",
     publishing: "Publicerar",
     dismiss: "Avfärda",
     reopen: "Öppna igen",
@@ -164,9 +187,17 @@ const copy = {
     visibilityHelpLabel: "Vad betyder alternativen?",
     visibilityHelpAgentOnly: "Endast agent: läggs till i agentens kunskap för framtida chattar, men markeras inte som publik text.",
     visibilityHelpPublicReady: "Publik redo: godkänt nog att senare återanvändas i en publik FAQ eller hjälpsida. Just nu publiceras det ändå bara till agenten.",
+    miloVisibilityHelpAgentOnly: "Endast Milo: läggs till i Milos kunskap för framtida chattar, men markeras inte som publik text.",
+    miloVisibilityHelpPublicReady: "Publik redo: godkänt nog att senare återanvändas i en publik FAQ eller hjälpsida. Just nu lär det bara Milo.",
     agentOnly: "Endast agent",
+    miloAgentOnly: "Endast Milo",
     publicReady: "Publik redo",
     addedToKnowledge: "Tillagd i agentens kunskap",
+    miloAddedToKnowledge: "Tillagd i Milos kunskap",
+    statusOpen: "Öppen",
+    statusAnswered: "Besvarad",
+    statusDismissed: "Avfärdad",
+    statusDuplicate: "Dubblett",
     draftKept: "Utkastet ligger kvar i editorn.",
     saved: "Sparat",
     published: "Publicerat",
@@ -177,13 +208,6 @@ const copy = {
 };
 
 type SortMode = "newest" | "oldest" | "confidence_desc" | "confidence_asc";
-
-const statusLabels: Record<UnansweredQueryStatus, string> = {
-  open: "Open",
-  answered: "Answered",
-  dismissed: "Dismissed",
-  duplicate: "Duplicate",
-};
 
 function buildQuestionsUrl(
   status: UnansweredQueryStatus | "all",
@@ -204,14 +228,64 @@ function buildQuestionsUrl(
   return `/api/flywheel/unanswered?${params.toString()}`;
 }
 
+const statusBoxConfig: Record<
+  UnansweredQueryStatus,
+  {
+    icon: typeof Circle;
+    activeBorder: string;
+    activeBg: string;
+    activeRing: string;
+    iconColor: string;
+    activeText: string;
+    indicatorColor: string;
+  }
+> = {
+  open: {
+    icon: CircleDot,
+    activeBorder: "border-primary/35",
+    activeBg: "bg-primary/[0.08]",
+    activeRing: "ring-1 ring-primary/20",
+    iconColor: "text-primary",
+    activeText: "text-primary",
+    indicatorColor: "bg-primary",
+  },
+  answered: {
+    icon: CheckCircle2,
+    activeBorder: "border-emerald-500/35",
+    activeBg: "bg-emerald-500/[0.08]",
+    activeRing: "ring-1 ring-emerald-500/20",
+    iconColor: "text-emerald-500 dark:text-emerald-400",
+    activeText: "text-emerald-600 dark:text-emerald-300",
+    indicatorColor: "bg-emerald-500",
+  },
+  dismissed: {
+    icon: XCircle,
+    activeBorder: "border-outline-variant/40",
+    activeBg: "bg-surface-container-high/80",
+    activeRing: "ring-1 ring-outline-variant/30",
+    iconColor: "text-on-surface-variant",
+    activeText: "text-on-surface",
+    indicatorColor: "bg-on-surface-variant/60",
+  },
+  duplicate: {
+    icon: Copy,
+    activeBorder: "border-amber-500/35",
+    activeBg: "bg-amber-500/[0.08]",
+    activeRing: "ring-1 ring-amber-500/20",
+    iconColor: "text-amber-500 dark:text-amber-400",
+    activeText: "text-amber-600 dark:text-amber-300",
+    indicatorColor: "bg-amber-500",
+  },
+};
+
 function statusTone(status: UnansweredQueryStatus) {
   switch (status) {
     case "open":
-      return "border-slate-300/30 bg-slate-500/10 text-slate-700 dark:text-slate-200";
+      return "border-primary/25 bg-primary/10 text-primary";
     case "answered":
       return "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
     case "duplicate":
-      return "border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-300";
+      return "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300";
     case "dismissed":
       return "border-outline-variant/20 bg-surface-container text-on-surface-variant";
   }
@@ -285,7 +359,29 @@ export default function QuestionsPageClient({
 }: QuestionsPageClientProps) {
   const { user, workspace } = useAppContext();
   const { language } = useLanguage();
-  const text = language === "sv" ? copy.sv : copy.en;
+  const languageCopy = language === "sv" ? copy.sv : copy.en;
+  const miloMode = workspace.product_experience === "milo" && process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false";
+  const text = miloMode
+    ? {
+        ...languageCopy,
+        description: languageCopy.miloDescription,
+        search: languageCopy.miloSearch,
+        emptyBody: languageCopy.miloEmptyBody,
+        previousAnswer: languageCopy.miloPreviousAnswer,
+        publish: languageCopy.miloPublish,
+        updateAnswer: languageCopy.miloUpdateAnswer,
+        visibilityHelpAgentOnly: languageCopy.miloVisibilityHelpAgentOnly,
+        visibilityHelpPublicReady: languageCopy.miloVisibilityHelpPublicReady,
+        agentOnly: languageCopy.miloAgentOnly,
+        addedToKnowledge: languageCopy.miloAddedToKnowledge,
+      }
+    : languageCopy;
+  const statusLabels: Record<UnansweredQueryStatus, string> = {
+    open: text.statusOpen,
+    answered: text.statusAnswered,
+    dismissed: text.statusDismissed,
+    duplicate: text.statusDuplicate,
+  };
   const { showToast } = useToast();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<UnansweredQueryStatus | "all">("open");
@@ -576,60 +672,101 @@ export default function QuestionsPageClient({
   return (
     <div className="app-page app-page-wide app-page-compact">
       <header className="app-section-header">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 max-w-xl">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
-                {text.title}
+                {miloMode ? (language === "sv" ? "Förbättra Milo" : "Improve Milo") : text.title}
               </h1>
-              <span className="rounded-full border border-primary/15 bg-primary/[0.08] px-2.5 py-1 text-xs font-semibold text-primary">
-                {counts.open} open
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[0.08] px-2.5 py-0.5 text-xs font-semibold text-primary">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                {counts.open} {language === "sv" ? "öppna" : "open"}
               </span>
             </div>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
+            <p className="mt-2 text-sm leading-6 text-on-surface-variant/75">
               {text.description}
             </p>
-            <p className="mt-2 truncate text-xs font-medium text-on-surface-variant/60">
+            <p className="mt-1.5 truncate text-xs font-medium text-on-surface-variant/60">
               {workspaceName}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
             {(["open", "answered", "dismissed", "duplicate"] as UnansweredQueryStatus[]).map(
-              (status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setStatusFilter(status)}
-                  className={`depth-button rounded-xl border px-3 py-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
-                    statusFilter === status
-                      ? "depth-button-primary border-primary/25 bg-primary/[0.08]"
-                      : "border-outline-variant/15 bg-surface-container-low hover:bg-surface-container"
-                  }`}
-                >
-                  <span className="block text-lg font-bold text-on-surface">
-                    {counts[status]}
-                  </span>
-                  <span className="text-xs font-medium text-on-surface-variant">
-                    {statusLabels[status]}
-                  </span>
-                </button>
-              ),
+              (status) => {
+                const config = statusBoxConfig[status];
+                const Icon = config.icon;
+                const isActive = statusFilter === status;
+
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => setStatusFilter(status)}
+                    className={`group relative flex min-w-[120px] flex-col justify-between rounded-xl border p-3.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                      isActive
+                        ? `${config.activeBorder} ${config.activeBg} ${config.activeRing} shadow-xs`
+                        : "border-outline-variant/15 bg-surface-container-low/60 hover:border-outline-variant/30 hover:bg-surface-container/75"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`truncate text-xs font-semibold transition-colors ${
+                          isActive
+                            ? "text-on-surface"
+                            : "text-on-surface-variant group-hover:text-on-surface"
+                        }`}
+                      >
+                        {statusLabels[status]}
+                      </span>
+                      <Icon
+                        className={`h-3.5 w-3.5 shrink-0 transition-colors ${
+                          isActive
+                            ? config.iconColor
+                            : "text-on-surface-variant/50 group-hover:text-on-surface-variant"
+                        }`}
+                      />
+                    </div>
+                    <div className="mt-2.5 flex items-baseline justify-between">
+                      <span
+                        className={`font-headline text-2xl font-bold tabular-nums tracking-tight transition-colors ${
+                          isActive
+                            ? config.activeText
+                            : "text-on-surface group-hover:text-on-surface"
+                        }`}
+                      >
+                        {counts[status]}
+                      </span>
+                      {isActive && (
+                        <span className={`h-1.5 w-1.5 rounded-full ${config.indicatorColor}`} />
+                      )}
+                    </div>
+                  </button>
+                );
+              },
             )}
           </div>
         </div>
       </header>
 
-      <section className="app-filter-panel p-3">
-        <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_160px_180px_180px_180px_auto]">
+      <section className="app-filter-panel p-2.5 sm:p-3">
+        <div
+          className={`grid gap-2.5 sm:gap-3 ${
+            miloMode
+              ? "grid-cols-1 sm:grid-cols-[1fr_150px_160px_auto]"
+              : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(200px,1fr)_150px_160px_160px_160px_auto]"
+          }`}
+        >
           <label className="relative min-w-0">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/45" />
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/45" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               type="search"
+              aria-label={text.search}
               placeholder={text.search}
-              className="depth-input h-11 w-full rounded-xl border border-transparent bg-surface-container-low pl-11 pr-4 text-sm font-medium text-on-surface outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/20 focus:bg-background focus:ring-2 focus:ring-primary/15"
+              className="depth-input h-10 w-full rounded-xl border border-transparent bg-surface-container-low pl-10 pr-4 text-sm font-medium text-on-surface outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/25 focus:bg-background focus:ring-2 focus:ring-primary/15"
             />
           </label>
 
@@ -637,53 +774,59 @@ export default function QuestionsPageClient({
             <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/45" />
             <select
               value={statusFilter}
+              aria-label={text.status}
               onChange={(event) =>
                 setStatusFilter(event.target.value as UnansweredQueryStatus | "all")
               }
-              className="depth-input h-11 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-9 pr-8 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
+              className="depth-input h-10 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-9 pr-8 text-sm font-medium text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
             >
               <option value="all">{text.allStatuses}</option>
-              <option value="open">Open</option>
-              <option value="answered">Answered</option>
-              <option value="dismissed">Dismissed</option>
-              <option value="duplicate">Duplicate</option>
+              <option value="open">{statusLabels.open}</option>
+              <option value="answered">{statusLabels.answered}</option>
+              <option value="dismissed">{statusLabels.dismissed}</option>
+              <option value="duplicate">{statusLabels.duplicate}</option>
             </select>
           </label>
 
-          <select
-            value={agentFilter}
-            onChange={(event) => setAgentFilter(event.target.value)}
-            className="depth-input h-11 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
-            aria-label={text.agent}
-          >
-            <option value="">{text.allAgents}</option>
-            {agents.map((agent) => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name}
-              </option>
-            ))}
-          </select>
+          {!miloMode && (
+            <select
+              value={agentFilter}
+              onChange={(event) => setAgentFilter(event.target.value)}
+              className="depth-input h-10 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-medium text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
+              aria-label={text.agent}
+            >
+              <option value="">{text.allAgents}</option>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name}
+                </option>
+              ))}
+            </select>
+          )}
 
-          <select
-            value={widgetFilter}
-            onChange={(event) => setWidgetFilter(event.target.value)}
-            className="depth-input h-11 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
-            aria-label={text.widget}
-          >
-            <option value="">{text.allWidgets}</option>
-            {widgets.map((widget) => (
-              <option key={widget.id} value={widget.id}>
-                {widget.name}
-              </option>
-            ))}
-          </select>
+          {!miloMode && (
+            <select
+              value={widgetFilter}
+              onChange={(event) => setWidgetFilter(event.target.value)}
+              className="depth-input h-10 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 text-sm font-medium text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
+              aria-label={text.widget}
+            >
+              <option value="">{text.allWidgets}</option>
+              {widgets.map((widget) => (
+                <option key={widget.id} value={widget.id}>
+                  {widget.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           <label className="relative">
             <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/45" />
             <select
               value={sortMode}
+              aria-label={text.sort}
               onChange={(event) => setSortMode(event.target.value as SortMode)}
-              className="depth-input h-11 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-9 pr-8 text-sm font-semibold text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
+              className="depth-input h-10 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-9 pr-8 text-sm font-medium text-on-surface outline-none focus:border-primary/25 focus:ring-2 focus:ring-primary/15"
             >
               <option value="newest">{text.newest}</option>
               <option value="oldest">{text.oldest}</option>
@@ -695,15 +838,15 @@ export default function QuestionsPageClient({
           <button
             type="button"
             onClick={() => void refreshAll()}
-            className="depth-button inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="depth-button inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3.5 text-sm font-medium text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             <RefreshCw className={`h-4 w-4 ${isValidating ? "animate-spin" : ""}`} />
-            {text.retry}
+            {text.refresh}
           </button>
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
+      <div className={`grid gap-5 ${filteredQuestions.length > 0 ? "xl:grid-cols-[minmax(0,1fr)_430px]" : ""}`}>
         <section className="min-w-0 space-y-3">
           {isLoading && !response ? (
             <QuestionSkeleton />
@@ -760,11 +903,14 @@ export default function QuestionsPageClient({
                       ) : question.status === "dismissed" ? (
                         <XCircle className="h-4 w-4 shrink-0 text-on-surface-variant/50" />
                       ) : question.status === "duplicate" ? (
-                        <Copy className="h-4 w-4 shrink-0 text-violet-500" />
+                        <Copy className="h-4 w-4 shrink-0 text-amber-500" />
                       ) : (
                         <Circle className="h-4 w-4 shrink-0 text-primary" />
                       )}
-                      <h3 className="truncate text-sm font-semibold text-on-surface group-hover:text-primary">
+                      <h3
+                        title={question.question}
+                        className="truncate text-sm font-semibold text-on-surface group-hover:text-primary"
+                      >
                         {question.question}
                       </h3>
                     </div>
@@ -775,7 +921,7 @@ export default function QuestionsPageClient({
                       {question.page_url ? (
                         <>
                           <span className="h-1 w-1 rounded-full bg-on-surface-variant/30" />
-                          <span className="max-w-[280px] truncate">{question.page_url}</span>
+                          <span title={question.page_url} className="max-w-[280px] truncate">{question.page_url}</span>
                         </>
                       ) : null}
                     </div>
@@ -805,7 +951,7 @@ export default function QuestionsPageClient({
           )}
         </section>
 
-        <aside className="depth-panel min-w-0 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest xl:sticky xl:top-6 xl:max-h-[calc(100vh-48px)] xl:overflow-hidden">
+        <aside className={`depth-panel min-w-0 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest xl:sticky xl:top-6 xl:max-h-[calc(100vh-48px)] xl:overflow-hidden ${filteredQuestions.length === 0 ? "hidden" : ""}`}>
           {!selectedQuestion ? (
             <div className="p-6">
               <EmptyState title={text.selectedEmpty} body={text.selectedEmptyBody} />

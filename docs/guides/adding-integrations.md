@@ -1,8 +1,8 @@
 # End-to-End Integration Guide — Adding New Toolkits
 
-Last updated: 2026-05-20
+Last updated: 2026-08-12
 
-This document defines the complete workflow for adding a new Composio toolkit (integration) to the Agenter platform. Follow these steps in order to ensure the integration is registered, secured, and properly exposed in the Agent Builder and Runtime.
+This document defines the complete workflow for adding a new Composio toolkit (integration) to Agentergroup. In the default product experience, Connections authorizes the workspace account and Milo Builder selects the approved actions Milo may use. The underlying implementation remains the shared Agent Builder and runtime, so classic and Automation Agent compatibility must be preserved.
 
 This guide covers live action toolkits. For external event triggers, also read `docs/guides/automation-agents.md`.
 

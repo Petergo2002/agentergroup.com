@@ -1,6 +1,6 @@
 # Agent Builder
 
-Last updated: 2026-06-24
+Last updated: 2026-08-12
 
 ## Purpose
 
@@ -18,7 +18,9 @@ This doc should be updated in the same PR whenever builder behavior changes.
 
 ## Product Role
 
-The product centers on the `agent`, not the canvas itself.
+The default customer product centers on Milo, not an agent inventory or the canvas itself. Milo Builder is the existing agent Builder rendered for `workspaces.primary_customer_agent_id` through the stable `/milo` route.
+
+Internally, the builder still centers on an `agent` record. That separation is intentional: the Milo facade simplifies the customer experience while drafts, versions, model choice, tools, Knowledge attachments, preview, publishing, and rollback continue to use the proven agent architecture.
 
 The builder is the editing surface for configuring an agent's:
 
@@ -39,16 +41,32 @@ It is also not a reporting surface:
 - Activity shows per-agent automation run history and troubleshooting.
 - Analytics shows workspace-level performance, trends, and reporting.
 
+### Milo-mode presentation
+
+When the loaded agent is the active workspace's primary Milo:
+
+- the editor runs in the focused full-screen app shell
+- the header and tabs use Milo product language
+- save/publish actions describe updating Milo
+- preview is labeled as testing Milo
+- the OpenRouter model picker remains visible and saved normally
+- instructions, timezone, conversation starters, Knowledge, tools, and end-chat behavior remain available
+- Agent Library publication and primary-agent destructive lifecycle actions are hidden or rejected
+
+Milo mode does not create a second builder, definition format, or runtime. Automation Agents and classic non-primary agents retain their existing presentation and behavior.
+
 ## Route and Main Files
 
 Primary route:
 
+- `src/app/(app)/milo/page.tsx` (stable Milo entry and primary-resource resolver)
 - `src/app/(app)/agents/[id]/builder/page.tsx`
 
 Related files:
 
 - `src/components/modals/CreateAgentModal.tsx`
 - `src/components/agents/AgentViewTabs.tsx`
+- `src/lib/milo/experience.ts`
 - `src/lib/agents/defaults.ts`
 - `src/lib/automation/executor.ts`
 - `src/lib/integrations.ts`

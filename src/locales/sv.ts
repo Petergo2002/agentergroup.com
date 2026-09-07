@@ -24,6 +24,7 @@ import { privacyPolicy } from "./sv/privacyPolicy";
 import { termsOfService } from "./sv/termsOfService";
 import { dataProcessing } from "./sv/dataProcessing";
 import { subprocessors } from "./sv/subprocessors";
+import { landing } from "./sv/landing";
 
 export const sv = {
   common,
@@ -51,4 +52,5 @@ export const sv = {
   termsOfService,
   dataProcessing,
   subprocessors,
+  landing,
 } satisfies Messages;

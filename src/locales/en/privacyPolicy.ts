@@ -81,7 +81,7 @@ export const privacyPolicy = {
     {
       title: "Contact",
       body: [
-        "For privacy-related questions, access requests, or deletion requests, contact Agentergroup support at info@agentergroup.com or through the website where this service was provided.",
+        "For privacy-related questions, access requests, or deletion requests, contact Agentergroup support at info@avenro.se or through the website where this service was provided.",
         "This policy may be updated from time to time as the product, providers, and legal requirements evolve.",
       ],
     },

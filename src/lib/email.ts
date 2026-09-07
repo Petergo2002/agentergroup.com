@@ -8,7 +8,7 @@ export function hasEmailEnv(): boolean {
 
 /** Returns the configured "from" address for transactional emails. */
 function getFromAddress(): string {
-  return process.env.EMAIL_FROM_ADDRESS ?? "Agentergroup <noreply@agentergroup.com>";
+  return process.env.EMAIL_FROM_ADDRESS ?? "Agentergroup <noreply@avenro.se>";
 }
 
 /** Creates a Resend client instance. */

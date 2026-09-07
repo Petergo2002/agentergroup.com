@@ -9,9 +9,12 @@ import type {
   WorkspaceRecord,
   WorkspaceSubscriptionRecord,
 } from "@/lib/types";
+import { provisionWorkspaceMilo } from "@/lib/milo/server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseLike = Pick<SupabaseClient<any>, "from">;
+
+const WORKSPACE_SELECT = "id, name, slug, description, owner_id, internal_assistants_enabled, automations_enabled, onboarding_completed, product_experience, primary_customer_agent_id, primary_widget_id";
 
 interface WorkspaceMembershipQuery {
   id: string;
@@ -151,7 +154,7 @@ export async function createWorkspaceForUser(
   const workspaceName = input?.name?.trim() || buildWorkspaceName(user);
   const workspaceDescription =
     input?.description?.trim() ||
-    "Primary workspace for managing agents, connections, and runs.";
+    "Primary workspace for Milo, Website Chat, connections, and knowledge.";
   const workspace = await createWorkspaceRecord(supabase, {
     ownerId: user.id,
     name: workspaceName,
@@ -161,6 +164,18 @@ export async function createWorkspaceForUser(
     workspaceId: workspace.id,
     userId: user.id,
   });
+
+  try {
+    const result = await provisionWorkspaceMilo({ workspaceId: workspace.id, actorId: user.id });
+    workspace.product_experience = "milo";
+    workspace.primary_customer_agent_id = result.agentId;
+    workspace.primary_widget_id = result.widgetId;
+  } catch (error) {
+    console.error("Milo provisioning failed during workspace creation", {
+      workspaceId: workspace.id,
+      code: error instanceof Error ? error.message : "milo_provision_failed",
+    });
+  }
 
   return {
     workspace,
@@ -177,7 +192,7 @@ async function loadOwnedWorkspaceBySlug(
 ) {
   const workspaceResult = await supabase
     .from("workspaces")
-    .select("id, name, slug, description, owner_id, internal_assistants_enabled, automations_enabled, onboarding_completed")
+    .select(WORKSPACE_SELECT)
     .eq("owner_id", input.ownerId)
     .eq("slug", input.slug)
     .maybeSingle();
@@ -194,7 +209,7 @@ async function createPrimaryWorkspaceForUser(
   user: User,
 ): Promise<AvailableWorkspace> {
   const workspaceName = buildWorkspaceName(user);
-  const workspaceDescription = "Primary workspace for managing agents, connections, and runs.";
+  const workspaceDescription = "Primary workspace for Milo, Website Chat, connections, and knowledge.";
   const slug = generateWorkspaceSlug(workspaceName, user.id.slice(0, 8));
 
   const workspaceInsertResult = await supabase
@@ -225,6 +240,18 @@ async function createPrimaryWorkspaceForUser(
     userId: user.id,
   });
 
+  try {
+    const result = await provisionWorkspaceMilo({ workspaceId: workspace.id, actorId: user.id });
+    workspace.product_experience = "milo";
+    workspace.primary_customer_agent_id = result.agentId;
+    workspace.primary_widget_id = result.widgetId;
+  } catch (error) {
+    console.error("Milo provisioning failed during primary workspace creation", {
+      workspaceId: workspace.id,
+      code: error instanceof Error ? error.message : "milo_provision_failed",
+    });
+  }
+
   return {
     workspace,
     membership,
@@ -238,7 +265,7 @@ async function loadWorkspaceMemberships(
   const membershipResult = await supabase
     .from("workspace_members")
     .select(
-      "id, workspace_id, user_id, role, created_at, workspace:workspaces(id, name, slug, description, owner_id, internal_assistants_enabled, automations_enabled, onboarding_completed)",
+      `id, workspace_id, user_id, role, created_at, workspace:workspaces(${WORKSPACE_SELECT})`,
     )
     .eq("user_id", userId);
 

@@ -3200,6 +3200,9 @@ export type Database = {
           name: string
           onboarding_completed: boolean
           owner_id: string
+          primary_customer_agent_id: string | null
+          primary_widget_id: string | null
+          product_experience: string
           slug: string
           updated_at: string
           website_agents_enabled: boolean
@@ -3214,6 +3217,9 @@ export type Database = {
           name: string
           onboarding_completed?: boolean
           owner_id: string
+          primary_customer_agent_id?: string | null
+          primary_widget_id?: string | null
+          product_experience?: string
           slug: string
           updated_at?: string
           website_agents_enabled?: boolean
@@ -3228,11 +3234,28 @@ export type Database = {
           name?: string
           onboarding_completed?: boolean
           owner_id?: string
+          primary_customer_agent_id?: string | null
+          primary_widget_id?: string | null
+          product_experience?: string
           slug?: string
           updated_at?: string
           website_agents_enabled?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "workspaces_primary_customer_agent_id_fkey"
+            columns: ["primary_customer_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspaces_primary_widget_id_fkey"
+            columns: ["primary_widget_id"]
+            isOneToOne: false
+            referencedRelation: "widgets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "workspaces_owner_id_fkey"
             columns: ["owner_id"]
@@ -3398,6 +3421,10 @@ export type Database = {
           p_timezone?: string
           p_workspace_id: string
         }
+        Returns: Json
+      }
+      provision_workspace_milo_v1: {
+        Args: { p_actor_id: string; p_workspace_id: string }
         Returns: Json
       }
       finalize_automation_provider_activation_v1: {
@@ -3742,4 +3769,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

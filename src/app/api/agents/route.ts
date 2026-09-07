@@ -107,6 +107,12 @@ export async function POST(request: Request) {
 
   const context = await ensureWorkspaceContext(supabase as never, user);
   const { requestId, name, surface, timezone } = parsed.data;
+  if (context.workspace.product_experience === "milo" && surface === "widget") {
+    return NextResponse.json(
+      { error: "This workspace already has Milo.", code: "milo_agent_already_exists" },
+      { status: 409 },
+    );
+  }
   const agentPayload = buildAgentPayload("custom", name, surface, timezone);
   const initialDefinition = buildInitialDefinition("custom", surface, timezone);
   const identityKind = surface === "widget" ? "legacy_widget" : surface;

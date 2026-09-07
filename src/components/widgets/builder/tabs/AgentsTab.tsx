@@ -5,14 +5,15 @@ import { Bot, UserCircle2 } from 'lucide-react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useWidgetBuilder } from '../WidgetBuilderContext';
 import { CreateAgentDropdown } from '@/components/agents/CreateAgentDropdown';
+import { MiloLogo } from '@/components/brand/MiloLogo';
 
-const fieldLabelClassName = 'text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1';
-const sectionDescClassName = 'text-sm text-on-surface-variant/60 leading-relaxed max-w-2xl';
-const inputFieldClassName = 'w-full rounded-[14px] border border-outline-variant/10 bg-background px-5 py-3.5 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/20 placeholder:text-on-surface-variant/30';
+const fieldLabelClassName = 'text-xs font-semibold text-on-surface-variant';
+const sectionDescClassName = 'max-w-2xl text-sm leading-relaxed text-on-surface-variant/70';
+const inputFieldClassName = 'w-full rounded-xl border border-outline-variant/20 bg-background px-4 py-3 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/15 placeholder:text-on-surface-variant/35';
 
 export function AgentsTab() {
   const { t } = useLanguage();
-  const { summary, attachedAgents, setAttachedAgents, addAgent, removeAgent, moveAgent } = useWidgetBuilder();
+  const { summary, attachedAgents, setAttachedAgents, addAgent, removeAgent, moveAgent, isPrimaryMiloWidget } = useWidgetBuilder();
 
   if (!summary) return null;
 
@@ -20,14 +21,23 @@ export function AgentsTab() {
     (agent) => !attachedAgents.some((item) => item.agentId === agent.id),
   );
 
+  const updateAttachedAgent = (
+    index: number,
+    update: (item: (typeof attachedAgents)[number]) => (typeof attachedAgents)[number],
+  ) => {
+    setAttachedAgents((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? update(item) : item)),
+    );
+  };
+
   return (
-    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
       {/* Attached Specialists */}
-      <section className="space-y-6">
+      <section className="space-y-4">
         <div className="space-y-1.5">
-          <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.agents.activeSpecialists')}</h2>
+          <h2 className="text-lg font-bold font-headline tracking-tight">{isPrimaryMiloWidget ? t('widgetBuilder.agents.miloChatTitle') : t('widgetBuilder.agents.activeSpecialists')}</h2>
           <p className={sectionDescClassName}>
-            {t('widgetBuilder.agents.activeSpecialistsDescription')}
+            {isPrimaryMiloWidget ? t('widgetBuilder.agents.miloChatDescription') : t('widgetBuilder.agents.activeSpecialistsDescription')}
           </p>
         </div>
 
@@ -35,27 +45,39 @@ export function AgentsTab() {
           {attachedAgents.map((item, index) => (
             <div 
               key={item.agentId} 
-              className="group relative rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm transition-all hover:border-primary/20 hover:shadow-md"
+              className="group relative rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm transition-all hover:border-primary/20"
             >
               <div className="flex flex-col gap-6 w-full">
                 {/* Agent Header */}
                 <div className="flex flex-wrap items-start justify-between gap-4 w-full">
                   <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-[1.2rem] bg-surface-container-low flex items-center justify-center border border-outline-variant/10">
-                      <Bot className="w-5 h-5 text-on-surface-variant/50" />
+                      {isPrimaryMiloWidget ? (
+                        <MiloLogo size={36} className="h-9 w-9" />
+                      ) : (
+                        <Bot className="h-5 w-5 text-on-surface-variant/50" />
+                      )}
                     </div>
                     <div>
                       <h3 className="text-base font-bold font-headline">{item.label}</h3>
-                      <p className="text-xs text-on-surface-variant/50 uppercase tracking-[0.12em] font-bold">
-                        {item.agent.name}
-                      </p>
-                      <p className="mt-1 text-[11px] text-on-surface-variant/45 uppercase tracking-[0.12em] font-bold">
-                        {item.agent.model}
-                      </p>
+                      {isPrimaryMiloWidget ? (
+                        <p className="text-xs font-semibold text-on-surface-variant/55">
+                          {t('widgetBuilder.agents.miloProfile')}
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-xs text-on-surface-variant/50 uppercase tracking-[0.12em] font-bold">
+                            {item.agent.name}
+                          </p>
+                          <p className="mt-1 text-[11px] text-on-surface-variant/45 uppercase tracking-[0.12em] font-bold">
+                            {item.agent.model}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  {!isPrimaryMiloWidget && <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 auto-cols-auto rounded-full bg-surface-container-low border border-outline-variant/5 p-1">
                       <button 
                         onClick={() => moveAgent(index, -1)}
@@ -78,7 +100,7 @@ export function AgentsTab() {
                     >
                       {t('widgetBuilder.agents.detachAgent')}
                     </button>
-                  </div>
+                  </div>}
                 </div>
 
                 {/* Form Zone */}
@@ -93,11 +115,11 @@ export function AgentsTab() {
                           setAttachedAgents(next);
                        }}
                        className={inputFieldClassName}
-                       placeholder={t('widgetBuilder.agents.displayNamePlaceholder')}
+                       placeholder={t(isPrimaryMiloWidget ? 'widgetBuilder.agents.miloDisplayNamePlaceholder' : 'widgetBuilder.agents.displayNamePlaceholder')}
                      />
                   </label>
                   <label className="block space-y-2">
-                     <span className={fieldLabelClassName}>{t('widgetBuilder.agents.greetingPrompt')}</span>
+                     <span className={fieldLabelClassName}>{t(isPrimaryMiloWidget ? 'widgetBuilder.agents.greeting' : 'widgetBuilder.agents.greetingPrompt')}</span>
                      <textarea
                        value={item.greeting}
                        onChange={(e) => {
@@ -109,7 +131,7 @@ export function AgentsTab() {
                      />
                   </label>
                   <label className="block space-y-2">
-                     <span className={fieldLabelClassName}>{t('widgetBuilder.agents.descriptionSnippet')}</span>
+                     <span className={fieldLabelClassName}>{t(isPrimaryMiloWidget ? 'widgetBuilder.agents.shortDescription' : 'widgetBuilder.agents.descriptionSnippet')}</span>
                      <textarea
                        value={item.description}
                        onChange={(e) => {
@@ -118,16 +140,165 @@ export function AgentsTab() {
                           setAttachedAgents(next);
                        }}
                        className={`${inputFieldClassName} h-28 resize-none`}
-                       placeholder={t('widgetBuilder.agents.descriptionPlaceholder')}
+                       placeholder={t(isPrimaryMiloWidget ? 'widgetBuilder.agents.miloDescriptionPlaceholder' : 'widgetBuilder.agents.descriptionPlaceholder')}
                      />
                   </label>
+                  {isPrimaryMiloWidget ? (
+                    <>
+                      <label className="block space-y-2">
+                        <span className={fieldLabelClassName}>{t('widgetBuilder.agents.messagePlaceholder')}</span>
+                        <input
+                          value={item.placeholder}
+                          onChange={(event) =>
+                            updateAttachedAgent(index, (current) => ({
+                              ...current,
+                              placeholder: event.target.value,
+                            }))
+                          }
+                          className={inputFieldClassName}
+                          placeholder={t('widgetBuilder.agents.defaultPlaceholder')}
+                        />
+                      </label>
+                      <label className="block space-y-2">
+                        <span className={fieldLabelClassName}>{t('widgetBuilder.agents.interaction')}</span>
+                        <select
+                          value={item.interactionMode}
+                          onChange={(event) =>
+                            updateAttachedAgent(index, (current) => ({
+                              ...current,
+                              interactionMode: event.target.value === 'contact_form' ? 'contact_form' : 'chat',
+                            }))
+                          }
+                          className={inputFieldClassName}
+                        >
+                          <option value="chat">{t('widgetBuilder.agents.realtimeChat')}</option>
+                          <option value="contact_form">{t('widgetBuilder.agents.contactForm')}</option>
+                        </select>
+                      </label>
+
+                      <div className="space-y-4 sm:col-span-2">
+                        <label className="flex items-center justify-between gap-4 rounded-[14px] border border-outline-variant/10 bg-background px-5 py-4">
+                          <span>
+                            <span className="block text-sm font-semibold text-on-surface">{t('widgetBuilder.agents.quickActions')}</span>
+                            <span className="mt-1 block text-xs text-on-surface-variant/60">{t('widgetBuilder.agents.quickActionsDescription')}</span>
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={item.showQuickActions}
+                            onChange={(event) =>
+                              updateAttachedAgent(index, (current) => ({
+                                ...current,
+                                showQuickActions: event.target.checked,
+                              }))
+                            }
+                            className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                          />
+                        </label>
+
+                        {item.showQuickActions ? (
+                          <div className="space-y-3">
+                            {item.quickActions.map((action, actionIndex) => (
+                              <div key={actionIndex} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                                <input
+                                  value={action.label || action.prompt}
+                                  onChange={(event) =>
+                                    updateAttachedAgent(index, (current) => ({
+                                      ...current,
+                                      quickActions: current.quickActions.map((entry, entryIndex) =>
+                                        entryIndex === actionIndex
+                                          ? { ...entry, label: event.target.value, prompt: event.target.value }
+                                          : entry,
+                                      ),
+                                    }))
+                                  }
+                                  className={inputFieldClassName}
+                                  placeholder={t('widgetBuilder.agents.quickActionLabel')}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateAttachedAgent(index, (current) => ({
+                                      ...current,
+                                      quickActions: current.quickActions.filter((_, entryIndex) => entryIndex !== actionIndex),
+                                    }))
+                                  }
+                                  className="rounded-[14px] border border-outline-variant/10 px-4 text-sm font-bold text-error hover:bg-error/5"
+                                  aria-label={t('widgetBuilder.agents.removeQuickAction')}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                            {item.quickActions.length < 3 ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateAttachedAgent(index, (current) => ({
+                                    ...current,
+                                    quickActions: [...current.quickActions, { label: '', prompt: '', icon: null }],
+                                  }))
+                                }
+                                className="text-xs font-bold text-primary hover:underline"
+                              >
+                                + {t('widgetBuilder.agents.addQuickAction')}
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {item.interactionMode === 'contact_form' ? (
+                        <div className="grid gap-4 rounded-[14px] border border-outline-variant/10 bg-background p-5 sm:col-span-2 sm:grid-cols-2">
+                          <label className="block space-y-2 sm:col-span-2">
+                            <span className={fieldLabelClassName}>{t('widgetBuilder.agents.contactIntro')}</span>
+                            <input
+                              value={item.contactFormSettings.introText}
+                              onChange={(event) =>
+                                updateAttachedAgent(index, (current) => ({
+                                  ...current,
+                                  contactFormSettings: { ...current.contactFormSettings, introText: event.target.value },
+                                }))
+                              }
+                              className={inputFieldClassName}
+                            />
+                          </label>
+                          <label className="block space-y-2">
+                            <span className={fieldLabelClassName}>{t('widgetBuilder.agents.contactSubmit')}</span>
+                            <input
+                              value={item.contactFormSettings.submitButtonText}
+                              onChange={(event) =>
+                                updateAttachedAgent(index, (current) => ({
+                                  ...current,
+                                  contactFormSettings: { ...current.contactFormSettings, submitButtonText: event.target.value },
+                                }))
+                              }
+                              className={inputFieldClassName}
+                            />
+                          </label>
+                          <label className="block space-y-2">
+                            <span className={fieldLabelClassName}>{t('widgetBuilder.agents.contactSuccess')}</span>
+                            <input
+                              value={item.contactFormSettings.successMessage}
+                              onChange={(event) =>
+                                updateAttachedAgent(index, (current) => ({
+                                  ...current,
+                                  contactFormSettings: { ...current.contactFormSettings, successMessage: event.target.value },
+                                }))
+                              }
+                              className={inputFieldClassName}
+                            />
+                          </label>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
           ))}
 
           {attachedAgents.length === 0 && (
-            <div className="rounded-[2.5rem] border border-dashed border-outline-variant/20 bg-surface-container-lowest p-16 text-center">
+            <div className="rounded-2xl border border-dashed border-outline-variant/20 bg-surface-container-lowest p-10 text-center">
               <div className="mx-auto h-16 w-16 mb-6 rounded-full bg-surface-container-low flex items-center justify-center">
                  <UserCircle2 className="w-7 h-7 opacity-20 text-on-surface-variant" />
               </div>
@@ -141,7 +312,7 @@ export function AgentsTab() {
       </section>
 
       {/* Specialist Registry (Picker) */}
-      <section className="space-y-6 pt-6 border-t border-outline-variant/10">
+      {!isPrimaryMiloWidget && <section className="space-y-4 border-t border-outline-variant/10 pt-6">
         <div className="space-y-1.5 text-center">
           <h2 className="text-lg font-bold font-headline tracking-tight">{t('widgetBuilder.agents.expandRoster')}</h2>
           <p className="text-sm text-on-surface-variant/60">{t('widgetBuilder.agents.expandRosterDescription')}</p>
@@ -182,7 +353,7 @@ export function AgentsTab() {
             </div>
           )}
         </div>
-      </section>
+      </section>}
     </div>
   );
 }

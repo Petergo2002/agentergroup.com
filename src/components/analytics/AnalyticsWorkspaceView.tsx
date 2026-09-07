@@ -111,8 +111,9 @@ function resolvePresenceDisplay(
   if (presenceStatus === "live") {
     return {
       label: t("analytics.live"),
-      className: "bg-primary/10 text-primary ring-primary/15",
-      dotClassName: "bg-primary",
+      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20",
+      dotClassName: "bg-emerald-500",
+      isLive: true,
     };
   }
 
@@ -340,8 +341,15 @@ function ConversationRow({
             <p className="truncate text-xs font-medium text-on-surface-variant">
               {identityDisplay.secondary}
             </p>
-            <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${presenceDisplay.className}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${presenceDisplay.dotClassName}`} />
+            <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ${presenceDisplay.className}`}>
+              {presenceDisplay.isLive ? (
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+              ) : (
+                <span className={`h-1.5 w-1.5 rounded-full ${presenceDisplay.dotClassName}`} />
+              )}
               {presenceDisplay.label}
             </span>
             {conversation.hasLead && (
@@ -754,13 +762,16 @@ function AnalyticsFilterBar({
   filters,
   data,
   activeView,
+  miloMode,
   onChange,
 }: {
   filters: DashboardAnalyticsAppliedFilters;
   data: DashboardAnalyticsResponse | null;
   activeView: "conversations" | "automations";
+  miloMode: boolean;
   onChange: (filters: DashboardAnalyticsAppliedFilters) => void;
 }) {
+  const { t } = useLanguage();
   const rangeOptions: Array<{ value: DashboardAnalyticsAppliedFilters["range"]; label: string }> = [
     { value: "7d", label: "7 days" },
     { value: "30d", label: "30 days" },
@@ -808,7 +819,11 @@ function AnalyticsFilterBar({
             onChange={(event) => onChange({ ...filters, agentId: event.target.value || null })}
             className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
           >
-            <option value="">All agents</option>
+            <option value="">
+              {miloMode && activeView === "conversations"
+                ? t("nav.milo")
+                : t("analytics.allAgents")}
+            </option>
             {agentOptions.map((agent) => (
               <option key={agent.id} value={agent.id}>{agent.name}</option>
             ))}
@@ -839,7 +854,9 @@ function AnalyticsFilterBar({
                 onChange={(event) => onChange({ ...filters, widgetId: event.target.value || null })}
                 className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
               >
-                <option value="">All widgets</option>
+                <option value="">
+                  {miloMode ? t("nav.websiteChat") : t("analytics.allWidgets")}
+                </option>
                 {(data?.filters.widgets ?? []).map((widget) => (
                   <option key={widget.id} value={widget.id}>{widget.name}</option>
                 ))}
@@ -1053,6 +1070,9 @@ export function AnalyticsWorkspaceView() {
   const { showToast } = useToast();
   const searchParams = useSearchParams();
   const requestedSessionId = searchParams.get("session");
+  const miloMode =
+    workspace.product_experience === "milo" &&
+    process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false";
   const [activeView, setActiveView] = useState<"conversations" | "automations">("conversations");
   const [isHeaderDetailsOpen, setIsHeaderDetailsOpen] = useState(false);
   const [filters, setFilters] = useState<DashboardAnalyticsAppliedFilters>({
@@ -1411,10 +1431,10 @@ export function AnalyticsWorkspaceView() {
     activeView === "automations" ? automationHeaderMetrics : conversationHeaderMetrics;
   const selectedAgentName =
     state.data?.filters.agents.find((agent) => agent.id === filters.agentId)?.name ??
-    "All agents";
+    (miloMode ? t("nav.milo") : t("analytics.allAgents"));
   const selectedWidgetName =
     state.data?.filters.widgets.find((widget) => widget.id === filters.widgetId)?.name ??
-    "All widgets";
+    (miloMode ? t("nav.websiteChat") : t("analytics.allWidgets"));
   const rangeLabel =
     filters.range === "7d" ? "7 days" : filters.range === "90d" ? "90 days" : "30 days";
   const statusLabel =
@@ -1515,6 +1535,7 @@ export function AnalyticsWorkspaceView() {
                 filters={filters}
                 data={state.data}
                 activeView={activeView}
+                miloMode={miloMode}
                 onChange={(nextFilters) => setFilters(nextFilters)}
               />
             </div>

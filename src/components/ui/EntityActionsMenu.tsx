@@ -102,6 +102,7 @@ export function EntityActionsMenu({
       <button
         ref={buttonRef}
         type="button"
+        aria-label={t('common.moreActions')}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => {
@@ -119,18 +120,20 @@ export function EntityActionsMenu({
         ? createPortal(
         <div
           ref={menuRef}
+          role="menu"
           className="fixed z-[70] min-w-[188px] rounded-2xl bg-surface-container-low p-2 shadow-[0_18px_48px_rgba(0,0,0,0.35)] ring-1 ring-outline-variant/10"
           style={{ top: menuPosition.top, left: menuPosition.left }}
         >
           {onArchiveToggle ? (
             <button
               type="button"
+              role="menuitem"
               onClick={() => {
                 setIsOpen(false);
                 onArchiveToggle();
               }}
               disabled={archiveDisabled}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
             >
               <AppIcon name="archive" className="h-[18px] w-[18px]" />
               {archiveLabel ?? t('common.archive')}
@@ -139,11 +142,12 @@ export function EntityActionsMenu({
           {onEdit ? (
             <button
               type="button"
+              role="menuitem"
               onClick={() => {
                 setIsOpen(false);
                 onEdit();
               }}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
             >
               <AppIcon name="edit" className="h-[18px] w-[18px]" />
               {editLabel ?? t('common.edit')}
@@ -152,6 +156,7 @@ export function EntityActionsMenu({
           {onDelete ? (
             <button
               type="button"
+              role="menuitem"
               onClick={() => {
                 setIsOpen(false);
                 onDelete();

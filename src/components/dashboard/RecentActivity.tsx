@@ -67,8 +67,14 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
             </p>
           </div>
         ) : (
-          conversations.slice(0, 5).map((convo) => (
-            <Link
+          conversations.slice(0, 5).map((convo) => {
+            const agentName = convo.agentLabel || convo.agentName || t("common.unknownAgent");
+            const showAgentName =
+              agentName.trim().toLocaleLowerCase() !==
+              convo.widgetName.trim().toLocaleLowerCase();
+
+            return (
+              <Link
               key={convo.widgetSessionId}
               href="/analytics"
               className="group grid gap-4 rounded-xl px-3.5 py-3.5 transition-all duration-200 hover:bg-surface-container-low/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:grid-cols-[minmax(0,1fr)_auto] border-b border-outline-variant/10 last:border-b-0"
@@ -82,9 +88,11 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
                     <h3 className="truncate text-sm font-semibold tracking-normal text-on-surface transition-colors group-hover:text-primary">
                       {convo.widgetName}
                     </h3>
-                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs font-semibold text-on-surface-variant transition-colors group-hover:bg-surface-container-high">
-                      {convo.agentLabel || convo.agentName || t("common.unknownAgent")}
-                    </span>
+                    {showAgentName ? (
+                      <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs font-semibold text-on-surface-variant transition-colors group-hover:bg-surface-container-high">
+                        {agentName}
+                      </span>
+                    ) : null}
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm leading-6 text-on-surface-variant">
                     {convo.latestSnippet || t("dashboard.noRecentActivity")}
@@ -92,12 +100,12 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-on-surface-variant sm:justify-end">
-                <span className="h-2 w-2 rounded-full bg-success ring-2 ring-success/20 animate-pulse" aria-hidden="true" />
                 <span>{formatRelativeDate(convo.lastActivityAt, language)}</span>
                 <ArrowRight className="h-4 w-4 opacity-55 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100 group-hover:text-primary" />
               </div>
-            </Link>
-          ))
+              </Link>
+            );
+          })
         )}
       </div>
     </section>

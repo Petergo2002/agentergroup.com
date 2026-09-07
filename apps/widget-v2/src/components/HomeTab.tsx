@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { WidgetAgentConfig, WidgetConfig } from "../types";
+import { MiloMark } from "./MiloMark";
 
 interface HomeTabProps {
   config: WidgetConfig;
@@ -165,9 +166,13 @@ export function HomeTab({
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-widget-fg">
             {selectedAgent.greeting || "Welcome."}
           </h1>
-          <p className="mt-4 max-w-full truncate px-4 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-widget-muted sm:text-[11px] sm:tracking-[0.18em]">
-            {selectedAgent.label}
-          </p>
+          <div
+            className="mt-4 flex max-w-full items-center justify-center gap-1.5 px-4 text-center text-[10px] font-semibold uppercase tracking-[0.16em] sm:text-[11px] sm:tracking-[0.18em]"
+            style={{ color: "var(--widget-milo-color)" }}
+          >
+            <MiloMark className="h-[18px] w-[18px]" />
+            <span className="truncate">Milo</span>
+          </div>
 
           <form
             onSubmit={(event) => {

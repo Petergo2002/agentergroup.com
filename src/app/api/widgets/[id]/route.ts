@@ -215,6 +215,15 @@ export async function DELETE(
   }
 
   const context = await ensureWorkspaceContext(supabase, user);
+  if (
+    context.workspace.product_experience === "milo" &&
+    context.workspace.primary_widget_id === id
+  ) {
+    return NextResponse.json(
+      { error: "Website Chat cannot be deleted while the Milo experience is active.", code: "milo_primary_widget_protected" },
+      { status: 409 },
+    );
+  }
   const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
 
   if (!loaded) {

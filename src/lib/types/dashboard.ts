@@ -159,6 +159,7 @@ export interface DashboardSummaryResponse {
     connectedApps: number;
     knowledgeSources: number;
     leads: number;
+    unansweredQuestions: number;
   };
 }
 

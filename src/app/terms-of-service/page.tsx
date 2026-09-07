@@ -8,7 +8,7 @@ import { getServerLanguage } from "@/lib/i18n-server";
 import { LegalLayout } from "@/components/legal/LegalLayout";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Agentergroup",
+  title: "Terms of Service",
   description:
     "Public terms of service for Agentergroup and Agentergroup-powered widgets.",
 };
@@ -33,4 +33,3 @@ export default async function TermsOfServicePage({
     />
   );
 }
-

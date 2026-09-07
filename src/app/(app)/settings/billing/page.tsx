@@ -10,9 +10,9 @@ import { EXTRA_MESSAGE_CREDIT_PACK_AMOUNT } from '@/lib/billing-credits';
 // ─── Static plan data ─────────────────────────────────────────────────────────
 
 const PLAN_FEATURES = {
-  free:    ['1 workspace', '1 widget', '50 messages per month', '1 active agent', '0 team members', '10 MB Knowledge Base storage', 'Community support'],
-  starter: ['1 workspace', 'Up to 3 widgets', '500 messages per month', 'Up to 3 agents', 'Up to 2 team members', '25 MB Knowledge Base storage', 'Full integrations', 'Priority support'],
-  premium: ['Up to 5 workspaces', 'Up to 6 widgets', '4000 messages per month', 'Unlimited agents', 'Up to 10 team members', '50 MB Knowledge Base storage', 'Full integrations', 'Remove widget branding', 'Dedicated support'],
+  free:    ['1 workspace', 'Milo AI employee', 'Website Chat', '50 messages per month', '10 MB Knowledge Base storage', 'Community support'],
+  starter: ['1 workspace', 'Milo AI employee', 'Website Chat', '500 messages per month', 'Up to 2 team members', '25 MB Knowledge Base storage', 'Full integrations', 'Priority support'],
+  premium: ['Up to 5 workspaces', 'Milo in every workspace', 'Website Chat', '4000 messages per month', 'Up to 10 team members', '50 MB Knowledge Base storage', 'Full integrations', 'Remove chat branding', 'Dedicated support'],
 };
 
 const PLAN_PRICES = { free: '$0', starter: '$30', premium: '$110' };

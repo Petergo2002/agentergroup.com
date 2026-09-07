@@ -2,14 +2,14 @@ export const leads = {
   badge: "Lead Inbox",
   title: "Leads",
   pageDescription:
-    "Granska varje kontakt som fångats av dina webbwidgets och gå från konversation till uppföljning utan att tappa sammanhanget.",
+    "Granska varje kontakt som fångats via webbchatten och gå från konversation till uppföljning utan att tappa sammanhanget.",
   capturedCount: "{count} fångade",
   contactSearchPlaceholder: "Sök på namn, e-post eller telefon",
   liveInbox: "Live-inkorg",
   refreshing: "Uppdaterar",
   noLeadsTitle: "Inga leads har fångats ännu",
   noLeadsDescription:
-    "Leads visas här när din widget är publicerad och besökare delar sina kontaktuppgifter i en konversation.",
+    "Leads visas här när webbchatten är live och besökare delar sina kontaktuppgifter i en konversation.",
   noSearchResultsTitle: "Inga matchande leads",
   noSearchResultsDescription:
     "Prova ett annat namn, en annan e-postadress eller ett annat telefonnummer.",

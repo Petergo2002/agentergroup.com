@@ -33,7 +33,7 @@ export function resolveWidgetApiBase(): string {
     }
   }
 
-  return "https://dashboard.agentergroup.com";
+  return "https://avenro.se";
 }
 
 function getApiBase(): string {

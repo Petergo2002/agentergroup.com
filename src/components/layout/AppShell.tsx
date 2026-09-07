@@ -130,8 +130,17 @@ export function AppShell({ children, context, user }: AppShellProps) {
 
   const pathname = usePathname();
   const isAnalyticsRoute = pathname.startsWith("/analytics");
+  const primaryWebsiteChatPath =
+    process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false" &&
+    context.workspace.product_experience === "milo" &&
+    context.workspace.primary_widget_id
+    ? `/widgets/${context.workspace.primary_widget_id}`
+    : null;
   const isFocusedAppRoute =
     /^\/agents\/[^/]+\/(builder|preview|activity)$/.test(pathname) ||
+    pathname === "/milo" ||
+    pathname === "/website-chat" ||
+    pathname === primaryWebsiteChatPath ||
     /^\/widgets\/[^/]+\/preview$/.test(pathname) ||
     /^\/assistants\/[^/]+$/.test(pathname);
   const latestAnalyticsConversation = latestActivityData?.latestConversation ?? null;

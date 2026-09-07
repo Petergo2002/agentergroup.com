@@ -42,6 +42,8 @@ import { useToast } from '@/components/ui/ToastProvider';
 import { AgentModelPicker } from '@/components/agents/AgentModelPicker';
 import { canEditAgentRecord } from '@/lib/agents/access';
 import { AgentViewTabs } from '@/components/agents/AgentViewTabs';
+import { MiloLogo } from '@/components/brand/MiloLogo';
+import { MiloLoadingScreen } from '@/components/milo/MiloLoadingScreen';
 import {
   AUTOMATION_GMAIL_TRIGGER_CONFIG,
   AUTOMATION_GMAIL_TRIGGER_SLUG,
@@ -533,6 +535,7 @@ const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<BuilderF
   const label = data.label || nodeText?.label;
   const type = data.type || nodeText?.type || 'Blueprint Node';
   const description = data.description || nodeText?.description;
+  const isMiloAgent = data.kind === 'agent' && data.isMiloBrand === true;
   const noteText =
     data.kind === 'annotation' && typeof data.text === 'string'
       ? data.text.trim()
@@ -612,8 +615,10 @@ const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<BuilderF
         ) : null}
       </div>
       <div className="flex items-center gap-3 px-4 pb-4">
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconTone}`}>
-          {(data as { simpleIcon?: string }).simpleIcon ? (
+        <div className={`flex shrink-0 items-center justify-center rounded-xl ${isMiloAgent ? 'h-10 w-10 bg-surface-container-low' : `h-9 w-9 ${iconTone}`}`}>
+          {isMiloAgent ? (
+            <MiloLogo size={36} className="h-9 w-9" />
+          ) : (data as { simpleIcon?: string }).simpleIcon ? (
             <SimpleIcon
               iconKey={(data as { simpleIcon?: string }).simpleIcon}
               color={(data as { simpleIconColor?: string }).simpleIconColor}
@@ -1629,6 +1634,7 @@ function enrichNodeForDisplay(
   node: BuilderFlowNode,
   connections: ConnectionRecord[],
   t: Translate,
+  isPrimaryMilo: boolean,
 ): BuilderFlowNode {
   const localizedText = getBuilderNodeText(
     node.data.kind,
@@ -1641,7 +1647,9 @@ function enrichNodeForDisplay(
     const providerLabel =
       node.data.provider === 'composio'
         ? t('agentBuilder.triggerProviderComposio')
-        : t('agentBuilder.triggerProviderInternal');
+        : isPrimaryMilo
+          ? t('agentBuilder.triggerProviderWebsiteChat')
+          : t('agentBuilder.triggerProviderInternal');
 
     return {
       ...node,
@@ -1746,7 +1754,9 @@ function enrichNodeForDisplay(
     data: {
       ...node.data,
       ...localizedText,
+      label: node.data.kind === 'agent' && isPrimaryMilo ? 'Milo' : localizedText.label,
       confidenceLabel: t('agentBuilder.confidence'),
+      isMiloBrand: node.data.kind === 'agent' && isPrimaryMilo,
     },
   };
 }
@@ -2742,6 +2752,10 @@ export default function AgentBuilderClient() {
   const { language, t } = useLanguage();
   const { showToast } = useToast();
   const agentId = params.id;
+  const isPrimaryMilo =
+    process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== 'false' &&
+    workspace.product_experience === 'milo' &&
+    workspace.primary_customer_agent_id === agentId;
   const builderBootstrapUrl = `/api/agents/${agentId}/builder`;
   const {
     data: builderBootstrap,
@@ -3024,7 +3038,7 @@ export default function AgentBuilderClient() {
     const hasStarterPrompt = starterPromptFields.some((prompt) => prompt.trim().length > 0);
 
     return nodes.map((node) => {
-      const enriched = enrichNodeForDisplay(node, connections, t);
+      const enriched = enrichNodeForDisplay(node, connections, t, isPrimaryMilo);
 
       if (enriched.data.kind !== 'agent') {
         return enriched;
@@ -3063,6 +3077,7 @@ export default function AgentBuilderClient() {
     hasConfiguredKnowledge,
     hasConfiguredTools,
     instructions,
+    isPrimaryMilo,
     name,
     nodes,
     agent?.surface,
@@ -4471,6 +4486,10 @@ export default function AgentBuilderClient() {
   };
 
   if (isLoading) {
+    if (isPrimaryMilo) {
+      return <MiloLoadingScreen />;
+    }
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-24 w-24 animate-spin rounded-full border-4 border-outline-variant/20 border-t-primary" />
@@ -4646,7 +4665,9 @@ export default function AgentBuilderClient() {
                       >
                         {isExternal
                           ? t('agentBuilder.triggerProviderComposio')
-                          : t('agentBuilder.triggerProviderInternal')}
+                          : isPrimaryMilo
+                            ? t('agentBuilder.triggerProviderWebsiteChat')
+                            : t('agentBuilder.triggerProviderInternal')}
                       </span>
                     </div>
                     <p className="mt-1.5 text-xs leading-relaxed text-on-surface-variant/65">
@@ -4792,18 +4813,20 @@ export default function AgentBuilderClient() {
           </div>
 
           <div className="space-y-6">
-            <div>
-              <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
-                {t('agentBuilder.identity')}
-              </label>
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={stopBuilderFieldKeyDown}
-                placeholder={t('agents.createModal.agentNamePlaceholder')}
-                className="w-full rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
-              />
-            </div>
+            {!isPrimaryMilo ? (
+              <div>
+                <label className="mb-2.5 ml-1 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
+                  {t('agentBuilder.identity')}
+                </label>
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  onKeyDown={stopBuilderFieldKeyDown}
+                  placeholder={t('agents.createModal.agentNamePlaceholder')}
+                  className="w-full rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 text-sm font-bold text-on-surface shadow-sm outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/5"
+                />
+              </div>
+            ) : null}
 
             <div>
               <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
@@ -4828,6 +4851,7 @@ export default function AgentBuilderClient() {
                 source={modelCatalogSource}
                 onChange={setModel}
                 onKeyDown={stopBuilderFieldKeyDown}
+                milo={isPrimaryMilo}
               />
             </div>
 
@@ -5728,11 +5752,12 @@ export default function AgentBuilderClient() {
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
+    <div className="animate-builder-enter flex h-screen flex-col overflow-hidden bg-background">
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-outline-variant/10 bg-surface/90 px-5 backdrop-blur-xl lg:px-7">
         <div className="flex min-w-0 items-center gap-4">
           <Link
             href="/dashboard"
+            aria-label={t('common.back')}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container-low text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-95"
           >
             <span className="material-symbols-outlined text-xl">arrow_back</span>
@@ -5741,10 +5766,14 @@ export default function AgentBuilderClient() {
           <div className="flex min-w-0 items-center gap-4">
             <div className="min-w-0">
               <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/45">
-                {agent?.surface === 'automation' ? t('agents.automation') : t('agentBuilder.blueprint')}
+                {agent?.surface === 'automation'
+                  ? t('agents.automation')
+                  : isPrimaryMilo
+                    ? t('agentBuilder.miloBuilder')
+                    : t('agentBuilder.blueprint')}
               </p>
               <h1 className="truncate text-sm font-semibold tracking-tight text-on-surface sm:max-w-56">
-                {name || agent?.name || t('agentBuilder.agentTitleFallback')}
+                {isPrimaryMilo ? 'Milo' : name || agent?.name || t('agentBuilder.agentTitleFallback')}
               </h1>
             </div>
 
@@ -5804,11 +5833,11 @@ export default function AgentBuilderClient() {
               {isSaving
                 ? t('agentBuilder.savingDraft')
                 : isDirty
-                  ? t('agentBuilder.saveDraft')
+                  ? isPrimaryMilo ? t('agentBuilder.saveMiloChanges') : t('agentBuilder.saveDraft')
                   : t('agentBuilder.saved')}
             </button>
 
-            {agent?.surface !== 'automation' ? (
+            {agent?.surface !== 'automation' && !isPrimaryMilo ? (
               <button
                 onClick={() => void submitToAgentLibrary()}
                 disabled={isSaving || isSubmittingLibrary || !canEditCurrentAgent}
@@ -5826,7 +5855,11 @@ export default function AgentBuilderClient() {
                 disabled={isPublishing}
                 className="signature-gradient h-10 rounded-full px-6 text-xs font-bold shadow-xl shadow-black/25 transition-all hover:border-primary/25 hover:bg-primary/8 hover:shadow-2xl active:scale-95 disabled:opacity-60"
               >
-                {isPublishing ? t('agentBuilder.publishing') : t('agentBuilder.deployBlueprint')}
+                {isPublishing
+                  ? t('agentBuilder.publishing')
+                  : isPrimaryMilo
+                    ? t('agentBuilder.updateMilo')
+                    : t('agentBuilder.deployBlueprint')}
               </button>
             ) : null}
 
@@ -6032,9 +6065,13 @@ export default function AgentBuilderClient() {
                 <div className="flex items-center gap-3 min-w-0">
                   {/* Small icon chip */}
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <span className="material-symbols-outlined text-base">
-                      {selectedNode.data.icon || 'smart_toy'}
-                    </span>
+                    {isPrimaryMilo && selectedNode.data.kind === 'agent' ? (
+                      <MiloLogo size={28} className="h-7 w-7" />
+                    ) : (
+                      <span className="material-symbols-outlined text-base">
+                        {selectedNode.data.icon || 'smart_toy'}
+                      </span>
+                    )}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">

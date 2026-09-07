@@ -11,9 +11,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test tests/security/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/**/*.test.ts",
     "widget:load-test": "node scripts/widget-load-test.mjs",
     "widget:dev": "npm --prefix apps/widget-v2 run dev",
+    "widget:typecheck": "npm --prefix apps/widget-v2 run typecheck",
     "widget:build": "npm --prefix apps/widget-v2 run build"
   },
   "dependencies": {

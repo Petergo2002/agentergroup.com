@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { Copy, Send, Paperclip } from "lucide-react";
-import { Fragment, useEffect, useRef } from "react";
+import { Check, Copy, Send, Paperclip } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type {
   Message,
   WidgetAgentConfig,
@@ -8,6 +8,7 @@ import type {
   WidgetConfig,
   WidgetEndChatReason,
 } from "../types";
+import { MiloMark } from "./MiloMark";
 
 // Typing cursor component - Gemini style
 function TypingCursor() {
@@ -19,6 +20,7 @@ function TypingCursor() {
 const TRANSLATIONS = {
   en: {
     copy: "Copy",
+    copied: "Copied",
     attachFile: "Attach file",
     sendMessage: "Send message",
     agentSubtext: "AI Agent",
@@ -32,6 +34,7 @@ const TRANSLATIONS = {
   },
   sv: {
     copy: "Kopiera",
+    copied: "Kopierat",
     attachFile: "Bifoga fil",
     sendMessage: "Skicka meddelande",
     agentSubtext: "AI-Agent",
@@ -49,23 +52,92 @@ function MessageActions({
   onCopy,
   language = "en",
 }: {
-  onCopy: () => void;
+  onCopy: () => Promise<boolean>;
   language?: string;
 }) {
   const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
+  const [copied, setCopied] = useState(false);
+  const resetTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current !== null) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopy = async () => {
+    const didCopy = await onCopy();
+    if (!didCopy) return;
+
+    setCopied(true);
+    if (resetTimerRef.current !== null) {
+      window.clearTimeout(resetTimerRef.current);
+    }
+    resetTimerRef.current = window.setTimeout(() => {
+      setCopied(false);
+      resetTimerRef.current = null;
+    }, 1600);
+  };
   
   return (
-    <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="mt-2 flex items-center gap-1 opacity-70 transition-opacity group-hover:opacity-100">
       <button
-        onClick={onCopy}
-        className="widget-icon-button p-1.5 rounded-lg"
-        aria-label={t.copy}
-        title={t.copy}
+        type="button"
+        onClick={() => void handleCopy()}
+        className={`widget-icon-button rounded-lg p-1.5 transition-colors ${
+          copied ? "text-emerald-600" : ""
+        }`}
+        aria-label={copied ? t.copied : t.copy}
+        title={copied ? t.copied : t.copy}
+        aria-live="polite"
       >
-        <Copy className="w-3.5 h-3.5" />
+        <motion.span
+          key={copied ? "copied" : "copy"}
+          initial={{ opacity: 0, scale: 0.75 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.16, ease: "easeOut" }}
+          className="block"
+        >
+          {copied ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
+        </motion.span>
       </button>
     </div>
   );
+}
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall through to the selection-based fallback for restricted iframes.
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    textarea.remove();
+  }
 }
 
 type ParsedBlock =
@@ -298,18 +370,10 @@ export function ChatView({
     }
   }, [messages, hasStarted, isLoading, isStreaming]);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (isConversationCompleted) {
-      return;
-    }
-
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isConversationCompleted) {
+      void sendMessage();
     }
   };
 
@@ -383,10 +447,15 @@ export function ChatView({
                       isStreaming={msg.isStreaming}
                     />
 
-                    {/* Subtext */}
+                    {/* Milo conversation identity */}
                     {!msg.isStreaming && (
-                      <div className="text-xs text-widget-muted">
-                        {selectedAgent.label || t.agentSubtext} &bull; {t.agentSubtext}
+                      <div className="flex items-center gap-1.5 text-xs text-widget-muted">
+                        <MiloMark className="h-4 w-4" />
+                        <span>
+                          <span className="font-semibold text-widget-fg">Milo</span>{" "}
+                          <span aria-hidden="true">&bull;</span>{" "}
+                          {t.agentSubtext}
+                        </span>
                       </div>
                     )}
 
@@ -394,7 +463,7 @@ export function ChatView({
                     {!msg.isStreaming && msg.content && (
                       <MessageActions
                         language={config.widget.language}
-                        onCopy={() => copyToClipboard(msg.content)}
+                        onCopy={() => copyTextToClipboard(msg.content)}
                       />
                     )}
                   </div>
@@ -411,6 +480,7 @@ export function ChatView({
               exit={{ opacity: 0 }}
               className="flex items-center gap-2 pl-1"
             >
+              <MiloMark className="h-4 w-4" />
               {/* Three dots with staggered fade-pulse */}
               <div className="flex items-center gap-[3px]">
                 {[0, 1, 2].map((i) => (
@@ -426,7 +496,7 @@ export function ChatView({
               </div>
               {/* Agent name + status */}
               <span className="text-[12px] text-widget-muted font-medium">
-                {selectedAgent.label}
+                Milo
                 {config.widget.language === "sv" ? " skriver..." : " is typing..."}
               </span>
             </motion.div>
@@ -437,7 +507,7 @@ export function ChatView({
       </div>
 
       {/* Chat Input */}
-      <div className="relative z-10 shrink-0 bg-[color:var(--widget-bg)]/96 px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-2 backdrop-blur-sm peer group md:px-10 lg:px-14">
+      <div className="relative z-10 shrink-0 bg-[var(--widget-bg)] px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-2 peer group md:px-10 lg:px-14">
         <div className="relative mx-auto max-w-4xl">
           {uploadError && (
             <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-xs font-medium text-red-500 shadow-sm border border-red-500/20">
@@ -483,7 +553,10 @@ export function ChatView({
               </button>
             </div>
           )}
-          <div className="widget-input-shell relative flex items-center rounded-2xl px-1.5 shadow-lg">
+          <form
+            onSubmit={handleSubmit}
+            className="widget-input-shell relative flex items-center rounded-2xl px-1.5 shadow-lg"
+          >
             {onAttachFile && (
               <label
                 className={`p-2.5 rounded-xl bg-transparent text-widget-muted hover:text-[var(--widget-secondary)] transition-colors shrink-0 ml-1 ${
@@ -509,7 +582,6 @@ export function ChatView({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyPress}
               onFocus={handleInputFocus}
               placeholder={
                 isConversationCompleted
@@ -520,9 +592,10 @@ export function ChatView({
               className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-widget-fg placeholder:text-widget-muted py-3 min-h-12 text-[15px] px-4 widget-chat-input"
               inputMode="text"
               enterKeyHint="send"
+              autoComplete="off"
             />
             <button
-              onClick={() => sendMessage()}
+              type="submit"
               disabled={
                 isConversationCompleted ||
                 (!input.trim() && (!pendingAttachments || pendingAttachments.length === 0)) ||
@@ -535,7 +608,7 @@ export function ChatView({
             >
               <Send className="w-5 h-5" />
             </button>
-          </div>
+          </form>
 
           <div className="mt-3 text-center">
             <p className="mx-auto max-w-2xl text-xs leading-5 text-widget-muted">

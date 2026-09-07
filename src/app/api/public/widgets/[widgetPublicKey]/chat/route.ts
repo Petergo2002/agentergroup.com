@@ -594,26 +594,6 @@ export async function POST(
       );
     }
 
-    // Preview-token chat skips the public volumetric limiter, but it still
-    // invokes OpenRouter and must spend workspace message credits.
-    try {
-      await consumeWorkspaceMessageUsage(
-        supabase,
-        loaded.widget.workspace_id,
-      );
-    } catch (usageError) {
-      if (!(usageError instanceof MessageLimitExceededError)) {
-        throw usageError;
-      }
-
-      return buildErrorResponse(
-        request,
-        usageError.status,
-        usageError.message,
-        usageError.code,
-      );
-    }
-
     turnRequestId = chatRequestId;
     turnLockWidgetId = loaded.widget.id;
     turnLockSessionId = sessionId;
@@ -642,6 +622,27 @@ export async function POST(
     }
 
     turnLockHeld = true;
+
+    // Charge only after the turn is accepted: busy/completed sessions must not
+    // spend credits. Preview-token chat is still billable, just like public chat.
+    try {
+      await consumeWorkspaceMessageUsage(
+        supabase,
+        loaded.widget.workspace_id,
+      );
+    } catch (usageError) {
+      if (!(usageError instanceof MessageLimitExceededError)) {
+        throw usageError;
+      }
+
+      await releaseTurnLock(loaded.widget.id, sessionId);
+      return buildErrorResponse(
+        request,
+        usageError.status,
+        usageError.message,
+        usageError.code,
+      );
+    }
 
     const userMessageTimestamp = new Date().toISOString();
     const [, userMessageRows] = await Promise.all([

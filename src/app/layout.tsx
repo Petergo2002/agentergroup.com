@@ -5,6 +5,7 @@ import { LanguageProvider } from "@/components/i18n/LanguageProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { getSiteOrigin } from "@/lib/site-url";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -18,6 +19,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteOrigin()),
   title: {
     default: "Agentergroup",
     template: "%s | Agentergroup",

@@ -1,6 +1,6 @@
 # Agentergroup Operations Runbook
 
-Last updated: 2026-06-11
+Last updated: 2026-08-24
 
 ## Purpose
 
@@ -26,6 +26,8 @@ depends on the new schema. The widget session-knowledge change requires
 For the June production-hardening migration order, private attachment rollout,
 Stripe verification, and production drift checks, use
 [`production-readiness.md`](./production-readiness.md).
+
+For a Milo release, also read [`../guides/milo-experience.md`](../guides/milo-experience.md). The required schema change is `20260811221031_milo_primary_workspace_resources.sql`; deploy it before code depends on primary workspace resources.
 
 ## Health Check
 
@@ -56,12 +58,17 @@ After deploying the dashboard app:
 4. Run a smoke test for the dashboard build artifact through the hosting provider.
 5. For billing, Composio, and privacy cron changes, verify the relevant route-level secret or signature checks before triggering live provider events.
 6. For widget document-upload changes, upload a PDF or text file before the first chat message and confirm the session-scoped knowledge source is created with an internal widget-session UUID.
+7. For Milo changes, confirm `/milo` resolves to the active workspace's primary Builder and `/website-chat` resolves to the primary full-screen editor.
+8. Confirm Website Chat does not show the global sidebar/topbar during loading or after redirect, and its Back control returns to `/dashboard`.
+9. Confirm a hosted and embedded Website Chat opens directly into Milo without a specialist chooser.
+10. Confirm Leads, Analytics, and Improve Milo still resolve records from the active workspace only.
+11. In Website Chat preview, change the theme/colors after opening a conversation and confirm the live preview updates without resetting chat; then save again after token rotation and confirm preview chat still succeeds.
 
 ## Widget Runtime Deployment
 
 The dashboard and widget runtime deploy separately.
 
-Changes under `apps/widget-v2` are not live on `widget.agentergroup.com` until the widget runtime is deployed. After a widget runtime deploy:
+Changes under `apps/widget-v2` are not live on `widget.avenro.se` until the widget runtime is deployed. After a widget runtime deploy:
 
 1. Run `npm run widget:build` locally or confirm the equivalent CI step passed.
 2. Open a hosted widget link for a deployed widget.
@@ -85,6 +92,7 @@ Restore drills should confirm:
 - widget runtime rows, messages, leads, and dashboard summaries are present
 - storage-backed knowledge files still resolve
 - Edge Functions can process and search knowledge after restore
+- Milo workspaces retain `product_experience`, both primary resource pointers, and the protected primary widget-agent link
 
 ## Incident Notes
 
