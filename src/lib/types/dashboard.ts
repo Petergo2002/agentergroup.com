@@ -148,6 +148,7 @@ export interface DashboardLatestActivityResponse {
     | "lastActivityAt"
   > | null;
   newLeadCount: number;
+  latestLeadCreatedAt?: string | null;
 }
 
 export interface DashboardSummaryResponse {

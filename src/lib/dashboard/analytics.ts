@@ -1099,12 +1099,12 @@ export async function getDashboardAutomationAnalytics(
 }
 
 /**
- * Counts leads captured during the last 24 hours for one workspace.
+ * Counts leads captured during the last 24 hours for one workspace and finds the newest lead timestamp.
  */
 async function countRecentWorkspaceLeads(
   supabase: AdminSupabase,
   workspaceId: string,
-) {
+): Promise<{ count: number; latestLeadCreatedAt: string | null }> {
   const widgetsResult = await supabase
     .from("widgets")
     .select("id")
@@ -1117,21 +1117,26 @@ async function countRecentWorkspaceLeads(
   const widgetIds = (widgetsResult.data ?? []).map((widget) => widget.id as string);
 
   if (widgetIds.length === 0) {
-    return 0;
+    return { count: 0, latestLeadCreatedAt: null };
   }
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const leadsResult = await supabase
     .from("widget_leads")
-    .select("id", { count: "exact", head: true })
+    .select("id, created_at")
     .in("widget_id", widgetIds)
-    .gte("created_at", since);
+    .gte("created_at", since)
+    .order("created_at", { ascending: false });
 
   if (leadsResult.error) {
     throw new Error(leadsResult.error.message);
   }
 
-  return leadsResult.count ?? 0;
+  const leads = (leadsResult.data ?? []) as Array<{ id: string; created_at: string }>;
+  return {
+    count: leads.length,
+    latestLeadCreatedAt: leads[0]?.created_at ?? null,
+  };
 }
 
 interface CachedLatestActivity {
@@ -1161,7 +1166,7 @@ export async function getDashboardLatestActivity(
     return cached.payload;
   }
 
-  const [recentConversations, newLeadCount] = await Promise.all([
+  const [recentConversations, leadActivityResult] = await Promise.all([
     listRecentDashboardConversations(supabase, {
       workspaceId,
       range: "30d",
@@ -1172,7 +1177,11 @@ export async function getDashboardLatestActivity(
   const [latest] = recentConversations;
 
   const payload: DashboardLatestActivityResponse = !latest
-    ? { latestConversation: null, newLeadCount }
+    ? {
+        latestConversation: null,
+        newLeadCount: leadActivityResult.count,
+        latestLeadCreatedAt: leadActivityResult.latestLeadCreatedAt,
+      }
     : {
         latestConversation: {
           widgetSessionId: latest.widgetSessionId,
@@ -1184,7 +1193,8 @@ export async function getDashboardLatestActivity(
           latestSnippet: latest.latestSnippet,
           lastActivityAt: latest.lastActivityAt,
         },
-        newLeadCount,
+        newLeadCount: leadActivityResult.count,
+        latestLeadCreatedAt: leadActivityResult.latestLeadCreatedAt,
       };
 
   latestActivityCache.set(workspaceId, {

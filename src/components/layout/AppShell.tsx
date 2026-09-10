@@ -24,9 +24,11 @@ interface AppShellProps {
 }
 
 const ANALYTICS_ACTIVITY_SEEN_PREFIX = "agenter_analytics_last_seen_at";
+const LEADS_ACTIVITY_SEEN_PREFIX = "agenter_leads_last_seen_at";
 
 export function AppShell({ children, context, user }: AppShellProps) {
   const analyticsStorageKey = `${ANALYTICS_ACTIVITY_SEEN_PREFIX}:${context.workspace.id}`;
+  const leadsStorageKey = `${LEADS_ACTIVITY_SEEN_PREFIX}:${context.workspace.id}`;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     () =>
@@ -51,6 +53,12 @@ export function AppShell({ children, context, user }: AppShellProps) {
     () =>
       typeof window !== "undefined"
         ? localStorage.getItem(analyticsStorageKey)
+        : null,
+  );
+  const [lastSeenLeadsAt, setLastSeenLeadsAt] = useState<string | null>(
+    () =>
+      typeof window !== "undefined"
+        ? localStorage.getItem(leadsStorageKey)
         : null,
   );
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
@@ -133,6 +141,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
 
   const pathname = usePathname();
   const isAnalyticsRoute = pathname.startsWith("/analytics");
+  const isLeadsRoute = pathname.startsWith("/leads");
   const primaryWebsiteChatPath =
     process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false" &&
     context.workspace.product_experience === "milo" &&
@@ -146,9 +155,12 @@ export function AppShell({ children, context, user }: AppShellProps) {
     pathname === primaryWebsiteChatPath ||
     /^\/widgets\/[^/]+\/preview$/.test(pathname) ||
     /^\/assistants\/[^/]+$/.test(pathname);
+
   const latestAnalyticsConversation = latestActivityData?.latestConversation ?? null;
-  const newLeadCount = latestActivityData?.newLeadCount ?? 0;
+  const rawLeadCount = latestActivityData?.newLeadCount ?? 0;
+  const latestLeadCreatedAt = latestActivityData?.latestLeadCreatedAt ?? null;
   const latestAnalyticsActivityAt = latestAnalyticsConversation?.lastActivityAt ?? null;
+
   const hasNewAnalyticsActivity =
     !isAnalyticsRoute &&
     Boolean(
@@ -157,29 +169,54 @@ export function AppShell({ children, context, user }: AppShellProps) {
           latestAnalyticsActivityAt > lastSeenAnalyticsActivityAt),
     );
 
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setLastSeenAnalyticsActivityAt(localStorage.getItem(analyticsStorageKey));
-    }, 0);
+  const hasNewLeads =
+    !isLeadsRoute &&
+    rawLeadCount > 0 &&
+    Boolean(
+      !lastSeenLeadsAt ||
+        (latestLeadCreatedAt && latestLeadCreatedAt > lastSeenLeadsAt),
+    );
 
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+  const effectiveNewLeadCount = hasNewLeads ? rawLeadCount : 0;
+
+  const clearAnalyticsAttention = useCallback(() => {
+    const now = new Date().toISOString();
+    try {
+      localStorage.setItem(analyticsStorageKey, now);
+    } catch {
+      // ignore
+    }
+    setLastSeenAnalyticsActivityAt(now);
   }, [analyticsStorageKey]);
 
-  useEffect(() => {
-    if (!isAnalyticsRoute) {
-      return;
+  const clearLeadsBadge = useCallback(() => {
+    const now = new Date().toISOString();
+    try {
+      localStorage.setItem(leadsStorageKey, now);
+    } catch {
+      // ignore
     }
+    setLastSeenLeadsAt(now);
+  }, [leadsStorageKey]);
 
-    const timeoutId = window.setTimeout(() => {
-      const seenAt = latestAnalyticsActivityAt ?? new Date().toISOString();
-      localStorage.setItem(analyticsStorageKey, seenAt);
-      setLastSeenAnalyticsActivityAt(seenAt);
-    }, 0);
+  useEffect(() => {
+    try {
+      setLastSeenAnalyticsActivityAt(localStorage.getItem(analyticsStorageKey));
+      setLastSeenLeadsAt(localStorage.getItem(leadsStorageKey));
+    } catch {
+      // ignore
+    }
+  }, [analyticsStorageKey, leadsStorageKey]);
 
-    return () => window.clearTimeout(timeoutId);
-  }, [analyticsStorageKey, isAnalyticsRoute, latestAnalyticsActivityAt]);
+  useEffect(() => {
+    if (!isAnalyticsRoute) return;
+    clearAnalyticsAttention();
+  }, [isAnalyticsRoute, clearAnalyticsAttention]);
+
+  useEffect(() => {
+    if (!isLeadsRoute) return;
+    clearLeadsBadge();
+  }, [isLeadsRoute, clearLeadsBadge]);
 
   return (
     <AppContextProvider value={{ ...context, user }}>
@@ -216,7 +253,9 @@ export function AppShell({ children, context, user }: AppShellProps) {
                         }
                       : null
                   }
-                  newLeadCount={newLeadCount}
+                  newLeadCount={effectiveNewLeadCount}
+                  onClearAnalyticsActivity={clearAnalyticsAttention}
+                  onClearLeads={clearLeadsBadge}
                 />
               </div>
 
@@ -260,7 +299,9 @@ export function AppShell({ children, context, user }: AppShellProps) {
                         }
                       : null
                   }
-                  newLeadCount={newLeadCount}
+                  newLeadCount={effectiveNewLeadCount}
+                  onClearAnalyticsActivity={clearAnalyticsAttention}
+                  onClearLeads={clearLeadsBadge}
                 />
               </div>
 

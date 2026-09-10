@@ -46,6 +46,8 @@ interface SidebarProps {
   analyticsHasNewActivity?: boolean;
   analyticsActivitySummary?: AnalyticsActivitySummary | null;
   newLeadCount?: number;
+  onClearAnalyticsActivity?: () => void;
+  onClearLeads?: () => void;
 }
 
 interface SidebarNavItem {
@@ -67,6 +69,8 @@ export function Sidebar({
   analyticsHasNewActivity = false,
   analyticsActivitySummary = null,
   newLeadCount = 0,
+  onClearAnalyticsActivity,
+  onClearLeads,
 }: SidebarProps) {
   const pathname = usePathname();
   const { membership, workspace, subscription } = useAppContext();
@@ -228,7 +232,7 @@ export function Sidebar({
               const Icon = item.icon;
               const hasAttention = Boolean(item.hasAttention && !isActive);
               const badgeCount = Math.max(0, item.badgeCount ?? 0);
-              const hasBadge = badgeCount > 0;
+              const hasBadge = Boolean(badgeCount > 0 && !isActive);
               const badgeLabel = badgeCount > 99 ? "99+" : String(badgeCount);
               const attentionAgent =
                 item.attentionSummary?.agentName || t("common.unknownAgent");
@@ -242,7 +246,14 @@ export function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={onNavigate}
+                  onClick={() => {
+                    onNavigate?.();
+                    if (item.href === "/analytics") {
+                      onClearAnalyticsActivity?.();
+                    } else if (item.href === "/leads") {
+                      onClearLeads?.();
+                    }
+                  }}
                   aria-label={
                     isCollapsed && !mobile
                       ? `${item.name}${item.beta ? ` (${t("common.beta")})` : ""}${

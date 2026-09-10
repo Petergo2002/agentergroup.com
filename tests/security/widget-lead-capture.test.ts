@@ -134,3 +134,27 @@ test("lead notification email template normalizes to Milo, strips raw tags, and 
   assert.match(emailSource, /#ff5c00/);
 });
 
+test("leads and analytics notifications clear smartly on click and route visit", () => {
+  const appShellSource = readFileSync("src/components/layout/AppShell.tsx", "utf8");
+  const sidebarSource = readFileSync("src/components/layout/Sidebar.tsx", "utf8");
+  const analyticsSource = readFileSync("src/lib/dashboard/analytics.ts", "utf8");
+
+  // AppShell tracks both analytics and leads seen timestamps in localStorage
+  assert.match(appShellSource, /agenter_leads_last_seen_at/);
+  assert.match(appShellSource, /agenter_analytics_last_seen_at/);
+  assert.match(appShellSource, /clearLeadsBadge/);
+  assert.match(appShellSource, /clearAnalyticsAttention/);
+
+  // AppShell computes effective lead count based on last seen timestamp
+  assert.match(appShellSource, /effectiveNewLeadCount/);
+
+  // Sidebar suppresses badge when item is active and executes clear on click
+  assert.match(sidebarSource, /hasBadge = Boolean\(badgeCount > 0 && !isActive\)/);
+  assert.match(sidebarSource, /onClearLeads\?\.()/);
+  assert.match(sidebarSource, /onClearAnalyticsActivity\?\.()/);
+
+  // Analytics helper tracks newest lead creation timestamp
+  assert.match(analyticsSource, /latestLeadCreatedAt/);
+});
+
+
