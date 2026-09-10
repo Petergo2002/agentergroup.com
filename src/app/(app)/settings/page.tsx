@@ -50,13 +50,24 @@ export default function SettingsPage() {
     setIsSaving(true);
 
     try {
+      const trimmedFullName = fullName.trim();
+      const trimmedCompanyName = companyName.trim();
+
       const profilePromise = supabase
         .from('profiles')
         .update({
-          full_name: fullName.trim(),
+          full_name: trimmedFullName,
           email: user.email,
         })
         .eq('id', user.id);
+
+      const authPromise = supabase.auth.updateUser({
+        data: {
+          full_name: trimmedFullName,
+          name: trimmedFullName,
+          workspace_name: trimmedCompanyName,
+        },
+      });
 
       const workspacePromise = canEditWorkspace
         ? fetch(`/api/workspaces/${workspace.id}`, {
@@ -65,19 +76,24 @@ export default function SettingsPage() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              name: companyName.trim(),
+              name: trimmedCompanyName,
               description: workspaceDescription.trim(),
             }),
           })
         : null;
 
-      const [profileResult, workspaceResponse] = await Promise.all([
+      const [profileResult, authResult, workspaceResponse] = await Promise.all([
         profilePromise,
+        authPromise,
         workspacePromise,
       ]);
 
       if (profileResult.error) {
         throw profileResult.error;
+      }
+
+      if (authResult.error) {
+        console.warn('Could not sync auth metadata:', authResult.error.message);
       }
 
       if (workspaceResponse) {

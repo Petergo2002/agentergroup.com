@@ -8,6 +8,7 @@ export const landing = {
     product: "Product",
     howItWorks: "How it works",
     useCases: "Use cases",
+    security: "Security",
     faq: "FAQ",
     login: "Log in",
     getStarted: "Get started",
@@ -194,6 +195,47 @@ export const landing = {
       },
     ],
   },
+  security: {
+    eyebrow: "Security & privacy",
+    title: "Your customer conversations deserve care.",
+    description:
+      "Practical protections for your workspace, with tools to help your team handle customer data responsibly.",
+    items: [
+      {
+        title: "GDPR privacy tools",
+        description:
+          "Workspace owners can find, export, and delete public chat visitor data to help respond to privacy requests.",
+      },
+      {
+        title: "Workspace access controls",
+        description:
+          "Member permissions and database access rules scope access to your workspace. Sensitive settings are reserved for owners and admins.",
+      },
+      {
+        title: "Protected chat attachments",
+        description:
+          "Visitor uploads use private storage and expiring file links, with checks on file type and size.",
+      },
+      {
+        title: "Built-in abuse protections",
+        description:
+          "Public chat uses request limits and short-lived access tokens. You can also restrict where your chat is embedded.",
+      },
+      {
+        title: "Privacy audit records",
+        description:
+          "Privacy lookups, exports, deletions, and retention runs create workspace audit records for traceability.",
+      },
+      {
+        title: "Defined retention controls",
+        description:
+          "Public chat has a 180-day retention policy and cleanup tooling. Imported knowledge stays until your workspace deletes it.",
+      },
+    ],
+    policyLink: "Read our privacy policy",
+    contactLabel: "Have specific security requirements?",
+    contactLink: "Talk to us",
+  },
   faq: {
     eyebrow: "Common questions",
     title: "A clear start, with room to grow.",
@@ -217,6 +259,11 @@ export const landing = {
         question: "Can I add Website Chat to an existing site?",
         answer:
           "Yes. Website Chat can be embedded into an existing website with a small loader snippet, or shared as a hosted standalone experience.",
+      },
+      {
+        question: "What about GDPR, SOC 2, and HIPAA?",
+        answer:
+          "Avenro provides privacy tools that support GDPR-related requests for public chat data. Compliance also depends on how your business collects and uses data, its agreements, and its operating procedures. We do not currently claim SOC 2 attestation or HIPAA compliance. Contact us to discuss your requirements before using Avenro for regulated health data.",
       },
       {
         question: "What happens when Milo does not know the answer?",

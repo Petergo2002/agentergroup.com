@@ -10,6 +10,7 @@ export const landing = {
     product: "Produkt",
     howItWorks: "Så fungerar det",
     useCases: "Användningsområden",
+    security: "Säkerhet",
     faq: "Vanliga frågor",
     login: "Logga in",
     getStarted: "Kom igång",
@@ -196,6 +197,47 @@ export const landing = {
       },
     ],
   },
+  security: {
+    eyebrow: "Säkerhet och integritet",
+    title: "Dina kundsamtal förtjänar omtanke.",
+    description:
+      "Konkreta skydd för din arbetsyta och verktyg som hjälper teamet att hantera kunddata ansvarsfullt.",
+    items: [
+      {
+        title: "Integritetsverktyg för GDPR",
+        description:
+          "Arbetsytans ägare kan söka fram, exportera och radera besöksdata från publik webbchatt för att hantera integritetsförfrågningar.",
+      },
+      {
+        title: "Åtkomstkontroll per arbetsyta",
+        description:
+          "Medlemsbehörigheter och databasregler styr åtkomsten till din arbetsyta. Känsliga inställningar är reserverade för ägare och administratörer.",
+      },
+      {
+        title: "Skyddade chattbilagor",
+        description:
+          "Besökares filer lagras privat och delas via tidsbegränsade länkar, med kontroller av filtyp och storlek.",
+      },
+      {
+        title: "Inbyggt skydd mot missbruk",
+        description:
+          "Publik webbchatt har anropsgränser och kortlivade åtkomsttoken. Du kan även begränsa var chatten får bäddas in.",
+      },
+      {
+        title: "Spårbara integritetsåtgärder",
+        description:
+          "Sökningar, exporter, raderingar och lagringsrensningar registreras i arbetsytans granskningslogg för spårbarhet.",
+      },
+      {
+        title: "Tydliga lagringsregler",
+        description:
+          "Publik webbchatt har en lagringspolicy på 180 dagar och verktyg för rensning. Importerad kunskap finns kvar tills din arbetsyta raderar den.",
+      },
+    ],
+    policyLink: "Läs vår integritetspolicy",
+    contactLabel: "Har ni särskilda säkerhetskrav?",
+    contactLink: "Prata med oss",
+  },
   faq: {
     eyebrow: "Vanliga frågor",
     title: "En tydlig start, med utrymme att växa.",
@@ -219,6 +261,11 @@ export const landing = {
         question: "Kan jag lägga Webbchatt på en befintlig webbplats?",
         answer:
           "Ja. Webbchatt kan bäddas in på en befintlig webbplats med ett litet kodavsnitt eller delas som en fristående upplevelse via en egen länk.",
+      },
+      {
+        question: "Vad gäller för GDPR, SOC 2 och HIPAA?",
+        answer:
+          "Avenro har integritetsverktyg som stödjer GDPR-relaterade förfrågningar om data från publik webbchatt. Efterlevnad beror också på hur din verksamhet samlar in och använder data, era avtal och era rutiner. Vi gör för närvarande inga anspråk på SOC 2-attestering eller HIPAA-efterlevnad. Kontakta oss om era krav innan ni använder Avenro för reglerade hälsouppgifter.",
       },
       {
         question: "Vad händer när Milo inte kan svaret?",

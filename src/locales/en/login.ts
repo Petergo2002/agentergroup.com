@@ -44,6 +44,12 @@ export const login = {
   signupConsentRequired:
     "You must agree to the Terms of Service and acknowledge the Privacy Policy to create an account.",
   logoAlt: "Avenro logo",
+  fullName: "Full Name",
+  fullNamePlaceholder: "Alex Morgan",
+  companyName: "Company Name",
+  companyNamePlaceholder: "Acme Inc.",
+  creatingAccount: "Creating account...",
+  signingIn: "Signing in...",
   continueWithGoogle: "Continue with Google",
   orContinueWith: "or continue with email",
 };

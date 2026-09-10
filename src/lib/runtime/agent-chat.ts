@@ -37,6 +37,7 @@ import type {
 
 interface RuntimeSelectQueryResult {
   data?: unknown[] | null;
+  count?: number | null;
 }
 
 interface RuntimeSelectQuery {
@@ -44,7 +45,10 @@ interface RuntimeSelectQuery {
 }
 
 interface RuntimeTableQuery {
-  select: (columns: string) => RuntimeSelectQuery;
+  select: (
+    columns: string,
+    options?: { count?: "exact" | "planned" | "estimated"; head?: boolean },
+  ) => RuntimeSelectQuery;
 }
 
 interface RuntimeSupabaseLike {
@@ -533,11 +537,13 @@ async function loadRuntimeContext(
   supabase: RuntimeSupabaseLike,
   agentId: string,
   toolUserId: string,
+  widgetSessionId?: string | null,
 ) {
   const [
     { data: attachedConnections },
     { data: attachedKnowledgeSources },
     { data: attachedKnowledgeFolders },
+    sessionKnowledgeResult,
   ] =
     await Promise.all([
       supabase
@@ -552,6 +558,12 @@ async function loadRuntimeContext(
         .from("agent_knowledge_folders")
         .select("knowledge_folder_id")
         .eq("agent_id", agentId),
+      widgetSessionId
+        ? supabase
+            .from("knowledge_sources")
+            .select("id", { count: "exact", head: true })
+            .eq("widget_session_id", widgetSessionId)
+        : Promise.resolve({ count: 0 }),
     ]);
 
   const connectedToolkits = (
@@ -571,10 +583,12 @@ async function loadRuntimeContext(
 
   const knowledgeAttachmentCount =
     (attachedKnowledgeSources?.length ?? 0) + (attachedKnowledgeFolders?.length ?? 0);
+  const sessionAttachmentCount = sessionKnowledgeResult?.count ?? 0;
 
   return {
     connectedToolkits,
     knowledgeAttachmentCount,
+    sessionAttachmentCount,
   };
 }
 
@@ -677,10 +691,15 @@ export async function runAgentChat({
   onToken?: (token: string) => void;
   onStatus?: (status: string) => void;
 }): Promise<AgentRuntimeResult> {
-  const { connectedToolkits, knowledgeAttachmentCount } = await loadRuntimeContext(
+  const {
+    connectedToolkits,
+    knowledgeAttachmentCount,
+    sessionAttachmentCount,
+  } = await loadRuntimeContext(
     supabase,
     agent.id,
     toolUserId,
+    widgetSessionId,
   );
   const effectiveEndChatPolicy = endChatPolicy ?? buildDisabledEndChatPolicy();
   const effectiveGmailRecipientPolicy: GmailRecipientPolicy =
@@ -768,8 +787,8 @@ export async function runAgentChat({
 
   // ─── File Upload Capability Instruction ──────────────────────────────────
   // If we are in a widget session, explicitly tell the agent it can read 
-  // uploaded files via RAG context.
-  if (audience === "widget" && widgetSessionId) {
+  // uploaded files via RAG context when session attachments exist.
+  if (audience === "widget" && widgetSessionId && sessionAttachmentCount > 0) {
     systemInstructionBlocks.push(
       "CAPABILITY: You CAN read and analyze documents (PDFs, Text) that the user uploads. " +
       "When a user uploads a file, it is automatically indexed and provided to you as context. " +
@@ -785,7 +804,7 @@ export async function runAgentChat({
   let knowledgeMatches: KnowledgeMatchRecord[] = [];
 
   const hasGlobalKnowledge = knowledgeAttachmentCount > 0;
-  const hasSessionKnowledge = Boolean(widgetSessionId);
+  const hasSessionKnowledge = sessionAttachmentCount > 0;
 
   if (hasGlobalKnowledge || hasSessionKnowledge) {
     try {

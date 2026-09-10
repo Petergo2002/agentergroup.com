@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import {
+  ensureWorkspaceContext,
+  invalidateWorkspaceContextCache,
+} from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 
 export async function PATCH(
@@ -58,6 +61,8 @@ export async function PATCH(
   if (updateResult.error) {
     return NextResponse.json({ error: updateResult.error.message }, { status: 500 });
   }
+
+  invalidateWorkspaceContextCache(user.id, workspaceId);
 
   return NextResponse.json({
     workspace: updateResult.data,
@@ -125,6 +130,8 @@ export async function DELETE(
       { status: 500 },
     );
   }
+
+  invalidateWorkspaceContextCache(user.id, workspaceId);
 
   const response = NextResponse.json({
     deletedWorkspaceId: workspaceId,

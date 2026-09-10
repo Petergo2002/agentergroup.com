@@ -148,6 +148,11 @@ checks before bundling. Use `npm run widget:typecheck` to run those checks alone
 CI also checks both packages for dependency advisories at moderate severity or
 higher. Root lint excludes the separate local workspaces under `.gemini/`.
 
+The `eslint-plugin-react-hooks` override retains version `7.0.1`: version
+`7.1.1` reports 39 errors in existing components that pass the previous version.
+Review those diagnostics in a separate React cleanup before removing the pin;
+the September 9, 2026 dependency maintenance keeps application behavior intact.
+
 The source-level security tests do not replace live RLS integration tests.
 Before self-service launch, run a local or staging test with two real Supabase
 users in different workspaces and verify cross-tenant knowledge, threads,

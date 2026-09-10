@@ -116,7 +116,7 @@ export default function Widget({
   const [conversationEndReason, setConversationEndReason] =
     useState<WidgetEndChatReason | null>(null);
   const [isWidgetOpen, setIsWidgetOpen] = useState(() =>
-    typeof window !== "undefined" ? window.parent === window : true,
+    previewMode || (typeof window !== "undefined" ? window.parent === window : true),
   );
   const [previewRevisionKey, setPreviewRevisionKey] = useState(
     previewRevision || "0",
@@ -501,7 +501,7 @@ export default function Widget({
       return;
     }
 
-    if (isEmbedded) {
+    if (isEmbedded && !previewMode) {
       return;
     }
 
@@ -530,7 +530,7 @@ export default function Widget({
     return () => {
       cancelled = true;
     };
-  }, [applyBootstrapPayload, bootstrapContext, isEmbedded, widgetPublicKey]);
+  }, [applyBootstrapPayload, bootstrapContext, isEmbedded, previewMode, widgetPublicKey]);
 
   useEffect(() => {
     if (!widgetPublicKey || !isEmbedded) {

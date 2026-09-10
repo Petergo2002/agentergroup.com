@@ -13,6 +13,9 @@ import {
   validateKnowledgeText,
 } from "@/lib/knowledge-text";
 import type { KnowledgeSourceRecord } from "@/lib/types";
+import { knowledgeProcessingError } from "@/lib/knowledge-processing-error";
+
+export const maxDuration = 150;
 
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 
@@ -163,15 +166,16 @@ export async function PATCH(
   );
 
   if (processResult.error) {
-    const safeFailureMessage = "Knowledge processing could not be started.";
     const { data: latestSource } = await admin
       .from("knowledge_sources")
-      .select("status")
+      .select("status, processing_token, error_message, updated_at")
       .eq("id", knowledgeSource.id)
       .eq("workspace_id", context.workspace.id)
       .maybeSingle();
+    const failure = await knowledgeProcessingError(processResult.error, latestSource?.error_message);
+    const safeFailureMessage = failure.message;
 
-    if (latestSource?.status === "processing") {
+    if (latestSource?.status === "processing" && !latestSource.processing_token) {
       await admin
         .from("knowledge_sources")
         .update({
@@ -180,13 +184,16 @@ export async function PATCH(
         })
         .eq("id", knowledgeSource.id)
         .eq("workspace_id", context.workspace.id)
+        .eq("updated_at", latestSource.updated_at)
         .eq("status", "processing");
     }
 
     console.error("Knowledge source processing invocation failed.", {
       sourceId: knowledgeSource.id,
       workspaceId: context.workspace.id,
-      message: processResult.error.message,
+      message: failure.message,
+      status: failure.status,
+      code: failure.code,
     });
 
     return NextResponse.json(
@@ -195,7 +202,7 @@ export async function PATCH(
     );
   }
 
-  return NextResponse.json({ ok: true, processStatus: "ready" });
+  return NextResponse.json({ ok: true, processStatus: processResult.data?.status ?? "processing" });
 }
 
 export async function DELETE(

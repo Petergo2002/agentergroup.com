@@ -79,7 +79,7 @@ Browser (Next.js App Router UI)
 ### Frontend and app server
 
 - Next.js 16, with the exact resolved patch version locked in `package-lock.json`
-- React `19.2.4`
+- React `19.2.8`
 - TypeScript
 - Tailwind CSS v4
 - App Router
@@ -1523,6 +1523,12 @@ The product surface is split into:
 
 The authenticated app owns:
 
+- **Widget Builder Studio (`/widgets/[id]`):** A dedicated full-width split-screen workspace featuring:
+  - Left configuration pane (`420px–480px`): Provides dedicated tabs for `Appearance`, `Milo Chat` (or `Specialists`), `Behavior`, and `Publish`.
+  - Right live studio canvas: A spacious, uncluttered preview environment offering viewport switching (Desktop and Mobile) and live interaction.
+  - **Canonical Milo Floating Launcher:** Features the authentic 56px (`h-14`) pill geometry matching `loader.js`, brand signature coloring, 40px circular white container with `MiloLogo` (or uploaded brand logo), and "Milo" product attribution. In open state, morphs into a 56px white circular close button (`✕`) below the floating chat window.
+  - **Live Preview PostMessage Protocol:** Bidirectional sync supporting `ag:widget-preview:update-config` (live theme/color overrides), `ag:widget-preview:update-auth` (preview token rotation), `ag:widget:state` (open/close state), and `ag:widget:close-request` (iframe-initiated close requests).
+  - **Direct Preview Bootstrap:** In preview mode (`preview=1`), Widget V2 directly bootstraps its configuration from `/api/public/widgets/[widgetPublicKey]/bootstrap` using preview headers without hanging on external loader scripts.
 - widget list and detail screens
 ### Widget Deployment & "Needs Sync"
 

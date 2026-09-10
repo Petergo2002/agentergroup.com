@@ -68,12 +68,7 @@ test("knowledge processing authorizes user-scoped source access before admin mut
   const userSourceLookup = processSource.indexOf(
     'await userClient\\n      .from("knowledge_sources")'.replace("\\n", "\n"),
   );
-  const adminMutation = processSource.indexOf(
-    'await adminClient\\n    .from("knowledge_sources")\\n    .update({ status: "processing"'.replaceAll(
-      "\\n",
-      "\n",
-    ),
-  );
+  const adminMutation = processSource.indexOf('adminClient.rpc("claim_knowledge_processing"');
 
   assert.ok(userLookup >= 0);
   assert.ok(userSourceLookup > userLookup);

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { knowledgeProcessingError } from "@/lib/knowledge-processing-error";
+
+export const maxDuration = 150;
 
 export async function POST(
   _request: Request,
@@ -51,10 +54,7 @@ export async function POST(
 
     return NextResponse.json(
       {
-        error:
-          failedSource?.error_message ??
-          result.error.message ??
-          "Failed to process knowledge source.",
+        error: (await knowledgeProcessingError(result.error, failedSource?.error_message)).message,
       },
       { status: 500 },
     );
@@ -62,6 +62,6 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
-    status: "processing",
+    status: result.data?.status ?? "processing",
   });
 }

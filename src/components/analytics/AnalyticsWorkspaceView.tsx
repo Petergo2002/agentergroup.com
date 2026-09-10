@@ -15,6 +15,7 @@ import useSWR from "swr";
 import { useAppContext } from "@/components/app/AppContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
+import { hasAutomationsEnabled } from "@/lib/assistants/feature-flags";
 import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
 import { formatRelativeDate } from "@/lib/utils";
 import type {
@@ -1073,6 +1074,7 @@ export function AnalyticsWorkspaceView() {
   const miloMode =
     workspace.product_experience === "milo" &&
     process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false";
+  const automationsEnabled = hasAutomationsEnabled(workspace);
   const [activeView, setActiveView] = useState<"conversations" | "automations">("conversations");
   const [isHeaderDetailsOpen, setIsHeaderDetailsOpen] = useState(false);
   const [filters, setFilters] = useState<DashboardAnalyticsAppliedFilters>({
@@ -1390,6 +1392,37 @@ export function AnalyticsWorkspaceView() {
 
   const overview = state.data?.overview;
   const automation = state.data?.automation;
+  const hasActiveAutomations =
+    automationsEnabled &&
+    Boolean(
+      (automation?.totalEvents && automation.totalEvents > 0) ||
+      (automation?.agents && automation.agents.length > 0) ||
+      state.data?.filters.agents.some((agent) => agent.surface === "automation"),
+    );
+  const effectiveActiveView = hasActiveAutomations ? activeView : "conversations";
+
+  useEffect(() => {
+    if (!hasActiveAutomations && activeView === "automations") {
+      setActiveView("conversations");
+    }
+  }, [hasActiveAutomations, activeView]);
+
+  useEffect(() => {
+    if (!hasActiveAutomations) {
+      if (filters.automationStatus !== "all") {
+        setFilters((current) => ({ ...current, automationStatus: "all" }));
+      }
+      if (
+        filters.agentId &&
+        state.data?.filters.agents.some(
+          (agent) => agent.id === filters.agentId && agent.surface === "automation",
+        )
+      ) {
+        setFilters((current) => ({ ...current, agentId: null }));
+      }
+    }
+  }, [hasActiveAutomations, filters.automationStatus, filters.agentId, state.data?.filters.agents]);
+
   const conversationHeaderMetrics: HeaderMetricItem[] = [
     {
       label: "Conversations",
@@ -1428,7 +1461,7 @@ export function AnalyticsWorkspaceView() {
     },
   ];
   const headerMetrics =
-    activeView === "automations" ? automationHeaderMetrics : conversationHeaderMetrics;
+    effectiveActiveView === "automations" ? automationHeaderMetrics : conversationHeaderMetrics;
   const selectedAgentName =
     state.data?.filters.agents.find((agent) => agent.id === filters.agentId)?.name ??
     (miloMode ? t("nav.milo") : t("analytics.allAgents"));
@@ -1438,7 +1471,7 @@ export function AnalyticsWorkspaceView() {
   const rangeLabel =
     filters.range === "7d" ? "7 days" : filters.range === "90d" ? "90 days" : "30 days";
   const statusLabel =
-    activeView === "automations"
+    effectiveActiveView === "automations"
       ? filters.automationStatus === "all"
         ? "All statuses"
         : filters.automationStatus
@@ -1453,7 +1486,7 @@ export function AnalyticsWorkspaceView() {
             ? "Idle sessions"
             : "Completed";
   const collapsedDetailSummary =
-    activeView === "automations"
+    effectiveActiveView === "automations"
       ? `${rangeLabel} · ${selectedAgentName} · ${statusLabel}`
       : `${rangeLabel} · ${selectedAgentName} · ${selectedWidgetName} · ${statusLabel}`;
 
@@ -1483,17 +1516,19 @@ export function AnalyticsWorkspaceView() {
           <div className="grid gap-3 xl:grid-cols-[minmax(360px,0.75fr)_minmax(0,1.25fr)] xl:items-end">
             <div className="min-w-0">
               <h1 className="truncate text-xl font-bold tracking-tight text-on-surface">
-                {activeView === "automations" ? "Automation performance" : "Conversation performance"}
+                {effectiveActiveView === "automations" ? "Automation performance" : "Conversation performance"}
               </h1>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <AnalyticsViewSwitch
-                activeView={activeView}
-                conversations={overview?.conversations ?? 0}
-                automations={automation?.totalEvents ?? 0}
-                onChange={handleViewChange}
-              />
+            <div className={`flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center ${hasActiveAutomations ? "lg:justify-between" : "lg:justify-end"}`}>
+              {hasActiveAutomations ? (
+                <AnalyticsViewSwitch
+                  activeView={effectiveActiveView}
+                  conversations={overview?.conversations ?? 0}
+                  automations={automation?.totalEvents ?? 0}
+                  onChange={handleViewChange}
+                />
+              ) : null}
 
               <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                 {!isHeaderDetailsOpen ? (
@@ -1534,7 +1569,7 @@ export function AnalyticsWorkspaceView() {
               <AnalyticsFilterBar
                 filters={filters}
                 data={state.data}
-                activeView={activeView}
+                activeView={effectiveActiveView}
                 miloMode={miloMode}
                 onChange={(nextFilters) => setFilters(nextFilters)}
               />
@@ -1543,7 +1578,7 @@ export function AnalyticsWorkspaceView() {
         </div>
       </header>
 
-      {activeView === "automations" ? (
+      {effectiveActiveView === "automations" ? (
         <AutomationPerformancePanel
           data={state.data}
           isLoading={state.isLoading}

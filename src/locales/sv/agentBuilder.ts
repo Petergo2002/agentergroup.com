@@ -173,6 +173,20 @@ export const agentBuilder = {
     "Anteckningar sparas med utkastet men ignoreras av runtime och kantgenerering.",
   semanticSourcesDescription:
     "Välj de semantiska källor som buildern får hämta från.",
+  verifiedAnswersTitle: "Milos verifierade svar",
+  verifiedAnswersSubtitle:
+    "Auktoritativa svar godkända från frågekön. Dessa har högsta prioritet framför allmänna dokument som primär sanning.",
+  verifiedAnswersActive: "Sanningskälla aktiv",
+  verifiedAnswersInactive: "Sanningskälla inaktiv",
+  verifiedAnswersCount: "{count} verifierade svar",
+  verifiedAnswersCountSingle: "1 verifierat svar",
+  verifiedAnswersEmpty:
+    "Inga verifierade svar har publicerats ännu. När besökare ställer frågor som Milo inte kan besvara fullt ut, granska och godkänn dem i frågekön.",
+  openQuestionsQueue: "Hantera i frågekön",
+  referenceFoldersTitle: "Referensmappar",
+  referenceDocumentsTitle: "Dokument och filer",
+  searchSourcesPlaceholder: "Sök dokument...",
+  noMatchingSources: "Inga matchande dokument hittades.",
   dataSources: "Datakällor",
   sourceCount: "{count} källa",
   sourceCountPlural: "{count} källor",

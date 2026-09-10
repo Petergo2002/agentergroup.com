@@ -23,15 +23,30 @@ function titleFromEmail(email?: string | null) {
     .join(" ");
 }
 
-function buildProfilePayload(user: User): ProfileRecord {
+export function buildProfilePayload(
+  user: User,
+  existingProfile?: ProfileRecord | null,
+): ProfileRecord {
+  const metaFullName =
+    typeof user.user_metadata?.full_name === "string" &&
+    user.user_metadata.full_name.trim()
+      ? user.user_metadata.full_name.trim()
+      : typeof user.user_metadata?.name === "string" &&
+        user.user_metadata.name.trim()
+      ? user.user_metadata.name.trim()
+      : null;
+
   return {
     id: user.id,
     email: user.email ?? null,
     full_name:
-      user.user_metadata?.full_name ??
-      user.user_metadata?.name ??
+      metaFullName ??
+      existingProfile?.full_name ??
       titleFromEmail(user.email),
-    avatar_url: user.user_metadata?.avatar_url ?? null,
+    avatar_url:
+      user.user_metadata?.avatar_url ??
+      existingProfile?.avatar_url ??
+      null,
   };
 }
 
@@ -94,8 +109,8 @@ export async function syncUserProfile(
   supabase: SupabaseLike,
   user: User,
 ): Promise<ProfileRecord> {
-  const profilePayload = buildProfilePayload(user);
   const existingProfile = await loadProfileById(supabase, user.id);
+  const profilePayload = buildProfilePayload(user, existingProfile);
 
   if (existingProfile && !profileNeedsSync(existingProfile, profilePayload)) {
     return existingProfile;
@@ -117,10 +132,11 @@ export async function syncUserProfile(
 
   if (isDuplicateKeyError(insertResult.error)) {
     const concurrentProfile = await loadProfileById(supabase, user.id);
-    if (concurrentProfile && !profileNeedsSync(concurrentProfile, profilePayload)) {
+    const retryPayload = buildProfilePayload(user, concurrentProfile);
+    if (concurrentProfile && !profileNeedsSync(concurrentProfile, retryPayload)) {
       return concurrentProfile;
     }
-    return updateProfile(supabase, profilePayload);
+    return updateProfile(supabase, retryPayload);
   }
 
   throw insertResult.error ?? new Error("Failed to create profile.");

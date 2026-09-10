@@ -172,6 +172,20 @@ export const agentBuilder = {
     "Annotations are saved with the draft but are ignored by runtime execution and edge generation.",
   semanticSourcesDescription:
     "Choose the semantic sources this builder can retrieve from.",
+  verifiedAnswersTitle: "Milo's Verified Answers",
+  verifiedAnswersSubtitle:
+    "Authoritative answers approved from your customer questions queue. These take priority over general documents as primary ground truth.",
+  verifiedAnswersActive: "Ground Truth Active",
+  verifiedAnswersInactive: "Ground Truth Disabled",
+  verifiedAnswersCount: "{count} verified answers",
+  verifiedAnswersCountSingle: "1 verified answer",
+  verifiedAnswersEmpty:
+    "No verified answers published yet. When visitors ask questions Milo cannot fully answer, review and verify them in the Questions queue.",
+  openQuestionsQueue: "Manage in Questions Queue",
+  referenceFoldersTitle: "Reference Folders",
+  referenceDocumentsTitle: "Documents & Files",
+  searchSourcesPlaceholder: "Search documents...",
+  noMatchingSources: "No matching documents found.",
   dataSources: "Data Sources",
   sourceCount: "{count} source",
   sourceCountPlural: "{count} sources",

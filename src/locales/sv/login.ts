@@ -44,6 +44,12 @@ export const login = {
   signupConsentRequired:
     "Du måste godkänna användarvillkoren och bekräfta integritetspolicyn för att skapa ett konto.",
   logoAlt: "Avenro-logotyp",
+  fullName: "Fullständigt namn",
+  fullNamePlaceholder: "Anna Andersson",
+  companyName: "Företagsnamn",
+  companyNamePlaceholder: "Acme AB",
+  creatingAccount: "Skapar konto...",
+  signingIn: "Loggar in...",
   continueWithGoogle: "Fortsätt med Google",
   orContinueWith: "eller fortsätt med e-post",
 };

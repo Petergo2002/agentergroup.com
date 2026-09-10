@@ -161,3 +161,18 @@ test("profile comparison ignores unchanged nullable fields", () => {
     true,
   );
 });
+
+test("profile sync preserves existing database full_name when user metadata lacks full_name", async () => {
+  const { client, operations } = createProfileClient(
+    buildProfile({ full_name: "Saved Database Name" }),
+  );
+  const user = buildUser({
+    email: "user@example.com",
+    user_metadata: {},
+  });
+
+  const profile = await syncUserProfile(client as never, user);
+
+  assert.equal(profile.full_name, "Saved Database Name");
+  assert.deepEqual(operations, ["select"]);
+});

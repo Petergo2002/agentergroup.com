@@ -78,12 +78,16 @@ Preview and deployed runtime should now render the same saved specialist configu
 
 ## Builder Preview Contract
 
-The authenticated Website Chat editor loads the real embed loader in preview mode. It communicates with the loader and iframe through origin-checked `postMessage` messages:
+The authenticated Website Chat editor (`/widgets/[id]`) runs the widget in preview mode (`preview=1`). In preview mode, the widget bypasses third-party loader dependencies and directly fetches bootstrap configuration using signed preview headers (`x-ag-preview-token`, `x-ag-preview-revision`).
 
-- `ag:widget-preview:update-config` applies draft theme and color changes immediately.
+It communicates with the parent studio canvas through origin-checked `postMessage` messages:
+
+- `ag:widget-preview:update-config` applies draft theme and color changes immediately without reloading.
 - `ag:widget-preview:update-auth` rotates the signed preview token and revision without rebuilding the iframe or resetting the active preview conversation.
 - `ag:widget-preview:reset-chat` explicitly clears preview session state when requested.
 - `ag:widget-preview:request-config` asks the parent editor to resend its current draft override.
+- `ag:widget:state` synchronizes open/closed state (`{ type: 'ag:widget:state', isOpen: boolean }`) between the outer canvas launcher and the inner widget.
+- `ag:widget:close-request` notifies the parent studio canvas when the close `✕` button inside the widget header is clicked to smoothly collapse the window back into the canonical Milo launcher pill.
 
 Preview mode does not trap focus inside the widget iframe because the surrounding dashboard remains an interactive editor surface. Live embedded mode retains the normal modal-like focus behavior.
 

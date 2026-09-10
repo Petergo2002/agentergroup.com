@@ -130,6 +130,7 @@
 .site[data-active-section="product"] .navLink[data-nav="product"],
 .site[data-active-section="how-it-works"] .navLink[data-nav="how-it-works"],
 .site[data-active-section="use-cases"] .navLink[data-nav="use-cases"],
+.site[data-active-section="security"] .navLink[data-nav="security"],
 .site[data-active-section="faq"] .navLink[data-nav="faq"] {
   color: var(--mkt-ink);
   background: var(--mkt-soft);
@@ -138,9 +139,55 @@
 .site[data-active-section="product"] .navLink[data-nav="product"]::after,
 .site[data-active-section="how-it-works"] .navLink[data-nav="how-it-works"]::after,
 .site[data-active-section="use-cases"] .navLink[data-nav="use-cases"]::after,
+.site[data-active-section="security"] .navLink[data-nav="security"]::after,
 .site[data-active-section="faq"] .navLink[data-nav="faq"]::after {
   opacity: 1;
   transform: scaleX(1);
+}
+
+.securityPanel {
+  border: 1px solid var(--mkt-border);
+  border-radius: var(--mkt-radius-panel);
+  background: var(--mkt-warm);
+}
+
+.securityGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  border-top: 1px solid var(--mkt-border);
+  background: var(--mkt-border);
+}
+
+.securityCard {
+  min-width: 0;
+  padding: 1.75rem;
+  background: var(--mkt-card);
+}
+
+.securityLink {
+  color: var(--mkt-ink);
+  transition: color var(--motion-fast) var(--ease-ui);
+}
+
+.securityLink:hover {
+  color: var(--mkt-orange-text);
+}
+
+@media (min-width: 640px) {
+  .securityGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .securityCard {
+    padding: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .securityGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .heroCopy > * {

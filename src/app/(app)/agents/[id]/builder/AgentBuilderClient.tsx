@@ -65,7 +65,12 @@ import {
   isChatIntegrationSlug,
   isToolNameForToolkit,
 } from '@/lib/integrations';
-import { getKnowledgeStatusTone, isReadyKnowledgeSource } from '@/lib/knowledge';
+import {
+  getKnowledgeStatusTone,
+  isReadyKnowledgeSource,
+  isVerifiedKnowledgeFolder,
+  isVerifiedKnowledgeSource,
+} from '@/lib/knowledge';
 import { jsonFetcher, workspaceSWRKey } from '@/lib/json-fetcher';
 import {
   createLegacyOpenRouterModelOption,
@@ -1635,6 +1640,8 @@ function enrichNodeForDisplay(
   connections: ConnectionRecord[],
   t: Translate,
   isPrimaryMilo: boolean,
+  knowledgeFolders?: KnowledgeFolderWithSources[],
+  knowledgeSources?: KnowledgeSourceRecord[],
 ): BuilderFlowNode {
   const localizedText = getBuilderNodeText(
     node.data.kind,
@@ -1667,9 +1674,43 @@ function enrichNodeForDisplay(
   }
 
   if (node.data.kind === 'knowledge') {
-    const sourceCount = node.data.sourceIds.length;
-    const folderCount = (node.data.folderIds ?? []).length;
-    const attachedCount = sourceCount + folderCount;
+    const attachedFolderIds = node.data.folderIds ?? [];
+    const attachedSourceIds = node.data.sourceIds ?? [];
+    const verifiedFolder = (knowledgeFolders ?? []).find((folder) =>
+      isVerifiedKnowledgeFolder(folder),
+    );
+    const hasVerifiedAttached = verifiedFolder
+      ? attachedFolderIds.includes(verifiedFolder.id)
+      : false;
+    const verifiedCount = (knowledgeSources ?? []).filter((s) =>
+      isVerifiedKnowledgeSource(s),
+    ).length;
+    const refSourceCount = attachedSourceIds.filter((id) => {
+      const src = (knowledgeSources ?? []).find((s) => s.id === id);
+      return src ? !isVerifiedKnowledgeSource(src) : true;
+    }).length;
+    const refFolderCount = attachedFolderIds.filter(
+      (id) => id !== verifiedFolder?.id,
+    ).length;
+
+    let badgeText = '';
+    let badgeTone: BuilderNodeData['badgeTone'] = 'warning';
+
+    if (hasVerifiedAttached && verifiedCount > 0) {
+      const refCount = refSourceCount + refFolderCount;
+      badgeText =
+        refCount > 0
+          ? `${verifiedCount} Verified · ${refCount} Ref`
+          : `${verifiedCount} Verified`;
+      badgeTone = 'success';
+    } else {
+      const attachedCount = attachedSourceIds.length + attachedFolderIds.length;
+      badgeText =
+        attachedCount > 0
+          ? t('agentBuilder.attachedBadge', { count: attachedCount })
+          : t('agentBuilder.noSourcesBadge');
+      badgeTone = attachedCount > 0 ? 'success' : 'warning';
+    }
 
     return {
       ...node,
@@ -1677,11 +1718,8 @@ function enrichNodeForDisplay(
         ...node.data,
         ...localizedText,
         confidenceLabel: t('agentBuilder.confidence'),
-        badgeText:
-          attachedCount > 0
-            ? t('agentBuilder.attachedBadge', { count: attachedCount })
-            : t('agentBuilder.noSourcesBadge'),
-        badgeTone: attachedCount > 0 ? 'success' : 'warning',
+        badgeText,
+        badgeTone,
       },
     };
   }
@@ -2792,6 +2830,9 @@ export default function AgentBuilderClient() {
   const [connections, setConnections] = useState<ConnectionRecord[]>([]);
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceRecord[]>([]);
   const [knowledgeFolders, setKnowledgeFolders] = useState<KnowledgeFolderWithSources[]>([]);
+  const [knowledgeSearchQuery, setKnowledgeSearchQuery] = useState('');
+  const [isVerifiedPreviewOpen, setIsVerifiedPreviewOpen] = useState(false);
+  const [isVerifiedInfoOpen, setIsVerifiedInfoOpen] = useState(false);
   const [versions, setVersions] = useState<AgentVersionRecord[]>([]);
   const [automationRecord, setAutomationRecord] = useState<AgentAutomationRecord | null>(null);
   const [automationEvents, setAutomationEvents] = useState<AutomationEventRecord[]>([]);
@@ -3038,7 +3079,14 @@ export default function AgentBuilderClient() {
     const hasStarterPrompt = starterPromptFields.some((prompt) => prompt.trim().length > 0);
 
     return nodes.map((node) => {
-      const enriched = enrichNodeForDisplay(node, connections, t, isPrimaryMilo);
+      const enriched = enrichNodeForDisplay(
+        node,
+        connections,
+        t,
+        isPrimaryMilo,
+        knowledgeFolders,
+        knowledgeSources,
+      );
 
       if (enriched.data.kind !== 'agent') {
         return enriched;
@@ -3078,6 +3126,8 @@ export default function AgentBuilderClient() {
     hasConfiguredTools,
     instructions,
     isPrimaryMilo,
+    knowledgeFolders,
+    knowledgeSources,
     name,
     nodes,
     agent?.surface,
@@ -4999,11 +5049,43 @@ export default function AgentBuilderClient() {
     if (knowledgeNode && isKnowledgeNodeData(knowledgeNode.data)) {
       const attachedSourceIds = knowledgeNode.data.sourceIds;
       const attachedFolderIds = knowledgeNode.data.folderIds ?? [];
+
+      // Detect the special Verified Answers folder
+      const verifiedFolder = knowledgeFolders.find((folder) =>
+        isVerifiedKnowledgeFolder(folder),
+      );
+      const isVerifiedFolderAttached = verifiedFolder
+        ? attachedFolderIds.includes(verifiedFolder.id)
+        : false;
+
+      // Filter verified sources from flywheel
+      const verifiedSources = knowledgeSources.filter((source) =>
+        isVerifiedKnowledgeSource(source),
+      );
+
+      // Filter custom reference folders (excluding internal verified answers folder)
+      const referenceFolders = knowledgeFolders.filter(
+        (folder) => !isVerifiedKnowledgeFolder(folder),
+      );
+
+      // Filter reference sources (excluding flywheel verified Q&A answers)
+      const referenceSources = knowledgeSources.filter(
+        (source) => !isVerifiedKnowledgeSource(source),
+      );
+
+      const filteredReferenceSources = knowledgeSearchQuery.trim()
+        ? referenceSources.filter((source) =>
+            source.name
+              .toLowerCase()
+              .includes(knowledgeSearchQuery.toLowerCase().trim()),
+          )
+        : referenceSources;
+
       const validAttachedSourceIds = attachedSourceIds.filter((id) =>
-        knowledgeSources.some((source) => source.id === id)
+        knowledgeSources.some((source) => source.id === id),
       );
       const validAttachedFolderIds = attachedFolderIds.filter((id) =>
-        knowledgeFolders.some((folder) => folder.id === id)
+        knowledgeFolders.some((folder) => folder.id === id),
       );
       const effectiveSourceIds = Array.from(
         new Set([
@@ -5015,183 +5097,458 @@ export default function AgentBuilderClient() {
       ).filter((id) => knowledgeSources.some((source) => source.id === id));
 
       return (
-          <div className="space-y-10">
-            <div className="relative overflow-hidden rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">{t('agentBuilder.dataSources')}</h3>
-                  <div className="flex shrink-0 items-center gap-2 rounded-full ring-1 ring-inset ring-primary/20 bg-primary/5 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-primary">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                    </span>
-                    {effectiveSourceIds.length === 1
-                      ? t('agentBuilder.sourceCount', { count: effectiveSourceIds.length })
-                      : t('agentBuilder.sourceCountPlural', { count: effectiveSourceIds.length })}
-                  </div>
-                </div>
-                <p className="text-xs leading-relaxed text-on-surface-variant/70 font-medium">
-                  {t('agentBuilder.semanticSourcesDescription')}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-on-surface-variant/50">
-                  <span>{t('agentBuilder.folderCount', { count: validAttachedFolderIds.length })}</span>
-                  <span>{t('agentBuilder.effectiveSourceCount', { count: effectiveSourceIds.length })}</span>
+        <div className="space-y-4 overflow-x-hidden">
+          {/* Top Overview Card */}
+          <div className="relative overflow-hidden rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-3.5 shadow-sm">
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">
+                  {t('agentBuilder.dataSources')}
+                </h3>
+                <div className="flex shrink-0 items-center gap-1.5 rounded-full ring-1 ring-inset ring-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
+                  </span>
+                  {effectiveSourceIds.length === 1
+                    ? t('agentBuilder.sourceCount', { count: effectiveSourceIds.length })
+                    : t('agentBuilder.sourceCountPlural', { count: effectiveSourceIds.length })}
                 </div>
               </div>
-              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-primary/5 blur-2xl" />
+              <p className="text-xs leading-relaxed text-on-surface-variant/70 font-medium">
+                {t('agentBuilder.semanticSourcesDescription')}
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-on-surface-variant/50">
+                <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
+                  <span className="material-symbols-outlined text-xs">verified</span>
+                  {isVerifiedFolderAttached
+                    ? verifiedSources.length === 1
+                      ? t('agentBuilder.verifiedAnswersCountSingle')
+                      : t('agentBuilder.verifiedAnswersCount', { count: verifiedSources.length })
+                    : t('agentBuilder.verifiedAnswersInactive')}
+                </span>
+                <span>•</span>
+                <span>{t('agentBuilder.folderCount', { count: validAttachedFolderIds.length })}</span>
+                <span>•</span>
+                <span>{t('agentBuilder.effectiveSourceCount', { count: effectiveSourceIds.length })}</span>
+              </div>
             </div>
-            
-            <div className="space-y-4">
-              {knowledgeFolders.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between px-1">
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
-                      {t('agentBuilder.knowledgeFolders')}
-                    </h4>
-                    <span className="text-[10px] font-black uppercase tracking-[0.16em] text-on-surface-variant/35">
-                      {t('agentBuilder.liveFolders')}
-                    </span>
-                  </div>
-                  {knowledgeFolders.map((folder) => {
-                    const checked = attachedFolderIds.includes(folder.id);
-                    const readySourceCount = folder.sourceIds.filter((id) =>
-                      knowledgeSources.some((source) => source.id === id && isReadyKnowledgeSource(source)),
-                    ).length;
+            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-primary/5 blur-2xl" />
+          </div>
 
-                    return (
-                      <label
-                        key={folder.id}
-                        className={`group relative flex items-center justify-between gap-4 rounded-[1.75rem] border p-5 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] cursor-pointer ${
-                          checked
-                            ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-lg shadow-primary/5'
-                            : 'border-outline-variant/10 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low hover:shadow-xl hover:shadow-black/5'
-                        }`}
-                      >
-                        <div className="min-w-0 flex-1 pl-1">
-                          <p className={`text-sm font-bold tracking-tight truncate pr-4 transition-colors ${checked ? 'text-primary' : 'text-on-surface'}`}>
-                            {folder.name}
-                          </p>
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="rounded-full bg-primary/5 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-primary">
-                              {t('agentBuilder.liveFolder')}
+          {/* DEDICATED COMPACT SECTION: Milo's Verified Answers (Ground Truth) */}
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.04] via-surface-container-lowest to-surface-container-lowest p-3.5 shadow-sm ring-1 ring-emerald-500/10">
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 shadow-sm ring-1 ring-emerald-500/20">
+                  <span className="material-symbols-outlined text-base">verified</span>
+                </div>
+                <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
+                  <h4 className="text-xs font-bold tracking-tight text-on-surface truncate">
+                    {t('agentBuilder.verifiedAnswersTitle')}
+                  </h4>
+                  <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] text-emerald-600">
+                    Ground Truth
+                  </span>
+                  {/* Information toggle */}
+                  <button
+                    type="button"
+                    aria-label="Information"
+                    onMouseEnter={() => setIsVerifiedInfoOpen(true)}
+                    onMouseLeave={() => setIsVerifiedInfoOpen(false)}
+                    onClick={() => setIsVerifiedInfoOpen((prev) => !prev)}
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-on-surface-variant/40 hover:text-emerald-600 hover:bg-emerald-500/10 transition-colors focus:outline-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">info</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Toggle Switch */}
+              {verifiedFolder ? (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isVerifiedFolderAttached}
+                  onClick={() =>
+                    updateKnowledgeFolders(verifiedFolder.id, !isVerifiedFolderAttached)
+                  }
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    isVerifiedFolderAttached ? 'bg-emerald-600' : 'bg-outline-variant/30'
+                  }`}
+                  title={
+                    isVerifiedFolderAttached
+                      ? t('agentBuilder.verifiedAnswersActive')
+                      : t('agentBuilder.verifiedAnswersInactive')
+                  }
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      isVerifiedFolderAttached ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              ) : null}
+            </div>
+
+            {/* Information popover (clean, in-card, zero horizontal overflow) */}
+            {isVerifiedInfoOpen && (
+              <div
+                onMouseEnter={() => setIsVerifiedInfoOpen(true)}
+                onMouseLeave={() => setIsVerifiedInfoOpen(false)}
+                className="mt-2.5 rounded-xl border border-outline-variant/15 bg-surface-container-highest/95 p-2.5 text-[11px] leading-relaxed text-on-surface shadow-md backdrop-blur-md"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium text-[11px] text-on-surface leading-normal">
+                    {t('agentBuilder.verifiedAnswersSubtitle')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsVerifiedInfoOpen(false)}
+                    className="text-on-surface-variant/40 hover:text-on-surface shrink-0"
+                    aria-label="Close info"
+                  >
+                    <span className="material-symbols-outlined text-xs">close</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-emerald-500/10 pt-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-on-surface-variant/80 min-w-0">
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                    isVerifiedFolderAttached && verifiedSources.length > 0
+                      ? 'bg-emerald-500'
+                      : 'bg-outline-variant/50'
+                  }`}
+                />
+                <span className="truncate">
+                  {verifiedSources.length === 1
+                    ? t('agentBuilder.verifiedAnswersCountSingle')
+                    : t('agentBuilder.verifiedAnswersCount', {
+                        count: verifiedSources.length,
+                      })}
+                  {isVerifiedFolderAttached
+                    ? ` • ${t('agentBuilder.verifiedAnswersActive')}`
+                    : ` • ${t('agentBuilder.verifiedAnswersInactive')}`}
+                </span>
+              </div>
+              <Link
+                href="/questions"
+                className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-primary hover:underline"
+              >
+                <span>{t('agentBuilder.openQuestionsQueue')}</span>
+                <span className="material-symbols-outlined text-xs">open_in_new</span>
+              </Link>
+            </div>
+
+            {/* Expandable Preview of Verified Q&As */}
+            {verifiedSources.length > 0 ? (
+              <div className="mt-2 border-t border-emerald-500/10 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsVerifiedPreviewOpen((prev) => !prev)}
+                  className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 hover:text-on-surface transition-colors"
+                >
+                  <span
+                    className="material-symbols-outlined text-sm transition-transform duration-200"
+                    style={{
+                      transform: isVerifiedPreviewOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                    }}
+                  >
+                    chevron_right
+                  </span>
+                  <span>
+                    {isVerifiedPreviewOpen
+                      ? 'Hide verified Q&As'
+                      : `View ${verifiedSources.length} verified Q&As`}
+                  </span>
+                </button>
+
+                {isVerifiedPreviewOpen ? (
+                  <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
+                    {verifiedSources.map((source) => {
+                      const cleanQuestion = source.name.replace(
+                        /^Verified answer:\s*/i,
+                        '',
+                      );
+                      return (
+                        <div
+                          key={source.id}
+                          className="rounded-lg border border-outline-variant/10 bg-surface-container-lowest p-2.5 text-xs shadow-2xs"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="material-symbols-outlined text-sm text-emerald-600 shrink-0 mt-0.5">
+                              check_circle
                             </span>
-                            <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/30">
-                              {t('agentBuilder.readySourceCount', { count: readySourceCount })}
-                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-on-surface line-clamp-1">
+                                {cleanQuestion}
+                              </p>
+                              {source.description ? (
+                                <p className="mt-0.5 text-[11px] text-on-surface-variant/60 line-clamp-2">
+                                  {source.description}
+                                </p>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
-                        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(event) => updateKnowledgeFolders(folder.id, event.target.checked)}
-                            className="peer absolute h-full w-full opacity-0 cursor-pointer z-10"
-                          />
-                          <div className={`h-7 w-7 rounded-xl border-2 transition-all duration-300 ${
-                            checked 
-                              ? 'border-primary bg-primary scale-110' 
-                              : 'border-outline-variant/20 bg-background group-hover:border-primary/50'
-                          }`} />
-                          <span className={`material-symbols-outlined absolute text-white text-[18px] transition-all duration-300 ${
-                            checked ? 'scale-100 opacity-100 rotate-0' : 'scale-50 opacity-0 rotate-12'
-                          }`}>check</span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between px-1 pt-2">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
-                  {t('agentBuilder.individualSources')}
-                </h4>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
+            ) : null}
+          </div>
 
-              {knowledgeSources.length === 0 ? (
-                <div className="flex flex-col items-center gap-4 rounded-[2.5rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-8 py-16 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/5 text-primary/40">
-                    <span className="material-symbols-outlined text-4xl">library_books</span>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-bold text-on-surface">{t('agentBuilder.noIndexedSources')}</p>
-                    <p className="text-xs text-on-surface-variant/60">{t('agentBuilder.noSourcesBadge')}</p>
-                  </div>
+          {/* SECTION: Reference Folders */}
+          {referenceFolders.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
+                  {t('agentBuilder.referenceFoldersTitle')}
+                </h4>
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-on-surface-variant/35">
+                  {t('agentBuilder.liveFolders')}
+                </span>
+              </div>
+              {referenceFolders.map((folder) => {
+                const checked = attachedFolderIds.includes(folder.id);
+                const readySourceCount = folder.sourceIds.filter((id) =>
+                  knowledgeSources.some(
+                    (source) => source.id === id && isReadyKnowledgeSource(source),
+                  ),
+                ).length;
+
+                return (
+                  <label
+                    key={folder.id}
+                    className={`group relative flex items-center justify-between gap-4 rounded-[1.75rem] border p-5 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] cursor-pointer ${
+                      checked
+                        ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-sm'
+                        : 'border-outline-variant/10 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1 pl-1">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg text-primary/70">
+                          folder
+                        </span>
+                        <p
+                          className={`text-sm font-bold tracking-tight truncate pr-4 transition-colors ${
+                            checked ? 'text-primary' : 'text-on-surface'
+                          }`}
+                        >
+                          {folder.name}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 pl-7">
+                        <span className="rounded-full bg-primary/5 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-primary">
+                          {t('agentBuilder.liveFolder')}
+                        </span>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/40">
+                          {t('agentBuilder.readySourceCount', { count: readySourceCount })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="relative flex h-7 w-7 shrink-0 items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) =>
+                          updateKnowledgeFolders(folder.id, event.target.checked)
+                        }
+                        className="peer absolute h-full w-full opacity-0 cursor-pointer z-10"
+                      />
+                      <div
+                        className={`h-7 w-7 rounded-xl border-2 transition-all duration-300 ${
+                          checked
+                            ? 'border-primary bg-primary scale-110'
+                            : 'border-outline-variant/20 bg-background group-hover:border-primary/50'
+                        }`}
+                      />
+                      <span
+                        className={`material-symbols-outlined absolute text-white text-[18px] transition-all duration-300 ${
+                          checked
+                            ? 'scale-100 opacity-100 rotate-0'
+                            : 'scale-50 opacity-0 rotate-12'
+                        }`}
+                      >
+                        check
+                      </span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+
+          {/* SECTION: Reference Documents & Files */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between px-1">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50">
+                {t('agentBuilder.referenceDocumentsTitle')}
+              </h4>
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-on-surface-variant/35">
+                {referenceSources.length} files
+              </span>
+            </div>
+
+            {referenceSources.length > 3 && (
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-base text-on-surface-variant/40">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={knowledgeSearchQuery}
+                  onChange={(e) => setKnowledgeSearchQuery(e.target.value)}
+                  placeholder={t('agentBuilder.searchSourcesPlaceholder')}
+                  className="w-full rounded-xl border border-outline-variant/15 bg-surface-container-lowest py-2 pl-9 pr-8 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                {knowledgeSearchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setKnowledgeSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface"
+                  >
+                    <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+                ) : null}
+              </div>
+            )}
+
+            {referenceSources.length === 0 ? (
+              <div className="flex flex-col items-center gap-4 rounded-[2.5rem] border border-dashed border-outline-variant/20 bg-surface-container-low/50 px-8 py-12 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/5 text-primary/40">
+                  <span className="material-symbols-outlined text-3xl">
+                    library_books
+                  </span>
                 </div>
-              ) : (
-                knowledgeSources.map((source) => {
-                  const checked = attachedSourceIds.includes(source.id);
-                  const isReady = isReadyKnowledgeSource(source);
+                <div className="space-y-1.5">
+                  <p className="text-sm font-bold text-on-surface">
+                    {t('agentBuilder.noIndexedSources')}
+                  </p>
+                  <p className="text-xs text-on-surface-variant/60">
+                    {t('agentBuilder.noSourcesBadge')}
+                  </p>
+                </div>
+                <Link
+                  href="/knowledge"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary/10 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-base">upload_file</span>
+                  <span>Upload Documents</span>
+                </Link>
+              </div>
+            ) : filteredReferenceSources.length === 0 ? (
+              <div className="py-8 text-center text-xs text-on-surface-variant/60">
+                {t('agentBuilder.noMatchingSources')}
+              </div>
+            ) : (
+              filteredReferenceSources.map((source) => {
+                const checked = attachedSourceIds.includes(source.id);
+                const isReady = isReadyKnowledgeSource(source);
+                const isPdf =
+                  source.mime_type?.includes('pdf') ||
+                  source.name.toLowerCase().endsWith('.pdf');
 
-                  return (
-                    <label
-                      key={source.id}
-                      className={`group relative flex items-center justify-between gap-4 rounded-[1.75rem] border p-5 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] cursor-pointer ${
-                        isReady
-                          ? checked 
-                            ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-lg shadow-primary/5' 
-                            : 'border-outline-variant/10 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low hover:shadow-xl hover:shadow-black/5'
-                          : 'border-outline-variant/5 bg-surface-container-high/20 grayscale opacity-60 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1 pl-1">
-                        <p className={`text-sm font-bold tracking-tight truncate pr-4 transition-colors ${checked ? 'text-primary' : 'text-on-surface'}`}>
+                return (
+                  <label
+                    key={source.id}
+                    className={`group relative flex items-center justify-between gap-4 rounded-[1.75rem] border p-5 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] cursor-pointer ${
+                      isReady
+                        ? checked
+                          ? 'border-primary/40 bg-primary/[0.04] ring-1 ring-inset ring-primary/10 shadow-sm'
+                          : 'border-outline-variant/10 bg-surface-container-lowest hover:border-outline-variant/30 hover:bg-surface-container-low'
+                        : 'border-outline-variant/5 bg-surface-container-high/20 grayscale opacity-60 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1 pl-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`material-symbols-outlined text-lg ${
+                            isPdf ? 'text-red-500/80' : 'text-primary/70'
+                          }`}
+                        >
+                          {isPdf ? 'picture_as_pdf' : 'description'}
+                        </span>
+                        <p
+                          className={`text-sm font-bold tracking-tight truncate pr-4 transition-colors ${
+                            checked ? 'text-primary' : 'text-on-surface'
+                          }`}
+                        >
                           {source.name}
                         </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] ${getKnowledgeStatusTone(source.status)}`}
-                          >
-                            {translateKnowledgeStatus(source.status, t)}
-                          </span>
-                          <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/30">
-                            {t('agentBuilder.knowledgeChunks', {
-                              count: source.chunk_count,
-                            })}
-                          </span>
-                        </div>
                       </div>
-                      <div className="relative flex h-7 w-7 shrink-0 items-center justify-center">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={!isReady}
-                          onChange={(event) => updateKnowledgeSources(source.id, event.target.checked)}
-                          className="peer absolute h-full w-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
-                        />
-                        <div className={`h-7 w-7 rounded-xl border-2 transition-all duration-300 ${
-                          checked 
-                            ? 'border-primary bg-primary scale-110' 
+                      <div className="flex items-center gap-3 mt-2 pl-7">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] ${getKnowledgeStatusTone(
+                            source.status,
+                          )}`}
+                        >
+                          {translateKnowledgeStatus(source.status, t)}
+                        </span>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/30">
+                          {t('agentBuilder.knowledgeChunks', {
+                            count: source.chunk_count,
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="relative flex h-7 w-7 shrink-0 items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!isReady}
+                        onChange={(event) =>
+                          updateKnowledgeSources(source.id, event.target.checked)
+                        }
+                        className="peer absolute h-full w-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
+                      />
+                      <div
+                        className={`h-7 w-7 rounded-xl border-2 transition-all duration-300 ${
+                          checked
+                            ? 'border-primary bg-primary scale-110'
                             : 'border-outline-variant/20 bg-background group-hover:border-primary/50'
-                        }`} />
-                        <span className={`material-symbols-outlined absolute text-white text-[18px] transition-all duration-300 ${
-                          checked ? 'scale-100 opacity-100 rotate-0' : 'scale-50 opacity-0 rotate-12'
-                        }`}>check</span>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-            
-            <div className="flex flex-col gap-3 pt-8 border-t border-outline-variant/10">
-              <Link
-                href="/knowledge"
-                className="flex items-center justify-center gap-3 rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-lowest px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/30 hover:shadow-md active:scale-[0.98]"
-              >
-                <span className="material-symbols-outlined text-lg">sync</span>
-                {t('agentBuilder.syncOperations')}
-              </Link>
-              <button
-                onClick={() => removeOptionalNode('knowledge')}
-                className="flex items-center justify-center gap-3 rounded-[1.25rem] bg-error/5 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-error transition-all hover:bg-error hover:text-on-error hover:shadow-lg hover:shadow-error/20 active:scale-[0.98]"
-                title={t('agentBuilder.removeNode')}
-              >
-                <span className="material-symbols-outlined text-lg">delete</span>
-                {t('agentBuilder.removeNode')}
-              </button>
-            </div>
+                        }`}
+                      />
+                      <span
+                        className={`material-symbols-outlined absolute text-white text-[18px] transition-all duration-300 ${
+                          checked
+                            ? 'scale-100 opacity-100 rotate-0'
+                            : 'scale-50 opacity-0 rotate-12'
+                        }`}
+                      >
+                        check
+                      </span>
+                    </div>
+                  </label>
+                );
+              })
+            )}
           </div>
+
+          {/* Bottom Actions */}
+          <div className="flex flex-col gap-2.5 pt-5 border-t border-outline-variant/10">
+            <Link
+              href="/knowledge"
+              className="flex items-center justify-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/30 hover:shadow-sm active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-base">sync</span>
+              {t('agentBuilder.syncOperations')}
+            </Link>
+            <button
+              onClick={() => removeOptionalNode('knowledge')}
+              className="flex items-center justify-center gap-2 rounded-xl bg-error/5 px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-error transition-all hover:bg-error hover:text-on-error hover:shadow-lg hover:shadow-error/20 active:scale-[0.98]"
+              title={t('agentBuilder.removeNode')}
+            >
+              <span className="material-symbols-outlined text-base">delete</span>
+              {t('agentBuilder.removeNode')}
+            </button>
+          </div>
+        </div>
       );
     }
 
@@ -6058,7 +6415,7 @@ export default function AgentBuilderClient() {
         </section>
 
         {selectedNode ? (
-          <aside className="border-l border-outline-variant/10 overflow-y-auto bg-surface/90 backdrop-blur-3xl flex flex-col">
+          <aside className="border-l border-outline-variant/10 overflow-hidden bg-surface/90 backdrop-blur-3xl flex flex-col">
             {/* ── Compact node header ── */}
             <div className="shrink-0 sticky top-0 z-10 border-b border-outline-variant/10 bg-surface/95 backdrop-blur-xl px-6 py-4">
               <div className="flex items-center justify-between gap-3">
@@ -6104,7 +6461,7 @@ export default function AgentBuilderClient() {
             </div>
 
             {/* ── Body ── */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5">
               {renderInspectorBody()}
             </div>
           </aside>

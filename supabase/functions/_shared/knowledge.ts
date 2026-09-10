@@ -25,7 +25,7 @@ function splitLargeBlock(block: string) {
       pieces.push(block.slice(index, index + KNOWLEDGE_CHUNK_TARGET).trim());
     }
 
-    return pieces.filter((piece) => piece.length >= KNOWLEDGE_CHUNK_MINIMUM);
+    return pieces.filter(Boolean);
   }
 
   const pieces: string[] = [];
@@ -34,7 +34,7 @@ function splitLargeBlock(block: string) {
   const pushCurrent = () => {
     const trimmed = current.trim();
 
-    if (trimmed.length >= KNOWLEDGE_CHUNK_MINIMUM) {
+    if (trimmed.length > 0) {
       pieces.push(trimmed);
     }
 
@@ -103,7 +103,7 @@ export function chunkKnowledgeText(value: string) {
   const pushCurrent = () => {
     const trimmed = current.trim();
 
-    if (trimmed.length >= KNOWLEDGE_CHUNK_MINIMUM) {
+    if (trimmed.length > 0) {
       chunks.push({
         content: trimmed,
         chunkIndex: chunks.length,
@@ -131,9 +131,21 @@ export function chunkKnowledgeText(value: string) {
 
   pushCurrent();
 
-  const normalizedChunks = chunks.map((chunk, index) => ({
-    ...chunk,
-    chunkIndex: index,
+  // Very long sentences and paragraph overlap must never exceed worker input limits.
+  // Keep short tails: dropping them loses facts at the end of a page.
+  const boundedContent = chunks.flatMap((chunk) => {
+    const pieces: string[] = [];
+    for (let start = 0; start < chunk.content.length;) {
+      const end = Math.min(start + KNOWLEDGE_CHUNK_TARGET, chunk.content.length);
+      const piece = chunk.content.slice(start, end).trim();
+      if (piece) pieces.push(piece);
+      if (end === chunk.content.length) break;
+      start = end - KNOWLEDGE_CHUNK_OVERLAP;
+    }
+    return pieces;
+  });
+  const normalizedChunks = boundedContent.map((content, chunkIndex) => ({
+    content, chunkIndex, contentLength: content.length,
   }));
 
   if (normalizedChunks.length === 0) {

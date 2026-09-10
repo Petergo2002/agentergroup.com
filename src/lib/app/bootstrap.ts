@@ -30,9 +30,17 @@ interface DatabaseError {
 }
 
 function buildWorkspaceName(user: User) {
+  const explicitWorkspace =
+    typeof user.user_metadata?.workspace_name === "string"
+      ? user.user_metadata.workspace_name.trim()
+      : "";
+
+  if (explicitWorkspace) {
+    return explicitWorkspace;
+  }
+
   const candidate =
-    user.user_metadata?.workspace_name ||
-    user.user_metadata?.full_name ||
+    user.user_metadata?.full_name?.trim() ||
     titleFromEmail(user.email);
 
   return `${candidate} Workspace`;

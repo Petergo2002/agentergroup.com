@@ -127,7 +127,21 @@ The primary Website Chat has exactly one attached Milo in the customer experienc
 
 Widget V2 consistently presents the Milo mark and product name in the public launcher, home identity, typing state, and assistant-message attribution. The editable widget-agent presentation still controls greetings, descriptions, placeholders, quick actions, contact-form behavior, and other visitor copy. Message copy actions show localized success feedback and retain a fallback for iframe environments where the Clipboard API is unavailable.
 
-The authenticated Website Chat preview uses the real embed loader. Draft theme/color changes flow through `ag:widget-preview:update-config`; refreshed preview credentials flow through `ag:widget-preview:update-auth`. Token rotation updates the live iframe without recreating it or losing the current preview conversation.
+The authenticated Website Chat builder (`/widgets/[id]`) features a dedicated full-width studio workspace designed for low-friction, uncrowded editing:
+
+- **Left Configuration Column (`420px–480px`):** Clean, spacious controls organized across the 4 primary tabs (`Appearance`, `Milo Chat`, `Behavior`, and `Publish`) with curated color palettes, brand logo uploaders with instant removal, and visual theme selection.
+- **Right Live Studio Canvas:** Expansive, edge-to-edge preview stage featuring:
+  - **Desktop View:** An ambient dot-grid studio stage rendering the **canonical Milo floating launcher bubble** and floating chat window.
+  - **Mobile View:** A centered smartphone chassis previewing the native mobile chat experience.
+  - **The Canonical Milo Launcher:**
+    - **Closed State:** A 56px (`h-14`) pill in the widget's configured primary color, containing a 40px circular white container with the canonical `MiloLogo` (or custom brand logo), a vertical divider line, and the white "Milo" product name.
+    - **Open State:** Morphs into the canonical 56px circular white button with a clean `✕` icon, floating below the live widget window.
+    - **Interactive Sync:** Clicking the bubble expands the chat; clicking the close `✕` button or the close icon inside the widget header collapses the chat back into the launcher pill.
+- **Bidirectional Live Sync:**
+  - Real-time draft theme and color changes flow into the live iframe via `ag:widget-preview:update-config` without reloading.
+  - Preview credentials rotate via `ag:widget-preview:update-auth` without resetting active conversations.
+  - Open/close state is kept in sync bidirectionally via `ag:widget:state` and `ag:widget:close-request`.
+  - In preview mode (`preview=1`), Widget V2 directly bootstraps its configuration from `/api/public/widgets/[widgetPublicKey]/bootstrap` with signed preview headers, eliminating loader dependencies and preventing iframe hangs.
 
 Website Chat may be used in either currently supported form:
 

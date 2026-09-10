@@ -23,6 +23,9 @@ import {
   normalizeWebsiteKnowledgeUrl,
 } from "@/lib/knowledge-website";
 import type { KnowledgeSourceRecord, KnowledgeSourceType } from "@/lib/types";
+import { knowledgeProcessingError } from "@/lib/knowledge-processing-error";
+
+export const maxDuration = 150;
 
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 const KNOWLEDGE_SOURCE_LIST_SELECT =
@@ -134,44 +137,55 @@ function queueKnowledgeProcessing(
 ) {
   after(async () => {
     const admin = createAdminClient();
-    const processResponse = await supabase.functions.invoke(
-      "process-knowledge-source",
-      {
-        headers: accessToken
-          ? {
-              Authorization: `Bearer ${accessToken}`,
-            }
-          : undefined,
-        body: {
-          sourceId,
+    let invocationError: unknown;
+    try {
+      const processResponse = await supabase.functions.invoke(
+        "process-knowledge-source",
+        {
+          headers: accessToken
+            ? {
+                Authorization: `Bearer ${accessToken}`,
+              }
+            : undefined,
+          body: {
+            sourceId,
+          },
         },
-      },
-    );
+      );
 
-    if (processResponse.error) {
+      invocationError = processResponse.error;
+    } catch (error) {
+      invocationError = error;
+    }
+
+    if (invocationError) {
       const { data: failedSource } = await supabase
         .from("knowledge_sources")
-        .select("error_message")
+        .select("error_message, status, processing_token, processing_expires_at, updated_at")
         .eq("id", sourceId)
         .maybeSingle();
 
-      const errorMessage =
-        failedSource?.error_message ??
-        processResponse.error.message ??
-        "Knowledge processing failed.";
+      const failure = await knowledgeProcessingError(invocationError, failedSource?.error_message);
+      const errorMessage = failure.message;
 
       console.error("[knowledge/sources] Background processing failed", {
         sourceId,
         message: errorMessage,
+        status: failure.status,
+        code: failure.code,
       });
 
+      // A gateway/network interruption may leave the worker running. Never clobber
+      // a live lease or a source that finished while the response was in flight.
+      if (!failedSource || failedSource.status === "ready" ||
+        (failedSource.processing_token && Date.parse(failedSource.processing_expires_at ?? "") > Date.now())) return;
       await admin
         .from("knowledge_sources")
         .update({
           status: "failed",
           error_message: errorMessage,
         })
-        .eq("id", sourceId);
+        .eq("id", sourceId).eq("updated_at", failedSource.updated_at);
     }
   });
 }
@@ -187,6 +201,13 @@ export async function GET() {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+  // Recover workers killed by the platform before their catch handler could run.
+  const recovery = await createAdminClient().from("knowledge_sources")
+    .update({ status: "failed", processing_token: null, processing_expires_at: null,
+      error_message: "Processing was interrupted. Saved progress can be retried." })
+    .eq("workspace_id", context.workspace.id).eq("status", "processing")
+    .not("processing_token", "is", null).lt("processing_expires_at", new Date().toISOString());
+  if (recovery.error) console.error("[knowledge/sources] Stale processing recovery failed", recovery.error);
   const { data, error } = await supabase
     .from("knowledge_sources")
     .select(KNOWLEDGE_SOURCE_LIST_SELECT)
@@ -378,7 +399,7 @@ export async function POST(request: NextRequest) {
     if (processResponse.error) {
       return NextResponse.json(
         {
-          error: processResponse.error.message,
+          error: (await knowledgeProcessingError(processResponse.error)).message,
           source,
         },
         { status: 500 },

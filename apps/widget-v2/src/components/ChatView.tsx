@@ -146,8 +146,10 @@ type ParsedBlock =
   | { type: "ordered"; lines: string[] }
   | { type: "paragraph"; lines: string[] };
 
-function renderInlineText(text: string) {
-  const segments = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+function renderInlineText(text: string, isStreaming?: boolean) {
+  const segments = text
+    .split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g)
+    .filter(Boolean);
   return segments.map((segment, index) => {
     const strongMatch = segment.match(/^\*\*(.+)\*\*$/);
     if (strongMatch) {
@@ -156,6 +158,66 @@ function renderInlineText(text: string) {
           {strongMatch[1]}
         </strong>
       );
+    }
+
+    const codeMatch = segment.match(/^`([^`]+)`$/);
+    if (codeMatch) {
+      return (
+        <code
+          key={index}
+          className="rounded bg-widget-surface px-1.5 py-0.5 font-mono text-[12px] text-widget-fg ring-1 ring-widget-border"
+        >
+          {codeMatch[1]}
+        </code>
+      );
+    }
+
+    const linkMatch = segment.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (linkMatch) {
+      return (
+        <a
+          key={index}
+          href={linkMatch[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-widget-primary underline underline-offset-2 hover:opacity-80 transition-opacity"
+        >
+          {linkMatch[1]}
+        </a>
+      );
+    }
+
+    if (isStreaming && index === segments.length - 1) {
+      const partialBold = segment.match(/^\*\*([^*]+)$/);
+      if (partialBold) {
+        return (
+          <strong key={index} className="font-semibold text-widget-fg">
+            {partialBold[1]}
+          </strong>
+        );
+      }
+      const partialCode = segment.match(/^`([^`]+)$/);
+      if (partialCode) {
+        return (
+          <code
+            key={index}
+            className="rounded bg-widget-surface px-1.5 py-0.5 font-mono text-[12px] text-widget-fg ring-1 ring-widget-border"
+          >
+            {partialCode[1]}
+          </code>
+        );
+      }
+      const partialLink = segment.match(/^\[([^\]]+)\]\(([^)]*)$/);
+      if (partialLink) {
+        return (
+          <span
+            key={index}
+            className="font-medium text-widget-primary underline underline-offset-2"
+          >
+            {partialLink[1]}
+          </span>
+        );
+      }
     }
 
     return <Fragment key={index}>{segment}</Fragment>;
@@ -176,24 +238,34 @@ function parseMessageBlocks(content: string): ParsedBlock[] {
       continue;
     }
 
-    if (/^[-*]\s+/.test(line)) {
+    const mdHeadingMatch = line.match(/^#{1,6}\s+(.+)$/);
+    if (mdHeadingMatch) {
+      blocks.push({
+        type: "heading",
+        lines: [mdHeadingMatch[1].trim()],
+      });
+      index += 1;
+      continue;
+    }
+
+    if (/^[-*]\s*/.test(line)) {
       const items: string[] = [];
       while (index < lines.length) {
-        const match = (lines[index] || "").trim().match(/^[-*]\s+(.*)$/);
-        if (!match?.[1]) break;
-        items.push(match[1].trim());
+        const match = (lines[index] || "").trim().match(/^[-*]\s*(.*)$/);
+        if (!match) break;
+        items.push(match[1]?.trim() || "");
         index += 1;
       }
       blocks.push({ type: "unordered", lines: items });
       continue;
     }
 
-    if (/^\d+[.)]\s+/.test(line)) {
+    if (/^\d+[.)]\s*/.test(line)) {
       const items: string[] = [];
       while (index < lines.length) {
-        const match = (lines[index] || "").trim().match(/^\d+[.)]\s+(.*)$/);
-        if (!match?.[1]) break;
-        items.push(match[1].trim());
+        const match = (lines[index] || "").trim().match(/^\d+[.)]\s*(.*)$/);
+        if (!match) break;
+        items.push(match[1]?.trim() || "");
         index += 1;
       }
       blocks.push({ type: "ordered", lines: items });
@@ -219,8 +291,9 @@ function parseMessageBlocks(content: string): ParsedBlock[] {
         break;
       }
       if (
-        /^[-*]\s+/.test(nextLine) ||
-        /^\d+[.)]\s+/.test(nextLine) ||
+        /^[-*]\s*/.test(nextLine) ||
+        /^\d+[.)]\s*/.test(nextLine) ||
+        /^#{1,6}\s+/.test(nextLine) ||
         /^[^:#\n]{2,64}:\s*$/.test(nextLine)
       ) {
         break;
@@ -242,31 +315,25 @@ function AgentMessageContent({
   content: string;
   isStreaming?: boolean;
 }) {
-  if (isStreaming) {
-    return (
-      <div className="text-sm leading-6 text-widget-fg whitespace-pre-wrap break-words">
-        {content}
-        <TypingCursor />
-      </div>
-    );
-  }
-
   const blocks = parseMessageBlocks(content);
 
   if (blocks.length === 0) {
-    return null;
+    return isStreaming ? <TypingCursor /> : null;
   }
 
   return (
     <div className="space-y-2.5 text-sm leading-6 text-widget-fg break-words">
       {blocks.map((block, blockIndex) => {
+        const isLastBlock = blockIndex === blocks.length - 1;
+
         if (block.type === "heading") {
           return (
             <h4
               key={blockIndex}
               className="text-[13px] font-semibold uppercase tracking-wide text-widget-muted"
             >
-              {renderInlineText(block.lines[0] || "")}
+              {renderInlineText(block.lines[0] || "", isStreaming && isLastBlock)}
+              {isStreaming && isLastBlock ? <TypingCursor /> : null}
             </h4>
           );
         }
@@ -277,9 +344,15 @@ function AgentMessageContent({
               key={blockIndex}
               className="space-y-1.5 pl-5 list-disc marker:text-widget-primary"
             >
-              {block.lines.map((item, itemIndex) => (
-                <li key={itemIndex}>{renderInlineText(item)}</li>
-              ))}
+              {block.lines.map((item, itemIndex) => {
+                const isLastItem = isLastBlock && itemIndex === block.lines.length - 1;
+                return (
+                  <li key={itemIndex}>
+                    {renderInlineText(item, isStreaming && isLastItem)}
+                    {isStreaming && isLastItem ? <TypingCursor /> : null}
+                  </li>
+                );
+              })}
             </ul>
           );
         }
@@ -290,21 +363,31 @@ function AgentMessageContent({
               key={blockIndex}
               className="space-y-1.5 pl-5 list-decimal marker:text-widget-primary"
             >
-              {block.lines.map((item, itemIndex) => (
-                <li key={itemIndex}>{renderInlineText(item)}</li>
-              ))}
+              {block.lines.map((item, itemIndex) => {
+                const isLastItem = isLastBlock && itemIndex === block.lines.length - 1;
+                return (
+                  <li key={itemIndex}>
+                    {renderInlineText(item, isStreaming && isLastItem)}
+                    {isStreaming && isLastItem ? <TypingCursor /> : null}
+                  </li>
+                );
+              })}
             </ol>
           );
         }
 
         return (
           <p key={blockIndex} className="whitespace-pre-wrap">
-            {block.lines.map((line, lineIndex) => (
-              <Fragment key={lineIndex}>
-                {renderInlineText(line)}
-                {lineIndex < block.lines.length - 1 ? "\n" : ""}
-              </Fragment>
-            ))}
+            {block.lines.map((line, lineIndex) => {
+              const isLastLine = isLastBlock && lineIndex === block.lines.length - 1;
+              return (
+                <Fragment key={lineIndex}>
+                  {renderInlineText(line, isStreaming && isLastLine)}
+                  {isStreaming && isLastLine ? <TypingCursor /> : null}
+                  {lineIndex < block.lines.length - 1 ? "\n" : ""}
+                </Fragment>
+              );
+            })}
           </p>
         );
       })}
@@ -447,24 +530,30 @@ export function ChatView({
                       isStreaming={msg.isStreaming}
                     />
 
-                    {/* Milo conversation identity */}
+                    {/* Milo conversation identity and actions */}
                     {!msg.isStreaming && (
-                      <div className="flex items-center gap-1.5 text-xs text-widget-muted">
-                        <MiloMark className="h-4 w-4" />
-                        <span>
-                          <span className="font-semibold text-widget-fg">Milo</span>{" "}
-                          <span aria-hidden="true">&bull;</span>{" "}
-                          {t.agentSubtext}
-                        </span>
-                      </div>
-                    )}
+                      <motion.div
+                        initial={{ opacity: 0, y: 3 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="space-y-1.5"
+                      >
+                        <div className="flex items-center gap-1.5 text-xs text-widget-muted">
+                          <MiloMark className="h-4 w-4" />
+                          <span>
+                            <span className="font-semibold text-widget-fg">Milo</span>{" "}
+                            <span aria-hidden="true">&bull;</span>{" "}
+                            {t.agentSubtext}
+                          </span>
+                        </div>
 
-                    {/* Action buttons */}
-                    {!msg.isStreaming && msg.content && (
-                      <MessageActions
-                        language={config.widget.language}
-                        onCopy={() => copyTextToClipboard(msg.content)}
-                      />
+                        {msg.content && (
+                          <MessageActions
+                            language={config.widget.language}
+                            onCopy={() => copyTextToClipboard(msg.content)}
+                          />
+                        )}
+                      </motion.div>
                     )}
                   </div>
                 </div>

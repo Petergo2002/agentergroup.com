@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-// @ts-expect-error -- npm: specifier is resolved by the Deno runtime, not the TS compiler
-import Firecrawl from "npm:@mendable/firecrawl-js";
-import { buildClientSafeError, json } from "../_shared/http.ts";
+import Firecrawl from "npm:@mendable/firecrawl-js@4.32.0";
+import { json } from "../_shared/http.ts";
+import { beforeDeadline, generateRemoteEmbedding, ProcessingError } from "../_shared/processing.ts";
 import { chunkKnowledgeText, extractTextFromFile, normalizeKnowledgeText } from "../_shared/knowledge.ts";
 
 function readFirstSupabaseSecretKey() {
@@ -43,7 +43,7 @@ const supabaseAdminKey =
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
   readFirstSupabaseSecretKey()!;
 const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
-const model = new Supabase.ai.Session("gte-small");
+
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 const MAX_WEBSITE_KNOWLEDGE_PAGES = 30;
 
@@ -58,6 +58,8 @@ interface KnowledgeSourceRow {
   storage_path: string | null;
   mime_type: string | null;
   metadata: Record<string, unknown> | null;
+  chunk_count: number;
+  processing_token: string | null;
 }
 
 function buildStorageLimitError(storageLimitBytes: number) {
@@ -163,6 +165,8 @@ function getConfiguredSecretKeys() {
 }
 
 Deno.serve(async (request) => {
+  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+  const deadline = AbortSignal.timeout(110_000);
   const adminClient = createClient(supabaseUrl, supabaseAdminKey);
   const body = await request.json().catch(() => ({}));
   const sourceId = String(body.sourceId ?? "").trim();
@@ -234,10 +238,27 @@ Deno.serve(async (request) => {
     return json({ error: "Knowledge source not found." }, 404);
   }
 
-  await adminClient
-    .from("knowledge_sources")
-    .update({ status: "processing", error_message: null })
-    .eq("id", sourceId);
+  if (source.status === "ready") {
+    return json({ ok: true, sourceId, status: "ready", chunkCount: source.chunk_count });
+  }
+
+  const processingToken = crypto.randomUUID();
+  const claim = await adminClient.rpc("claim_knowledge_processing", {
+    p_source_id: sourceId, p_token: processingToken,
+  });
+  if (claim.error) {
+    console.error("[Process] Claim failed", claim.error);
+    return json({ error: "Could not acquire the processing lock.", code: "PROCESSING_CLAIM_FAILED" }, 503);
+  }
+  if (!claim.data) return json({ ok: true, sourceId, status: "processing" }, 202);
+
+  // Reload after claiming: an edit may have completed between authorization and claim.
+  const current = await adminClient.from("knowledge_sources").select("*")
+    .eq("id", sourceId).eq("processing_token", processingToken).single();
+  if (current.error || !current.data) {
+    return json({ error: "Could not load the claimed source. Retry in three minutes.", code: "PROCESSING_LOAD_FAILED" }, 503);
+  }
+  source = current.data as KnowledgeSourceRow;
 
   try {
     let finalRawText = source.raw_text as string | null;
@@ -249,7 +270,9 @@ Deno.serve(async (request) => {
         throw new Error("FIRECRAWL_API_KEY is not configured in Supabase secrets.");
       }
 
-      const firecrawl = new Firecrawl({ apiKey: firecrawlApiKey });
+      const firecrawl = new Firecrawl({
+        apiKey: firecrawlApiKey, timeoutMs: 35_000, maxRetries: 2,
+      });
       const metadata = source.metadata || {};
       const rawUrl = typeof metadata.sourceUrl === "string"
         ? metadata.sourceUrl
@@ -292,23 +315,27 @@ Deno.serve(async (request) => {
       if (selectedUrls.length > 0) {
         console.log(`[Process] Scraping ${selectedUrls.length} selected URLs in batches...`);
         const validResults: string[] = [];
+        const failedUrls: string[] = [];
         const batchSize = 4;
 
         for (let index = 0; index < selectedUrls.length; index += batchSize) {
+          deadline.throwIfAborted();
           const batch = selectedUrls.slice(index, index + batchSize);
           const scrapePromises: Array<Promise<string | null>> = batch.map(async (u: string) => {
             console.log(`[Process] Scraping individual URL: ${u}`);
             try {
-              const res = await firecrawl.scrape(u, { formats: ["markdown"] });
-              if (res.markdown) {
+              const res = await beforeDeadline(firecrawl.scrape(u, { formats: ["markdown"], timeout: 25_000, skipTlsVerification: false }), deadline);
+              if (res.markdown?.trim() && (!res.metadata?.statusCode || res.metadata.statusCode < 400)) {
                 console.log(`[Process] Successfully scraped ${u} (${res.markdown.length} chars)`);
                 return res.markdown;
               } else {
-                console.warn(`[Process] No markdown returned for ${u}`);
+                console.warn(`[Process] No readable markdown returned for ${u}`);
+                failedUrls.push(u);
                 return null;
               }
             } catch (err) {
               console.error(`[Process] Scrape error for ${u}:`, err);
+              failedUrls.push(u);
               return null;
             }
           });
@@ -318,23 +345,34 @@ Deno.serve(async (request) => {
           console.log(`[Process] Finished selected URL batch ${Math.floor(index / batchSize) + 1}/${Math.ceil(selectedUrls.length / batchSize)}.`);
         }
 
+        if (failedUrls.length) {
+          throw new ProcessingError(
+            `Could not scrape ${failedUrls.length} of ${selectedUrls.length} selected pages: ${failedUrls.join(", ")}. Check the pages and retry.`,
+            "WEBSITE_PAGES_FAILED", 422,
+          );
+        }
         scrapedText = validResults.join("\n\n---\n\n");
 
       } else if (crawlLimit > 1 && isPremium) {
         console.log(`[Process] Crawling website: ${targetUrl.toString()} (Limit: ${crawlLimit})`);
         // firecrawl.crawl() polls until done and returns a CrawlJob ({ status, data[], total, completed })
-        const crawlResult = await firecrawl.crawl(targetUrl.toString(), {
+        const crawlResult = await beforeDeadline(firecrawl.crawl(targetUrl.toString(), {
           limit: crawlLimit,
-          scrapeOptions: { formats: ["markdown"] },
-        });
+          timeout: 60,
+          scrapeOptions: { formats: ["markdown"], timeout: 25_000, skipTlsVerification: false },
+        }), deadline);
 
         // CrawlJob.status is 'completed' | 'failed' | 'cancelled' | 'scraping'
-        if (crawlResult.status === "failed" || crawlResult.status === "cancelled") {
+        if (crawlResult.status !== "completed") {
           console.error(`[Process] Crawl failed with status: ${crawlResult.status}`, crawlResult);
           throw new Error(`Website crawl ended with status: ${crawlResult.status}`);
         }
 
         const pages = Array.isArray(crawlResult.data) ? crawlResult.data : [];
+        if (pages.some((page: { markdown?: string; metadata?: { statusCode?: number } }) =>
+          !page.markdown?.trim() || (page.metadata?.statusCode ?? 200) >= 400)) {
+          throw new ProcessingError("Some crawled pages did not return readable content. Select specific pages and retry.", "WEBSITE_PAGES_FAILED", 422);
+        }
         scrapedText = pages
           .map((page: { markdown?: string }) => page.markdown)
           .filter(Boolean)
@@ -342,8 +380,8 @@ Deno.serve(async (request) => {
         console.log(`[Process] Crawl finished. Status: ${crawlResult.status}, pages: ${pages.length}/${crawlResult.total ?? '?'}.`);
       } else {
         console.log(`[Process] Scraping single page: ${targetUrl.toString()}`);
-        const scrapeResult = await firecrawl.scrape(targetUrl.toString(), { formats: ["markdown"] });
-        if (!scrapeResult.markdown) {
+        const scrapeResult = await beforeDeadline(firecrawl.scrape(targetUrl.toString(), { formats: ["markdown"], timeout: 25_000, skipTlsVerification: false }), deadline);
+        if (!scrapeResult.markdown?.trim() || (scrapeResult.metadata?.statusCode ?? 200) >= 400) {
           console.error(`[Process] Single scrape failed:`, scrapeResult);
           throw new Error(`Failed to extract markdown from ${targetUrl.toString()}.`);
         }
@@ -355,6 +393,7 @@ Deno.serve(async (request) => {
         throw new Error(`No readable content could be extracted from the website. Check if the URL is accessible.`);
       }
 
+      deadline.throwIfAborted();
       const newSizeBytes = new TextEncoder().encode(scrapedText).length;
       const storageLimitBytes =
         subscriptionResult.data?.storage_limit_bytes ??
@@ -394,7 +433,7 @@ Deno.serve(async (request) => {
         .update({
           raw_text: scrapedText,
         })
-        .eq("id", source.id);
+        .eq("id", source.id).eq("processing_token", processingToken);
 
       if (updateError) throw new Error(`DB Update Error: ${updateError.message}`);
       finalRawText = scrapedText;
@@ -427,87 +466,63 @@ Deno.serve(async (request) => {
       throw new Error("No readable text was found in this source after normalization.");
     }
 
-    console.log(`[Process] Generating embeddings for ${chunks.length} chunks...`);
-    const chunkRows: Array<Record<string, unknown>> = [];
-    const embeddingBatchSize = 8;
-
-    for (let index = 0; index < chunks.length; index += embeddingBatchSize) {
-      const batch = chunks.slice(index, index + embeddingBatchSize);
-      const rows = await Promise.all(
-        batch.map(async (chunk) => {
-          try {
-            const embedding = await model.run(chunk.content, {
-              mean_pool: true,
-              normalize: true,
-            });
-
-            return {
-              source_id: source.id,
-              workspace_id: source.workspace_id,
-              chunk_index: chunk.chunkIndex,
-              content: chunk.content,
-              content_length: chunk.contentLength,
-              embedding: JSON.stringify(embedding),
-              metadata: {
-                sourceType: source.source_type,
-                sourceName: source.name,
-                chunkIndex: chunk.chunkIndex,
-                contentLength: chunk.contentLength,
-                ingestionVersion: 1,
-              },
-            };
-          } catch (embErr) {
-            console.error(`[Process] Embedding error for chunk ${chunk.chunkIndex}:`, embErr);
-            throw embErr;
-          }
-        }),
-      );
-
-      chunkRows.push(...rows);
-      console.log(
-        `[Process] Finished embedding batch ${Math.floor(index / embeddingBatchSize) + 1}/${Math.ceil(chunks.length / embeddingBatchSize)}.`,
-      );
+    const revisionBytes = await crypto.subtle.digest(
+      "SHA-256", new TextEncoder().encode(`gte-small:v2:${normalizedText}`),
+    );
+    const revision = Array.from(new Uint8Array(revisionBytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const completed = new Set<number>();
+    // Paginate checkpoints instead of silently truncating sources at PostgREST's row limit.
+    for (let offset = 0; ; offset += 500) {
+      const saved = await adminClient.from("knowledge_chunks").select("chunk_index")
+        .eq("source_id", source.id).eq("metadata->>ingestionRevision", revision)
+        .not("embedding", "is", null).order("chunk_index").range(offset, offset + 499);
+      if (saved.error) throw saved.error;
+      for (const row of saved.data ?? []) completed.add(row.chunk_index);
+      if ((saved.data?.length ?? 0) < 500) break;
     }
-
-    chunkRows.sort((a, b) => Number(a.chunk_index) - Number(b.chunk_index));
-
-    console.log(`[Process] Deleting old chunks...`);
-    await adminClient.from("knowledge_chunks").delete().eq("source_id", source.id);
-
-    console.log(`[Process] Inserting ${chunkRows.length} new chunks...`);
-    const insertResult = await adminClient.from("knowledge_chunks").insert(chunkRows);
-    if (insertResult.error) throw insertResult.error;
-
-    // Phase 3: Finalize
-    console.log(`[Process] Finalizing source status...`);
-    const updateResult = await adminClient
-      .from("knowledge_sources")
-      .update({
-        status: "ready",
-        chunk_count: chunkRows.length,
-        last_processed_at: new Date().toISOString(),
-        error_message: null,
-      })
-      .eq("id", source.id);
-
-    if (updateResult.error) throw updateResult.error;
-
+    const pending = chunks.filter((chunk) => !completed.has(chunk.chunkIndex));
+    console.log(`[Process] Embedding ${pending.length}/${chunks.length} chunks; ${completed.size} already saved.`);
+    for (let index = 0; index < pending.length; index += 2) {
+      deadline.throwIfAborted();
+      // Remote inference, with at most two in flight. Each worker performs ONE inference.
+      const rows = await Promise.all(pending.slice(index, index + 2).map(async (chunk) => ({
+        chunk_index: chunk.chunkIndex,
+        content: chunk.content,
+        embedding: await generateRemoteEmbedding(chunk.content, {
+          url: supabaseUrl, key: supabaseAdminKey, signal: deadline,
+        }),
+      })));
+      const checkpoint = await adminClient.rpc("checkpoint_knowledge_processing", {
+        p_source_id: source.id, p_token: processingToken, p_revision: revision,
+        p_chunks: rows, p_total_chunks: chunks.length,
+      });
+      if (checkpoint.error) throw checkpoint.error;
+      console.log(`[Process] Saved ${Math.min(index + 2, pending.length) + completed.size}/${chunks.length} embeddings.`);
+    }
+    const finalized = await adminClient.rpc("checkpoint_knowledge_processing", {
+      p_source_id: source.id, p_token: processingToken, p_revision: revision,
+      p_chunks: [], p_total_chunks: chunks.length, p_complete: true,
+    });
+    if (finalized.error) throw finalized.error;
     console.log(`[Process] Job completed successfully for source: ${sourceId}`);
-    return json({ ok: true, sourceId: source.id, chunkCount: chunkRows.length });
+    return json({ ok: true, sourceId: source.id, status: "ready", chunkCount: chunks.length });
 
   } catch (error) {
     console.error(`[Process] CRITICAL ERROR for source ${sourceId}:`, error);
     
-    await adminClient
+    const message = deadline.aborted
+      ? "Processing reached its time limit. Progress is saved; retry to continue."
+      : error instanceof ProcessingError ? error.message
+      : error instanceof Error && (error.message.startsWith("FIRECRAWL_API_KEY") || error.message.startsWith("Storage limit exceeded"))
+        ? error.message
+        : "Knowledge processing failed. Saved progress can be retried.";
+    const failure = await adminClient
       .from("knowledge_sources")
-      .update({
-        status: "failed",
-        chunk_count: 0,
-        error_message: error instanceof Error ? error.message : "Knowledge processing failed.",
-      })
-      .eq("id", sourceId);
-
-    const safeError = buildClientSafeError("process-knowledge-source", error, "Knowledge processing failed.");
-    return json(safeError, 500);
+      .update({ status: "failed", error_message: message, processing_token: null, processing_expires_at: null })
+      .eq("id", sourceId).eq("processing_token", processingToken);
+    if (failure.error) console.error("[Process] Could not save failure state", failure.error);
+    return json({ error: message, code: deadline.aborted ? "PROCESSING_TIMEOUT"
+      : error instanceof ProcessingError ? error.code : "KNOWLEDGE_PROCESSING_FAILED" },
+      error instanceof ProcessingError && error.status < 500 ? error.status : 503);
   }
 });

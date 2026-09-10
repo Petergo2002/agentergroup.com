@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { hasAutomationsEnabled } from "@/lib/assistants/feature-flags";
 import {
   getAnalyticsDateRange,
   getDashboardAutomationAnalytics,
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
       limit,
     });
     const { startIso } = getAnalyticsDateRange(appliedFilters.range);
+    const automationsEnabled = hasAutomationsEnabled(context.workspace);
     const [overview, automation] = await Promise.all([
       getDashboardAnalyticsOverview(admin, {
         workspaceId: context.workspace.id,
@@ -86,20 +88,35 @@ export async function GET(request: NextRequest) {
         leadCount: conversationResult.overview.leadCount,
         activeWidgetIds: conversationResult.overview.activeWidgetIds,
       }),
-      getDashboardAutomationAnalytics(admin, {
-        workspaceId: context.workspace.id,
-        startIso,
-        agentId: appliedFilters.agentId,
-        automationStatus: appliedFilters.automationStatus,
-      }),
+      automationsEnabled
+        ? getDashboardAutomationAnalytics(admin, {
+            workspaceId: context.workspace.id,
+            startIso,
+            agentId: appliedFilters.agentId,
+            automationStatus: appliedFilters.automationStatus,
+          })
+        : Promise.resolve({
+            totalEvents: 0,
+            processedEvents: 0,
+            failedEvents: 0,
+            successRate: 0,
+            actionTaken: 0,
+            agents: [],
+            recentFailures: [],
+            trend: [],
+          }),
     ]);
+
+    const agentOptions = automationsEnabled
+      ? conversationResult.agentOptions
+      : conversationResult.agentOptions.filter((agent) => agent.surface !== "automation");
 
     return NextResponse.json({
       overview,
       automation,
       filters: {
         widgets: conversationResult.widgetOptions,
-        agents: conversationResult.agentOptions,
+        agents: agentOptions,
         applied: appliedFilters,
       },
       conversations: conversationResult.conversations,

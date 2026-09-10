@@ -11,9 +11,15 @@ import {
   ChevronDown,
   CircleHelp,
   Clock3,
+  FileKey2,
+  Fingerprint,
+  History,
+  KeyRound,
   LifeBuoy,
   MessageCircleReply,
   MessageSquareText,
+  ShieldCheck,
+  ShieldUser,
   Sparkles,
   Target,
   UserRoundPlus,
@@ -47,6 +53,7 @@ const featureIcons = [
 
 const outcomeIcons = [MessageCircleReply, Target, Clock3] as const;
 const useCaseIcons = [UsersRound, LifeBuoy, CalendarCheck2] as const;
+const securityIcons = [ShieldUser, KeyRound, FileKey2, ShieldCheck, Fingerprint, History] as const;
 
 interface IntegrationItemConfig {
   iconKey: SimpleIconKey;
@@ -130,7 +137,7 @@ export function LandingPage({ copy, language }: LandingPageProps) {
             {[
               ["#how-it-works", "how-it-works", copy.nav.howItWorks],
               ["#product", "product", copy.nav.product],
-              ["#use-cases", "use-cases", copy.nav.useCases],
+              ["#security", "security", copy.nav.security],
               ["#faq", "faq", copy.nav.faq],
             ].map(([href, sectionId, label]) => (
               <a
@@ -400,6 +407,49 @@ export function LandingPage({ copy, language }: LandingPageProps) {
           </div>
         </section>
 
+        <section id="security" aria-labelledby="security-heading" className="px-4 pt-24 sm:px-6 sm:pt-28 lg:px-8 lg:pt-32">
+          <div className={`${styles.securityPanel} mx-auto max-w-7xl overflow-hidden`}>
+            <div data-reveal className="flex flex-col gap-7 p-7 sm:p-10 lg:flex-row lg:items-start lg:gap-8 lg:p-12">
+              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--mkt-ink)] text-[var(--mkt-orange)]" aria-hidden="true">
+                <ShieldCheck className="h-8 w-8" strokeWidth={1.5} />
+              </span>
+              <div className="max-w-3xl">
+                <p className={styles.eyebrow}>{copy.security.eyebrow}</p>
+                <h2 id="security-heading" className={`${styles.sectionTitle} mt-4`}>{copy.security.title}</h2>
+                <p className={`${styles.sectionLead} mt-5`}>{copy.security.description}</p>
+              </div>
+            </div>
+
+            <div className={styles.securityGrid}>
+              {copy.security.items.map((item, index) => {
+                const Icon = securityIcons[index];
+                return (
+                  <article key={item.title} data-reveal style={motionOrder(index % 3)} className={styles.securityCard}>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--mkt-warm)] text-[var(--mkt-orange-text)]">
+                      <Icon className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <h3 className="mt-5 text-base font-bold tracking-[-0.02em] text-[var(--mkt-ink)]">{item.title}</h3>
+                    <p className="mt-3 text-sm leading-7 text-[var(--mkt-muted)]">{item.description}</p>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-col gap-5 border-t border-[var(--mkt-border)] px-7 py-6 sm:px-10 lg:flex-row lg:items-center lg:justify-between lg:px-12">
+              <Link href="/privacy-policy" className={`${styles.securityLink} inline-flex min-h-11 w-fit items-center gap-2 rounded-lg text-sm font-bold`}>
+                {copy.security.policyLink}
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <p className="flex flex-wrap items-center gap-x-2 text-sm text-[var(--mkt-muted)]">
+                {copy.security.contactLabel}
+                <a href="mailto:info@avenro.se" className={`${styles.securityLink} inline-flex min-h-11 items-center rounded-lg font-bold underline underline-offset-4`}>
+                  {copy.security.contactLink}
+                </a>
+              </p>
+            </div>
+          </div>
+        </section>
+
         <section id="faq" className="px-4 py-24 sm:px-6 sm:py-28 lg:px-8 lg:py-32">
           <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.75fr_1.25fr] lg:gap-20">
             <SectionHeading eyebrow={copy.faq.eyebrow} title={copy.faq.title} />
@@ -487,6 +537,7 @@ export function LandingPage({ copy, language }: LandingPageProps) {
             <div>
               <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mkt-ink)]">{copy.footer.legal}</h2>
               <div className="mt-5 grid gap-3 text-sm text-[var(--mkt-muted)]">
+                <a href="#security" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.security}</a>
                 <Link href="/privacy-policy" className="w-fit hover:text-[var(--mkt-ink)]">{copy.footer.privacy}</Link>
                 <Link href="/terms-of-service" className="w-fit hover:text-[var(--mkt-ink)]">{copy.footer.terms}</Link>
                 <Link href="/data-processing" className="w-fit hover:text-[var(--mkt-ink)]">{copy.footer.dataProcessing}</Link>

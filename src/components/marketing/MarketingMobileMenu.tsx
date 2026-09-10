@@ -52,6 +52,7 @@ export function MarketingMobileMenu({ copy, serverLanguage }: MarketingMobileMen
     { href: "#how-it-works", label: copy.howItWorks },
     { href: "#product", label: copy.product },
     { href: "#use-cases", label: copy.useCases },
+    { href: "#security", label: copy.security },
     { href: "#faq", label: copy.faq },
   ];
 

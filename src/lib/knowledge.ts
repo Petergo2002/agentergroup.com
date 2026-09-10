@@ -108,3 +108,26 @@ export function getKnowledgeCitationSummary(matches: KnowledgeMatchRecord[]) {
     metadata: match.metadata,
   }));
 }
+
+export function isVerifiedKnowledgeFolder(folder: {
+  name: string;
+  metadata?: Record<string, unknown> | null;
+}): boolean {
+  if (!folder) return false;
+  return (
+    folder.metadata?.purpose === "verified_answers" ||
+    folder.name.toLowerCase().startsWith("verified answers")
+  );
+}
+
+export function isVerifiedKnowledgeSource(source: {
+  name: string;
+  metadata?: Record<string, unknown> | null;
+}): boolean {
+  if (!source) return false;
+  return (
+    source.metadata?.flywheel === true ||
+    source.name.toLowerCase().startsWith("verified answer:")
+  );
+}
+

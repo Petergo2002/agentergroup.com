@@ -7,7 +7,9 @@ import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUrl } from "@/lib/env";
-import { createLegalConsentToken } from "@/lib/legal-consent";
+import { createLegalConsentToken, recordLegalAcceptance } from "@/lib/legal-consent";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { invalidateWorkspaceContextCache } from "@/lib/app/bootstrap";
 
 function getCredentials(formData: FormData) {
   return {
@@ -100,14 +102,41 @@ export async function login(formData: FormData) {
 
 export async function signup(formData: FormData) {
   const supabase = await createClient();
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  const companyName = String(formData.get("companyName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
   const legalConsentAccepted = formData.get("legalConsent") === "on";
   const redirectTo = sanitizePostAuthRedirectTo(String(formData.get("redirectTo") ?? "/dashboard"));
   const messages = await getLoginMessages();
 
+  if (!fullName) {
+    redirect(buildLoginRedirectUrl({
+      error: "Please enter your full name.",
+      redirectTo,
+      view: "signup",
+    }));
+  }
+
+  if (!companyName) {
+    redirect(buildLoginRedirectUrl({
+      error: "Please enter your company name.",
+      redirectTo,
+      view: "signup",
+    }));
+  }
+
   if (!email) {
     redirect(buildLoginRedirectUrl({
       error: "Email is required.",
+      redirectTo,
+      view: "signup",
+    }));
+  }
+
+  if (!password || password.length < 6) {
+    redirect(buildLoginRedirectUrl({
+      error: messages.passwordPlaceholder || "Password must be at least 6 characters.",
       redirectTo,
       view: "signup",
     }));
@@ -123,9 +152,15 @@ export async function signup(formData: FormData) {
 
   const legalConsent = createLegalConsentToken("email_signup");
 
-  const { error } = await supabase.auth.signInWithOtp({
+  const { data, error } = await supabase.auth.signUp({
     email,
+    password,
     options: {
+      data: {
+        full_name: fullName,
+        name: fullName,
+        workspace_name: companyName,
+      },
       emailRedirectTo: `${getAppUrl()}/auth/confirm?next=${encodeURIComponent(
         buildCompleteSignupRedirectUrl({ legalConsent, redirectTo }),
       )}`,
@@ -135,11 +170,27 @@ export async function signup(formData: FormData) {
   if (error) {
     redirect(
       buildLoginRedirectUrl({
-        error: messages.createAccountError,
+        error: error.message || messages.createAccountError,
         redirectTo,
         view: "signup",
       }),
     );
+  }
+
+  // If a session was returned immediately (email confirmation disabled or auto-confirm)
+  if (data?.session?.user) {
+    try {
+      await recordLegalAcceptance({
+        supabase: createAdminClient(),
+        userId: data.session.user.id,
+        token: legalConsent,
+      });
+    } catch (consentError) {
+      console.error("[Signup] Legal consent error:", consentError);
+    }
+
+    revalidatePath("/", "layout");
+    redirect(redirectTo);
   }
 
   revalidatePath("/", "layout");
@@ -148,6 +199,7 @@ export async function signup(formData: FormData) {
     buildLoginRedirectUrl({
       notice: messages.confirmEmailNotice,
       redirectTo,
+      view: "signup",
     }),
   );
 }
@@ -179,10 +231,11 @@ export async function updatePassword(formData: FormData) {
   }
 
   // Update password and store profile/workspace metadata
-  const { error } = await supabase.auth.updateUser({
+  const { data: updateData, error } = await supabase.auth.updateUser({
     password: password,
     data: {
       full_name: fullName,
+      name: fullName,
       workspace_name: companyName,
     },
   });
@@ -192,6 +245,22 @@ export async function updatePassword(formData: FormData) {
       error: error.message,
       redirectTo,
     }));
+  }
+
+  if (updateData?.user) {
+    if (fullName) {
+      await supabase
+        .from("profiles")
+        .update({ full_name: fullName })
+        .eq("id", updateData.user.id);
+    }
+    if (companyName) {
+      await supabase
+        .from("workspaces")
+        .update({ name: companyName })
+        .eq("owner_id", updateData.user.id);
+    }
+    invalidateWorkspaceContextCache(updateData.user.id);
   }
 
   revalidatePath("/", "layout");
