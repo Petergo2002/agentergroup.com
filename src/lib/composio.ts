@@ -23,7 +23,10 @@ import {
   AUTOMATION_GMAIL_TRIGGER_CONFIG,
   AUTOMATION_GMAIL_TRIGGER_SLUG,
 } from "@/lib/agents/defaults";
-import { extractGoogleCalendarListItems } from "@/lib/google-calendar";
+import {
+  buildMeetingDurationArguments,
+  extractGoogleCalendarListItems,
+} from "@/lib/google-calendar";
 import type {
   CalSelection,
   DriveImportFileRecord,
@@ -152,6 +155,19 @@ const DEFAULT_COMPOSIO_TOOLKIT_VERSIONS = {
 } as const;
 
 const SESSION_TTL_MS = 1000 * 60 * 30;
+// Tool definitions are static JSON schemas, but they were refetched from
+// Composio on every single chat turn, adding a network round trip before the
+// first token. The cache key contains the exact tool set, so changing the
+// enabled tools in the builder produces a different key and takes effect
+// immediately rather than waiting out the TTL. Which tools a workspace may use
+// is still gated upstream by the live connection check in loadRuntimeContext,
+// so this caches shape, never authorization.
+const TOOL_DEFINITION_TTL_MS = 1000 * 60 * 10;
+const TOOL_DEFINITION_CACHE_LIMIT = 500;
+const toolDefinitionCache = new Map<
+  string,
+  { value: unknown[]; createdAt: number }
+>();
 const toolRouterSessionCache = new Map<string, ToolRouterSessionRef>();
 const composioSessionCache = new Map<
   string,
@@ -1125,6 +1141,17 @@ export async function getWrappedTools(
     return [];
   }
 
+  const cacheKey = JSON.stringify([
+    userId,
+    [...selectedTools].sort(),
+    [...builtInToolkits].sort(),
+  ]);
+  const cached = toolDefinitionCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.createdAt < TOOL_DEFINITION_TTL_MS) {
+    return cached.value;
+  }
+
   try {
     const toolCollections = await Promise.all([
       selectedTools.length > 0
@@ -1139,7 +1166,21 @@ export async function getWrappedTools(
         : Promise.resolve([]),
     ]);
 
-    return toolCollections.flat();
+    const tools = toolCollections.flat();
+
+    // Only cache a usable result; an empty list is usually a transient Composio
+    // failure and caching it would silently disarm the agent for the whole TTL.
+    if (tools.length > 0) {
+      if (toolDefinitionCache.size >= TOOL_DEFINITION_CACHE_LIMIT) {
+        const oldestKey = toolDefinitionCache.keys().next().value;
+        if (oldestKey !== undefined) {
+          toolDefinitionCache.delete(oldestKey);
+        }
+      }
+      toolDefinitionCache.set(cacheKey, { value: tools, createdAt: Date.now() });
+    }
+
+    return tools;
   } catch (error) {
     console.error("[Composio] Failed to get tools:", error);
     return [];
@@ -1256,6 +1297,17 @@ function applyGoogleCalendarSelectionToCompletion(
   const availabilityItems = includePrimaryCalendar
     ? [selectedCalendarId, "primary"]
     : [selectedCalendarId];
+  const meetingDurationArguments = buildMeetingDurationArguments(
+    googleCalendarSelection.meetingDurationMinutes,
+  );
+
+  function withMeetingDuration(arguments_: Record<string, unknown>) {
+    if (!meetingDurationArguments) {
+      return arguments_;
+    }
+
+    return { ...arguments_, ...meetingDurationArguments };
+  }
 
   function getLocalParts(date: Date, timeZone: string) {
     const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -1423,10 +1475,12 @@ function applyGoogleCalendarSelectionToCompletion(
       let nextToolCalls: typeof message.tool_calls | null = null;
 
       if (toolCall.function.name === GOOGLE_CALENDAR_CREATE_EVENT_TOOL) {
-        const selectedCalendarArguments = withCalendarTimezone({
-          ...parsed,
-          calendar_id: selectedCalendarId,
-        });
+        const selectedCalendarArguments = withMeetingDuration(
+          withCalendarTimezone({
+            ...parsed,
+            calendar_id: selectedCalendarId,
+          }),
+        );
         const selectedCalendarCall = {
           ...toolCall,
           function: {
@@ -1444,10 +1498,12 @@ function applyGoogleCalendarSelectionToCompletion(
                 function: {
                   ...toolCall.function,
                   arguments: JSON.stringify(
-                    withCalendarTimezone({
-                      ...parsed,
-                      calendar_id: "primary",
-                    }),
+                    withMeetingDuration(
+                      withCalendarTimezone({
+                        ...parsed,
+                        calendar_id: "primary",
+                      }),
+                    ),
                   ),
                 },
               },

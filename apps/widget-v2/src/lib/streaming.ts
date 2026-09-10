@@ -1,3 +1,5 @@
+import type { WidgetGenerativeUi } from "../types";
+
 interface ResolveStreamedAgentContentInput {
   previousContent: string;
   incomingContent: string;
@@ -18,16 +20,69 @@ interface ShouldRevealInterimStreamContentInput {
   hasRevealedInterimContent: boolean;
 }
 
+export const MAX_STATUS_LENGTH = 120;
+
 export type WidgetStreamEvent =
   | { type: "done" }
   | { type: "delta"; content: string }
   | { type: "content"; content: string }
+  | { type: "ui"; ui: WidgetGenerativeUi }
+  | { type: "status"; status: string }
   | {
       type: "session-completed";
       endReason: "assistant_suggestion" | "inactivity_timeout" | null;
     }
   | { type: "error"; message: string; code?: string }
   | { type: "noop" };
+
+function parseGenerativeUi(value: unknown): WidgetGenerativeUi | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const ui = value as Record<string, unknown>;
+
+  if (ui.type === "calendar_availability") {
+    if (
+      typeof ui.timezone !== "string" ||
+      typeof ui.durationMinutes !== "number" ||
+      !Array.isArray(ui.slots)
+    ) {
+      return null;
+    }
+    const slots = ui.slots.filter(
+      (slot): slot is { start: string; end: string } =>
+        Boolean(
+          slot &&
+            typeof slot === "object" &&
+            typeof (slot as { start?: unknown }).start === "string" &&
+            typeof (slot as { end?: unknown }).end === "string",
+        ),
+    );
+    if (slots.length === 0) return null;
+    return {
+      type: "calendar_availability",
+      timezone: ui.timezone,
+      durationMinutes: ui.durationMinutes,
+      slots,
+    };
+  }
+
+  if (
+    ui.type === "calendar_booking_confirmation" &&
+    typeof ui.timezone === "string" &&
+    typeof ui.start === "string"
+  ) {
+    return {
+      type: "calendar_booking_confirmation",
+      timezone: ui.timezone,
+      title: typeof ui.title === "string" ? ui.title : null,
+      start: ui.start,
+      end: typeof ui.end === "string" ? ui.end : null,
+      calendarUrl: typeof ui.calendarUrl === "string" ? ui.calendarUrl : null,
+      meetingUrl: typeof ui.meetingUrl === "string" ? ui.meetingUrl : null,
+    };
+  }
+
+  return null;
+}
 
 export function parseWidgetStreamEvent(data: string): WidgetStreamEvent {
   if (data === "[DONE]") {
@@ -71,6 +126,16 @@ export function parseWidgetStreamEvent(data: string): WidgetStreamEvent {
 
   if (typeof payload.content === "string") {
     return { type: "content", content: payload.content };
+  }
+
+  const ui = parseGenerativeUi(payload.ui);
+  if (ui) return { type: "ui", ui };
+
+  if (typeof payload.status === "string" && payload.status.trim()) {
+    return {
+      type: "status",
+      status: payload.status.trim().slice(0, MAX_STATUS_LENGTH),
+    };
   }
 
   return { type: "noop" };

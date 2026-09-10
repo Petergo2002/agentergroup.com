@@ -19,6 +19,35 @@ export function buildDefaultGoogleCalendarSelection(): GoogleCalendarSelection {
     calendarLabel: null,
     timezone: null,
     includePrimaryCalendar: false,
+    meetingDurationMinutes: 30,
+  };
+}
+
+/**
+ * GOOGLECALENDAR_CREATE_EVENT takes its length as event_duration_hour plus
+ * event_duration_minutes, and the model picks both on its own — so it happily
+ * books an hour right after telling the visitor the meeting is 30 minutes, and
+ * the booking then disagrees with the availability slots the widget rendered at
+ * the configured length. Returns the arguments that pin the configured length,
+ * or null when no duration is configured. event_duration_minutes only accepts
+ * 0-59, so whole hours have to move into event_duration_hour.
+ */
+export function buildMeetingDurationArguments(
+  meetingDurationMinutes: number | null | undefined,
+) {
+  if (
+    typeof meetingDurationMinutes !== "number" ||
+    !Number.isFinite(meetingDurationMinutes) ||
+    meetingDurationMinutes <= 0
+  ) {
+    return null;
+  }
+
+  const totalMinutes = Math.round(meetingDurationMinutes);
+
+  return {
+    event_duration_hour: Math.floor(totalMinutes / 60),
+    event_duration_minutes: totalMinutes % 60,
   };
 }
 
@@ -75,12 +104,19 @@ export function extractGoogleCalendarSelectionFromNodes(
     return buildDefaultGoogleCalendarSelection();
   }
 
+  const duration =
+    typeof calendarNode.data.meetingDurationMinutes === "number" &&
+    calendarNode.data.meetingDurationMinutes > 0
+      ? calendarNode.data.meetingDurationMinutes
+      : 30;
+
   return {
     connectionId: pickString(calendarNode.data.connectionId),
     calendarId: pickString(calendarNode.data.calendarId),
     calendarLabel: pickString(calendarNode.data.calendarLabel),
     timezone: pickString(calendarNode.data.timezone),
     includePrimaryCalendar: calendarNode.data.includePrimaryCalendar === true,
+    meetingDurationMinutes: duration,
   };
 }
 

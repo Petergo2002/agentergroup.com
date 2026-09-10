@@ -21,6 +21,7 @@ export interface GoogleCalendarSelection {
   calendarLabel: string | null;
   timezone: string | null;
   includePrimaryCalendar: boolean;
+  meetingDurationMinutes?: number | null;
 }
 
 export interface CalSelection {

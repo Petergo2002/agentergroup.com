@@ -165,6 +165,19 @@ export interface AgentRuntimeInput {
   publishedDefinition?: BuilderDefinition | null;
 }
 
+/**
+ * Coarse progress phases for surfaces that show the visitor what the agent is
+ * doing while it works. Deliberately not free text: the public widget renders
+ * these, and the underlying detail includes raw tool slugs like
+ * GMAIL_SEND_EMAIL that must never be shown to an end visitor. Callers
+ * localise these keys themselves.
+ */
+export type AgentRuntimePhase =
+  | "knowledge"
+  | "thinking"
+  | "tools"
+  | "finalizing";
+
 export interface AgentRuntimeResult {
   assistantContent: string;
   assistantMetadata: Record<string, unknown>;
@@ -470,6 +483,11 @@ function buildToolGuidance(
         `For Google Calendar scheduling, treat ${resolvedCalendarTimezone} as the calendar timezone for availability checks and event creation.`,
       );
     }
+
+    const meetingDuration = googleCalendarSelection?.meetingDurationMinutes ?? 30;
+    guidance.push(
+      `For Google Calendar scheduling, every meeting is exactly ${meetingDuration} minutes long. Propose slots of ${meetingDuration} minutes and state that length to the visitor. The booking is created at ${meetingDuration} minutes regardless of the duration you send, so never offer or confirm a different length.`,
+    );
   }
 
   if (toolkitSlugs.includes("cal")) {
@@ -782,7 +800,7 @@ export async function runAgentChat({
   onStatus,
 }: AgentRuntimeInput & {
   onToken?: (token: string) => void;
-  onStatus?: (status: string) => void;
+  onStatus?: (phase: AgentRuntimePhase) => void;
 }): Promise<AgentRuntimeResult> {
   const {
     connectedToolkits,
@@ -908,7 +926,7 @@ export async function runAgentChat({
 
   if (hasGlobalKnowledge || hasSessionKnowledge) {
     try {
-      if (onStatus) onStatus("Searching knowledge...");
+      if (onStatus) onStatus("knowledge");
       knowledgeMatches = await retrieveKnowledgeMatches({
         supabase,
         workspaceId: agent.workspace_id,
@@ -973,7 +991,7 @@ export async function runAgentChat({
   let errorSummary: string | undefined;
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration += 1) {
-    if (onStatus && iteration > 0) onStatus("Thinking...");
+    if (onStatus && iteration > 0) onStatus("thinking");
     
     // Check if tools are currently available, if not, or if this is the last iteration, 
     // we should stream the response back. Actually, we can stream every iteration.
@@ -1063,10 +1081,7 @@ export async function runAgentChat({
       break;
     }
 
-    if (onStatus) {
-      const toolNames = toolCallsArray.map(tc => tc.function.name).join(", ");
-      onStatus(`Using tool: ${toolNames}...`);
-    }
+    if (onStatus) onStatus("tools");
 
     // Record tool call events
     for (const tc of toolCallsArray) {
@@ -1192,7 +1207,24 @@ export async function runAgentChat({
             content: "Tool executed, but no result was returned.",
           }));
         } else {
-          externalToolMessages = results;
+          const toolNamesByCallId = new Map(
+            externalToolCalls.map((toolCall) => [
+              toolCall.id,
+              toolCall.function.name,
+            ]),
+          );
+          externalToolMessages = results.map((message, index) => {
+            const toolCallId =
+              typeof message.tool_call_id === "string"
+                ? message.tool_call_id.replace(/_primary$/, "")
+                : null;
+            const name =
+              (typeof message.name === "string" && message.name) ||
+              (toolCallId ? toolNamesByCallId.get(toolCallId) : null) ||
+              externalToolCalls[index]?.function.name;
+
+            return name ? { ...message, name } : message;
+          });
 
           for (const msg of externalToolMessages) {
             let abbrResult = msg.content;
@@ -1248,7 +1280,7 @@ export async function runAgentChat({
   }
 
   if (!finalAssistantMessage || !assistantContent) {
-    if (onStatus) onStatus("Finalizing...");
+    if (onStatus) onStatus("finalizing");
     
     debugEvents.push({
       type: "recovery_triggered",

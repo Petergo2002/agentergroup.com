@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { usePathname } from "next/navigation";
 import useSWR, { SWRConfig } from "swr";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -9,6 +15,12 @@ import { ToastProvider } from "@/components/ui/ToastProvider";
 import { ModalProvider } from "@/components/ui/ModalProvider";
 import { AppContextProvider } from "@/components/app/AppContext";
 import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
+import {
+  markSeenNow,
+  readSeenAt,
+  readSeenAtOnServer,
+  subscribeToSeenAt,
+} from "@/lib/seen-at-store";
 import type {
   AppWorkspaceContext,
   DashboardLatestActivityResponse,
@@ -49,17 +61,15 @@ export function AppShell({ children, context, user }: AppShellProps) {
       dedupingInterval: 30_000,
     },
   );
-  const [lastSeenAnalyticsActivityAt, setLastSeenAnalyticsActivityAt] = useState<string | null>(
-    () =>
-      typeof window !== "undefined"
-        ? localStorage.getItem(analyticsStorageKey)
-        : null,
+  const lastSeenAnalyticsActivityAt = useSyncExternalStore(
+    subscribeToSeenAt,
+    () => readSeenAt(analyticsStorageKey),
+    readSeenAtOnServer,
   );
-  const [lastSeenLeadsAt, setLastSeenLeadsAt] = useState<string | null>(
-    () =>
-      typeof window !== "undefined"
-        ? localStorage.getItem(leadsStorageKey)
-        : null,
+  const lastSeenLeadsAt = useSyncExternalStore(
+    subscribeToSeenAt,
+    () => readSeenAt(leadsStorageKey),
+    readSeenAtOnServer,
   );
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -180,43 +190,22 @@ export function AppShell({ children, context, user }: AppShellProps) {
   const effectiveNewLeadCount = hasNewLeads ? rawLeadCount : 0;
 
   const clearAnalyticsAttention = useCallback(() => {
-    const now = new Date().toISOString();
-    try {
-      localStorage.setItem(analyticsStorageKey, now);
-    } catch {
-      // ignore
-    }
-    setLastSeenAnalyticsActivityAt(now);
+    markSeenNow(analyticsStorageKey);
   }, [analyticsStorageKey]);
 
   const clearLeadsBadge = useCallback(() => {
-    const now = new Date().toISOString();
-    try {
-      localStorage.setItem(leadsStorageKey, now);
-    } catch {
-      // ignore
-    }
-    setLastSeenLeadsAt(now);
+    markSeenNow(leadsStorageKey);
   }, [leadsStorageKey]);
 
   useEffect(() => {
-    try {
-      setLastSeenAnalyticsActivityAt(localStorage.getItem(analyticsStorageKey));
-      setLastSeenLeadsAt(localStorage.getItem(leadsStorageKey));
-    } catch {
-      // ignore
-    }
-  }, [analyticsStorageKey, leadsStorageKey]);
-
-  useEffect(() => {
     if (!isAnalyticsRoute) return;
-    clearAnalyticsAttention();
-  }, [isAnalyticsRoute, clearAnalyticsAttention]);
+    markSeenNow(analyticsStorageKey);
+  }, [isAnalyticsRoute, analyticsStorageKey]);
 
   useEffect(() => {
     if (!isLeadsRoute) return;
-    clearLeadsBadge();
-  }, [isLeadsRoute, clearLeadsBadge]);
+    markSeenNow(leadsStorageKey);
+  }, [isLeadsRoute, leadsStorageKey]);
 
   return (
     <AppContextProvider value={{ ...context, user }}>

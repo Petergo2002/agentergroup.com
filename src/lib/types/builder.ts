@@ -104,6 +104,7 @@ export interface GoogleCalendarBuilderNodeData extends BaseBuilderNodeData {
   calendarId: string | null;
   calendarLabel: string | null;
   includePrimaryCalendar: boolean;
+  meetingDurationMinutes?: number | null;
   simpleIcon?: string;
   simpleIconColor?: string;
 }

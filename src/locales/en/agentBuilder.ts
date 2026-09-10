@@ -285,6 +285,10 @@ export const agentBuilder = {
   alsoBookPrimary: "Also book on primary calendar",
   alsoBookPrimaryDescription:
     "When enabled, the assistant will mirror bookings to the account's primary calendar in addition to the selected booking calendar.",
+  bookingDuration: "Meeting Duration",
+  bookingDurationDescription:
+    "Choose the default length for meetings scheduled through the calendar.",
+  minutesUnit: "min",
   bookingTimezone: "Booking Timezone",
   eventType: "Meeting Type",
   eventTypeDesc:

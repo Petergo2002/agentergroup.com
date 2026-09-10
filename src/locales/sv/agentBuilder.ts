@@ -287,6 +287,10 @@ export const agentBuilder = {
   alsoBookPrimary: "Boka även på primärkalendern",
   alsoBookPrimaryDescription:
     "När detta är aktiverat speglar assistenten bokningar till kontots primärkalender utöver den valda bokningskalendern.",
+  bookingDuration: "Möteslängd",
+  bookingDurationDescription:
+    "Välj standardlängd för möten som bokas via kalendern.",
+  minutesUnit: "min",
   bookingTimezone: "Bokningstidszon",
   eventType: "Mötestyp",
   eventTypeDesc:

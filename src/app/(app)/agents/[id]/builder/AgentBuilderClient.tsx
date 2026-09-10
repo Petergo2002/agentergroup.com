@@ -71,6 +71,7 @@ import {
   isVerifiedKnowledgeFolder,
   isVerifiedKnowledgeSource,
 } from '@/lib/knowledge';
+import { sanitizeKnowledgeSelection } from '@/lib/knowledge-selection';
 import { jsonFetcher, workspaceSWRKey } from '@/lib/json-fetcher';
 import {
   createLegacyOpenRouterModelOption,
@@ -1076,6 +1077,7 @@ function createGoogleCalendarNode(
       calendarId: null,
       calendarLabel: null,
       includePrimaryCalendar: false,
+      meetingDurationMinutes: 30,
       enabledTools: getRecommendedChatToolsForToolkit('googlecalendar'),
       ...(data ?? {}),
     } as BuilderNodeData,
@@ -1269,6 +1271,8 @@ function normalizeDefinition(
   attachedConnectionIds: string[],
   attachedKnowledgeSourceIds: string[],
   attachedKnowledgeFolderIds: string[],
+  availableKnowledgeSourceIds: string[],
+  availableKnowledgeFolderIds: string[],
 ): NormalizedBuilderDefinition {
   const rawNodes = (Array.isArray(definition.nodes) ? definition.nodes : []) as BuilderFlowNode[];
   const nodesByKind = new Map<BuilderNodeKind, BuilderFlowNode>();
@@ -1296,14 +1300,23 @@ function normalizeDefinition(
   }
 
   const knowledgeNode = nodesByKind.get('knowledge');
-  const knowledgeSourceIds =
+  const storedKnowledgeSourceIds =
     knowledgeNode && isKnowledgeNodeData(knowledgeNode.data)
       ? knowledgeNode.data.sourceIds
       : attachedKnowledgeSourceIds;
-  const knowledgeFolderIds =
+  const storedKnowledgeFolderIds =
     knowledgeNode && isKnowledgeNodeData(knowledgeNode.data)
       ? knowledgeNode.data.folderIds ?? []
       : attachedKnowledgeFolderIds;
+  const { sourceIds: knowledgeSourceIds, folderIds: knowledgeFolderIds } =
+    sanitizeKnowledgeSelection(
+      {
+        sourceIds: storedKnowledgeSourceIds,
+        folderIds: storedKnowledgeFolderIds,
+      },
+      availableKnowledgeSourceIds,
+      availableKnowledgeFolderIds,
+    );
 
   const gmailNode = nodesByKind.get('gmail');
   const outlookNode = nodesByKind.get('outlook');
@@ -1548,6 +1561,11 @@ function normalizeDefinition(
                   ? calendarNode.data.calendarLabel
                   : null,
               includePrimaryCalendar: calendarNode.data.includePrimaryCalendar === true,
+              meetingDurationMinutes:
+                typeof calendarNode.data.meetingDurationMinutes === 'number' &&
+                calendarNode.data.meetingDurationMinutes > 0
+                  ? calendarNode.data.meetingDurationMinutes
+                  : 30,
               enabledTools: pickEnabledToolsFromNode('googlecalendar', calendarNode),
             }
           : undefined,
@@ -2957,7 +2975,7 @@ export default function AgentBuilderClient() {
       updates: Partial<
         Pick<
           GoogleCalendarBuilderNodeData,
-          'timezone' | 'calendarId' | 'calendarLabel' | 'includePrimaryCalendar'
+          'timezone' | 'calendarId' | 'calendarLabel' | 'includePrimaryCalendar' | 'meetingDurationMinutes'
         >
       >,
     ) => {
@@ -3186,6 +3204,8 @@ export default function AgentBuilderClient() {
       attachedConnectionIds,
       attachedKnowledgeSourceIds,
       attachedKnowledgeFolderIds,
+      payload.knowledgeSources.map((item) => item.id),
+      payload.availableKnowledgeFolders.map((item) => item.id),
     );
     let normalizedNodes = normalized.nodes;
     const automationPayload = payload.automation;
@@ -4228,7 +4248,7 @@ export default function AgentBuilderClient() {
         if (saveError.code === '40001') {
           throw new Error(t('agentBuilder.saveConflictError'));
         }
-        throw saveError;
+        throw new Error(saveError.message || t('agentBuilder.saveError'));
       }
 
       const { updatedAt, draftVersion: nextDraftVersion, status: nextStatus } = saveResult as {
@@ -5759,6 +5779,45 @@ export default function AgentBuilderClient() {
                     </div>
                   </label>
                 ) : null}
+
+                <div>
+                  <label className="mb-2.5 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
+                    {t('agentBuilder.bookingDuration')}
+                  </label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {[15, 30, 45, 60, 90].map((mins) => {
+                      const isSelected =
+                        ((toolData as GoogleCalendarBuilderNodeData).meetingDurationMinutes ?? 30) === mins;
+                      return (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => {
+                            updateGoogleCalendarSettings(toolNode.id, {
+                              meetingDurationMinutes: mins,
+                            });
+                          }}
+                          className={`flex flex-col items-center justify-center rounded-[1.25rem] border py-3 px-1 transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/10 text-primary font-black shadow-sm'
+                              : 'border-outline-variant/10 bg-surface-container-lowest text-on-surface font-semibold hover:border-outline-variant/30 hover:bg-surface-container-low'
+                          }`}
+                        >
+                          <span className="text-sm">{mins}</span>
+                          <span className="text-[10px] uppercase tracking-wider opacity-70">
+                            {t('agentBuilder.minutesUnit')}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 px-1">
+                    <span className="material-symbols-outlined text-sm text-primary/60 mt-0.5">timer</span>
+                    <p className="text-[11px] leading-relaxed text-on-surface-variant/60 font-medium">
+                      {t('agentBuilder.bookingDurationDescription')}
+                    </p>
+                  </div>
+                </div>
 
                 <div className="rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1 mb-3">

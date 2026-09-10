@@ -63,6 +63,7 @@ import type {
   WidgetBootstrapResponse,
   WidgetConfig,
   WidgetEndChatReason,
+  WidgetGenerativeUi,
 } from "./types";
 
 interface WidgetProps {
@@ -106,6 +107,10 @@ export default function Widget({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  // Coarse progress phase from the server, shown while the agent works and no
+  // text has arrived yet. Knowledge retrieval and tool calls both happen before
+  // the first token, so this is the only feedback during the slowest stretch.
+  const [streamPhase, setStreamPhase] = useState<string | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<WidgetAttachment[]>([]);
@@ -860,6 +865,7 @@ export default function Widget({
       let streamError: Error | null = null;
       let streamCompleted = false;
       let streamEndReason: WidgetEndChatReason | null = null;
+      let generativeUi: WidgetGenerativeUi | undefined;
       const streamStartedAt = Date.now();
       let hasRevealedInterimContent = false;
 
@@ -868,6 +874,7 @@ export default function Widget({
         { role: "agent", content: "", isStreaming: true },
       ]);
       setIsStreaming(true);
+      setStreamPhase(null);
 
       const updateAssistantMessage = (content: string, streaming: boolean) => {
         setMessages((previous) => {
@@ -883,6 +890,7 @@ export default function Widget({
               streaming,
             }),
             isStreaming: streaming,
+            ...(generativeUi ? { ui: generativeUi } : {}),
           };
           return next;
         });
@@ -944,6 +952,13 @@ export default function Widget({
           case "content":
             fullText = event.content;
             scheduleRenderedFlush();
+            return;
+          case "ui":
+            generativeUi = event.ui;
+            updateAssistantMessage(fullText, true);
+            return;
+          case "status":
+            setStreamPhase(event.status);
             return;
           case "noop":
             return;
@@ -1050,6 +1065,7 @@ export default function Widget({
         activeStreamAbortControllerRef.current = null;
       }
       setIsLoading(false);
+      setStreamPhase(null);
     }
   };
 
@@ -1300,6 +1316,7 @@ export default function Widget({
                 setInput={setInput}
                 isLoading={isLoading}
                 isStreaming={isStreaming}
+                streamPhase={streamPhase}
                 hasStarted={hasStarted}
                 isConversationCompleted={isConversationCompleted}
                 endReason={conversationEndReason}

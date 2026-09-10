@@ -28,6 +28,7 @@ import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
+import { buildWidgetGenerativeUi } from "@/lib/widgets/generative-ui";
 import {
   validateBody,
   validateWidgetChatBody,
@@ -832,11 +833,29 @@ export async function POST(
               const encoder = new TextEncoder();
               controller.enqueue(encoder.encode(sseChunk({ delta: token })));
             },
+            // Knowledge retrieval and tool execution both run before the first
+            // token, so without these the visitor watches a motionless typing
+            // indicator for the slowest part of the turn.
+            onStatus: (status) => {
+              const encoder = new TextEncoder();
+              controller.enqueue(encoder.encode(sseChunk({ status })));
+            },
           });
           const assistantMessageTimestamp = new Date().toISOString();
           const persistedToolMessages = buildPersistedToolMessages(
             result.toolMessages,
           );
+          const generativeUi = buildWidgetGenerativeUi({
+            toolMessages: result.toolMessages,
+            timezone: calendarTimezone ?? selected!.agent.timezone,
+            durationMinutes: googleCalendarSelection.meetingDurationMinutes,
+          });
+
+          if (generativeUi) {
+            controller.enqueue(
+              new TextEncoder().encode(sseChunk({ ui: generativeUi })),
+            );
+          }
 
           const persistedMessages = await insertWidgetMessages(supabase, {
             widgetSessionId: widgetSession.id,
@@ -854,6 +873,7 @@ export async function POST(
                 content: result.assistantContent,
                 metadata: {
                   ...buildPersistedAssistantMetadata(result.assistantMetadata),
+                  ...(generativeUi ? { generativeUi } : {}),
                   ...(result.debugTrace ? { debugTrace: result.debugTrace } : {}),
                 },
               },

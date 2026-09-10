@@ -1,5 +1,13 @@
 import { motion } from "framer-motion";
-import { Check, Copy, Send, Paperclip } from "lucide-react";
+import {
+  CalendarClock,
+  Check,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  Paperclip,
+  Send,
+} from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type {
   Message,
@@ -7,6 +15,7 @@ import type {
   WidgetAttachment,
   WidgetConfig,
   WidgetEndChatReason,
+  WidgetGenerativeUi,
 } from "../types";
 import { MiloMark } from "./MiloMark";
 
@@ -31,6 +40,15 @@ const TRANSLATIONS = {
     completedTimeout: "The chat ended after inactivity.",
     completedButton: "Start a new chat",
     completedPlaceholder: "Start a new chat to continue",
+    availableTimes: "Available times",
+    chooseTime: "Choose a time to book",
+    bookingConfirmed: "Meeting booked",
+    openCalendar: "Open in calendar",
+    joinMeeting: "Join meeting",
+    phaseKnowledge: "Looking this up...",
+    phaseThinking: "Thinking...",
+    phaseTools: "Working on it...",
+    phaseFinalizing: "Almost done...",
   },
   sv: {
     copy: "Kopiera",
@@ -45,8 +63,130 @@ const TRANSLATIONS = {
     completedTimeout: "Chatten avslutades efter inaktivitet.",
     completedButton: "Starta ny chatt",
     completedPlaceholder: "Starta en ny chatt för att fortsätta",
+    availableTimes: "Lediga tider",
+    chooseTime: "Välj en tid att boka",
+    bookingConfirmed: "Mötet är bokat",
+    openCalendar: "Öppna i kalendern",
+    joinMeeting: "Anslut till mötet",
+    phaseKnowledge: "Letar upp det...",
+    phaseThinking: "Tänker...",
+    phaseTools: "Jobbar på det...",
+    phaseFinalizing: "Nästan klar...",
   },
 };
+
+function formatCalendarDateTime(value: string, timezone: string, language: string) {
+  const locale = language === "sv" ? "sv-SE" : "en-US";
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: timezone,
+    }).format(new Date(value));
+  } catch {
+    return new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }).format(new Date(value));
+  }
+}
+
+function CalendarGenerativeUi({
+  ui,
+  language,
+  disabled,
+  onSelectSlot,
+}: {
+  ui: WidgetGenerativeUi;
+  language: string;
+  disabled: boolean;
+  onSelectSlot: (start: string, end: string) => void;
+}) {
+  const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
+
+  if (ui.type === "calendar_booking_confirmation") {
+    return (
+      <div className="mt-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.07] p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500">
+            <CheckCircle2 className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-widget-fg">
+              {t.bookingConfirmed}
+            </p>
+            {ui.title ? (
+              <p className="mt-0.5 truncate text-xs font-medium text-widget-muted">
+                {ui.title}
+              </p>
+            ) : null}
+            <p className="mt-2 text-sm text-widget-fg">
+              {formatCalendarDateTime(ui.start, ui.timezone, language)}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {ui.calendarUrl ? (
+                <a
+                  href={ui.calendarUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-widget-border bg-widget-card px-3 py-2 text-xs font-semibold text-widget-fg transition-colors hover:border-widget-primary/40"
+                >
+                  {t.openCalendar}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : null}
+              {ui.meetingUrl ? (
+                <a
+                  href={ui.meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-widget-primary px-3 py-2 text-xs font-semibold text-widget-primary-fg transition-opacity hover:opacity-90"
+                >
+                  {t.joinMeeting}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-2xl border border-widget-border bg-widget-card/70 p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2.5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-widget-primary/10 text-widget-primary">
+          <CalendarClock className="h-5 w-5" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-widget-fg">{t.availableTimes}</p>
+          <p className="text-xs text-widget-muted">{t.chooseTime}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {ui.slots.map((slot) => (
+          <button
+            key={`${slot.start}:${slot.end}`}
+            type="button"
+            disabled={disabled}
+            onClick={() => onSelectSlot(slot.start, slot.end)}
+            className="rounded-xl border border-widget-border bg-widget-bg px-3 py-2.5 text-left text-sm font-semibold text-widget-fg transition-all hover:border-widget-primary/50 hover:bg-widget-primary/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {formatCalendarDateTime(slot.start, ui.timezone, language)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function MessageActions({
   onCopy,
@@ -404,6 +544,7 @@ interface ChatViewProps {
   setInput: (value: string) => void;
   isLoading: boolean;
   isStreaming: boolean;
+  streamPhase?: string | null;
   hasStarted: boolean;
   isConversationCompleted: boolean;
   endReason: WidgetEndChatReason | null;
@@ -424,6 +565,7 @@ export function ChatView({
   setInput,
   isLoading,
   isStreaming,
+  streamPhase,
   hasStarted,
   isConversationCompleted,
   endReason,
@@ -525,10 +667,38 @@ export function ChatView({
                 <div className="flex flex-col gap-1.5">
                   {/* Message Content — no avatar, full width */}
                   <div className="flex-1 space-y-1.5 min-w-0">
+                    {msg.isStreaming && !msg.content && streamPhase ? (
+                      <motion.p
+                        key={streamPhase}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-[13px] italic text-widget-muted"
+                      >
+                        {t[
+                          `phase${streamPhase.charAt(0).toUpperCase()}${streamPhase.slice(1)}` as keyof typeof t
+                        ] ?? t.phaseThinking}
+                      </motion.p>
+                    ) : null}
+
                     <AgentMessageContent
                       content={msg.content}
                       isStreaming={msg.isStreaming}
                     />
+
+                    {msg.ui ? (
+                      <CalendarGenerativeUi
+                        ui={msg.ui}
+                        language={config.widget.language ?? "en"}
+                        disabled={isLoading || isStreaming || isConversationCompleted}
+                        onSelectSlot={(start, end) => {
+                          const prompt =
+                            config.widget.language === "sv"
+                              ? `Boka mötestiden som börjar ${start} och slutar ${end}.`
+                              : `Book the meeting slot that starts at ${start} and ends at ${end}.`;
+                          void sendMessage(prompt);
+                        }}
+                      />
+                    ) : null}
 
                     {/* Milo conversation identity and actions */}
                     {!msg.isStreaming && (

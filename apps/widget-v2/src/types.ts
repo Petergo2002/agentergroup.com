@@ -82,9 +82,27 @@ export interface WidgetAttachment {
   size: number;
 }
 
+export type WidgetGenerativeUi =
+  | {
+      type: "calendar_availability";
+      timezone: string;
+      durationMinutes: number;
+      slots: Array<{ start: string; end: string }>;
+    }
+  | {
+      type: "calendar_booking_confirmation";
+      timezone: string;
+      title: string | null;
+      start: string;
+      end: string | null;
+      calendarUrl: string | null;
+      meetingUrl: string | null;
+    };
+
 export interface Message {
   role: "user" | "agent";
   content: string;
   isStreaming?: boolean;
   attachments?: WidgetAttachment[];
+  ui?: WidgetGenerativeUi;
 }
