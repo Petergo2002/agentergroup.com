@@ -169,4 +169,5 @@ export interface WidgetLeadListItem extends WidgetLeadRecord {
   widget_name: string;
   agent_name: string | null;
   ai_summary: LeadConversationSummary | null;
+  source_channel?: "contact_form" | "chat";
 }

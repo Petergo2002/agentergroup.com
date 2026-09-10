@@ -27,6 +27,23 @@ const builderPage = readFileSync(
   "src/app/(app)/agents/[id]/builder/AgentBuilderClient.tsx",
   "utf8",
 );
+const transactionalSaveMigration = readFileSync(
+  "supabase/migrations/20260910140100_transactional_agent_save_publish.sql",
+  "utf8",
+);
+const versionScopedSearchMigration = readFileSync(
+  "supabase/migrations/20260910140000_agent_version_scoped_knowledge_search.sql",
+  "utf8",
+);
+const agentChatRuntime = readFileSync("src/lib/runtime/agent-chat.ts", "utf8");
+const publicWidgetChatRoute = readFileSync(
+  "src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts",
+  "utf8",
+);
+const searchKnowledgeFunction = readFileSync(
+  "supabase/functions/search-knowledge/index.ts",
+  "utf8",
+);
 
 test("website knowledge URLs are normalized and restricted to one origin", () => {
   const base = normalizeWebsiteKnowledgeUrl("example.com/docs");
@@ -108,8 +125,9 @@ test("knowledge storage reservation distinguishes quota from database failures",
   assert.match(knowledgeSourcesRoute, /deleteKnowledgeSource\(supabase, source\.id\)/);
 });
 
-test("builder connection replacement is delegated to one transactional RPC", () => {
-  assert.match(builderPage, /\.rpc\(['"]replace_agent_connections['"]/);
+test("builder save/publish is delegated to transactional RPCs", () => {
+  assert.match(builderPage, /\.rpc\(\s*['"]save_agent_draft_v1['"]/);
+  assert.match(builderPage, /\.rpc\(\s*['"]publish_agent_version_v1['"]/);
   assert.match(
     hardeningMigration,
     /create or replace function public\.replace_agent_connections/,
@@ -125,5 +143,81 @@ test("builder connection replacement is delegated to one transactional RPC", () 
   assert.doesNotMatch(
     connectionHelperFixMigration,
     /if not public\.can_edit_agent\(p_agent_id\)/,
+  );
+  // save_agent_draft_v1 must replace connections/knowledge in the SAME
+  // transaction as the agents/agent_drafts writes, not as separate calls.
+  assert.match(
+    transactionalSaveMigration,
+    /create or replace function public\.save_agent_draft_v1/,
+  );
+  assert.match(
+    transactionalSaveMigration,
+    /perform public\.replace_agent_connections\(p_agent_id, p_connection_ids\)/,
+  );
+  assert.match(
+    transactionalSaveMigration,
+    /create or replace function public\.replace_agent_knowledge_v1/,
+  );
+  assert.match(
+    transactionalSaveMigration,
+    /perform public\.replace_agent_knowledge_v1\(p_agent_id, p_knowledge_source_ids, p_knowledge_folder_ids\)/,
+  );
+  // Both save and publish must reject a caller working from a stale snapshot
+  // instead of silently overwriting a concurrent editor's changes.
+  assert.match(
+    transactionalSaveMigration,
+    /if agent_record\.updated_at is distinct from p_expected_agent_updated_at then\s*\n\s*raise exception 'AGENT_SAVE_CONFLICT' using errcode = '40001';/,
+  );
+  assert.match(
+    transactionalSaveMigration,
+    /create or replace function public\.publish_agent_version_v1/,
+  );
+  assert.match(
+    transactionalSaveMigration,
+    /raise exception 'AGENT_PUBLISH_CONFLICT' using errcode = '40001';/,
+  );
+});
+
+test("public widget chat scopes tools and knowledge to the published version, not the live draft", () => {
+  // The public chat route must hand the published version's definition to the
+  // runtime so it never trusts an unpublished draft's connections/knowledge.
+  assert.match(
+    publicWidgetChatRoute,
+    /publishedDefinition:\s*publishedVersion\?\.definition/,
+  );
+
+  // loadRuntimeContext must branch on a supplied publishedDefinition and
+  // derive tool connections/knowledge ids from it instead of the live
+  // agent_connections/agent_knowledge_sources/agent_knowledge_folders tables.
+  assert.match(agentChatRuntime, /if \(publishedDefinition\) \{/);
+  assert.match(agentChatRuntime, /getKnowledgeSourceIdsFromDefinition\(publishedDefinition\)/);
+  assert.match(agentChatRuntime, /getKnowledgeFolderIdsFromDefinition\(publishedDefinition\)/);
+  assert.match(agentChatRuntime, /getToolConnectionsFromDefinition\(publishedDefinition\)/);
+
+  // The live-table fallback must remain for surfaces that intentionally run
+  // against the current draft (e.g. Builder preview/test chat).
+  assert.match(agentChatRuntime, /from\("agent_connections"\)/);
+  assert.match(agentChatRuntime, /from\("agent_knowledge_sources"\)/);
+  assert.match(agentChatRuntime, /from\("agent_knowledge_folders"\)/);
+
+  // search-knowledge must call the version-scoped RPC when given explicit
+  // source/folder ids, not the agent-id-joined default function.
+  assert.match(searchKnowledgeFunction, /match_agent_knowledge_chunks_scoped/);
+  assert.match(searchKnowledgeFunction, /isScopedRequest/);
+
+  // The scoped SQL function must restrict eligible sources to the given id
+  // arrays instead of joining agent_knowledge_sources/agent_knowledge_folders
+  // by agent_id (which would still leak live draft attachments).
+  assert.match(
+    versionScopedSearchMigration,
+    /create or replace function public\.match_agent_knowledge_chunks_scoped/,
+  );
+  assert.match(
+    versionScopedSearchMigration,
+    /sources\.id = any \(coalesce\(input_source_ids, '\{\}'::uuid\[\]\)\)/,
+  );
+  assert.doesNotMatch(
+    versionScopedSearchMigration,
+    /public\.agent_knowledge_sources/,
   );
 });

@@ -67,7 +67,7 @@ function WidgetBuilderLayout() {
         </div>
 
         {/* Right Column: Full-Height Expansive Live Studio Canvas */}
-        <main className="hidden lg:flex flex-1 min-w-0 bg-surface-container-low/20 p-5 xl:p-8 flex-col sticky top-[57px] h-[calc(100vh-57px)] overflow-hidden">
+        <main className="hidden lg:flex flex-1 min-w-0 bg-surface-container-low/20 p-3 xl:p-5 flex-col sticky top-[57px] h-[calc(100vh-57px)] overflow-hidden">
           <WidgetDevicePreview />
         </main>
       </div>

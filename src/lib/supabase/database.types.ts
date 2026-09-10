@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1538,6 +1538,8 @@ export type Database = {
           metadata: Json
           mime_type: string | null
           name: string
+          processing_expires_at: string | null
+          processing_token: string | null
           raw_text: string | null
           source_type: string
           status: string
@@ -1559,6 +1561,8 @@ export type Database = {
           metadata?: Json
           mime_type?: string | null
           name: string
+          processing_expires_at?: string | null
+          processing_token?: string | null
           raw_text?: string | null
           source_type: string
           status?: string
@@ -1580,6 +1584,8 @@ export type Database = {
           metadata?: Json
           mime_type?: string | null
           name?: string
+          processing_expires_at?: string | null
+          processing_token?: string | null
           raw_text?: string | null
           source_type?: string
           status?: string
@@ -2440,6 +2446,36 @@ export type Database = {
           },
         ]
       }
+      user_legal_acceptances: {
+        Row: {
+          acceptance_method: string
+          accepted_at: string
+          id: string
+          privacy_version: string
+          recorded_at: string
+          terms_version: string
+          user_id: string
+        }
+        Insert: {
+          acceptance_method: string
+          accepted_at: string
+          id?: string
+          privacy_version: string
+          recorded_at?: string
+          terms_version: string
+          user_id: string
+        }
+        Update: {
+          acceptance_method?: string
+          accepted_at?: string
+          id?: string
+          privacy_version?: string
+          recorded_at?: string
+          terms_version?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       verified_facts: {
         Row: {
           agent_id: string
@@ -3243,6 +3279,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "workspaces_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "workspaces_primary_customer_agent_id_fkey"
             columns: ["primary_customer_agent_id"]
             isOneToOne: false
@@ -3254,13 +3297,6 @@ export type Database = {
             columns: ["primary_widget_id"]
             isOneToOne: false
             referencedRelation: "widgets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workspaces_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3346,6 +3382,17 @@ export type Database = {
         Args: { p_actor_id: string; p_agent_id: string }
         Returns: Json
       }
+      checkpoint_knowledge_processing: {
+        Args: {
+          p_chunks: Json
+          p_complete?: boolean
+          p_revision: string
+          p_source_id: string
+          p_token: string
+          p_total_chunks: number
+        }
+        Returns: undefined
+      }
       claim_agent_automation_provider_outbox_v1: {
         Args: { p_limit: number; p_outbox_id: string }
         Returns: {
@@ -3362,6 +3409,10 @@ export type Database = {
           provider_trigger_id: string
           workspace_id: string
         }[]
+      }
+      claim_knowledge_processing: {
+        Args: { p_source_id: string; p_token: string }
+        Returns: boolean
       }
       cleanup_ephemeral_knowledge: { Args: never; Returns: undefined }
       close_stale_widget_sessions: {
@@ -3421,10 +3472,6 @@ export type Database = {
           p_timezone?: string
           p_workspace_id: string
         }
-        Returns: Json
-      }
-      provision_workspace_milo_v1: {
-        Args: { p_actor_id: string; p_workspace_id: string }
         Returns: Json
       }
       finalize_automation_provider_activation_v1: {
@@ -3529,13 +3576,51 @@ export type Database = {
               source_name: string
             }[]
           }
+      match_agent_knowledge_chunks_scoped: {
+        Args: {
+          input_agent_id: string
+          input_folder_ids: string[]
+          input_source_ids: string[]
+          input_widget_session_id?: string
+          input_workspace_id: string
+          match_count: number
+          match_threshold: number
+          query_embedding: string
+        }
+        Returns: {
+          chunk_id: string
+          chunk_index: number
+          content: string
+          metadata: Json
+          similarity: number
+          source_id: string
+          source_name: string
+        }[]
+      }
       prepare_automation_provider_activation_v1: {
         Args: { p_actor_id: string; p_agent_id: string }
+        Returns: Json
+      }
+      provision_workspace_milo_v1: {
+        Args: { p_actor_id: string; p_workspace_id: string }
         Returns: Json
       }
       prune_expired_rate_limit_windows: {
         Args: { p_expires_before?: string }
         Returns: number
+      }
+      publish_agent_version_v1: {
+        Args: {
+          p_agent_id: string
+          p_definition: Json
+          p_description: string
+          p_expected_agent_updated_at: string
+          p_instructions: string
+          p_model: string
+          p_name: string
+          p_starter_prompts: string[]
+        }
+        Returns: Json
       }
       purge_agent_automation_v1: {
         Args: { p_actor_id: string; p_agent_id: string }
@@ -3561,6 +3646,14 @@ export type Database = {
         Args: { p_agent_id: string; p_connection_ids: string[] }
         Returns: undefined
       }
+      replace_agent_knowledge_v1: {
+        Args: {
+          p_agent_id: string
+          p_folder_ids: string[]
+          p_source_ids: string[]
+        }
+        Returns: undefined
+      }
       reserve_knowledge_source_storage: {
         Args: {
           p_size_bytes: number
@@ -3579,6 +3672,25 @@ export type Database = {
           p_expected_agent_updated_at: string
           p_expected_draft_version: number
           p_version_id: string
+        }
+        Returns: Json
+      }
+      save_agent_draft_v1: {
+        Args: {
+          p_agent_id: string
+          p_connection_ids: string[]
+          p_definition: Json
+          p_description: string
+          p_expected_agent_updated_at: string
+          p_expected_draft_version: number
+          p_instructions: string
+          p_knowledge_folder_ids: string[]
+          p_knowledge_source_ids: string[]
+          p_model: string
+          p_name: string
+          p_starter_prompts: string[]
+          p_surface: string
+          p_timezone: string
         }
         Returns: Json
       }
@@ -3655,12 +3767,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3684,11 +3796,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3709,11 +3821,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3734,11 +3846,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3751,11 +3863,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

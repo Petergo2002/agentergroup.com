@@ -6,6 +6,7 @@ import {
   getKnowledgeFolderIdsFromDefinition,
   getKnowledgeSourceIdsFromDefinition,
   getRequiredIntegrationsFromDefinition,
+  getToolConnectionsFromDefinition,
   sanitizeBuilderDefinitionForTemplate,
 } from "../../src/lib/agent-library.ts";
 import type { BuilderDefinition } from "../../src/lib/types/index.ts";
@@ -115,6 +116,45 @@ test("extracts selected knowledge and required integrations from builder definit
     "gmail",
     "googlecalendar",
   ]);
+});
+
+test("extracts per-node tool connections from a builder definition, deduped by connection id", () => {
+  const definition = buildDefinition();
+
+  const connections = getToolConnectionsFromDefinition(definition);
+
+  assert.deepEqual(
+    connections.sort((a, b) => a.toolkitSlug.localeCompare(b.toolkitSlug)),
+    [
+      { toolkitSlug: "gmail", connectionId: "creator-gmail-connection" },
+      { toolkitSlug: "googlecalendar", connectionId: "creator-calendar-connection" },
+    ],
+  );
+
+  // Public chat scopes tool access to exactly these published-version
+  // connection ids, so a node without a connectionId must never surface.
+  const withUnconnectedNode: BuilderDefinition = {
+    ...definition,
+    nodes: [
+      ...(definition.nodes as Array<Record<string, unknown>>),
+      {
+        id: "slack",
+        data: {
+          kind: "slack",
+          integrationSlug: "slack",
+          label: "Slack",
+          connectionId: null,
+        },
+      },
+    ],
+  };
+
+  assert.equal(
+    getToolConnectionsFromDefinition(withUnconnectedNode).some(
+      (connection) => connection.toolkitSlug === "slack",
+    ),
+    false,
+  );
 });
 
 test("applies imported knowledge source ids to sanitized template definitions", () => {

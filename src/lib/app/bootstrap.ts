@@ -159,6 +159,9 @@ export async function createWorkspaceForUser(
     description?: string;
   },
 ): Promise<AvailableWorkspace> {
+  // Ensure profile exists to avoid 23503 foreign key violation if called directly
+  await syncUserProfile(supabase, user);
+
   const workspaceName = input?.name?.trim() || buildWorkspaceName(user);
   const workspaceDescription =
     input?.description?.trim() ||
@@ -216,6 +219,9 @@ async function createPrimaryWorkspaceForUser(
   supabase: SupabaseLike,
   user: User,
 ): Promise<AvailableWorkspace> {
+  // Ensure profile exists before workspace creation to prevent 23503 foreign key violation
+  await syncUserProfile(supabase, user);
+
   const workspaceName = buildWorkspaceName(user);
   const workspaceDescription = "Primary workspace for Milo, Website Chat, connections, and knowledge.";
   const slug = generateWorkspaceSlug(workspaceName, user.id.slice(0, 8));
@@ -376,10 +382,12 @@ export async function ensureWorkspaceContext(
     return cached.context;
   }
 
-  const [profile, workspaces] = await Promise.all([
-    syncUserProfile(supabase, user),
-    getOrCreateUserWorkspaces(supabase, user),
-  ]);
+  // Ensure profile is synced and saved to public.profiles before attempting to
+  // create workspaces or memberships. Workspaces have a foreign key constraint
+  // (owner_id REFERENCES public.profiles), so running them concurrently causes
+  // PostgreSQL error 23503 on first login/signup.
+  const profile = await syncUserProfile(supabase, user);
+  const workspaces = await getOrCreateUserWorkspaces(supabase, user);
   const activeWorkspace = await resolveActiveWorkspace(workspaces);
 
   const subscriptionResult = await supabase

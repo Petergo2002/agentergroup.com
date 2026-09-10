@@ -248,7 +248,25 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
             </p>
           </section>
 
-          <section className="grid grid-cols-2 gap-4">
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-xs">
+              <p className="text-xs font-medium text-on-surface-variant/65">
+                {t("leads.sourceLabel")}
+              </p>
+              <div className="mt-1.5 flex items-center">
+                {lead.source_channel === "contact_form" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    <Phone className="h-3 w-3" />
+                    {t("leads.sourceContactForm")}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                    <MessageSquareText className="h-3 w-3" />
+                    {t("leads.sourceChat")}
+                  </span>
+                )}
+              </div>
+            </div>
             <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-xs">
               <p className="text-xs font-medium text-on-surface-variant/65">
                 {t("leads.widgetLabel")}
@@ -464,7 +482,18 @@ export default function LeadsPageClient({
                       {getLeadInitials(lead.name)}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">{lead.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">{lead.name}</p>
+                        {lead.source_channel === "contact_form" ? (
+                          <span className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            {t("leads.sourceContactForm")}
+                          </span>
+                        ) : (
+                          <span className="inline-flex shrink-0 items-center rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                            {t("leads.sourceChat")}
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-1 truncate text-xs text-on-surface-variant/60 md:hidden">
                         {lead.widget_name}
                       </p>

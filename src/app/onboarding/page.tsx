@@ -26,10 +26,19 @@ export default async function OnboardingPage() {
     redirect("/dashboard");
   }
 
+  // Check if legal terms were already accepted
+  const { data: legalConsent } = await supabase
+    .from("user_legal_acceptances")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
   return (
     <OnboardingContent
       workspaceName={context.workspace.name}
-      userName={context.profile.full_name || ""}
+      userName={context.profile.full_name || user.user_metadata?.full_name || ""}
+      userEmail={user.email || ""}
+      hasAcceptedTerms={Boolean(legalConsent)}
     />
   );
 }

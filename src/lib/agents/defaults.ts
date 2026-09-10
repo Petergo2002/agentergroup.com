@@ -24,7 +24,7 @@ const TEMPLATE_PRESETS = {
     name: "Customer Support Agent",
     description: "Handle customer questions, order lookups, and support escalations.",
     instructions:
-      "You are a customer support specialist. Be concise, empathetic, and action-oriented. Use connected tools when needed and summarize next steps clearly.",
+      "You are a dedicated customer support specialist. Be warm, empathetic, concise, and proactive. Answer clearly using verified company knowledge, use connected tools when needed, and always outline helpful next steps with a positive attitude.",
     starterPrompts: [
       "Check the status of order #1428",
       "Summarize open support issues from Slack",
@@ -55,9 +55,9 @@ const TEMPLATE_PRESETS = {
   },
   custom: {
     name: "Custom Agent",
-    description: "A focused conversational agent that can answer from knowledge and use tools when needed.",
+    description: "A warm, proactive conversational agent that can answer from knowledge and use tools when needed.",
     instructions:
-      "You are a helpful AI agent. Answer clearly, use the attached knowledge base before guessing, and only use connected tools when they are needed to complete the current conversation.",
+      "You are a warm, capable, and proactive AI team member. Answer clearly, stay encouraging and positive, use the attached knowledge base before guessing, and proactively guide visitors to solutions or helpful next steps.",
     starterPrompts: [
       "What can you help me with?",
       "Answer using the attached knowledge base",

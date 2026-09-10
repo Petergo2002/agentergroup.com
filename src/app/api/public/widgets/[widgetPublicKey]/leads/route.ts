@@ -1,4 +1,5 @@
 import { after, NextRequest, NextResponse } from "next/server";
+import { sendLeadNotificationEmail } from "@/lib/email";
 import { generateLeadConversationSummary } from "@/lib/leads/conversation-summary";
 import {
   buildPublicWidgetRateLimitContext,
@@ -291,6 +292,10 @@ export async function POST(
       activeAgentId: selected!.agent.id,
     });
 
+    const leadMessage = message?.trim()
+      ? (message.trim().startsWith("[Kontaktformulär]") ? message.trim() : `[Kontaktformulär] ${message.trim()}`)
+      : "[Kontaktformulär] Förfrågan om återkoppling";
+
     const lead = await insertWidgetLead(supabase, {
       widget_id: loaded.widget.id,
       widget_session_id: widgetSession.id,
@@ -299,18 +304,60 @@ export async function POST(
       name,
       email,
       phone,
-      message,
+      message: leadMessage,
     });
 
     after(async () => {
+      const adminClient = createAdminClient();
+
       try {
-        await generateLeadConversationSummary(createAdminClient(), {
+        await generateLeadConversationSummary(adminClient, {
           leadId: lead.id,
         });
       } catch (error) {
         console.error("Background lead summary generation failed.", {
           leadId: lead.id,
           error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        const { data: workspace } = await adminClient
+          .from("workspaces")
+          .select("name, owner_id")
+          .eq("id", loaded.widget.workspace_id)
+          .maybeSingle();
+
+        if (workspace?.owner_id) {
+          const { data: ownerProfile } = await adminClient
+            .from("profiles")
+            .select("email")
+            .eq("id", workspace.owner_id)
+            .maybeSingle();
+
+          if (ownerProfile?.email) {
+            const rawWidgetName = loaded.widget.name?.trim() || "";
+            const widgetName =
+              !rawWidgetName || /^(maja|widget|avenro\s*widget)$/i.test(rawWidgetName)
+                ? "Milo"
+                : rawWidgetName;
+
+            await sendLeadNotificationEmail({
+              to: ownerProfile.email,
+              widgetName,
+              lead: {
+                name,
+                email,
+                phone,
+                message,
+              },
+            });
+          }
+        }
+      } catch (emailError) {
+        console.error("Background lead notification email failed.", {
+          leadId: lead.id,
+          error: emailError instanceof Error ? emailError.message : String(emailError),
         });
       }
     });

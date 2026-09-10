@@ -68,7 +68,9 @@ export const agentBuilder = {
   loadLeadSchemaError: "Failed to load the workspace lead schema.",
   loadCalendarsError: "Failed to load Google calendars.",
   saveError: "Failed to save draft.",
+  saveConflictError: "This agent was changed elsewhere. Reloading the latest version.",
   publishError: "Failed to publish agent.",
+  publishConflictError: "This agent was changed elsewhere. Reloading the latest version before publishing.",
   submitLibrarySuccess:
     "Agent submitted to the library. It will appear publicly after admin verification.",
   submitLibraryError: "Failed to submit agent to the library.",

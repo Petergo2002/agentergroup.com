@@ -201,12 +201,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
-  border-radius: 3px;
+  background: rgba(140, 140, 140, 0.25);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #ff5c00;
+  background: var(--widget-primary);
 }
 
 /* Typing cursor animation */

@@ -9,6 +9,7 @@ interface HomeTabProps {
   onSelectAgent: (widgetAgentId: string) => void;
   onSendMessage: (text?: string) => void;
   onSwitchToMessages: () => void;
+  onSwitchToContact?: () => void;
 }
 
 const TRANSLATIONS = {
@@ -17,6 +18,7 @@ const TRANSLATIONS = {
     contactBadge: "Contact",
     chatBadge: "Chat",
     openSpecialist: "Open this specialist to continue.",
+    contactPrompt: "Prefer a callback? Leave your details",
     tabAll: "All",
     tabActive: "Active",
     tabDraft: "Draft",
@@ -34,6 +36,7 @@ const TRANSLATIONS = {
     contactBadge: "Kontakt",
     chatBadge: "Chatt",
     openSpecialist: "Öppna denna specialist för att fortsätta.",
+    contactPrompt: "Vill du hellre bli uppringd? Kontakta oss",
     tabAll: "Alla",
     tabActive: "Aktiva",
     tabDraft: "Utkast",
@@ -55,6 +58,7 @@ export function HomeTab({
   onSelectAgent,
   onSendMessage,
   onSwitchToMessages,
+  onSwitchToContact,
 }: HomeTabProps) {
   const t = TRANSLATIONS[config.widget.language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
 
@@ -159,18 +163,18 @@ export function HomeTab({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.25 }}
-      className="absolute inset-0 flex flex-col items-center overflow-y-auto px-6 pb-24 pt-16 widget-scroll md:px-10 md:justify-center md:pt-8 lg:px-14 lg:pt-10"
+      className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto px-5 py-3 widget-scroll"
     >
-      <div className="flex w-full max-w-5xl flex-col items-center text-center">
-        <div className="mb-8 flex flex-col items-center">
-          <h1 className="text-4xl font-bold leading-tight tracking-tight text-widget-fg">
+      <div className="flex w-full max-w-lg flex-col items-center text-center my-auto">
+        <div className="mb-4 flex flex-col items-center w-full">
+          <h1 className="text-2xl sm:text-[28px] font-bold leading-snug tracking-tight text-widget-fg max-w-sm">
             {selectedAgent.greeting || "Welcome."}
           </h1>
           <div
-            className="mt-4 flex max-w-full items-center justify-center gap-1.5 px-4 text-center text-[10px] font-semibold uppercase tracking-[0.16em] sm:text-[11px] sm:tracking-[0.18em]"
+            className="mt-3 flex max-w-full items-center justify-center gap-1.5 px-4 text-center text-[10px] font-semibold uppercase tracking-[0.16em] sm:text-[11px] sm:tracking-[0.18em]"
             style={{ color: "var(--widget-milo-color)" }}
           >
-            <MiloMark className="h-[18px] w-[18px]" />
+            <MiloMark className="h-[17px] w-[17px]" />
             <span className="truncate">Milo</span>
           </div>
 
@@ -187,17 +191,17 @@ export function HomeTab({
 
               onSwitchToMessages();
             }}
-            className="relative mt-8 w-full max-w-sm shadow-lg shadow-black/5 sm:max-w-xl lg:max-w-2xl"
+            className="relative mt-5 w-full max-w-sm shadow-lg shadow-black/5"
           >
             <input
               type="text"
               name="message"
               placeholder={selectedAgent.placeholder || "How can we help?"}
-              className="widget-input-shell w-full rounded-2xl py-3.5 pl-5 pr-14 text-base font-medium text-widget-fg shadow-inner placeholder:text-widget-fg/40"
+              className="widget-input-shell w-full rounded-2xl py-3 pl-4 pr-12 text-[15px] font-medium text-widget-fg shadow-inner placeholder:text-widget-fg/40"
             />
             <button
               type="submit"
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl bg-transparent p-2 text-widget-muted transition-colors hover:text-[var(--widget-secondary)] active:scale-95 disabled:opacity-50"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-xl bg-transparent p-2 text-widget-muted transition-colors hover:text-[var(--widget-secondary)] active:scale-95 disabled:opacity-50"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -214,15 +218,26 @@ export function HomeTab({
               </svg>
             </button>
           </form>
+
+          {onSwitchToContact ? (
+            <button
+              type="button"
+              onClick={onSwitchToContact}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-widget-muted transition-colors hover:text-widget-fg"
+            >
+              <span>{t.contactPrompt}</span>
+              <span aria-hidden="true">&rarr;</span>
+            </button>
+          ) : null}
         </div>
 
         {quickActions.length > 0 ? (
-          <div className="mb-16 flex w-full max-w-xl flex-col items-center lg:max-w-3xl">
+          <div className="mt-1 mb-2 flex w-full max-w-sm flex-col items-center">
             {quickActions.map((action, index) => (
               <button
                 key={`${action.label}-${index}`}
                 onClick={() => handleQuickAction(action.prompt)}
-                className="group flex w-full max-w-[34rem] items-center justify-between gap-3 px-1 py-3.5 text-left transition-colors duration-200 lg:max-w-3xl"
+                className="group flex w-full items-center justify-between gap-3 px-1 py-2.5 text-left transition-colors duration-200"
                 style={{
                   borderBottom:
                     index < quickActions.length - 1
@@ -230,7 +245,7 @@ export function HomeTab({
                       : "none",
                 }}
               >
-                <span className="text-[14px] font-medium text-widget-fg group-hover:text-[var(--widget-secondary)] transition-colors duration-200 leading-snug">
+                <span className="text-[13px] font-medium text-widget-fg group-hover:text-[var(--widget-secondary)] transition-colors duration-200 leading-snug">
                   {action.label}
                 </span>
                 <svg

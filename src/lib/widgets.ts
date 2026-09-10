@@ -89,6 +89,23 @@ export function buildPrivacyPolicyUrl() {
   return new URL("/privacy-policy", getAppUrl()).toString();
 }
 
+export function normalizePrivacyPolicyUrl(url: string | null | undefined): string {
+  if (!url) return buildPrivacyPolicyUrl();
+  const trimmed = url.trim();
+  if (!trimmed) return buildPrivacyPolicyUrl();
+  try {
+    const parsed = new URL(trimmed, getAppUrl());
+    if (parsed.hostname.includes("agentergroup.com")) {
+      const canonical = new URL(getAppUrl());
+      parsed.protocol = canonical.protocol;
+      parsed.host = canonical.host;
+    }
+    return parsed.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
 export function buildDefaultWidgetInput(
   workspace: WorkspaceRecord,
   input?: { name?: string; slug?: string },
@@ -208,7 +225,7 @@ export function buildWidgetRuntimeConfig(
     brand: {
       name: widget.brand_name,
       logoUrl: widget.logo_url,
-      privacyPolicyUrl: widget.privacy_policy_url,
+      privacyPolicyUrl: normalizePrivacyPolicyUrl(widget.privacy_policy_url),
     },
     widget: {
       theme: widget.theme,
@@ -279,7 +296,7 @@ export function buildWidgetRuntimeConfigFromDraft(
     brand: {
       name: draft.widget.brandName.trim() || widget.brand_name,
       logoUrl: draft.widget.logoUrl.trim() || null,
-      privacyPolicyUrl: draft.widget.privacyPolicyUrl.trim() || null,
+      privacyPolicyUrl: normalizePrivacyPolicyUrl(draft.widget.privacyPolicyUrl),
     },
     widget: {
       theme: draft.widget.theme,

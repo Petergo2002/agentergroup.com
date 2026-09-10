@@ -250,3 +250,28 @@ export async function sendWidgetEvent(
     // Best-effort telemetry only.
   });
 }
+
+export async function submitWidgetLead(
+  widgetPublicKey: string,
+  body: {
+    sessionId: string;
+    name: string;
+    email: string;
+    phone?: string;
+    message?: string;
+    widgetAgentId?: string;
+  },
+  context: WidgetRequestContext,
+): Promise<{ ok: boolean; leadId: string; createdAt: string }> {
+  const response = await fetch(buildWidgetUrl(widgetPublicKey, "/leads"), {
+    method: "POST",
+    headers: buildWidgetHeaders(context),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    await parseError(response);
+  }
+
+  return (await response.json()) as { ok: boolean; leadId: string; createdAt: string };
+}

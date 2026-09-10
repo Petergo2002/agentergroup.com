@@ -110,6 +110,16 @@ Deno.serve(async (request) => {
   const widgetSessionId = normalizeUuid(body.widgetSessionId);
   const matchThreshold = Number(body.matchThreshold ?? 0.7);
   const matchCount = Math.min(Number(body.matchCount ?? 8), 20);
+  // Presence of these arrays (even empty) means the caller wants results scoped
+  // to an explicit id list (e.g. a published agent version) rather than
+  // whatever the live agent_knowledge_sources/agent_knowledge_folders rows say.
+  const isScopedRequest = Array.isArray(body.sourceIds) || Array.isArray(body.folderIds);
+  const scopedSourceIds = Array.isArray(body.sourceIds)
+    ? body.sourceIds.map(normalizeUuid).filter((id: string | null): id is string => id !== null)
+    : [];
+  const scopedFolderIds = Array.isArray(body.folderIds)
+    ? body.folderIds.map(normalizeUuid).filter((id: string | null): id is string => id !== null)
+    : [];
   const configuredSecretKeys = getConfiguredSecretKeys();
   const requestKeys = [
     internalServiceKey,
@@ -155,16 +165,27 @@ Deno.serve(async (request) => {
   });
 
   const searchClient = isInternalRequest ? adminClient : supabase;
-  let result = await searchClient.rpc("match_agent_knowledge_chunks", {
-    input_workspace_id: workspaceId,
-    input_agent_id: agentId,
-    input_widget_session_id: widgetSessionId,
-    query_embedding: embedding,
-    match_threshold: matchThreshold,
-    match_count: matchCount,
-  });
+  let result = isScopedRequest
+    ? await searchClient.rpc("match_agent_knowledge_chunks_scoped", {
+        input_workspace_id: workspaceId,
+        input_agent_id: agentId,
+        input_source_ids: scopedSourceIds,
+        input_folder_ids: scopedFolderIds,
+        input_widget_session_id: widgetSessionId,
+        query_embedding: embedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+      })
+    : await searchClient.rpc("match_agent_knowledge_chunks", {
+        input_workspace_id: workspaceId,
+        input_agent_id: agentId,
+        input_widget_session_id: widgetSessionId,
+        query_embedding: embedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+      });
 
-  if (result.error?.code === "PGRST202") {
+  if (result.error?.code === "PGRST202" && !isScopedRequest) {
     result = await searchClient.rpc("match_agent_knowledge_chunks", {
       input_workspace_id: workspaceId,
       input_agent_id: agentId,

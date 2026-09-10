@@ -186,6 +186,37 @@ export function getRequiredIntegrationsFromDefinition(
   return Array.from(integrations).sort();
 }
 
+export function getToolConnectionsFromDefinition(
+  definition: BuilderDefinition,
+) {
+  const nodes = Array.isArray(definition.nodes) ? definition.nodes : [];
+  const connections = new Map<string, { toolkitSlug: string; connectionId: string }>();
+
+  for (const node of nodes) {
+    if (!isObject(node) || !isObject(node.data)) {
+      continue;
+    }
+
+    const kind = typeof node.data.kind === "string" ? node.data.kind : null;
+    const connectionId =
+      typeof node.data.connectionId === "string" && node.data.connectionId.length > 0
+        ? node.data.connectionId
+        : null;
+    const toolkitSlug =
+      typeof node.data.integrationSlug === "string"
+        ? node.data.integrationSlug
+        : kind && TOOL_NODE_KINDS.has(kind)
+          ? kind
+          : null;
+
+    if (connectionId && toolkitSlug) {
+      connections.set(connectionId, { toolkitSlug, connectionId });
+    }
+  }
+
+  return Array.from(connections.values());
+}
+
 export function applyImportedKnowledgeSourceIds(
   definition: BuilderDefinition,
   sourceIds: string[],

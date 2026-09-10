@@ -69,7 +69,10 @@ export const agentBuilder = {
   loadLeadSchemaError: "Det gick inte att ladda workspace-schemat för leads.",
   loadCalendarsError: "Det gick inte att ladda Google-kalendrar.",
   saveError: "Det gick inte att spara utkastet.",
+  saveConflictError: "Agenten ändrades någon annanstans. Laddar om den senaste versionen.",
   publishError: "Det gick inte att publicera agenten.",
+  publishConflictError:
+    "Agenten ändrades någon annanstans. Laddar om den senaste versionen innan publicering.",
   submitLibrarySuccess:
     "Agenten skickades till biblioteket. Den visas publikt efter adminverifiering.",
   submitLibraryError: "Det gick inte att skicka agenten till biblioteket.",

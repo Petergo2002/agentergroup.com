@@ -6,7 +6,7 @@ import ts from "typescript";
 
 function loadModule(path: string, globals: Record<string, unknown> = {}) {
   const source = readFileSync(path, "utf8").replaceAll("import.meta.env", "__viteEnv");
-  const exports: Record<string, (...args: string[]) => string> = {};
+  const exports: Record<string, (...args: (string | null | undefined)[]) => string> = {};
   const code = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
@@ -122,3 +122,25 @@ test("SEO origin defaults to avenro and still supports explicit deployment confi
   assert.equal(origin(), "https://avenro.se");
   assert.equal(origin({ NEXT_PUBLIC_APP_URL: "https://preview.example/path" }), "https://preview.example");
 });
+
+test("normalizePrivacyPolicyUrl rewrites legacy agentergroup.com domain to active origin", () => {
+  const widgets = loadWidgets("https://avenro.se", "https://widget.avenro.se");
+  const normalized = widgets.normalizePrivacyPolicyUrl("https://agentergroup.com/privacy-policy");
+  assert.equal(normalized, "https://avenro.se/privacy-policy");
+
+  const defaultUrl = widgets.normalizePrivacyPolicyUrl(null);
+  assert.equal(defaultUrl, "https://avenro.se/privacy-policy");
+});
+
+test("Widget V2 localized privacy policy rewrites legacy agentergroup domain to avenro.se with language", () => {
+  const loc = loadModule("apps/widget-v2/src/lib/localization.ts");
+  const sv = loc.buildLocalizedPrivacyPolicyUrl("https://agentergroup.com/privacy-policy", "sv");
+  assert.equal(sv, "https://avenro.se/privacy-policy?lang=sv");
+
+  const en = loc.buildLocalizedPrivacyPolicyUrl("https://dashboard.agentergroup.com/privacy-policy", "en");
+  assert.equal(en, "https://avenro.se/privacy-policy?lang=en");
+
+  const fallback = loc.buildLocalizedPrivacyPolicyUrl(null, "sv");
+  assert.equal(fallback, "https://avenro.se/privacy-policy?lang=sv");
+});
+

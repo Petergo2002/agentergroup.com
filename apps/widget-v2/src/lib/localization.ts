@@ -93,14 +93,19 @@ export function buildLocalizedPrivacyPolicyUrl(
   value: string | null | undefined,
   language: "sv" | "en",
 ): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
+  const trimmed = value?.trim();
 
   try {
+    const raw = trimmed || "https://avenro.se/privacy-policy";
     const base =
       typeof window !== "undefined" ? window.location.href : "https://avenro.se";
-    const parsed = new URL(trimmed, base);
+    const parsed = new URL(raw, base);
+
+    // Redirect legacy agentergroup domain to the new canonical avenro.se domain
+    if (parsed.hostname.includes("agentergroup.com")) {
+      parsed.protocol = "https:";
+      parsed.host = "avenro.se";
+    }
 
     if (parsed.pathname === "/privacy-policy") {
       parsed.searchParams.set("lang", language);
@@ -108,6 +113,6 @@ export function buildLocalizedPrivacyPolicyUrl(
 
     return parsed.toString();
   } catch {
-    return trimmed;
+    return trimmed || "https://avenro.se/privacy-policy";
   }
 }

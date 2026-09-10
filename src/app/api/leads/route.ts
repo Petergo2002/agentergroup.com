@@ -182,6 +182,15 @@ export async function GET(request: NextRequest) {
             0
           : 0;
 
+        const rawMessage = row.message?.trim() ?? null;
+        const isContactForm =
+          Boolean(rawMessage && (rawMessage.startsWith("[Kontaktformulär]") || rawMessage.startsWith("[Contact Form]"))) ||
+          (rawMessage !== null && currentMessageCount === 0);
+
+        const cleanMessage = rawMessage
+          ? rawMessage.replace(/^\[(Kontaktformulär|Contact Form)\]\s*/, "").trim() || null
+          : null;
+
         return {
           id: row.id,
           widget_id: row.widget_id,
@@ -191,7 +200,8 @@ export async function GET(request: NextRequest) {
           name: row.name,
           email: row.email,
           phone: row.phone,
-          message: row.message,
+          message: cleanMessage,
+          source_channel: isContactForm ? "contact_form" : "chat",
           created_at: row.created_at,
           widget_name: widget?.name ?? "Unknown widget",
           agent_name: agent?.name ?? null,

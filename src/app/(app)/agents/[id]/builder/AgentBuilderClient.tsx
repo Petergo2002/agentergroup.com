@@ -2826,7 +2826,6 @@ export default function AgentBuilderClient() {
     useState<ReactFlowInstance<BuilderFlowNode, BuilderFlowEdge> | null>(null);
   const [agent, setAgent] = useState<AgentRecord | null>(null);
   const [draftVersion, setDraftVersion] = useState(1);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [connections, setConnections] = useState<ConnectionRecord[]>([]);
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceRecord[]>([]);
   const [knowledgeFolders, setKnowledgeFolders] = useState<KnowledgeFolderWithSources[]>([]);
@@ -3172,37 +3171,6 @@ export default function AgentBuilderClient() {
     ? canEditAgentRecord(agent, user.id, membership.role)
     : true;
 
-  const syncSelectedConnections = async (nextNodes: BuilderFlowNode[]) => {
-    const selectedConnectionIds = getSelectedConnectionIdsFromNodes(nextNodes, connections);
-
-    const { error } = await supabase.rpc('replace_agent_connections', {
-      p_agent_id: agentId,
-      p_connection_ids: selectedConnectionIds,
-    });
-
-    if (error) {
-      throw error;
-    }
-  };
-
-  const syncSelectedKnowledgeSources = async (nextNodes: BuilderFlowNode[]) => {
-    const response = await fetch(`/api/agents/${agentId}/knowledge`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        sourceIds: getKnowledgeSourceIdsFromNodes(nextNodes),
-        folderIds: getKnowledgeFolderIdsFromNodes(nextNodes),
-      }),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload.error ?? t('agentBuilder.saveKnowledgeError'));
-    }
-  };
-
   const hydrateBuilder = useCallback((payload: AgentBuilderBootstrapResponse) => {
     const chatConnections = payload.connections;
     const attachedConnectionIds = payload.selectedConnectionIds;
@@ -3276,7 +3244,6 @@ export default function AgentBuilderClient() {
     setAutomationEvents(automationPayload?.events ?? []);
     setAutomationRuns(automationPayload?.runs ?? []);
     setAutomationEnvironment(automationPayload?.environment ?? null);
-    setCurrentUserId(payload.currentUserId);
     setSelectedNodeId(null);
     setStatusNote(
       payload.draft?.updated_at
@@ -4240,49 +4207,40 @@ export default function AgentBuilderClient() {
             ? 'automation'
             : 'widget';
 
-      const [agentResult, draftResult] = await Promise.all([
-        supabase
-          .from('agents')
-          .update({
-            name,
-            description,
-            instructions,
-            model,
-            surface: nextSurface,
-            starter_prompts: definition.config.starterPrompts,
-            timezone,
-            ...(agent.surface === 'assistant' && agent.status === 'draft'
-              ? { status: 'active' }
-              : {}),
-          })
-          .eq('id', agentId),
-        supabase.from('agent_drafts').upsert(
-          {
-            agent_id: agentId,
-            workspace_id: agent.workspace_id,
-            updated_by: currentUserId ?? agent.created_by,
-            definition,
-            version: draftVersion,
-          },
-          {
-            onConflict: 'agent_id',
-          },
-        ),
-      ]);
+      const { data: saveResult, error: saveError } = await supabase.rpc('save_agent_draft_v1', {
+        p_agent_id: agentId,
+        p_name: name,
+        p_description: description,
+        p_instructions: instructions,
+        p_model: model,
+        p_surface: nextSurface,
+        p_starter_prompts: definition.config.starterPrompts,
+        p_timezone: timezone,
+        p_definition: definition,
+        p_connection_ids: getSelectedConnectionIdsFromNodes(resolvedNodes, connections),
+        p_knowledge_source_ids: getKnowledgeSourceIdsFromNodes(resolvedNodes),
+        p_knowledge_folder_ids: getKnowledgeFolderIdsFromNodes(resolvedNodes),
+        p_expected_agent_updated_at: agent.updated_at,
+        p_expected_draft_version: draftVersion,
+      });
 
-      if (agentResult.error) {
-        throw agentResult.error;
+      if (saveError) {
+        if (saveError.code === '40001') {
+          throw new Error(t('agentBuilder.saveConflictError'));
+        }
+        throw saveError;
       }
 
-      if (draftResult.error) {
-        throw draftResult.error;
-      }
+      const { updatedAt, draftVersion: nextDraftVersion, status: nextStatus } = saveResult as {
+        updatedAt: string;
+        draftVersion: number;
+        status: AgentRecord['status'];
+      };
 
-      await syncSelectedConnections(resolvedNodes);
-      await syncSelectedKnowledgeSources(resolvedNodes);
       await syncExternalTriggerBinding(definition);
       setNodes(resolvedNodes);
       setEdges(buildEdges(resolvedNodes));
+      setDraftVersion(nextDraftVersion);
       setAgent((current) =>
         current
           ? {
@@ -4294,10 +4252,8 @@ export default function AgentBuilderClient() {
               surface: nextSurface,
               starter_prompts: definition.config.starterPrompts,
               timezone,
-              status:
-                current.surface === 'assistant' && current.status === 'draft'
-                  ? 'active'
-                  : current.status,
+              status: nextStatus,
+              updated_at: updatedAt,
             }
           : current,
       );
@@ -4314,6 +4270,8 @@ export default function AgentBuilderClient() {
         showToast(t('agentBuilder.draftSaved'), 'success');
       }
       void mutateBuilderBootstrap();
+
+      return { updatedAt, draftVersion: nextDraftVersion, definition };
     } catch (error) {
       await reloadBuilder().catch(() => undefined);
       const message = error instanceof Error ? error.message : t('agentBuilder.saveError');
@@ -4332,52 +4290,45 @@ export default function AgentBuilderClient() {
     setIsPublishing(true);
 
     try {
-      await saveDraft();
-      const definition = buildDefinition();
+      const saved = await saveDraft();
+      if (!saved) {
+        return;
+      }
+      const { definition, updatedAt } = saved;
 
-      const { data: latestVersion } = await supabase
-        .from('agent_versions')
-        .select('version')
-        .eq('agent_id', agentId)
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { data: publishResult, error: publishError } = await supabase.rpc(
+        'publish_agent_version_v1',
+        {
+          p_agent_id: agentId,
+          p_definition: definition,
+          p_starter_prompts: definition.config.starterPrompts,
+          p_name: name,
+          p_description: description,
+          p_instructions: instructions,
+          p_model: model,
+          p_expected_agent_updated_at: updatedAt,
+        },
+      );
 
-      const versionNumber = (latestVersion?.version ?? 0) + 1;
-      const { data: version, error: versionError } = await supabase
-        .from('agent_versions')
-        .insert({
-          agent_id: agentId,
-          workspace_id: agent.workspace_id,
-          version: versionNumber,
-          definition,
-          published_by: currentUserId ?? agent.created_by,
-        })
-        .select()
-        .single();
-
-      if (versionError || !version) {
-        throw versionError ?? new Error(t('agentBuilder.publishError'));
+      if (publishError) {
+        if (publishError.code === '40001') {
+          throw new Error(t('agentBuilder.publishConflictError'));
+        }
+        throw publishError;
       }
 
-      const { error: updateError } = await supabase
-        .from('agents')
-        .update({
-          status: 'active',
-          published_version_id: version.id,
-          name,
-          description,
-          instructions,
-          model,
-          starter_prompts: definition.config.starterPrompts,
-        })
-        .eq('id', agentId);
-
-      if (updateError) {
-        throw updateError;
-      }
+      const { version: versionNumber, updatedAt: publishedUpdatedAt } = publishResult as {
+        updatedAt: string;
+        version: number;
+        versionId: string;
+      };
 
       setDraftVersion(versionNumber + 1);
+      setAgent((current) =>
+        current
+          ? { ...current, status: 'active', updated_at: publishedUpdatedAt }
+          : current,
+      );
       setStatusNote({
         kind: 'publishedAt',
         date: new Date().toISOString(),

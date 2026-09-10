@@ -260,7 +260,7 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
       </div>
 
       {/* Main Preview Playground Viewport (Clean, Uncluttered Canvas) */}
-      <div className="relative flex-1 min-h-0 bg-surface-container-lowest/40 overflow-hidden flex items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div className="relative flex-1 min-h-0 bg-surface-container-lowest/40 overflow-hidden flex items-center justify-center p-2.5 sm:p-3.5 lg:p-4">
         {deviceMode === 'desktop' ? (
           /* Desktop Clean Stage */
           <div className="relative h-full w-full rounded-2xl border border-outline-variant/15 bg-background shadow-xs overflow-hidden flex flex-col">
@@ -301,7 +301,7 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
             {/* Floating Chat Window (when open) */}
             {widgetPreviewUrl && (
               <div
-                className={`absolute bottom-22 right-6 sm:right-8 w-[400px] sm:w-[420px] max-w-[calc(100%-3rem)] h-[620px] max-h-[calc(100%-7rem)] rounded-[1.4rem] border border-outline-variant/20 bg-background shadow-[0_24px_60px_-12px_rgba(0,0,0,0.3)] overflow-hidden transition-all duration-300 origin-bottom-right z-30 ${
+                className={`absolute bottom-20 right-5 sm:right-6 w-[410px] sm:w-[420px] max-w-[calc(100%-2.5rem)] h-[670px] max-h-[calc(100%-5.5rem)] rounded-[1.4rem] border border-outline-variant/20 bg-background shadow-[0_24px_60px_-12px_rgba(0,0,0,0.3)] overflow-hidden transition-all duration-300 origin-bottom-right z-30 ${
                   isOpen
                     ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
                     : 'opacity-0 scale-90 translate-y-6 pointer-events-none'
@@ -333,7 +333,7 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
             )}
 
             {/* The Canonical Milo Floating Chat Launcher */}
-            <div className="absolute bottom-6 right-6 sm:right-8 z-40">
+            <div className="absolute bottom-5 right-5 sm:right-6 z-40">
               {isOpen ? (
                 /* Canonical Open State: 56px circular button with clean X */
                 <button

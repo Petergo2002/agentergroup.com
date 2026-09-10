@@ -50,3 +50,6 @@ lint_output.txt
 
 # Separate local project, not part of this repository
 /.gemini/Jenna/
+
+# Claude Code personal settings (permissions etc.), not shared with the team
+/.claude/settings.local.json

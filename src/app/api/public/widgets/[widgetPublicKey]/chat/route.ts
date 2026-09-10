@@ -826,6 +826,7 @@ export async function POST(
             endChatPolicy,
             gmailRecipientPolicy,
             enabledToolsByToolkit,
+            publishedDefinition: publishedVersion?.definition,
             abortSignal: streamAbortController.signal,
             onToken: (token) => {
               const encoder = new TextEncoder();

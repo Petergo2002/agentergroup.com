@@ -4,6 +4,7 @@ import {
   Home,
   Loader2,
   MessageSquare,
+  Phone,
   RotateCcw,
   X,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ContactTab } from "./components/ContactTab";
 import { HomeTab } from "./components/HomeTab";
 import { MessagesTab } from "./components/MessagesTab";
 import { WidgetMark } from "./components/WidgetMark";
@@ -109,7 +111,7 @@ export default function Widget({
   const [pendingAttachments, setPendingAttachments] = useState<WidgetAttachment[]>([]);
   const [hasStarted, setHasStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"home" | "messages">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "messages" | "contact">("home");
   const [hasUnread, setHasUnread] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isConversationCompleted, setIsConversationCompleted] = useState(false);
@@ -1056,6 +1058,7 @@ export default function Widget({
     config?.home.mode === "chooser" && selectedAgent === null;
   const navLabelHome = widgetLanguage === "sv" ? "Hem" : "Home";
   const navLabelMessages = widgetLanguage === "sv" ? "Meddelanden" : "Messages";
+  const navLabelContact = widgetLanguage === "sv" ? "Kontakt" : "Contact";
   const newChatLabel = widgetLanguage === "sv" ? "Starta ny chatt" : "Start a new chat";
   const showStandaloneDesktopShell = !isEmbedded;
   const showSurfaceNav =
@@ -1066,7 +1069,7 @@ export default function Widget({
 
 
   useEffect(() => {
-    if (config?.home.mode === "chooser" && !selectedAgent && activeTab === "messages") {
+    if (config?.home.mode === "chooser" && !selectedAgent && activeTab !== "home") {
       setActiveTab("home");
     }
   }, [activeTab, config?.home.mode, selectedAgent]);
@@ -1152,9 +1155,9 @@ export default function Widget({
         )}
 
         <header
-          className={`relative flex items-center justify-between px-6 pb-4 pt-[calc(env(safe-area-inset-top,0px)+3rem)] shrink-0 ${
+          className={`relative flex items-center justify-between px-5 pb-3 pt-[calc(env(safe-area-inset-top,0px)+1rem)] shrink-0 z-20 ${
             showStandaloneDesktopShell
-              ? "lg:border-b lg:border-[var(--widget-border)] lg:px-10 lg:pb-5 lg:pt-10"
+              ? "lg:border-b lg:border-[var(--widget-border)] lg:px-10 lg:pb-5 lg:pt-8"
               : ""
           }`}
         >
@@ -1191,7 +1194,7 @@ export default function Widget({
           </div>
 
           <div
-            className="absolute inset-x-0 top-[3.75rem] flex justify-center pointer-events-none select-none z-0"
+            className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center pointer-events-none select-none z-0"
           >
             <span
               className="block text-center font-semibold uppercase text-widget-fg opacity-40 text-[10px] tracking-[0.16em] sm:text-[11px] sm:tracking-[0.18em] truncate"
@@ -1225,6 +1228,14 @@ export default function Widget({
                   style={activeTab === "messages" ? { color: palette.secondary } : undefined}
                 >
                   {navLabelMessages}
+                </button>
+                <button
+                  onClick={() => setActiveTab("contact")}
+                  data-active={activeTab === "contact" ? "true" : "false"}
+                  className="widget-nav-button rounded-full px-4 py-2 text-xs font-semibold"
+                  style={activeTab === "contact" ? { color: palette.secondary } : undefined}
+                >
+                  {navLabelContact}
                 </button>
               </div>
             ) : null}
@@ -1265,6 +1276,18 @@ export default function Widget({
                   setActiveTab("home");
                 }}
                 onSwitchToMessages={() => setActiveTab("messages")}
+                onSwitchToContact={() => setActiveTab("contact")}
+              />
+            ) : activeTab === "contact" ? (
+              <ContactTab
+                key="contact"
+                config={config}
+                language={widgetLanguage}
+                selectedAgent={selectedAgent}
+                sessionId={sessionId}
+                requestContext={requestContext}
+                palette={palette}
+                onSwitchToChat={() => setActiveTab("messages")}
               />
             ) : (
               <MessagesTab
@@ -1312,17 +1335,22 @@ export default function Widget({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 50 }}
-              className={`px-6 pb-6 shrink-0 ${
+              className={`px-5 pb-4 pt-1 shrink-0 z-20 ${
                 showStandaloneDesktopShell ? "lg:hidden" : ""
               }`}
             >
-              <div className="glass-navbar rounded-2xl h-16 w-full flex items-center justify-around relative overflow-hidden">
+              <div className="glass-navbar rounded-2xl h-14 w-full flex items-center justify-around relative overflow-hidden">
                 <motion.div
                   layoutId="nav-indicator"
                   className="absolute bottom-0 w-10 h-0.5 blur-sm opacity-70"
                   style={{ backgroundColor: palette.stateSelectedIcon }}
                   animate={{
-                    left: activeTab === "home" ? "25%" : "75%",
+                    left:
+                      activeTab === "home"
+                        ? "16.66%"
+                        : activeTab === "messages"
+                          ? "50%"
+                          : "83.33%",
                     translateX: "-50%",
                   }}
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
@@ -1331,7 +1359,7 @@ export default function Widget({
                 <button
                   onClick={() => setActiveTab("home")}
                   data-active={activeTab === "home" ? "true" : "false"}
-                  className="widget-nav-button relative z-10 flex h-full w-1/2 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
+                  className="widget-nav-button relative z-10 flex h-full w-1/3 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
                   style={activeTab === "home" ? { color: palette.secondary } : undefined}
                 >
                   <Home className="w-5 h-5" />
@@ -1343,7 +1371,7 @@ export default function Widget({
                 <button
                   onClick={() => setActiveTab("messages")}
                   data-active={activeTab === "messages" ? "true" : "false"}
-                  className="widget-nav-button relative z-10 flex h-full w-1/2 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
+                  className="widget-nav-button relative z-10 flex h-full w-1/3 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
                   style={activeTab === "messages" ? { color: palette.secondary } : undefined}
                 >
                   <div className="relative">
@@ -1357,6 +1385,18 @@ export default function Widget({
                   </div>
                   <span className="text-[11px] font-medium">
                     {navLabelMessages}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("contact")}
+                  data-active={activeTab === "contact" ? "true" : "false"}
+                  className="widget-nav-button relative z-10 flex h-full w-1/3 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
+                  style={activeTab === "contact" ? { color: palette.secondary } : undefined}
+                >
+                  <Phone className="w-5 h-5" />
+                  <span className="text-[11px] font-medium">
+                    {navLabelContact}
                   </span>
                 </button>
               </div>

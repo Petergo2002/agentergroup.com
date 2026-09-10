@@ -96,3 +96,41 @@ test("lead conversation action uses the Analytics session parameter", () => {
   assert.match(leadsPageSource, /\/analytics\?session=/);
   assert.doesNotMatch(leadsPageSource, /\/analytics\?conversation=/);
 });
+
+test("public widget leads route triggers lead notification email in background handler", () => {
+  const publicLeadsSource = readFileSync(
+    "src/app/api/public/widgets/[widgetPublicKey]/leads/route.ts",
+    "utf8",
+  );
+
+  assert.match(publicLeadsSource, /sendLeadNotificationEmail/);
+  assert.match(publicLeadsSource, /after\(async \(\) =>/);
+});
+
+test("widget v2 integrates contact tab and exports submitWidgetLead", () => {
+  const widgetSource = readFileSync("apps/widget-v2/src/Widget.tsx", "utf8");
+  const apiSource = readFileSync("apps/widget-v2/src/lib/api.ts", "utf8");
+  const contactTabSource = readFileSync(
+    "apps/widget-v2/src/components/ContactTab.tsx",
+    "utf8",
+  );
+
+  assert.match(apiSource, /export async function submitWidgetLead/);
+  assert.match(widgetSource, /<ContactTab/);
+  assert.match(widgetSource, /activeTab === "contact"/);
+  assert.match(contactTabSource, /submitWidgetLead/);
+});
+
+test("lead notification email template normalizes to Milo, strips raw tags, and uses brand orange", () => {
+  const emailSource = readFileSync("src/lib/email.ts", "utf8");
+
+  // Verify normalization to Milo
+  assert.match(emailSource, /Milo/);
+  assert.match(emailSource, /maja/i);
+  // Verify technical tag stripping
+  assert.match(emailSource, /Kontaktformulär/);
+  assert.match(emailSource, /replace/);
+  // Verify brand orange accent
+  assert.match(emailSource, /#ff5c00/);
+});
+
