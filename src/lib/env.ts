@@ -1,4 +1,4 @@
-import { OPENROUTER_DEFAULT_AGENT_MODEL } from "./openrouter-models";
+import { OPENROUTER_DEFAULT_AGENT_MODEL } from "./openrouter-models.ts";
 
 /** Shared environment helpers for the dashboard app and widget runtime. */
 

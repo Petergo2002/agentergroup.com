@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { NextRequest } from "next/server";
-import { getRateLimitSecret } from "@/lib/env";
-import { resolveTrustedClientIp } from "@/lib/trusted-client-ip";
+import { getRateLimitSecret } from "./env.ts";
+import { resolveTrustedClientIp } from "./trusted-client-ip.ts";
 
 interface RateLimitRpcResult {
   allowed?: boolean | null;
@@ -275,21 +275,46 @@ export function getPublicWidgetRateLimitRules(
   return PUBLIC_WIDGET_RATE_LIMITS[endpoint](context);
 }
 
+/**
+ * Consumes every rule concurrently rather than one blocking round trip each.
+ * Widget chat carries three independent scopes (ip_global, widget_ip,
+ * widget_session), so serially awaiting them put two extra database round trips
+ * in front of every visitor message before the model was even called.
+ *
+ * Results are evaluated in rule order, so the decision returned — which rule
+ * denies, its message, code, and retry hint — is identical to the sequential
+ * version, and a denial still takes precedence over an error in a later rule.
+ *
+ * The one behavioural difference: when a request is denied, the rules after the
+ * denying one have already consumed a slot instead of being skipped. Denials are
+ * the rare path and counting a blocked caller slightly harder is harmless.
+ */
 export async function enforceRateLimits(
   supabase: RateLimitRpcClient,
   rules: RateLimitRule[],
 ): Promise<RateLimitDecision> {
-  for (const rule of rules) {
-    const { data, error } = await supabase.rpc<RateLimitRpcResult[]>(
-      "consume_rate_limit_window",
-      {
+  const settled = await Promise.allSettled(
+    rules.map((rule) =>
+      supabase.rpc<RateLimitRpcResult[]>("consume_rate_limit_window", {
         p_scope_kind: rule.scopeKind,
         p_scope_key: rule.scopeKey,
         p_endpoint: rule.endpoint,
         p_window_seconds: rule.windowSeconds,
         p_limit: rule.limit,
-      },
-    );
+      }),
+    ),
+  );
+
+  for (const [index, rule] of rules.entries()) {
+    const outcome = settled[index];
+
+    if (outcome.status === "rejected") {
+      throw outcome.reason instanceof Error
+        ? outcome.reason
+        : new Error(String(outcome.reason));
+    }
+
+    const { data, error } = outcome.value;
 
     if (error) {
       throw new Error(error.message);
