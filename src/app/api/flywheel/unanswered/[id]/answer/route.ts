@@ -6,6 +6,7 @@ import {
 } from "@/lib/flywheel/server";
 import { createClient } from "@/lib/supabase/server";
 import type { VerifiedFactVisibility } from "@/lib/types";
+import { getVerifiedApiIdentity } from "@/lib/app/api-auth";
 
 function toErrorResponse(error: unknown) {
   if (error instanceof FlywheelError) {
@@ -28,12 +29,7 @@ export async function POST(
 ) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { user, session } = await getVerifiedApiIdentity(supabase);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

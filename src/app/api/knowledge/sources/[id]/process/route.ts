@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { knowledgeProcessingError } from "@/lib/knowledge-processing-error";
+import { getVerifiedApiIdentity } from "@/lib/app/api-auth";
 
 export const maxDuration = 150;
 
@@ -11,12 +12,7 @@ export async function POST(
 ) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { user, session } = await getVerifiedApiIdentity(supabase);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -40,6 +40,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { MessageRecord } from "@/lib/types";
+import { getVerifiedApiIdentity } from "@/lib/app/api-auth";
 
 const THREAD_BUSY_ERROR =
   "Another reply is already being generated for this chat. Please wait for the current response to finish.";
@@ -64,12 +65,7 @@ export async function POST(
 ) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { user, session } = await getVerifiedApiIdentity(supabase);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

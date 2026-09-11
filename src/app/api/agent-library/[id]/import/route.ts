@@ -16,6 +16,7 @@ import type {
   AgentLibraryTemplateSourceRecord,
   BuilderDefinition,
 } from "@/lib/types";
+import { getVerifiedApiIdentity } from "@/lib/app/api-auth";
 
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 
@@ -46,12 +47,7 @@ export async function POST(
 
   const supabase = await createClient();
   const admin = createAdminClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { user, session } = await getVerifiedApiIdentity(supabase);
 
   if (!user || !session?.access_token) {
     return errorResponse("Unauthorized", 401);

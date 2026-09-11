@@ -20,6 +20,7 @@ import { KNOWLEDGE_BUCKET } from "@/lib/knowledge";
 import { getDriveImportMimeTypes } from "@/lib/integrations";
 import { SafeFetchError, fetchSafeDownloadBytes } from "@/lib/safe-fetch";
 import type { ConnectionRecord } from "@/lib/types";
+import { getVerifiedApiIdentity } from "@/lib/app/api-auth";
 
 const DRIVE_DOWNLOAD_TIMEOUT_MS = 30_000;
 
@@ -149,12 +150,7 @@ async function getFilePayloadBytes(
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { user, session } = await getVerifiedApiIdentity(supabase);
 
   if (!user || !session?.access_token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

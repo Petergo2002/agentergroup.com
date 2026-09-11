@@ -33,6 +33,7 @@ import {
   createRunStep,
 } from "@/lib/runtime/observability";
 import type { MessageRecord } from "@/lib/types";
+import { getVerifiedApiIdentity } from "@/lib/app/api-auth";
 
 interface PreviewThreadRecord {
   id: string;
@@ -62,12 +63,7 @@ export async function POST(
 ) {
   const { id: agentId } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { user, session } = await getVerifiedApiIdentity(supabase);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
