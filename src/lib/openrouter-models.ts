@@ -69,6 +69,21 @@ const MODEL_SECTION_ORDER: OpenRouterModelSectionKey[] = [
 
 const CURATED_MODEL_DEFINITIONS: CuratedModelDefinition[] = [
   {
+    id: 'openai/gpt-5.6-luna',
+    providerLabel: 'OpenAI',
+    name: 'GPT-5.6 Luna',
+    shortName: 'GPT-5.6 Luna',
+    summary:
+      'Fast, low-cost model built for high-volume chat and lightweight agent workflows.',
+    section: 'recommended',
+    badge: 'Fast',
+    contextLength: 1_050_000,
+    pricing: { prompt: '0.20', completion: '1.20' },
+    tags: ['Fast', 'Affordable', '1M context'],
+    recommended: true,
+    latest: true,
+  },
+  {
     id: 'anthropic/claude-sonnet-4.6',
     providerLabel: 'Anthropic',
     name: 'Claude Sonnet 4.6',
@@ -150,15 +165,17 @@ const CURATED_MODEL_DEFINITIONS: CuratedModelDefinition[] = [
     latest: true,
   },
   {
-    id: 'x-ai/grok-4',
+    // `x-ai/grok-4` was retired from OpenRouter; selecting it saved a model id
+    // that no longer resolves, so chat failed at runtime.
+    id: 'x-ai/grok-4.6',
     providerLabel: 'xAI',
-    name: 'Grok 4',
-    shortName: 'Grok 4',
+    name: 'Grok 4.6',
+    shortName: 'Grok 4.6',
     summary: 'Alternative frontier reasoning model with strong tool use and broad context.',
     section: 'frontier',
     badge: 'Frontier',
-    contextLength: 256_000,
-    pricing: { prompt: '3', completion: '15' },
+    contextLength: 500_000,
+    pricing: { prompt: '2', completion: '6' },
     tags: ['Reasoning', 'Tools', 'Alternative'],
     latest: true,
   },

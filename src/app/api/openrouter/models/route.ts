@@ -13,8 +13,13 @@ interface OpenRouterModelsResponse {
 
 export async function GET() {
   try {
+    // Deliberately unfiltered. `?supported_parameters=tools` returns batch
+    // pricing for OpenAI models — about half the standard rate — which showed
+    // GPT-5 Mini at 0.12/1.00 instead of 0.25/2.00. The full listing carries
+    // correct pricing and `supported_parameters`, and
+    // buildOpenRouterModelSectionsFromApi already applies the tools filter.
     const response = await fetch(
-      'https://openrouter.ai/api/v1/models?supported_parameters=tools',
+      'https://openrouter.ai/api/v1/models',
       {
         headers: {
           Accept: 'application/json',
