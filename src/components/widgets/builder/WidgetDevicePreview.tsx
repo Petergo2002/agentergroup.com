@@ -12,7 +12,6 @@ import {
   Monitor,
   RotateCw,
   Smartphone,
-  Sparkles,
   X,
 } from 'lucide-react';
 
@@ -308,8 +307,7 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
                 }`}
               >
                 {isIframeLoading && (
-                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/90 backdrop-blur-xs">
-                    <Sparkles className="h-6 w-6 animate-spin text-primary" />
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/90 backdrop-blur-xs">
                     <p className="text-xs font-semibold text-on-surface-variant">
                       {previewStatus === 'loading'
                         ? t('widgetBuilder.devicePreviewSyncing')
@@ -391,8 +389,7 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
               {widgetPreviewUrl ? (
                 <>
                   {isIframeLoading && (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/90 backdrop-blur-xs">
-                      <Sparkles className="h-6 w-6 animate-spin text-primary" />
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/90 backdrop-blur-xs">
                       <p className="text-xs font-semibold text-on-surface-variant">
                         Starting widget...
                       </p>

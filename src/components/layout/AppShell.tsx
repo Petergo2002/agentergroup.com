@@ -224,7 +224,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
             <div className="min-h-screen bg-background">{children}</div>
           ) : (
             <div className="app-shell-gradient flex min-h-screen">
-              <div className="hidden lg:flex lg:shrink-0 transition-all duration-300 relative z-50">
+              <div className="hidden lg:flex lg:shrink-0 relative z-50">
                 <Sidebar 
                   userEmail={user.email} 
                   isCollapsed={isSidebarCollapsed}

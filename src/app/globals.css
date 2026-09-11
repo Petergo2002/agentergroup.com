@@ -849,6 +849,64 @@
   animation: builder-enter 220ms ease-out both;
 }
 
+/* ─── Sidebar collapse ───
+   The panel width is the only thing that animates; `transition-all` used to
+   animate colours, borders and padding at the same time, which fought the
+   width change and made the slide stutter.
+
+   The inner content is swapped structurally (different markup when collapsed),
+   so it cannot tween — it used to pop at frame 0 while the panel kept sliding
+   for another 300ms. Instead it re-fades on every toggle. Two identical
+   keyframes under different names are what make that work: swapping the
+   animation-name restarts the animation without remounting the nav, which
+   would otherwise lose scroll position and focus.
+
+   Opacity only, never transform: the collapsed-mode tooltips are
+   `position: fixed`, and a transformed ancestor would become their containing
+   block and throw them across the screen. */
+.sidebar-panel {
+  transition: width 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes sidebarContentA {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sidebarContentB {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.sidebar-content-a {
+  animation: sidebarContentA 180ms ease-out 40ms both;
+}
+
+.sidebar-content-b {
+  animation: sidebarContentB 180ms ease-out 40ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-panel {
+    transition: none;
+  }
+
+  .sidebar-content-a,
+  .sidebar-content-b {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .milo-logo-waves-active path,
   .animate-builder-enter {

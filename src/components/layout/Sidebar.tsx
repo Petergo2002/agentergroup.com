@@ -155,17 +155,25 @@ export function Sidebar({
   ];
   const navGroups = miloMode ? miloNavGroups : classicNavGroups;
 
+  // Alternating class names restart the cross-fade each time the panel is
+  // toggled; see the .sidebar-content-a/-b note in globals.css.
+  const contentFade = mobile
+    ? ""
+    : isCollapsed
+      ? "sidebar-content-a"
+      : "sidebar-content-b";
+
   return (
     <aside
-      className={`depth-shell flex h-full flex-col text-on-surface transition-all duration-300 ease-in-out ${
+      className={`depth-shell flex h-full flex-col text-on-surface ${
         mobile
           ? "bg-surface shadow-2xl shadow-black/40"
-          : `sticky top-0 h-screen shrink-0 border-r border-outline-variant/10 bg-surface-container-low transition-all duration-300 ease-in-out ${
+          : `sidebar-panel sticky top-0 h-screen shrink-0 border-r border-outline-variant/10 bg-surface-container-low ${
               isCollapsed ? "w-[60px]" : "w-[240px]"
             }`
       }`}
     >
-      <div className={`px-4 pt-6 pb-4 flex flex-col items-center transition-all duration-300 ${isCollapsed && !mobile ? 'gap-6' : 'gap-5'}`}>
+      <div className={`px-4 pt-6 pb-4 flex flex-col items-center ${contentFade} ${isCollapsed && !mobile ? 'gap-6' : 'gap-5'}`}>
         <Link
           href="/"
           title="Avenro - Back to landing page"
@@ -213,7 +221,7 @@ export function Sidebar({
         </div>
       </div>
       
-      <nav className={`mt-2 flex-1 space-y-4 font-label transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-3'} overflow-y-auto overflow-x-hidden`}>
+      <nav className={`mt-2 flex-1 space-y-4 font-label ${contentFade} ${isCollapsed && !mobile ? 'px-2' : 'px-3'} overflow-y-auto overflow-x-hidden`}>
         {navGroups.map((group, groupIndex) => (
           <div key={groupIndex} className="space-y-1 relative">
             {(!isCollapsed || mobile) && (
@@ -307,7 +315,7 @@ export function Sidebar({
                     </span>
                   ) : null}
                   {(!isCollapsed || mobile) && (
-                    <span className="min-w-0 flex-1 overflow-hidden transition-all duration-300">
+                    <span className="min-w-0 flex-1 overflow-hidden transition-colors duration-200">
                       <span className={`block truncate text-sm tracking-tight ${isActive ? "font-semibold" : "font-medium"}`}>
                         {item.name}
                       </span>
@@ -384,7 +392,7 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className={`mt-auto pb-4 pt-2 space-y-2 transition-all duration-300 ${isCollapsed && !mobile ? 'px-2' : 'px-3'}`}>
+      <div className={`mt-auto pb-4 pt-2 space-y-2 ${contentFade} ${isCollapsed && !mobile ? 'px-2' : 'px-3'}`}>
         
         {/* Message Usage Bar */}
         {subscription && (

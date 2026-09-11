@@ -25,7 +25,7 @@ function WidgetBuilderLayout() {
 
   if (isLoading || !summary) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="animate-builder-enter min-h-screen bg-background">
         <header className="border-b border-outline-variant/10 bg-background/80 backdrop-blur-xl">
           <div className="mx-auto flex w-full items-center justify-between gap-4 px-6 py-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -53,7 +53,7 @@ function WidgetBuilderLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="animate-builder-enter min-h-screen bg-background flex flex-col">
       <WidgetBuilderHeader />
 
       {/* Full-width Studio Split Workspace */}
