@@ -12,7 +12,9 @@ async function loadWidgetsPageData() {
     throw new Error("Unauthorized");
   }
 
-  const allWidgets = await loadAllWidgetsWithAgents(supabase as never, context.workspace.id);
+  const allWidgets = await loadAllWidgetsWithAgents(supabase as never, context.workspace.id, {
+    canHideBranding: context.subscription?.plan_tier === "premium",
+  });
 
   return allWidgets.map((loaded) => {
     return {

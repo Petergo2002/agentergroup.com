@@ -158,23 +158,6 @@ export async function loadWidgetSession(
   return (data ?? null) as WidgetSessionRecord | null;
 }
 
-export async function loadWidgetSessionHistory(
-  supabase: WidgetAdminSupabase,
-  widgetSessionId: string,
-) {
-  const { data, error } = await supabase
-    .from("widget_session_messages")
-    .select("*")
-    .eq("widget_session_id", widgetSessionId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const rows = Array.isArray(data) ? data : data ? [data] : [];
-  return rows as WidgetSessionMessageRecord[];
-}
 
 export async function loadOrderedWidgetSessionHistory(
   supabase: WidgetAdminSupabase,

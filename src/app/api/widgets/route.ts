@@ -35,7 +35,9 @@ export async function GET() {
   const context = await ensureWorkspaceContext(supabase as never, user);
 
   try {
-    const allWidgets = await loadAllWidgetsWithAgents(supabase as never, context.workspace.id);
+    const allWidgets = await loadAllWidgetsWithAgents(supabase as never, context.workspace.id, {
+      canHideBranding: context.subscription?.plan_tier === "premium",
+    });
 
     const widgets = allWidgets.map((loaded) => {
       const summary = buildWidgetSummary(loaded.widget, loaded.widgetAgents);

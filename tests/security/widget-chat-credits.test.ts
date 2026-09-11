@@ -4,6 +4,7 @@ import test from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import * as messageUsage from "../../src/lib/message-usage.ts";
+import { resolveSelectedWidgetAgent } from "../../src/lib/widgets/selection.ts";
 
 // Execute the actual route, replacing external services rather than asserting
 // source-text ordering. No database, provider, or real message credits are used.
@@ -11,6 +12,8 @@ const routePath = "src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts";
 const compiledRoute = ts.transpileModule(readFileSync(routePath, "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
+const browserSessionId = "d3407571-dc76-4d82-8863-998034e53cd4";
+const databaseSessionId = "f362b335-077f-4ba2-80c1-f12bcc2708c4";
 
 type ChatRoute = {
   POST(request: Request, context: {
@@ -25,10 +28,14 @@ function createHarness(options: {
   persistenceFails?: boolean;
   modelGate?: Promise<void>;
 } = {}) {
-  const state = { charges: 0, quotaCalls: 0, modelCalls: 0, releases: 0, lockOwner: null as string | null };
+  const state = {
+    charges: 0, quotaCalls: 0, modelCalls: 0, releases: 0,
+    lockOwner: null as string | null,
+    runtimeSessionId: null as string | null,
+  };
   const source = options.source ?? "hosted";
   const modelStarted = Promise.withResolvers<void>();
-  const session = { id: "internal-session", source };
+  const session = { id: databaseSessionId, session_id: browserSessionId, source };
   const agent = { id: "agent", workspace_id: "workspace" };
   const selection = { agent, widgetAgentId: "widget-agent", publishedVersionId: "version" };
   const db = {
@@ -65,7 +72,9 @@ function createHarness(options: {
     "@/lib/widgets": {
       readAgentIdFromDraftPreviewWidgetAgentId: () => null,
     },
+    "@/lib/widgets/generative-ui": { buildWidgetGenerativeUi: () => null },
     "@/lib/widgets/server": {
+      resolveSelectedWidgetAgent,
       resolveWidgetRuntimeRequestOrigin: () => ({ ok: true }),
       buildWidgetRuntimeCorsHeaders: () => ({}),
       loadWidgetByPublicKey: async () => ({
@@ -110,8 +119,9 @@ function createHarness(options: {
       buildPersistedAssistantMetadata: () => ({}),
     },
     "@/lib/runtime/agent-chat": {
-      async runAgentChat(input: { onToken: (token: string) => void }) {
+      async runAgentChat(input: { widgetSessionId: string; onToken: (token: string) => void }) {
         state.modelCalls++;
+        state.runtimeSessionId = input.widgetSessionId;
         modelStarted.resolve();
         await options.modelGate;
         input.onToken("Hello");
@@ -133,7 +143,7 @@ function createHarness(options: {
     modelStarted: modelStarted.promise,
     post: () => exports.POST(new Request("https://widget.test/chat", {
       method: "POST",
-      body: JSON.stringify({ sessionId: "session", message: "Hello" }),
+      body: JSON.stringify({ sessionId: browserSessionId, message: "Hello" }),
     }), { params: Promise.resolve({ widgetPublicKey: "public-key" }) }),
   };
 }
@@ -151,6 +161,23 @@ for (const [status, code] of [["active", "SESSION_BUSY"], ["completed", "SESSION
 }
 
 for (const source of ["hosted", "preview"] as const) {
+  test(`${source} chat scopes uploaded knowledge to the database session ID`, async () => {
+    const harness = createHarness({ source });
+    const response = await harness.post();
+    const stream = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(stream, /"delta":"Hello"/);
+    assert.match(stream, /\[DONE\]/);
+    assert.doesNotMatch(stream, /"error":/);
+    // Uploads store knowledge_sources.widget_session_id using widget_sessions.id,
+    // which is a different identifier from the browser's session_id capability.
+    assert.equal(harness.state.runtimeSessionId, databaseSessionId);
+    assert.notEqual(harness.state.runtimeSessionId, browserSessionId);
+    assert.equal(harness.state.charges, 1);
+    assert.equal(harness.state.releases, 1);
+  });
+
   test(`${source} overlapping requests charge once and preserve the accepted reply`, async () => {
     const modelGate = Promise.withResolvers<void>();
     const harness = createHarness({ source, modelGate: modelGate.promise });

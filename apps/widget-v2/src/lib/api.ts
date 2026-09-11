@@ -1,6 +1,5 @@
 import type {
   WidgetBootstrapResponse,
-  WidgetConfig,
   WidgetConversationDetail,
   WidgetConversationSummary,
 } from "../types";
@@ -127,21 +126,6 @@ export async function getWidgetBootstrap(
   return (await response.json()) as WidgetBootstrapResponse;
 }
 
-export async function getWidgetConfig(
-  widgetPublicKey: string,
-  context: WidgetRequestContext,
-): Promise<WidgetConfig> {
-  const response = await fetch(buildWidgetUrl(widgetPublicKey, "/config"), {
-    headers: buildWidgetHeaders(context, { includeContentType: false }),
-    cache: context.previewToken ? "no-store" : "default",
-  });
-
-  if (!response.ok) {
-    await parseError(response);
-  }
-
-  return (await response.json()) as WidgetConfig;
-}
 
 export async function getWidgetConversations(
   widgetPublicKey: string,

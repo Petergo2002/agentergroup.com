@@ -9,7 +9,6 @@ import {
   loadWidgetByPublicKey,
   resolveWidgetBootstrapAccess,
   resolveWidgetPreviewContext,
-  resolveWidgetRuntimeRequestOrigin,
   signWidgetAccessToken,
   type WidgetAdminSupabase,
 } from "@/lib/widgets/server";
@@ -27,17 +26,6 @@ function buildErrorResponse(
 }
 
 export async function OPTIONS(request: NextRequest) {
-  const runtimeOrigin = resolveWidgetRuntimeRequestOrigin(request);
-
-  if (!runtimeOrigin.ok) {
-    return buildErrorResponse(
-      request,
-      runtimeOrigin.status,
-      runtimeOrigin.error,
-      runtimeOrigin.code,
-    );
-  }
-
   return new NextResponse(null, {
     status: 204,
     headers: buildWidgetCorsHeaders(request),

@@ -14,6 +14,10 @@ const leadsRoute = readFileSync(
   "src/app/api/public/widgets/[widgetPublicKey]/leads/route.ts",
   "utf8",
 );
+const selectionModule = readFileSync(
+  "src/lib/widgets/selection.ts",
+  "utf8",
+);
 
 const AGENT_ID = "7fab1f1d-9df5-455b-b0ca-cbec996f87e3";
 const STORED_WIDGET_AGENT_ID = "81040331-1888-4929-ab70-f55bc5ab466c";
@@ -68,28 +72,32 @@ test("both public widget routes match a request across the draft/stored switch",
       /requestedAgentId,\s*\}\);/,
       `${name} route should pass the resolved agent id to the matcher`,
     );
-    // The fallback must be a fallback: an exact widget-agent id still wins.
     assert.match(
       route,
-      /widgetAgents\.find\(\(item\) => item\.widgetAgentId === requestedWidgetAgentId\) \?\?\s*\(requestedAgentId/,
-      `${name} route should prefer an exact widget-agent id match`,
+      /resolveSelectedWidgetAgent/,
+      `${name} route should delegate to the agent selection matcher`,
     );
   }
+
+  // The fallback must be a fallback: an exact widget-agent id still wins.
+  assert.match(
+    selectionModule,
+    /widgetAgents\.find\(\(item\) => item\.widgetAgentId === requestedWidgetAgentId\) \?\?\s*\(requestedAgentId/,
+    "selection module should prefer an exact widget-agent id match",
+  );
 });
 
 test("the switch does not weaken agent scoping", () => {
   // Matching is still confined to the agents attached to this widget, so an
   // agent id from another widget or workspace cannot be selected.
-  for (const route of [chatRoute, leadsRoute]) {
-    assert.match(
-      route,
-      /widgetAgents\.find\(\(item\) => item\.agent\.id === requestedAgentId\)/,
-    );
-    // The unknown-agent rejection is still present.
-    assert.match(route, /INVALID_WIDGET_AGENT/);
-    assert.match(
-      route,
-      /if \(requestedWidgetAgentId && !selectedFromRequest\)/,
-    );
-  }
+  assert.match(
+    selectionModule,
+    /widgetAgents\.find\(\(item\) => item\.agent\.id === requestedAgentId\)/,
+  );
+  // The unknown-agent rejection is still present.
+  assert.match(selectionModule, /INVALID_WIDGET_AGENT/);
+  assert.match(
+    selectionModule,
+    /if \(requestedWidgetAgentId && !selectedFromRequest\)/,
+  );
 });

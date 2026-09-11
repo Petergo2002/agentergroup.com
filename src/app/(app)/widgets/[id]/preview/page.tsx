@@ -28,7 +28,9 @@ export default async function WidgetDraftPreviewPage({
     return null;
   }
 
-  const loaded = await loadWidgetById(supabase as never, id);
+  const loaded = await loadWidgetById(supabase as never, id, {
+    canHideBranding: context.subscription?.plan_tier === "premium",
+  });
 
   if (!loaded || loaded.widget.workspace_id !== context.workspace.id) {
     return null;

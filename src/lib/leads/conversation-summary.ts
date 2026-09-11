@@ -399,7 +399,6 @@ export async function generateLeadConversationSummary(
 
   if (!input.force && existing) {
     const unchanged = existing.source_hash === sourceHash;
-    const shouldKeepReadySummary = existing.status === "ready";
     const generationStartedAt = Date.parse(existing.updated_at);
     const generationIsActive =
       existing.status === "generating" &&
@@ -408,7 +407,7 @@ export async function generateLeadConversationSummary(
     const shouldKeepCurrentAttempt =
       generationIsActive || (unchanged && existing.status !== "generating");
 
-    if (shouldKeepReadySummary || shouldKeepCurrentAttempt) {
+    if (shouldKeepCurrentAttempt) {
       return {
         leadId: lead.id,
         summary: serializeLeadConversationSummary(

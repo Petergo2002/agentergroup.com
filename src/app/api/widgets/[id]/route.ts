@@ -43,7 +43,9 @@ export async function GET(
   }
 
   const context = await ensureWorkspaceContext(supabase, user);
-  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
+  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id, {
+    canHideBranding: context.subscription?.plan_tier === "premium",
+  });
 
   if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
@@ -112,7 +114,9 @@ export async function PATCH(
   }
 
   const context = await ensureWorkspaceContext(supabase, user);
-  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
+  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id, {
+    canHideBranding: context.subscription?.plan_tier === "premium",
+  });
 
   if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
@@ -234,7 +238,9 @@ export async function DELETE(
       { status: 409 },
     );
   }
-  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id);
+  const loaded = await loadWidgetById(supabase as unknown as WidgetAdminSupabase, id, {
+    canHideBranding: context.subscription?.plan_tier === "premium",
+  });
 
   if (!loaded) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
