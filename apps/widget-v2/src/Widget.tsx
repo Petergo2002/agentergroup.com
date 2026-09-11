@@ -116,7 +116,6 @@ export default function Widget({
   // Coarse progress phase from the server, shown while the agent works and no
   // text has arrived yet. Knowledge retrieval and tool calls both happen before
   // the first token, so this is the only feedback during the slowest stretch.
-  const [streamPhase, setStreamPhase] = useState<string | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<WidgetAttachment[]>([]);
@@ -488,7 +487,6 @@ export default function Widget({
       setUploadError(null);
       setIsLoading(false);
       setIsStreaming(false);
-      setStreamPhase(null);
       setIsConversationCompleted(conversation.status === "completed");
       setConversationEndReason(conversation.endReason);
       setOpeningSessionId(null);
@@ -1184,7 +1182,6 @@ export default function Widget({
         { role: "agent", content: "", isStreaming: true },
       ]);
       setIsStreaming(true);
-      setStreamPhase(null);
 
       const updateAssistantMessage = (content: string, streaming: boolean) => {
         setMessages((previous) => {
@@ -1268,7 +1265,8 @@ export default function Widget({
             updateAssistantMessage(fullText, true);
             return;
           case "status":
-            setStreamPhase(event.status);
+            // The server still reports coarse progress, but the widget shows a
+            // single "Milo is typing" indicator rather than naming each phase.
             return;
           case "noop":
             return;
@@ -1378,7 +1376,6 @@ export default function Widget({
         activeStreamAbortControllerRef.current = null;
       }
       setIsLoading(false);
-      setStreamPhase(null);
       // The stored transcript just changed, so drop the cached copy and let the
       // list prefetch re-warm it.
       conversationCacheRef.current.delete(activeSessionId);
@@ -1710,7 +1707,6 @@ export default function Widget({
                 setInput={setInput}
                 isLoading={isLoading}
                 isStreaming={isStreaming}
-                streamPhase={streamPhase}
                 hasStarted={hasStarted}
                 isConversationCompleted={isConversationCompleted}
                 endReason={conversationEndReason}

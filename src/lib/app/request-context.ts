@@ -3,17 +3,24 @@ import "server-only";
 import { cache } from "react";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { loadRequestContext } from "@/lib/app/request-context-core";
+import { buildUserFromVerifiedClaims } from "@/lib/app/verified-claims-user";
 import { createClient } from "@/lib/supabase/server";
 
 async function loadAppRequestContext() {
   return loadRequestContext({
     createSupabaseClient: createClient,
+    // Verified locally against the project's ES256 signing key rather than by
+    // calling the Auth server, which removes a network round trip from the
+    // front of every authenticated render. Identity is still established
+    // cryptographically; see buildUserFromVerifiedClaims for the trade-off.
     getUser: async (supabase) => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data, error } = await supabase.auth.getClaims();
 
-      return user;
+      if (error) {
+        return null;
+      }
+
+      return buildUserFromVerifiedClaims(data?.claims);
     },
     ensureWorkspace: (supabase, user) =>
       ensureWorkspaceContext(supabase as never, user),

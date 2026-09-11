@@ -66,6 +66,12 @@ experimental: { staleTimes: { dynamic: 30, static: 180 } }
 
 **Safety precondition verified before enabling:** sign-out is a native `<form method="post" action="/auth/logout">` (`src/components/layout/WorkspaceSwitcher.tsx`), i.e. a full browser navigation, so the in-memory router cache cannot outlive a session. Workspace switching already calls `router.refresh()`.
 
+### 4. Region: Stockholm, with hops removed instead
+
+`arn1` is `eu-north-1` (Stockholm); the database is `eu-west-1` (Ireland), so a round trip still costs roughly 25-30 ms rather than the ~1-2 ms of true co-location. `dub1` **is** `eu-west-1` and would co-locate them, but Stockholm is the deliberate choice for Swedish visitor latency.
+
+With the per-hop cost fixed by that decision, the remaining lever is the number of hops. Hence the `getClaims()` change above, and why collapsing the workspace bootstrap (below) is worth more here than it would be under co-location.
+
 ### Deliberately not changed
 
 - `optimizePackageImports: ["lucide-react"]` — **already optimized by default** in Next 16; would be a no-op.
@@ -96,7 +102,8 @@ Ordered by expected impact. **These should be re-prioritised against fresh measu
 
 | Severity | Finding | Location |
 | --- | --- | --- |
-| CRITICAL | `auth.getUser()` is a network round trip on every server render. The project publishes an **ES256** JWKS key, so `getClaims()` verifies locally instead. Keep `getUser()` on sensitive mutations; a revoked session then stays valid until token expiry. | `src/lib/app/request-context.ts:14`; 9 handlers also call `getUser()` **and** `getSession()` |
+| ~~CRITICAL~~ **DONE** | `auth.getUser()` was a network round trip on every server render. Now `getClaims()`, verified locally against the project's ES256 key. Only the render path changed — 102 `getUser()` call sites remain, including all of billing and workspaces. Trade-off: a revoked session stays usable until token expiry. | `src/lib/app/request-context.ts`, `src/lib/app/verified-claims-user.ts` |
+| HIGH | 9 handlers still call `getUser()` **and** `getSession()` back to back. | `api/agents/[id]/chat/route.ts:67,70` and 8 others |
 | CRITICAL | Workspace bootstrap runs 3 serial DB round trips per request; the 30 s in-process `Map` cache is per-instance and misses on cold starts. Collapsible to one RPC. `cookies()` is read twice for the same value. | `src/lib/app/bootstrap.ts:367-417` |
 | HIGH | Duplicate `workspace_subscriptions` fetch — context already has it. Independent queries serialized. | `src/lib/widgets/loader.ts:18,170-222` |
 | HIGH | `AppShell` badge poll repeats the full auth + bootstrap chain; queries `widgets` twice internally. Needs `fallbackData`. | `AppShell.tsx:50-63`, `api/dashboard/latest-activity` |

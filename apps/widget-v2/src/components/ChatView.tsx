@@ -45,10 +45,6 @@ const TRANSLATIONS = {
     bookingConfirmed: "Meeting booked",
     openCalendar: "Open in calendar",
     joinMeeting: "Join meeting",
-    phaseKnowledge: "Looking this up...",
-    phaseThinking: "Thinking...",
-    phaseTools: "Working on it...",
-    phaseFinalizing: "Almost done...",
   },
   sv: {
     copy: "Kopiera",
@@ -68,10 +64,6 @@ const TRANSLATIONS = {
     bookingConfirmed: "Mötet är bokat",
     openCalendar: "Öppna i kalendern",
     joinMeeting: "Anslut till mötet",
-    phaseKnowledge: "Letar upp det...",
-    phaseThinking: "Tänker...",
-    phaseTools: "Jobbar på det...",
-    phaseFinalizing: "Nästan klar...",
   },
 };
 
@@ -544,7 +536,6 @@ interface ChatViewProps {
   setInput: (value: string) => void;
   isLoading: boolean;
   isStreaming: boolean;
-  streamPhase?: string | null;
   hasStarted: boolean;
   isConversationCompleted: boolean;
   endReason: WidgetEndChatReason | null;
@@ -565,7 +556,6 @@ export function ChatView({
   setInput,
   isLoading,
   isStreaming,
-  streamPhase,
   hasStarted,
   isConversationCompleted,
   endReason,
@@ -580,6 +570,15 @@ export function ChatView({
   const inputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const t = TRANSLATIONS[config.widget.language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
+
+  // The agent's bubble is added empty before the first token arrives, so the
+  // typing indicator has to survive that placeholder rather than stopping the
+  // moment the last message becomes an agent message.
+  const lastMessage = messages[messages.length - 1];
+  const isAwaitingFirstToken =
+    isLoading &&
+    (lastMessage?.role !== "agent" ||
+      (Boolean(lastMessage.isStreaming) && !lastMessage.content));
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -667,19 +666,6 @@ export function ChatView({
                 <div className="flex flex-col gap-1.5">
                   {/* Message Content — no avatar, full width */}
                   <div className="flex-1 space-y-1.5 min-w-0">
-                    {msg.isStreaming && !msg.content && streamPhase ? (
-                      <motion.p
-                        key={streamPhase}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-[13px] italic text-widget-muted"
-                      >
-                        {t[
-                          `phase${streamPhase.charAt(0).toUpperCase()}${streamPhase.slice(1)}` as keyof typeof t
-                        ] ?? t.phaseThinking}
-                      </motion.p>
-                    ) : null}
-
                     <AgentMessageContent
                       content={msg.content}
                       isStreaming={msg.isStreaming}
@@ -732,7 +718,7 @@ export function ChatView({
           ))}
 
           {/* Typing indicator — premium minimal style */}
-          {isLoading && messages[messages.length - 1]?.role !== "agent" && (
+          {isAwaitingFirstToken && (
             <motion.div
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}

@@ -17,7 +17,6 @@ export interface MessagesTabProps {
   setInput: (value: string) => void;
   isLoading: boolean;
   isStreaming: boolean;
-  streamPhase?: string | null;
   hasStarted: boolean;
   isConversationCompleted: boolean;
   endReason: WidgetEndChatReason | null;
@@ -38,7 +37,6 @@ export function MessagesTab({
   setInput,
   isLoading,
   isStreaming,
-  streamPhase,
   hasStarted,
   isConversationCompleted,
   endReason,
@@ -67,7 +65,6 @@ export function MessagesTab({
           setInput={setInput}
           isLoading={isLoading}
           isStreaming={isStreaming}
-          streamPhase={streamPhase}
           hasStarted={hasStarted}
           isConversationCompleted={isConversationCompleted}
           endReason={endReason}
