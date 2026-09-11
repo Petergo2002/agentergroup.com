@@ -2,6 +2,15 @@
 
 Reviewed: 2026-08-08
 
+> [!NOTE]
+> **Living document, but its counts are point-in-time.** The resolved findings
+> and confirmed controls below still describe the system. Figures tied to the
+> review date have moved on — it records 93 local migrations, where the tree now
+> has **105** (see
+> [Production Readiness → Migration Status](../runbooks/production-readiness.md#migration-status)).
+> Its **Remaining items** section is still live and is referenced by the
+> [compliance inventory](./compliance-inventory.md).
+
 ## Executive summary
 
 The application, widget runtime, and linked Supabase project were reviewed for

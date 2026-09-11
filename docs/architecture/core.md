@@ -209,7 +209,6 @@ Important implementation docs:
 - `src/app/api/widgets/[id]/status/route.ts`
 - `src/app/api/milo/provision/route.ts`
 - `src/app/api/public/widgets/[widgetPublicKey]/bootstrap/route.ts`
-- `src/app/api/public/widgets/[widgetPublicKey]/config/route.ts`
 - `src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts`
 - `src/app/api/public/widgets/[widgetPublicKey]/complete/route.ts`
 - `src/app/api/public/widgets/[widgetPublicKey]/events/route.ts`
@@ -858,6 +857,11 @@ Purpose:
   - `refresh_dashboard_conversation_summary_on_session` (on `widget_sessions`)
   - `refresh_dashboard_conversation_summary_on_message` (on `widget_session_messages`)
   - `refresh_dashboard_conversation_summary_on_lead` (on `widget_leads`)
+- Trigger performance optimization (`20260911180000_optimize_widget_session_summary_triggers.sql`):
+  - `active_turn_request_id` turn-lock updates short-circuit immediately without touching summary rows.
+  - 30-second heartbeat presence updates (`last_seen_at`) execute a direct primary-key indexed update of `last_activity_at` (~0.1ms) rather than re-running lateral message joins and regex parsing.
+  - Stale session timeouts by `pg_cron` (`status = 'completed'`) execute a direct primary-key update of `status`.
+  - Only genuine structural session mutations (agent reassignments, title edits, or initial inserts) execute the full aggregation query.
 - Fields include: message/lead counts, latest snippet, lead contact info, page URL, referrer, status, and a `search_text` generated column backed by a `gin_trgm_ops` index.
 - Only covers `source IN ('embedded', 'hosted')` sessions; preview sessions are excluded.
 - Used by the analytics backend to serve paginated conversation lists and search without expensive per-request aggregations.
@@ -1569,8 +1573,7 @@ Important current behavior:
 
 The public runtime uses these endpoints:
 
-- `GET /api/public/widgets/[widgetPublicKey]/bootstrap`
-- `GET /api/public/widgets/[widgetPublicKey]/config`
+- `GET /api/public/widgets/[widgetPublicKey]/bootstrap` (unified runtime bootstrap, configuration, and token issuance)
 - `POST /api/public/widgets/[widgetPublicKey]/chat`
 - `POST /api/public/widgets/[widgetPublicKey]/complete`
 - `POST /api/public/widgets/[widgetPublicKey]/events`
@@ -2425,12 +2428,14 @@ After import, the source behaves like any other workspace knowledge source.
 | `POST /api/widgets/[id]/status` | Toggle deployment state between `draft` and `deployed` |
 | `POST /api/widgets/[id]/preview` | Create/update a preview draft and return preview access data |
 
+- Performance & Concurrency: Widget loading (`src/lib/widgets/loader.ts`) threads `canHideBranding` from `context.subscription.plan_tier === "premium"` to bypass redundant `workspace_subscriptions` round trips on authenticated routes, and parallelizes independent database queries via `Promise.all`.
+- Authentication Efficiency & Hardening: High-frequency mutation and chat endpoints (`api/agents/[id]/chat`, `api/assistants/[id]/chat`, `api/knowledge/*`, `api/flywheel/*`, `api/agent-library/*`) authenticate callers via `getVerifiedApiIdentity()` (`src/lib/app/api-auth.ts`). This verifies the token's cryptographic ES256 signature locally via `supabase.auth.getClaims()`, preventing cookie-spoofing risks while retaining `session.access_token` for downstream services and cutting out the auth network hop (~40–80 ms saved per turn).
+
 ### Public widget runtime APIs
 
 | Route | Purpose |
 | --- | --- |
 | `GET /api/public/widgets/[widgetPublicKey]/bootstrap` | Validate runtime access, return config bootstrap, and issue widget access token |
-| `GET /api/public/widgets/[widgetPublicKey]/config` | Return current public widget runtime config |
 | `POST /api/public/widgets/[widgetPublicKey]/chat` | Process a widget chat message, reject overlapping same-session turns with `409 SESSION_BUSY`, consume workspace message credits before model execution, and rate-limit abusive hosted/embed traffic with `429`; signed preview-token chat skips public rate limits but remains credit-metered |
 | `POST /api/public/widgets/[widgetPublicKey]/complete` | Mark a widget session completed, currently for inactivity timeout, refuse completion while a live turn is active, and apply public runtime rate limits backed by the named `rate_limit_windows_scope_window_constraint` upsert path |
 | `POST /api/public/widgets/[widgetPublicKey]/events` | Persist widget client events under public runtime rate limits without surfacing SQL ambiguity errors from the rate-limit RPC |

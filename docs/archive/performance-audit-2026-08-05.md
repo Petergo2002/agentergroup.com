@@ -1,5 +1,18 @@
 # Agentergroup Production Performance Audit — Implementation Report
 
+> [!WARNING]
+> **ARCHIVED — 11 September 2026. Superseded by the September 11 audit.**
+>
+> A point-in-time implementation report for the 5 August 2026 build
+> (Next.js 16.2.9 / React 19.2.4 — both since upgraded; 203 tests, now 355).
+> Its seven implemented phases are still in the codebase and its reasoning
+> remains sound, but its "next five actions" were re-prioritised once the
+> September audit found the real bottleneck: functions running in `iad1`
+> while the database sits in `eu-west-1`.
+>
+> Current performance source of truth:
+> [Performance Audit 2026-09-11](../roadmap/performance-audit-2026-09-11.md).
+
 Date: 2026-08-05  
 Application: Next.js 16.2.9 / React 19.2.4 / Supabase / Vercel  
 Repository: `/Users/petergorgees/Dev/Agentergroup/Agentergroup.com`

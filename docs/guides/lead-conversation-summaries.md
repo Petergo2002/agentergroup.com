@@ -1,6 +1,6 @@
 # Lead Conversation Summaries
 
-Last updated: 2026-06-18
+Last updated: 2026-09-11
 
 ## Purpose
 
@@ -28,17 +28,21 @@ Each model generation attempt consumes one workspace message credit. If the work
 - `insufficient`: no useful customer request was available yet. A structured fallback still shows known contact data and missing information.
 - `failed`: generation did not complete. A previously successful summary is retained when available.
 
-A ready summary is not regenerated on every new message. The API compares its stored message count with the current conversation, marks it stale in the UI, and lets an authorized user regenerate it. This avoids repeated model calls during active chats.
+### Caching and Dynamic Refresh
 
-Manual regeneration uses `POST /api/leads/:leadId/summary`. The route authenticates the user, resolves the active workspace, and passes that workspace id to the admin-backed generator before any summary is returned or changed.
+- **Dynamic Refresh on Transcript Change:** When a visitor continues the conversation after initial lead capture, background execution via `after()` in the public chat route observes that the transcript's SHA-256 `sourceHash` has changed. The generator re-runs in the background to incorporate the new messages into the summary so operators see the complete conversational context.
+- **Zero-Cost Cache Hits:** If the transcript is unchanged (`sourceHash` matches the persisted hash), the existing `ready` summary is immediately returned without making a redundant model call or consuming message credits.
+- **Manual Regeneration:** Operators can trigger manual regeneration using `POST /api/leads/:leadId/summary`. The route authenticates the user, resolves the active workspace, and passes that workspace id to the admin-backed generator before any summary is returned or changed.
 
 ## Storage and Security
 
-Migration `20260618120959_lead_conversation_ai_summaries.sql` creates one summary row per lead. Rows reference the workspace, lead, and widget session. Lead/session deletion cascades to the summary.
-
-RLS is enabled. Authenticated users receive read-only access when `private.is_workspace_member(workspace_id)` succeeds. Anonymous access is revoked. Writes are server-only through the service role, after route-level workspace authorization or from trusted post-response widget processing.
-
-The transcript is treated as untrusted input in the model prompt. Instructions found inside customer messages must not be followed, and generated claims must come from the captured lead or transcript.
+- Migration `20260618120959_lead_conversation_ai_summaries.sql` creates one summary row per lead. Rows reference the workspace, lead, and widget session. Lead/session deletion cascades to the summary.
+- Migration `20260911180000_optimize_widget_session_summary_triggers.sql` adds high-performance fast-paths to `private.refresh_dashboard_conversation_summary_from_session()`:
+  - Turn-lock state transitions (`active_turn_request_id`) bypass summary refresh.
+  - Heartbeat pings (`last_seen_at`) update `last_activity_at` via primary-key index update without lateral joins.
+  - Periodic `pg_cron` inactivity sweeps update `status = 'completed'` without running full aggregation pipelines.
+- RLS is enabled. Authenticated users receive read-only access when `private.is_workspace_member(workspace_id)` succeeds. Anonymous access is revoked. Writes are server-only through the service role, after route-level workspace authorization or from trusted post-response widget processing.
+- The transcript is treated as untrusted input in the model prompt. Instructions found inside customer messages must not be followed, and generated claims must come from the captured lead or transcript.
 
 ## Relevant Files
 

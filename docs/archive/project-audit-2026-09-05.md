@@ -1,5 +1,31 @@
 # Agentergroup project audit — September 5, 2026
 
+> [!WARNING]
+> **ARCHIVED — 11 September 2026. Superseded; do not treat its numbers as current.**
+>
+> This is a point-in-time audit of the 5 September 2026 working tree. Its
+> verification table is stale in ways that actively mislead: it records 227
+> passing tests (now **355**), a standard lint run failing with 1,553 errors
+> (now **0 errors, 0 warnings**), and Next.js 16.3.0 (now **16.3.4**). Its
+> evidence links are absolute paths on one developer's machine.
+>
+> **Status of its eight findings, verified against the tree on 11 Sep 2026:**
+>
+> | # | Finding | Status |
+> | --- | --- | --- |
+> | 1 | Rejected overlapping requests consume credits | **Resolved** — the turn lock is acquired before quota is charged, and released if quota fails (`chat/route.ts:558-596`). |
+> | 2 | Publishing does not isolate live capabilities from draft edits | **Resolved** — `publishedDefinition` now derives connections and knowledge from the published version for public widget chat (`src/lib/runtime/agent-chat.ts:157-165`). |
+> | 3 | Builder save and publish can partially succeed | **Resolved** — `save_agent_v1` / `publish_agent_v1` are atomic transactions with optimistic row locks (migration `20260910140100`). |
+> | 4 | Knowledge outages silently degrade answer grounding | **Still open** — carried forward to the production-readiness runbook. |
+> | 5 | Automated verification weaker than the test count suggests | **Largely resolved** — lint scope fixed, widget type-check gated, suite now 355 tests. The ratio of source-text assertions to behavioural ones is still worth watching. |
+> | 6 | Automation has no demonstrated crash recovery | **Still open** — carried forward. |
+> | 7 | Model usage limits give no cost accountability | **Still open** — carried forward. |
+> | 8 | Dependency advisories need a reviewed refresh | **Resolved** — pinned via `overrides` in `package.json`. |
+>
+> The three open findings are tracked in
+> [Production Readiness](../runbooks/production-readiness.md#known-open-findings-carried-forward-from-archived-audits).
+> Retained for its reasoning and product feedback, not as a status report.
+
 **Follow-up: straightforward fixes completed locally.** The original audit below
 describes the pre-fix state. This subsequent implementation fixes credit charging
 on lock rejection (finding 1), the local lint exclusion and widget type-check/CI
@@ -52,7 +78,7 @@ The scoped lint command covered `src`, widget `src`, widget loader, middleware, 
 
 The public chat route increments workspace usage before acquiring its session turn lock. If another turn holds the lock, the request returns `409 SESSION_BUSY` after the increment, without running the model. A race with session completion can similarly reach a rejection after charging. No compensating refund occurs in these branches.
 
-Evidence: [chat route](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts:597), particularly quota consumption at line 600, lock acquisition at 620, and rejection at 626.
+Evidence: [chat route](../../src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts:597), particularly quota consumption at line 600, lock acquisition at 620, and rejection at 626.
 
 **Fix:** acquire the turn lock before consuming quota, retain reliable lock release if quota is exhausted, and add request idempotency or an explicit usage reservation model for retries. Verify two simultaneous requests produce one accepted model turn and one credit charge. This is a source-confirmed control-flow defect; no real workspace credits were spent to reproduce it.
 
@@ -62,7 +88,7 @@ Public chat reads instructions/model from a published version, but `loadRuntimeC
 
 The tool case is more consequential: a newly saved connection can enter the live connected-toolkit list even when absent from the deployed definition. The tool selector falls back to recommended tools when that toolkit has no explicit selection. This can make a newly attached toolkit's defaults available to public chat before it is published. Actual provider execution still depends on the connection, provider availability, and model behavior.
 
-Evidence: [runtime context](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/lib/runtime/agent-chat.ts:532), [tool default selection](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/lib/composio.ts:997), [versioned instructions](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/lib/widgets/runtime-config.ts:33), and [Knowledge search SQL](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/supabase/migrations/20260531160122_folder_sources_in_widget_session_search.sql:28).
+Evidence: [runtime context](../../src/lib/runtime/agent-chat.ts:532), [tool default selection](../../src/lib/composio.ts:997), [versioned instructions](../../src/lib/widgets/runtime-config.ts:33), and [Knowledge search SQL](../../supabase/migrations/20260531160122_folder_sources_in_widget_session_search.sql:28).
 
 **Fix:** derive the live connection/source/folder selection from the deployed version and deny toolkits absent from that version. Continue checking current connection revocation and tenant ownership. Separately define whether changes to the contents of an already published Knowledge folder are intentionally live. Verify that adding a draft connection or attachment leaves an existing deployment unchanged until publishing/syncing.
 
@@ -70,7 +96,7 @@ Evidence: [runtime context](/Users/petergorgees/Dev/Agentergroup/Agentergroup.co
 
 Builder first writes agent metadata and the draft independently, then synchronizes Connections, Knowledge, and the external trigger. Failure of a later step does not roll back successful earlier writes. Reloading after failure can also replace the user's local state with this partially saved state. Publishing separately inserts a version and updates the agent pointer; version numbering is allocated with read-latest-plus-one, which can race across editors.
 
-Evidence: [save and publish implementation](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/app/(app)/agents/[id]/builder/AgentBuilderClient.tsx:4176). The production-readiness runbook already acknowledges partial saves; this audit confirms that the implementation still has them.
+Evidence: save and publish implementation (`src/app/(app)/agents/[id]/builder/AgentBuilderClient.tsx:4176`). The production-readiness runbook already acknowledges partial saves; this audit confirms that the implementation still has them.
 
 **Fix:** consolidate database changes into a transactional server/RPC operation with a revision check. Handle external provider synchronization as a durable follow-up with explicit status and retries. Verify rollback after injected failures and reject stale concurrent edits without silently overwriting another editor's work.
 
@@ -78,7 +104,7 @@ Evidence: [save and publish implementation](/Users/petergorgees/Dev/Agentergroup
 
 Knowledge lookup has a useful eight-second timeout, but failures are logged and chat continues with no retrieved Knowledge and no structured outage signal added to the model context. Initial attachment queries also discard database errors. Customers can therefore receive a normal-looking answer when the business information was unavailable. This is a demonstrated fallback path, not proof that the model has fabricated an answer; the default Milo instructions do tell it not to invent facts.
 
-Evidence: [attachment queries](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/lib/runtime/agent-chat.ts:537) and [retrieval failure handling](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/lib/runtime/agent-chat.ts:809).
+Evidence: [attachment queries](../../src/lib/runtime/agent-chat.ts:537) and [retrieval failure handling](../../src/lib/runtime/agent-chat.ts:809).
 
 **Fix:** distinguish no matching answer from unavailable Knowledge. Propagate a typed retrieval outcome, instruct Milo to defer business-specific claims when retrieval fails, and expose an operator-visible incident signal. Test timeouts, database failures, zero matches, and relevant matches separately.
 
@@ -88,7 +114,7 @@ Evidence: [attachment queries](/Users/petergorgees/Dev/Agentergroup/Agentergroup
 
 CI also builds the widget without explicitly type-checking it. Its build script is only `vite build`, and the root TypeScript configuration excludes widget code. The separate widget type check passed in this audit, but future type regressions are not explicitly gated by CI. The standard lint command additionally traverses unrelated generated files in the current workspace.
 
-Evidence: [quota tests](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/tests/security/message-usage.test.ts:32), [Milo tests](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/tests/milo/experience.test.ts:75), [CI](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/.github/workflows/ci.yml:25), [widget build script](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/apps/widget-v2/package.json:6), and [lint ignores](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/eslint.config.mjs:9).
+Evidence: [quota tests](../../tests/security/message-usage.test.ts:32), [Milo tests](../../tests/milo/experience.test.ts:75), [CI](../../.github/workflows/ci.yml:25), [widget build script](../../apps/widget-v2/package.json:6), and [lint ignores](../../eslint.config.mjs:9).
 
 **Fix:** exclude local generated workspaces from lint without excluding legitimate source, add widget type checking and dependency audit policy to CI, then add a small behavior-focused suite: two-tenant authorization, save/publish failure, simultaneous chat, hosted/embed chat, lead persistence, and reviewed-answer retrieval. Supabase documents RLS as the database enforcement layer; source inspection alone does not exercise that layer. [Supabase RLS documentation](https://supabase.com/docs/guides/database/postgres/row-level-security).
 
@@ -96,7 +122,7 @@ Evidence: [quota tests](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/te
 
 The webhook persists an event and acknowledges it while processing runs through `after()`. The executor claims `received` events by marking them `processing`. Duplicate deliveries requeue only events still in `received`. A process termination after claiming can leave an event stuck in `processing`; no lease/reclaim worker was found in the reviewed implementation.
 
-Evidence: [webhook scheduling/replay](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/app/api/composio/webhook/route.ts:456) and [executor claim](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/lib/automation/executor.ts:57). Next.js documents that `after()` remains bounded by the route's platform duration. [Next.js documentation](https://nextjs.org/docs/app/api-reference/functions/after).
+Evidence: [webhook scheduling/replay](../../src/app/api/composio/webhook/route.ts:456) and [executor claim](../../src/lib/automation/executor.ts:57). Next.js documents that `after()` remains bounded by the route's platform duration. [Next.js documentation](https://nextjs.org/docs/app/api-reference/functions/after).
 
 **Fix:** before relying on automation for time-sensitive business operations, add durable job leases, retry/reclaim handling, dead-letter visibility, and action idempotency. Replaying a job after a crash must account for an external action that may already have succeeded. Keeping automation outside the initial Milo pilot reduces immediate exposure.
 
@@ -104,7 +130,7 @@ Evidence: [webhook scheduling/replay](/Users/petergorgees/Dev/Agentergroup/Agent
 
 A chat turn can run up to six tool-loop completions plus a recovery completion. The OpenRouter wrapper supplies no explicit output-token limit, and the stream accumulator preserves model/id but does not accumulate provider usage into a per-turn cost record. Message credits constrain turn count, but do not make differently sized/modelled turns comparable in cost.
 
-Evidence: [provider request](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/lib/openrouter.ts:49), [loop and stream accumulation](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/lib/runtime/agent-chat.ts:854), and [recovery completion](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/lib/runtime/agent-chat.ts:1137).
+Evidence: [provider request](../../src/lib/openrouter.ts:49), [loop and stream accumulation](../../src/lib/runtime/agent-chat.ts:854), and [recovery completion](../../src/lib/runtime/agent-chat.ts:1137).
 
 **Fix:** capture usage from every completion, including recovery and failed attempts when available; assign operation/workspace/model identifiers; set reviewed output and duration limits; and report estimated cost per conversation and workspace. Verify answer quality and cost using a small, repeatable English/Swedish business-question set before changing default models. No real provider spend or profitability was measured in this audit.
 
@@ -126,7 +152,7 @@ Advisories: [Browserslist memory growth](https://github.com/advisories/GHSA-c83g
 
 The desktop landing page has a clear hierarchy, legible typography, an obvious action, and a useful example conversation. The one-Milo product model and reviewed-answer loop provide a coherent explanation of why a customer would keep using the product. Preserve the shared runtime and explicit primary-resource IDs rather than introducing a separate Milo backend.
 
-The signup transition loses that clarity: its copy describes generic work organization rather than answers, leads, or bookings. The landing footer also links to Data processing and Subprocessors, but both routes return `307 /login` for anonymous visitors. Privacy's rendered title repeats the brand. These are reproduced public-journey inconsistencies, not conclusions about legal compliance. Evidence: [signup copy](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/app/login/page.tsx:87), [footer links](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/components/marketing/LandingPage.tsx:593), [Data processing route](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/app/data-processing/page.tsx:1), and [Subprocessors route](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/app/subprocessors/page.tsx:1).
+The signup transition loses that clarity: its copy describes generic work organization rather than answers, leads, or bookings. The landing footer also links to Data processing and Subprocessors, but both routes return `307 /login` for anonymous visitors. Privacy's rendered title repeats the brand. These are reproduced public-journey inconsistencies, not conclusions about legal compliance. Evidence: [signup copy](../../src/app/login/page.tsx:87), [footer links](../../src/components/marketing/LandingPage.tsx:593), [Data processing route](../../src/app/data-processing/page.tsx:1), and [Subprocessors route](../../src/app/subprocessors/page.tsx:1).
 
 For small-business onboarding, I would put a guided setup path in front of the graph: business details, Knowledge, permitted actions, a test conversation, then publish. Keep advanced configuration accessible. This is a design recommendation based on the documented product and Builder source, not an authenticated usability study. Explain manual activation and show the next required action clearly.
 
@@ -134,7 +160,7 @@ The Builder client is 6,622 lines; the shared runtime is 1,216 and Composio modu
 
 The health endpoint currently proves the web process can respond, not that Supabase, Knowledge processing, or model calls work. Retain it as a lightweight liveness check; add separate dependency probes and alerts with request correlation. External monitoring configuration was not inspected, so this audit does not claim production monitoring is absent.
 
-A small repair UX bug also remains: `MiloSetupCard.provision` has no `try/catch/finally` around `fetch`, so a network rejection can leave its retry button disabled until reload. [Repair handler](/Users/petergorgees/Dev/Agentergroup/Agentergroup.com/src/components/milo/MiloSetupCard.tsx:16).
+A small repair UX bug also remains: `MiloSetupCard.provision` has no `try/catch/finally` around `fetch`, so a network rejection can leave its retry button disabled until reload. [Repair handler](../../src/components/milo/MiloSetupCard.tsx:16).
 
 **Recommended order**
 

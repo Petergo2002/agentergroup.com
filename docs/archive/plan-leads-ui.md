@@ -1,5 +1,19 @@
 # Leads UI Refresh Plan
 
+> [!WARNING]
+> **ARCHIVED — 11 September 2026. Shipped; unticked boxes are misleading.**
+>
+> The checkboxes below were never ticked, but the work landed: the
+> glassmorphic detail panel, inbox-style rows and bento grouping are present
+> in `src/components/leads/LeadsPageClient.tsx` and
+> `src/components/leads/LeadAiSummaryCard.tsx`. Treat this as a design brief,
+> not an open task list. Current design rules live in
+> [UI Patterns](../guides/ui-patterns.md).
+>
+> Note: this plan names Framer Motion as a possible dependency. It is **not**
+> a dependency of this project and must not be added on the strength of this
+> document — the animations use Tailwind `animate-in` utilities.
+
 ## Overview
 Codex successfully implemented the functional foundation of the Leads page. However, it currently looks like a standard data table. We need to elevate this to a "UI/UX Pro Max" experience that wows the user, applying premium aesthetics, dynamic interactions, and glassmorphism, while strictly adhering to the project's design system (and avoiding any purple/violet colors).
 

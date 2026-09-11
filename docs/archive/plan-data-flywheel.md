@@ -1,5 +1,14 @@
 # Plan: Build The Data Flywheel First
 
+> [!WARNING]
+> **ARCHIVED — 11 September 2026. Shipped; superseded by the feature guide.**
+>
+> This was the plan that argued for building the learning loop before the
+> mini-site. That argument won and the feature shipped. For current runtime
+> behaviour, API contracts, detection rules, dedupe behaviour and indexes, use
+> [Questions / Data Flywheel](../guides/questions-data-flywheel.md) and
+> [Core Architecture](../architecture/core.md).
+
 Status: historical implementation plan. The Data Flywheel/Questions feature has shipped; use `docs/guides/questions-data-flywheel.md` and `docs/architecture/core.md#questions--data-flywheel-architecture` as the current source of truth for runtime behavior, API contracts, detection rules, dedupe behavior, and database indexes.
 
 ## Summary

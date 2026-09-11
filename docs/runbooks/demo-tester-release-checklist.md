@@ -70,7 +70,9 @@ Agentergroup is ready to be offered as a small, managed pilot. It is not yet rea
 - [ ] Schedule and verify the daily privacy-retention job.
 - [ ] Confirm a recent production backup.
 - [ ] Complete a restore test in a non-production project.
-- [ ] Confirm all 96 migrations match the target project before deployment.
+- [ ] Confirm the local and linked migration histories match before deployment
+      (`supabase migration list --linked`, then `supabase db push --linked --dry-run`).
+      See [Production Readiness → Migration Status](./production-readiness.md#migration-status).
 - [ ] Run Supabase security and performance advisors after deployment.
 - [ ] Resolve the legacy Widget attachment inventory decision.
 - [ ] Verify Composio lifecycle webhook subscriptions.

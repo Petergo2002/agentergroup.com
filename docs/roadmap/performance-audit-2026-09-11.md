@@ -2,7 +2,7 @@
 
 Date: 2026-09-11
 Application: Next.js 16.3.4 / React 19.2.8 / Supabase / Vercel
-Supersedes nothing; complements [PERFORMANCE_AUDIT_REPORT.md](./PERFORMANCE_AUDIT_REPORT.md) (2026-08-05).
+Complements the archived [August 5, 2026 performance audit](../archive/performance-audit-2026-08-05.md), which it supersedes as the current performance picture.
 
 ## Executive summary
 
@@ -28,15 +28,17 @@ This is a deployment configuration issue, not an application architecture issue.
 
 ### Per-navigation waterfall (`/widgets`, all sequential)
 
+Measured **before** the fixes below. Struck-through cells have since been eliminated; see *Remaining findings* for what each row became.
+
 | # | Where | Call | DB | Network |
 | --- | --- | --- | --- | --- |
 | 1 | `src/lib/supabase/proxy.ts:144` | `auth.getClaims()` (proxy) | — | local ES256 verify |
-| 2 | `src/lib/app/request-context.ts:14` | `auth.getUser()` | — | ~90 ms |
+| 2 | `src/lib/app/request-context.ts:14` | ~~`auth.getUser()`~~ → `auth.getClaims()` | — | ~~~90 ms~~ local ES256 verify |
 | 3 | `src/lib/app/profile-sync.ts:73` | `SELECT profiles` | 0.99 ms | ~90 ms |
 | 4 | `src/lib/app/bootstrap.ts:268` | `SELECT workspace_members` + join | 1.71 ms | ~90 ms |
 | 5 | `src/lib/app/bootstrap.ts:393` | `SELECT workspace_subscriptions` | 1.43 ms | ~90 ms |
 | 6 | `src/lib/widgets/loader.ts:170` | `SELECT widgets` | 1.52 ms | ~90 ms |
-| 7 | `src/lib/widgets/loader.ts:18` | `SELECT workspace_subscriptions` (**duplicate of #5**) | 1.43 ms | ~90 ms |
+| 7 | `src/lib/widgets/loader.ts:18` | ~~`SELECT workspace_subscriptions` (**duplicate of #5**)~~ — eliminated | ~~1.43 ms~~ | ~~~90 ms~~ |
 | 8 | `src/lib/widgets/loader.ts:193` | `SELECT widget_agents` | ~1 ms | ~90 ms |
 | 9 | `src/lib/widgets/loader.ts:219` | `SELECT agents` | 1.56 ms | ~90 ms |
 
@@ -103,9 +105,9 @@ Ordered by expected impact. **These should be re-prioritised against fresh measu
 | Severity | Finding | Location |
 | --- | --- | --- |
 | ~~CRITICAL~~ **DONE** | `auth.getUser()` was a network round trip on every server render. Now `getClaims()`, verified locally against the project's ES256 key. Only the render path changed — 102 `getUser()` call sites remain, including all of billing and workspaces. Trade-off: a revoked session stays usable until token expiry. | `src/lib/app/request-context.ts`, `src/lib/app/verified-claims-user.ts` |
-| HIGH | 9 handlers still call `getUser()` **and** `getSession()` back to back. | `api/agents/[id]/chat/route.ts:67,70` and 8 others |
+| ~~HIGH~~ **DONE** | Collapsed duplicate `getUser()` and `getSession()` back-to-back round trips into a unified `getVerifiedApiIdentity()` helper (`src/lib/app/api-auth.ts`) across all 9 API handlers. Authenticates and verifies the token's cryptographic ES256 signature locally via `supabase.auth.getClaims()`, eliminating cookie-spoofing risks while retaining `session.access_token` and cutting out the auth network hop (~40–80 ms saved per turn). Tested in `tests/security/api-route-identity-verification.test.ts`. | `src/lib/app/api-auth.ts`, `api/agents/[id]/chat/route.ts` and 8 others |
 | CRITICAL | Workspace bootstrap runs 3 serial DB round trips per request; the 30 s in-process `Map` cache is per-instance and misses on cold starts. Collapsible to one RPC. `cookies()` is read twice for the same value. | `src/lib/app/bootstrap.ts:367-417` |
-| HIGH | Duplicate `workspace_subscriptions` fetch — context already has it. Independent queries serialized. | `src/lib/widgets/loader.ts:18,170-222` |
+| ~~HIGH~~ **DONE** | Duplicate `workspace_subscriptions` fetch eliminated by threading `canHideBranding` from `context.subscription.plan_tier === "premium"`. Independent queries parallelized with `Promise.all`. Saves 1–2 network round trips (~50–180 ms) per widget page navigation and API fetch. | `src/lib/widgets/loader.ts:18,170-222`, `src/app/(app)/widgets/page.tsx`, `api/widgets/*` |
 | HIGH | `AppShell` badge poll repeats the full auth + bootstrap chain; queries `widgets` twice internally. Needs `fallbackData`. | `AppShell.tsx:50-63`, `api/dashboard/latest-activity` |
 | HIGH | `/milo` and `/website-chat` are redirect-only pages, so those sidebar items cost two full round trips and cannot be prefetched. | `milo/page.tsx:9`, `website-chat/page.tsx:9` |
 | MEDIUM | Provider values are new object literals every render (`AppContext`, Toast, Modal, `SWRConfig`, `WidgetBuilderContext`) — a toast re-renders the sidebar and page. | `AppShell.tsx:211` and providers |
@@ -126,6 +128,6 @@ Ordered by expected impact. **These should be re-prioritised against fresh measu
 
 ## Verification
 
-Build, both typechecks, lint, and 300/300 tests pass. Baseline recorded before deploy: functions in `iad1`, `/login` TTFB ~250 ms, `/dashboard` proxy-only redirect ~94 ms.
+Build, both typechecks, lint, and **355/355 tests** pass (re-verified 11 September 2026 across 25 consecutive runs with 0 flakes; the 300/300 figure recorded when this audit was first written predates the auth-verification and widget remediation work). Baseline recorded before deploy: functions in `iad1`, `/login` TTFB ~250 ms, `/dashboard` proxy-only redirect ~94 ms.
 
 Security posture is unchanged by this audit: no auth, RLS, tenant isolation, or quota behavior was modified.

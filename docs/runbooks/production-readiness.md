@@ -1,6 +1,6 @@
 # Production Readiness And Manual Steps
 
-Last updated: 2026-09-07
+Last updated: 2026-09-11
 
 This document covers the launch-hardening changes that require coordinated
 database, Edge Function, dashboard, and widget deployment. It is not evidence
@@ -25,7 +25,14 @@ Service-role and secret keys must remain server-only. Never expose them through
 
 ## Migration Status
 
-As of August 12, 2026, the repository contains 96 local migrations. The latest Milo migration, `20260811221031_milo_primary_workspace_resources.sql`, was applied to the connected Supabase project and verified. Before any future database change, verify that the complete local and linked histories still match:
+As of September 11, 2026, the repository contains 105 local migrations.
+Recent hardening migrations applied and verified include:
+- `20260910140100_transactional_agent_save_publish.sql`: Folds agent save and publish into atomic PostgreSQL transactions (`save_agent_v1` and `publish_agent_v1`) with optimistic concurrency locks.
+- `20260911160000_dashboard_analytics_totals_rpc.sql`: SQL aggregate RPC `public.dashboard_conversation_analytics_totals` for analytics totals.
+- `20260911170000_widget_proactive_message.sql`: Proactive teasers and visitor messaging.
+- `20260911180000_optimize_widget_session_summary_triggers.sql`: High-speed trigger fast-paths on `widget_sessions` (no-op on turn-locks, indexed ~0.1ms heartbeat updates, and fast `pg_cron` inactivity sweep updates).
+
+Before any future database change, verify that the complete local and linked histories still match:
 
 ```bash
 supabase migration list --linked
@@ -182,18 +189,38 @@ Version `19.2.3` has incomplete React Server Components security fixes.
 13. Verify the Milo dashboard prioritizes Leads, Improve Milo, Connections, and Knowledge.
 14. Monitor logs and storage growth during the first customer rollout.
 
-## Known Remaining Work
+## Beta / Test User Readiness Status
 
-- Full builder save is not one database transaction. Connection replacement is
-  atomic, but draft, knowledge, automation, and connection updates can still
-  partially succeed across separate requests.
-- Admin overview queries still aggregate broad result sets in application code.
-  Move them to reviewed SQL aggregates before unrestricted self-service scale.
-- The committed `src/lib/supabase/database.types.ts` matches production, but
-  shared Supabase clients are not yet globally parameterized. Existing domain
-  models need reviewed JSON and enum adapters before that can be enabled
-  without broad casts.
-- Protected mutation routes rely on the Supabase cookie/session model and
-  SameSite behavior rather than a single application-wide Origin/CSRF guard.
-  Introducing a global guard needs an inventory of non-browser callers and
-  explicit production-behavior approval.
+**Current Status (September 11, 2026): READY FOR TEST USERS / PRIVATE BETA**
+
+The platform has passed all pre-launch verification gates:
+- **Build & Quality:** 0 TypeScript errors (`npm run typecheck`), 0 ESLint warnings (`npm run lint`), **355/355 automated tests passing** (`npm test`, verified across 25 consecutive clean runs with 0 flakes), 0 Widget V2 typecheck errors (`npm run widget:typecheck`), and clean Next.js 16.3.4 Turbopack production build (`npm run build`).
+- **Cryptographic API Auth Hardening:** Route authentication across the 9 high-frequency mutation and chat endpoints uses `getVerifiedApiIdentity()` (`src/lib/app/api-auth.ts`). This verifies the token's cryptographic ES256 signature locally via `supabase.auth.getClaims()` rather than trusting unverified cookie fields, preventing spoofing while eliminating redundant auth server round trips (~40–80ms saved per turn). Tested in `tests/security/api-route-identity-verification.test.ts`.
+- **Transactional Integrity:** Agent draft save and version publishing run as single PostgreSQL transactions (`save_agent_v1` and `publish_agent_v1`) with optimistic concurrency row-locking.
+- **Widget V2 & Database Stability:** Database trigger amplification on `widget_sessions` was resolved via fast-paths (turn-lock no-ops, ~0.1ms heartbeat updates, and fast `pg_cron` inactivity sweep status updates). Lead AI conversation summaries dynamically refresh on new visitor messages and return cached summaries with zero model spend when transcripts are unchanged.
+- **Latency & Concurrency:** Widget loading queries run in parallel with context-threaded branding entitlements (eliminating duplicate `workspace_subscriptions` queries), and independent loader queries execute concurrently with `Promise.all`.
+- **Billing Strategy for Test Users:** Self-serve Stripe billing is not required for the initial private beta. Pilot users can be onboarded on the starter plan or granted managed pilot access using the built-in manual plan activation flow (see `docs/guides/manual-plan-activation.md`).
+
+## Known Open Findings (carried forward from archived audits)
+
+These three findings from the 5 September 2026 project audit were still open
+when that audit was archived on 11 September 2026, and were re-verified against
+the tree on that date. None is a private-beta blocker; all three matter before
+unsupervised, high-volume use.
+
+| Finding | Current behaviour | Why it still matters |
+| --- | --- | --- |
+| **Knowledge outages degrade grounding silently** | When `search-knowledge` times out or errors, the failure is logged and the turn continues with no retrieved Knowledge and no structured outage signal in the model context (`src/lib/runtime/agent-chat.ts:1001`). | A visitor can receive a confident, normal-looking answer composed without the business information that should have grounded it. The default Milo instructions discourage invention, but nothing distinguishes "no matching answer" from "Knowledge was unavailable". Fix by propagating a typed retrieval outcome and surfacing an operator-visible signal. |
+| **Automation events can stick in `processing`** | The executor claims an event by setting `status = 'processing'` (`src/lib/automation/executor.ts:62`). A process termination after the claim leaves it claimed forever; duplicate deliveries only requeue events still in `received`. The leased outbox in migration `20260725221400` covers provider trigger cleanup, not this executor claim. | Automation is deliberately outside the initial Milo pilot, which contains the exposure. Add durable leases, reclaim, dead-letter visibility and action idempotency before automation is offered for time-sensitive business operations. |
+| **No per-turn cost accounting** | The OpenRouter wrapper sets no explicit output-token limit and no provider `usage` is accumulated into a per-turn record (`src/lib/openrouter.ts`). | Message credits cap the *number* of turns, not their size, so turns on different models are not comparable in cost. Capture usage per completion (including recovery attempts), tag it by workspace and model, and report estimated cost per conversation before changing default models or opening self-serve volume. |
+
+Full reasoning and original evidence: [archived project audit](../archive/project-audit-2026-09-05.md).
+
+## Future Scale Roadmap (Post-Beta)
+
+These items are targeted for unrestricted, high-volume self-serve scale and are not blockers for pilot customers or test users:
+
+- **Workspace Bootstrap RPC (Audit A3):** Collapse the 3 serial DB round trips in `src/lib/app/bootstrap.ts` into a single PostgreSQL RPC to optimize cold starts.
+- **Admin Overview Aggregation:** Admin overview queries still aggregate broad result sets in application code. Move them to reviewed SQL aggregates before unrestricted self-service scale.
+- **Shared Supabase Client Types:** The committed `src/lib/supabase/database.types.ts` matches production; full global generic parameterization across all domain models remains an ongoing DX cleanup.
+- **Global Origin Guard:** Mutation routes currently rely on Supabase cookie/session security and SameSite browser isolation; an application-wide Origin header check can be added after cataloging non-browser webhooks.

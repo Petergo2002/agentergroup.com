@@ -1,8 +1,17 @@
 # Domain change audit — 6 September 2026
 
+> [!WARNING]
+> **ARCHIVED — 11 September 2026. The migration this document planned is done.**
+>
+> Kept as the record of *why* the migration was sequenced the way it was
+> (notably the Widget V2 loader-default trap in the "easy-to-miss dependency"
+> section, which is still worth reading before any future origin change).
+> For anything operational, use the live runbook:
+> [avenro.se — Vercel and one.com setup](../runbooks/avenro-domain-setup.md).
+
 > [!NOTE]
 > **Status: Migration Executed (7 September 2026)**  
-> The domain migration to `https://avenro.se` (Next.js dashboard and API) and `https://widget.avenro.se` (Widget V2 runtime) has been fully applied in code, DNS, and Vercel configuration. For the current setup guide and operational status, see the active runbook: [**avenro.se — Vercel and one.com Setup Guide**](./runbooks/avenro-domain-setup.md).
+> The domain migration to `https://avenro.se` (Next.js dashboard and API) and `https://widget.avenro.se` (Widget V2 runtime) has been fully applied in code, DNS, and Vercel configuration. For the current setup guide and operational status, see the active runbook: [**avenro.se — Vercel and one.com Setup Guide**](../runbooks/avenro-domain-setup.md).
 
 Repository inspection only. No application code, environment values, DNS, provider settings, or database records were changed for this audit. A new domain has not been selected. Live hosting/provider configuration and production data were not inspected; those checks remain pending.
 

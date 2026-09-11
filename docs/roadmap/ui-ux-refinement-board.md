@@ -1,6 +1,14 @@
 # Comprehensive Application UI & UX Refinement Plan
 
+**Status: ACTIVE — Phase 1 complete, Phases 2–5 open.** Last reviewed 11 September 2026.
+
 > **Goal:** Transform the Agentergroup Web Application into a world-class, modern SaaS experience (inspired by Vercel and Linear standards) through targeted, non-breaking visual polish, typography contrast, responsive touch targets, and tactile micro-interactions.
+
+> [!NOTE]
+> This board changes presentation only. Brand tokens, semantic CSS and the
+> shared surface rules it must obey are defined in
+> [UI Patterns](../guides/ui-patterns.md) — that guide is the source of truth,
+> this board is the worklist.
 
 ---
 
