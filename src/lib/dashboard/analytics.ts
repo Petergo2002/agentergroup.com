@@ -23,7 +23,7 @@ import type {
   WorkspaceMemberRecord,
 } from "@/lib/types";
 
-type AdminSupabase = Pick<SupabaseClient, "from" | "storage">;
+type AdminSupabase = Pick<SupabaseClient, "from" | "storage" | "rpc">;
 
 export interface AnalyticsWidgetRow {
   id: string;
@@ -716,7 +716,27 @@ function applySummaryRowFilters(
   return nextQuery;
 }
 
-async function fetchAllMatchingSummaryRows(
+interface SummaryTotalsRow {
+  conversation_count: number;
+  message_count: number;
+  lead_count: number;
+  active_widget_ids: string[] | null;
+}
+
+export interface DashboardSummaryTotals {
+  conversationCount: number;
+  messageCount: number;
+  leadCount: number;
+  widgetIds: string[];
+}
+
+/**
+ * Overview totals are four numbers, so they are aggregated in Postgres rather
+ * than by transferring every matching conversation row into Node. Filters must
+ * stay in sync with applySummaryRowFilters(); the search term is escaped here
+ * the same way so ILIKE behaviour is identical.
+ */
+async function fetchSummaryTotals(
   supabase: AdminSupabase,
   input: {
     workspaceId: string;
@@ -727,35 +747,35 @@ async function fetchAllMatchingSummaryRows(
     sessionStatus: DashboardAnalyticsAppliedFilters["sessionStatus"];
     liveCutoffIso: string;
   },
-) {
-  const pageSize = 1000;
-  const rows: DashboardConversationSummaryRow[] = [];
+): Promise<DashboardSummaryTotals> {
+  const { data, error } = await supabase.rpc(
+    "dashboard_conversation_analytics_totals",
+    {
+      p_workspace_id: input.workspaceId,
+      p_start: input.startIso,
+      p_live_cutoff: input.liveCutoffIso,
+      p_widget_id: input.widgetId,
+      p_agent_id: input.agentId,
+      p_search: input.search ? escapeIlikePattern(input.search) : null,
+      p_session_status: input.sessionStatus ?? null,
+    },
+  );
 
-  for (let offset = 0; ; offset += pageSize) {
-    const query = applySummaryRowFilters(
-      supabase
-        .from("dashboard_conversation_summaries")
-        .select(DASHBOARD_CONVERSATION_SUMMARY_SELECT)
-        .order("last_activity_at", { ascending: false })
-        .order("widget_session_id", { ascending: false })
-        .range(offset, offset + pageSize - 1),
-      input,
-    );
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const pageRows = (data ?? []) as DashboardConversationSummaryRow[];
-    rows.push(...pageRows);
-
-    if (pageRows.length < pageSize) {
-      break;
-    }
+  if (error) {
+    throw new Error(error.message);
   }
 
-  return rows;
+  const totals = (Array.isArray(data) ? data[0] : data) as
+    | SummaryTotalsRow
+    | null
+    | undefined;
+
+  return {
+    conversationCount: Number(totals?.conversation_count ?? 0),
+    messageCount: Number(totals?.message_count ?? 0),
+    leadCount: Number(totals?.lead_count ?? 0),
+    widgetIds: totals?.active_widget_ids ?? [],
+  };
 }
 
 async function fetchPagedSummaryRows(
@@ -1322,8 +1342,8 @@ export async function listDashboardConversations(
   }
 
   const limit = normalizeLimit(input.limit);
-  const [matchingSummaries, pagedSummaries] = await Promise.all([
-    fetchAllMatchingSummaryRows(supabase, {
+  const [summaryTotals, pagedSummaries] = await Promise.all([
+    fetchSummaryTotals(supabase, {
       workspaceId: input.workspaceId,
       widgetId: input.appliedFilters.widgetId,
       agentId: input.appliedFilters.agentId,
@@ -1345,7 +1365,7 @@ export async function listDashboardConversations(
     }),
   ]);
 
-  if (matchingSummaries.length === 0) {
+  if (summaryTotals.conversationCount === 0) {
     return {
       widgetOptions,
       agentOptions,
@@ -1373,27 +1393,19 @@ export async function listDashboardConversations(
   const conversations = pageRows.sort(compareConversationRows).slice(0, limit);
   const hasMore = pagedSummaries.length > limit;
   const lastRow = conversations[conversations.length - 1];
-  const activeWidgetIds = Array.from(
-    new Set(
-      matchingSummaries
-        .filter((summary) => widgetStatusById.get(summary.widget_id) === "deployed")
-        .map((summary) => summary.widget_id),
-    ),
+  // The aggregate returns every widget with activity; deployment status is
+  // already loaded here, and the list is bounded by the workspace's widget count.
+  const activeWidgetIds = summaryTotals.widgetIds.filter(
+    (widgetId) => widgetStatusById.get(widgetId) === "deployed",
   );
 
   return {
     widgetOptions,
     agentOptions,
     overview: {
-      conversationCount: matchingSummaries.length,
-      messageCount: matchingSummaries.reduce(
-        (sum, summary) => sum + summary.message_count,
-        0,
-      ),
-      leadCount: matchingSummaries.reduce(
-        (sum, summary) => sum + summary.lead_count,
-        0,
-      ),
+      conversationCount: summaryTotals.conversationCount,
+      messageCount: summaryTotals.messageCount,
+      leadCount: summaryTotals.leadCount,
       activeWidgetIds,
     },
     conversations,

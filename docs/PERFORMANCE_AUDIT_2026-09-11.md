@@ -71,6 +71,25 @@ experimental: { staleTimes: { dynamic: 30, static: 180 } }
 - `optimizePackageImports: ["lucide-react"]` — **already optimized by default** in Next 16; would be a no-op.
 - `serverExternalPackages` — none of `stripe`, `@composio/core`, `@mendable/firecrawl-js`, `resend`, `@supabase/supabase-js` are in Next's default list, but opting out of bundling is a compatibility flag, not a demonstrated navigation win. Not added without evidence.
 
+### 3. Analytics overview totals aggregated in Postgres
+
+`fetchAllMatchingSummaryRows` paged `dashboard_conversation_summaries` 1000 rows at a time **with no upper bound**, then reduced them in JavaScript to four numbers: conversation count, message sum, lead sum, and the distinct active widgets. The transfer grew linearly with conversation volume while the answer stayed constant-size.
+
+Replaced with `public.dashboard_conversation_analytics_totals` (migration `20260911160000`), a `security invoker` function granted to `service_role` only, with `search_path` locked. Filter semantics mirror `applySummaryRowFilters()` exactly, and the search term is escaped by the same `escapeIlikePattern()` helper so `ILIKE` behaviour is unchanged.
+
+Verified against live data before switching — identical on every filter combination tested:
+
+| | rows-in-JS (old) | aggregate (new) |
+| --- | --- | --- |
+| conversations | 346 | 346 |
+| messages | 556 | 556 |
+| leads | 2 | 2 |
+| distinct widgets | 1 | 1 |
+| completed-only conversations | 346 | 346 |
+| completed-only messages | 556 | 556 |
+
+Covered by `tests/security/dashboard-analytics-totals.test.ts`, which locks the filter parity, the escaping, and the no-privilege-widening properties.
+
 ## Remaining findings (not yet implemented)
 
 Ordered by expected impact. **These should be re-prioritised against fresh measurements after the region change lands** — several may no longer justify their risk.
@@ -83,7 +102,8 @@ Ordered by expected impact. **These should be re-prioritised against fresh measu
 | HIGH | `AppShell` badge poll repeats the full auth + bootstrap chain; queries `widgets` twice internally. Needs `fallbackData`. | `AppShell.tsx:50-63`, `api/dashboard/latest-activity` |
 | HIGH | `/milo` and `/website-chat` are redirect-only pages, so those sidebar items cost two full round trips and cannot be prefetched. | `milo/page.tsx:9`, `website-chat/page.tsx:9` |
 | MEDIUM | Provider values are new object literals every render (`AppContext`, Toast, Modal, `SWRConfig`, `WidgetBuilderContext`) — a toast re-renders the sidebar and page. | `AppShell.tsx:211` and providers |
-| MEDIUM | Analytics pages unbounded rows to aggregate in JS (`length`, `sum`, daily trend) where SQL aggregates belong. | `dashboard/analytics.ts:719-757,887-931` |
+| ~~MEDIUM~~ **DONE** | Conversation analytics totals paged unbounded rows into Node to reduce them to four numbers. Replaced by the `dashboard_conversation_analytics_totals` aggregate (see below). | `dashboard/analytics.ts` |
+| MEDIUM | `automation_events` still pages unbounded rows, but it builds a per-agent breakdown and a daily trend rather than scalar totals, so SQL aggregation is a larger change. Low urgency: 14 rows and 1 automation configured today. | `dashboard/analytics.ts:887-931` |
 | MEDIUM | Whole i18n bundle (~100 KB source) serialized into every route's payload, including `/login`. | `src/app/layout.tsx:50` |
 | MEDIUM | Large client components not code-split: `AnalyticsWorkspaceView` (1628), `KnowledgePageClient` (1580), `QuestionsPageClient` (1237), `CreateWorkspaceModal` (in the shell chunk). | various |
 | MEDIUM | 4 separate `count: "exact"` queries for question statuses where one `GROUP BY` suffices. | `flywheel/server.ts:358-382` |
