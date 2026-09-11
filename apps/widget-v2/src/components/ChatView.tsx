@@ -33,6 +33,7 @@ const TRANSLATIONS = {
     attachFile: "Attach file",
     sendMessage: "Send message",
     agentSubtext: "AI Agent",
+    typing: "is typing",
     privacyText: "By sending a message, you acknowledge our ",
     privacyLink: "privacy policy",
     automatedWarning: "Chat messages may be processed automatically.",
@@ -52,6 +53,7 @@ const TRANSLATIONS = {
     attachFile: "Bifoga fil",
     sendMessage: "Skicka meddelande",
     agentSubtext: "AI-Agent",
+    typing: "skriver",
     privacyText: "När du skickar ett meddelande bekräftar du vår ",
     privacyLink: "integritetspolicy",
     automatedWarning: "Chattmeddelanden kan behandlas automatiskt.",
@@ -450,7 +452,7 @@ function AgentMessageContent({
   const blocks = parseMessageBlocks(content);
 
   if (blocks.length === 0) {
-    return isStreaming ? <TypingCursor /> : null;
+    return null;
   }
 
   return (
@@ -620,13 +622,23 @@ export function ChatView({
         className="min-h-0 flex-1 overflow-y-auto px-4 py-6 widget-scroll touch-pan-y"
       >
         <div className="mx-auto max-w-4xl space-y-6 pb-4">
-          {messages.map((msg, idx) => (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="group"
-            >
+          {messages.map((msg, idx) => {
+            // The agent bubble is pushed empty before the first token. Render
+            // nothing for it — the typing indicator below stands in its place,
+            // and an empty node here would still claim a `space-y-6` gap.
+            // Scoped to the streaming placeholder so a finished message is
+            // never swallowed.
+            if (msg.role === "agent" && msg.isStreaming && !msg.content && !msg.ui) {
+              return null;
+            }
+
+            return (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="group"
+              >
               {msg.role === "user" ? (
                 <div className="flex justify-end">
                   <div className="max-w-[85%] flex flex-col gap-2">
@@ -715,9 +727,16 @@ export function ChatView({
                 </div>
               )}
             </motion.div>
-          ))}
+            );
+          })}
 
-          {/* Typing indicator — premium minimal style */}
+          {/* Typing indicator: one quiet line — no bubble. The three dots are
+              the ellipsis, animated as a staggered wave, which is why the
+              `typing` strings stop at "skriver"/"is typing". They are
+              decorative, so the label alone is what gets announced. The name is
+              always "Milo" — the underlying agent record may be called
+              something else (older workspaces are named "Maja"), but visitors
+              only ever meet Milo. */}
           {isAwaitingFirstToken && (
             <motion.div
               initial={{ opacity: 0, y: 4 }}
@@ -726,23 +745,13 @@ export function ChatView({
               className="flex items-center gap-2 pl-1"
             >
               <MiloMark className="h-4 w-4" />
-              {/* Three dots with staggered fade-pulse */}
-              <div className="flex items-center gap-[3px]">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="block w-[5px] h-[5px] rounded-full bg-widget-muted"
-                    style={{
-                      animation: "typingPulse 1.2s ease-in-out infinite",
-                      animationDelay: `${i * 0.18}s`,
-                    }}
-                  />
-                ))}
-              </div>
-              {/* Agent name + status */}
-              <span className="text-[12px] text-widget-muted font-medium">
-                Milo
-                {config.widget.language === "sv" ? " skriver..." : " is typing..."}
+              <span className="flex items-center gap-1.5 text-[12px] font-medium text-widget-muted">
+                Milo {t.typing}
+                <span className="flex items-center gap-[3px]" aria-hidden="true">
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                </span>
               </span>
             </motion.div>
           )}
