@@ -13,11 +13,12 @@ import {
 } from "@/lib/widgets/server";
 import { WorkspaceAccessError, assertOwnedWorkspaceResource } from "@/lib/workspace-security";
 import type { AgentRecord } from "@/lib/types";
+import { PROACTIVE_MESSAGE_MAX_LENGTH } from "@/lib/widgets";
 
 const WIDGET_AGENT_SELECT =
   "id, workspace_id, created_by, surface, name, slug, description, status, model, instructions, starter_prompts, timezone, published_version_id, archived_at, archived_by, created_at, updated_at";
 const WIDGET_SELECT =
-  "id, workspace_id, name, slug, status, widget_public_key, brand_name, logo_url, primary_color, secondary_color, background_color, text_color, theme, language, home_title, home_subtitle, hosted_enabled, show_branding, privacy_policy_url, allowed_origins, description, created_at, updated_at, deployed_at";
+  "id, workspace_id, name, slug, status, widget_public_key, brand_name, logo_url, primary_color, secondary_color, background_color, text_color, theme, language, home_title, home_subtitle, hosted_enabled, show_branding, proactive_message, proactive_enabled, privacy_policy_url, allowed_origins, description, created_at, updated_at, deployed_at";
 
 function parseString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -158,6 +159,15 @@ export async function PATCH(
     show_branding: canHideBranding
       ? parseBoolean(body.showBranding, loaded.widget.show_branding)
       : true,
+    proactive_enabled: parseBoolean(
+      body.proactiveEnabled,
+      loaded.widget.proactive_enabled,
+    ),
+    // Trimmed and capped here as well as in the database, so an over-long
+    // message is stored truncated rather than rejecting the whole save.
+    proactive_message:
+      parseString(body.proactiveMessage)?.slice(0, PROACTIVE_MESSAGE_MAX_LENGTH) ??
+      null,
     privacy_policy_url:
       parseString(body.privacyPolicyUrl) ?? loaded.widget.privacy_policy_url,
     allowed_origins: Array.isArray(body.allowedOrigins)

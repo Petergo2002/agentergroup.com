@@ -37,6 +37,12 @@ export const widgetBuilder = {
   takeOffline: "Ta offline",
   processing: "Bearbetar...",
   behavior: {
+    proactiveTitle: "Uppmärksamhetsmeddelande",
+    proactiveDescription: "En kort hälsning som dyker upp bredvid chattbubblan några sekunder efter att någon kommit in på sajten, för att bjuda in till ett samtal.",
+    proactiveEnabled: "Visa uppmärksamhetsmeddelande",
+    proactiveEnabledDescription: "Visas en gång per besökare. Det försvinner när de stänger det eller öppnar chatten.",
+    proactiveMessage: "Meddelande",
+    proactiveMessagePlaceholder: "Hej! Fråga mig gärna om våra tjänster 👋",
     interactionLogic: "Chattbeteende",
     interactionDescription:
       "Styr hur widgeten beter sig när en användare först interagerar med den.",

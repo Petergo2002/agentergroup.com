@@ -4,6 +4,7 @@ import { useWidgetBuilder } from '../WidgetBuilderContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useAppContext } from '@/components/app/AppContext';
 import { Globe, ShieldCheck } from 'lucide-react';
+import { PROACTIVE_MESSAGE_MAX_LENGTH } from '@/lib/widgets';
 
 const fieldLabelClassName = 'text-xs font-bold text-on-surface';
 const inputFieldClassName =
@@ -119,6 +120,76 @@ export function BehaviorTab() {
               />
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* Proactive attention message */}
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-bold font-headline tracking-tight text-on-surface">
+            {t('widgetBuilder.behavior.proactiveTitle')}
+          </h2>
+          <p className="text-xs text-on-surface-variant/70">
+            {t('widgetBuilder.behavior.proactiveDescription')}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-xs space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-on-surface">
+                {t('widgetBuilder.behavior.proactiveEnabled')}
+              </span>
+              <p className="text-[11px] leading-relaxed text-on-surface-variant/65">
+                {t('widgetBuilder.behavior.proactiveEnabledDescription')}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.proactiveEnabled}
+              onClick={() =>
+                setForm((current) =>
+                  current
+                    ? { ...current, proactiveEnabled: !current.proactiveEnabled }
+                    : current,
+                )
+              }
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                form.proactiveEnabled ? 'bg-primary' : 'bg-outline-variant/40'
+              }`}
+            >
+              <span
+                className={`pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-xs transition-transform ${
+                  form.proactiveEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {form.proactiveEnabled && (
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className={fieldLabelClassName}>
+                  {t('widgetBuilder.behavior.proactiveMessage')}
+                </span>
+                <span className="text-[10px] tabular-nums text-on-surface-variant/60">
+                  {form.proactiveMessage.length}/{PROACTIVE_MESSAGE_MAX_LENGTH}
+                </span>
+              </div>
+              <textarea
+                value={form.proactiveMessage}
+                maxLength={PROACTIVE_MESSAGE_MAX_LENGTH}
+                onChange={(e) =>
+                  setForm((c) => (c ? { ...c, proactiveMessage: e.target.value } : c))
+                }
+                placeholder={t('widgetBuilder.behavior.proactiveMessagePlaceholder')}
+                className={`${inputFieldClassName} h-20 resize-none`}
+                rows={3}
+              />
+            </div>
+          )}
         </div>
       </section>
 

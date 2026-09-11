@@ -4,6 +4,7 @@ import { buildDefaultGmailRecipientPolicy } from "@/lib/gmail";
 import { buildDefaultGoogleCalendarSelection } from "@/lib/google-calendar";
 import { buildDefaultCalSelection } from "@/lib/cal";
 import { buildDraftPreviewWidgetAgentId } from "./widgets/draft-agent-id";
+import { resolveProactiveMessage } from "./widgets/proactive-message";
 import {
   normalizeAllowedOrigin,
   normalizeAllowedOrigins,
@@ -59,6 +60,10 @@ export {
   buildDraftPreviewWidgetAgentId,
   readAgentIdFromDraftPreviewWidgetAgentId,
 } from "./widgets/draft-agent-id";
+export {
+  PROACTIVE_MESSAGE_MAX_LENGTH,
+  resolveProactiveMessage,
+} from "./widgets/proactive-message";
 
 export interface WidgetAgentWithAgent {
   widgetAgent: WidgetAgentRecord;
@@ -237,6 +242,10 @@ export function buildWidgetRuntimeConfig(
       textColor: widget.text_color,
       language: widget.language,
       showBranding: widget.show_branding,
+      proactiveMessage: resolveProactiveMessage(
+        widget.proactive_enabled,
+        widget.proactive_message,
+      ),
     },
     home: {
       mode: orderedAgents.length === 1 ? "single_auto" : "chooser",
@@ -308,6 +317,10 @@ export function buildWidgetRuntimeConfigFromDraft(
       textColor: draft.widget.textColor,
       language: draft.widget.language || "en",
       showBranding: draft.widget.showBranding,
+      proactiveMessage: resolveProactiveMessage(
+        draft.widget.proactiveEnabled,
+        draft.widget.proactiveMessage,
+      ),
     },
     home: {
       mode: orderedAgents.length === 1 ? "single_auto" : "chooser",

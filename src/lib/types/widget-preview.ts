@@ -29,6 +29,8 @@ export interface WidgetDraftPreviewInput {
     homeTitle: string | null;
     homeSubtitle: string | null;
     showBranding: boolean;
+    proactiveEnabled: boolean;
+    proactiveMessage: string | null;
     privacyPolicyUrl: string;
     allowedOrigins: string[];
   };
@@ -63,6 +65,8 @@ export interface WidgetRuntimeConfig {
     textColor?: string;
     language: string;
     showBranding: boolean;
+    /** Null unless the owner enabled a non-empty teaser. */
+    proactiveMessage: string | null;
   };
   home: {
     mode: "single_auto" | "chooser";

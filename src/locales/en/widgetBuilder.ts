@@ -37,6 +37,12 @@ export const widgetBuilder = {
   takeOffline: "Take Offline",
   processing: "Processing...",
   behavior: {
+    proactiveTitle: "Attention message",
+    proactiveDescription: "A short note that appears beside the chat bubble a few seconds after someone lands on your site, to invite them to start a conversation.",
+    proactiveEnabled: "Show attention message",
+    proactiveEnabledDescription: "Shown once per visitor. It disappears when they dismiss it or open the chat.",
+    proactiveMessage: "Message",
+    proactiveMessagePlaceholder: "Hi! Ask me anything about our services 👋",
     interactionLogic: "Chat behavior",
     interactionDescription:
       "Control how the widget behaves when a user first interacts with it.",

@@ -10,7 +10,7 @@ import {
 } from "@/lib/widgets/server";
 
 const DEPLOY_WIDGET_SELECT =
-  "id, workspace_id, name, slug, status, widget_public_key, brand_name, logo_url, primary_color, secondary_color, background_color, text_color, theme, language, home_title, home_subtitle, hosted_enabled, show_branding, privacy_policy_url, allowed_origins, description, created_at, updated_at, deployed_at";
+  "id, workspace_id, name, slug, status, widget_public_key, brand_name, logo_url, primary_color, secondary_color, background_color, text_color, theme, language, home_title, home_subtitle, hosted_enabled, show_branding, proactive_message, proactive_enabled, privacy_policy_url, allowed_origins, description, created_at, updated_at, deployed_at";
 
 export async function POST(
   _request: NextRequest,

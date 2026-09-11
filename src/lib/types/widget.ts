@@ -53,6 +53,8 @@ export interface WidgetRecord {
   home_subtitle: string | null;
   hosted_enabled: boolean;
   show_branding: boolean;
+  proactive_message: string | null;
+  proactive_enabled: boolean;
   privacy_policy_url: string | null;
   allowed_origins: string[];
   description: string;

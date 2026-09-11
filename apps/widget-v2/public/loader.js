@@ -138,6 +138,11 @@
   let isOpen = false;
   let container = null;
   let bubble = null;
+  let teaser = null;
+  let teaserTimerId = null;
+  let teaserShown = false;
+  let audioContext = null;
+  let audioPrimed = false;
   let closeButton = null;
   let iframeContainer = null;
   let iframe = null;
@@ -635,6 +640,80 @@
       pointer-events: auto;
     }
 
+    .ag-widget-teaser {
+      position: absolute;
+      bottom: 68px;
+      right: 0;
+      z-index: 1;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      /* The container is width:max-content, so an absolutely positioned child
+         shrink-to-fits against the launcher's width and wraps one word per
+         line. Sizing to content first, then capping, gives a real bubble. */
+      box-sizing: border-box;
+      width: max-content;
+      max-width: min(288px, calc(100vw - 48px));
+      padding: 12px 14px;
+      border-radius: 16px 16px 4px 16px;
+      background: #ffffff;
+      color: #17181a;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      box-shadow: 0 10px 32px rgba(0, 0, 0, 0.16);
+      font-size: 14px;
+      line-height: 1.42;
+      text-align: left;
+      cursor: pointer;
+      pointer-events: auto;
+      opacity: 0;
+      transform: translateY(10px) scale(0.96);
+      transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .ag-widget-teaser.ag-is-visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .ag-widget-teaser.ag-is-dark {
+      background: #1c1d21;
+      color: #f4f4f5;
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .ag-widget-teaser-text {
+      flex: 1 1 auto;
+      overflow-wrap: anywhere;
+    }
+
+    .ag-widget-teaser-dismiss {
+      flex: 0 0 auto;
+      width: 20px;
+      height: 20px;
+      margin: -2px -4px 0 0;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: currentColor;
+      opacity: 0.4;
+      cursor: pointer;
+      line-height: 1;
+      font-size: 15px;
+      transition: opacity 0.15s ease;
+    }
+
+    .ag-widget-teaser-dismiss:hover {
+      opacity: 0.85;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ag-widget-teaser {
+        transition: opacity 0.01s linear;
+        transform: none;
+      }
+    }
+
     .ag-widget-bubble {
       position: relative;
       z-index: 2;
@@ -1002,6 +1081,186 @@
     return params.toString();
   }
 
+  const TEASER_DELAY_MS = 8000;
+  const TEASER_SEEN_KEY_PREFIX = "ag_widget_teaser_seen_v1";
+
+  function getTeaserSeenKey() {
+    return TEASER_SEEN_KEY_PREFIX + "_" + widgetPublicKey;
+  }
+
+  function hasSeenTeaser() {
+    // Previewing in the builder should always demonstrate the teaser, otherwise
+    // the owner sees it once and can never look at it again.
+    if (previewEnabled) return false;
+    try {
+      return window.localStorage.getItem(getTeaserSeenKey()) === "1";
+    } catch {
+      // Privacy-restricted browsers: treat as unseen rather than failing.
+      return false;
+    }
+  }
+
+  function markTeaserSeen() {
+    if (previewEnabled) return;
+    try {
+      window.localStorage.setItem(getTeaserSeenKey(), "1");
+    } catch {
+      // Best effort; it still stays hidden for this page view.
+    }
+  }
+
+  /**
+   * Browsers refuse to start audio until the visitor has interacted with the
+   * page, so the context is created and unsuspended on the first real gesture.
+   * A visitor who has not touched the page yet simply gets the teaser silently.
+   */
+  function primeTeaserAudio() {
+    if (audioPrimed) return;
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) {
+      audioPrimed = true;
+      return;
+    }
+    try {
+      if (!audioContext) audioContext = new Ctor();
+      if (audioContext.state === "suspended") {
+        audioContext.resume().catch(function () {});
+      }
+      audioPrimed = true;
+    } catch {
+      audioPrimed = true;
+    }
+  }
+
+  function playTeaserChime() {
+    if (!audioContext || audioContext.state !== "running") return;
+    try {
+      var startedAt = audioContext.currentTime;
+      var notes = [
+        { frequency: 880, startAt: 0, duration: 0.16 },
+        { frequency: 1174.66, startAt: 0.1, duration: 0.22 },
+      ];
+      for (var i = 0; i < notes.length; i += 1) {
+        var note = notes[i];
+        var oscillator = audioContext.createOscillator();
+        var gain = audioContext.createGain();
+        var noteStart = startedAt + note.startAt;
+        var noteEnd = noteStart + note.duration;
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(note.frequency, noteStart);
+        // Fade in and out; a bare start/stop produces an audible click.
+        gain.gain.setValueAtTime(0.0001, noteStart);
+        gain.gain.exponentialRampToValueAtTime(0.07, noteStart + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start(noteStart);
+        oscillator.stop(noteEnd + 0.02);
+      }
+    } catch {
+      // Audio is a nicety; never let it break the page.
+    }
+  }
+
+  function showTeaser(message) {
+    if (!container || teaserShown || isOpen) return;
+
+    // The teaser only fires once per visitor, so it must not be spent while the
+    // tab is in the background where nobody would see or hear it.
+    if (document.visibilityState === "hidden") {
+      var showWhenVisible = function () {
+        document.removeEventListener("visibilitychange", showWhenVisible);
+        if (document.visibilityState === "visible") showTeaser(message);
+      };
+      document.addEventListener("visibilitychange", showWhenVisible);
+      return;
+    }
+
+    teaserShown = true;
+
+    teaser = document.createElement("div");
+    teaser.className = "ag-widget-teaser";
+    if (bootstrapPayload?.config?.widget?.theme === "dark") {
+      teaser.classList.add("ag-is-dark");
+    }
+    teaser.setAttribute("role", "button");
+    teaser.setAttribute("tabindex", "0");
+    teaser.setAttribute("aria-label", message);
+
+    var text = document.createElement("span");
+    text.className = "ag-widget-teaser-text";
+    // textContent, never innerHTML: this string is owner-authored config and
+    // must never be able to inject markup into the host page.
+    text.textContent = message;
+
+    var dismiss = document.createElement("button");
+    dismiss.className = "ag-widget-teaser-dismiss";
+    dismiss.type = "button";
+    dismiss.setAttribute("aria-label", getLoaderLabel("close"));
+    dismiss.textContent = "\u00d7";
+    dismiss.onclick = function (event) {
+      event.stopPropagation();
+      hideTeaser({ remember: true });
+    };
+
+    function openFromTeaser() {
+      hideTeaser({ remember: true });
+      void toggleWidget();
+    }
+
+    teaser.onclick = openFromTeaser;
+    teaser.onkeydown = function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openFromTeaser();
+      }
+    };
+
+    teaser.appendChild(text);
+    teaser.appendChild(dismiss);
+    container.appendChild(teaser);
+
+    // Reveal on the next frame so the transition runs rather than the element
+    // appearing already at its final state. requestAnimationFrame does not fire
+    // in a background tab, so a timeout backs it up.
+    var reveal = function () {
+      if (teaser) teaser.classList.add("ag-is-visible");
+    };
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(reveal);
+    });
+    window.setTimeout(reveal, 60);
+
+    playTeaserChime();
+  }
+
+  function scheduleTeaser() {
+    if (teaserShown || teaserTimerId || isOpen) return;
+
+    var message = bootstrapPayload?.config?.widget?.proactiveMessage;
+    if (typeof message !== "string" || !message.trim()) return;
+    if (hasSeenTeaser()) return;
+
+    teaserTimerId = window.setTimeout(function () {
+      teaserTimerId = null;
+      showTeaser(message.trim());
+    }, TEASER_DELAY_MS);
+  }
+
+  function hideTeaser(options) {
+    if (teaserTimerId) {
+      window.clearTimeout(teaserTimerId);
+      teaserTimerId = null;
+    }
+    if (!teaser) return;
+    teaser.classList.remove("ag-is-visible");
+    if (options && options.remember) markTeaserSeen();
+    window.setTimeout(function () {
+      if (teaser && teaser.parentNode) teaser.parentNode.removeChild(teaser);
+      teaser = null;
+    }, 300);
+  }
+
   function getBubbleMarkup() {
     return `
       <div class="ag-widget-bubble-content">
@@ -1268,13 +1527,27 @@
           updateBubbleContent();
           applyWidgetTheme();
           bubble?.classList?.add("ag-is-ready");
+          scheduleTeaser();
         })
         .catch(() => {
           bubble?.classList?.add("ag-is-ready");
         });
     } else {
       bubble?.classList?.add("ag-is-ready");
+      scheduleTeaser();
     }
+
+    // Audio cannot start until the visitor has interacted with the page, so the
+    // context is unsuspended on the first gesture anywhere on the host page.
+    var primeOnce = function () {
+      primeTeaserAudio();
+      document.removeEventListener("pointerdown", primeOnce, true);
+      document.removeEventListener("keydown", primeOnce, true);
+      document.removeEventListener("touchstart", primeOnce, true);
+    };
+    document.addEventListener("pointerdown", primeOnce, true);
+    document.addEventListener("keydown", primeOnce, true);
+    document.addEventListener("touchstart", primeOnce, true);
 
     if (
       previewEnabled &&
@@ -1293,6 +1566,10 @@
     if (isOpen) return;
 
     if (!bubble) return;
+
+    // Opening the chat is the outcome the teaser exists to produce, so it has
+    // served its purpose and should not return.
+    hideTeaser({ remember: true });
 
     if (bubble) {
       bubble.disabled = true;

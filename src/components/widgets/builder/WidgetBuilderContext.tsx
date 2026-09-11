@@ -55,6 +55,8 @@ export interface WidgetFormState {
   homeSubtitle: string;
   hostedEnabled: boolean;
   showBranding: boolean;
+  proactiveEnabled: boolean;
+  proactiveMessage: string;
   privacyPolicyUrl: string;
   allowedOrigins: string[];
   originInput: string;
@@ -224,6 +226,8 @@ function getInitialFormState(summary: WidgetDetailResponse): WidgetFormState {
     homeSubtitle: summary.widget.home_subtitle || '',
     hostedEnabled: summary.widget.hosted_enabled,
     showBranding: summary.widget.show_branding,
+    proactiveEnabled: summary.widget.proactive_enabled ?? false,
+    proactiveMessage: summary.widget.proactive_message ?? "",
     privacyPolicyUrl: summary.widget.privacy_policy_url ?? '',
     allowedOrigins: summary.widget.allowed_origins,
     originInput: '',
@@ -270,6 +274,8 @@ function buildDraftPreviewPayload(
       homeTitle: form.homeTitle,
       homeSubtitle: form.homeSubtitle,
       showBranding: form.showBranding,
+      proactiveEnabled: form.proactiveEnabled,
+      proactiveMessage: form.proactiveMessage || null,
       privacyPolicyUrl: form.privacyPolicyUrl,
       allowedOrigins: form.allowedOrigins,
     },
@@ -432,6 +438,8 @@ export function WidgetBuilderProvider({ children }: { children: ReactNode }) {
           homeSubtitle: form.homeSubtitle || null,
           hostedEnabled: form.hostedEnabled,
           showBranding: form.showBranding,
+          proactiveEnabled: form.proactiveEnabled,
+          proactiveMessage: form.proactiveMessage,
           privacyPolicyUrl: form.privacyPolicyUrl,
           allowedOrigins: form.allowedOrigins,
         }),

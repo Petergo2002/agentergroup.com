@@ -3,6 +3,7 @@ import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { getAppUrl } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { PROACTIVE_MESSAGE_MAX_LENGTH } from "@/lib/widgets";
 import type {
   AgentRecord,
   WidgetContactFormSettingsRecord,
@@ -93,6 +94,12 @@ function parseDraftPreviewInput(body: Record<string, unknown>) {
       homeTitle: typeof widget.homeTitle === "string" ? widget.homeTitle.trim() : null,
       homeSubtitle: typeof widget.homeSubtitle === "string" ? widget.homeSubtitle.trim() : null,
       showBranding: typeof widget.showBranding === "boolean" ? widget.showBranding : true,
+      proactiveEnabled:
+        typeof widget.proactiveEnabled === "boolean" ? widget.proactiveEnabled : false,
+      proactiveMessage:
+        typeof widget.proactiveMessage === "string"
+          ? widget.proactiveMessage.trim().slice(0, PROACTIVE_MESSAGE_MAX_LENGTH) || null
+          : null,
       privacyPolicyUrl:
         typeof widget.privacyPolicyUrl === "string"
           ? widget.privacyPolicyUrl.trim()
