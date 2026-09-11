@@ -26,6 +26,7 @@ import {
 } from "@/lib/rate-limit";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createClientSafeError } from "@/lib/server-errors";
+import { readAgentIdFromDraftPreviewWidgetAgentId } from "@/lib/widgets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
 import { buildWidgetGenerativeUi } from "@/lib/widgets/generative-ui";
@@ -310,12 +311,20 @@ function resolveSelectedWidgetAgent(args: {
   activeWidgetAgentId: string | null;
   activeAgentId: string | null;
   requestedWidgetAgentId: string | null;
+  /**
+   * The agent behind `requestedWidgetAgentId`, when the caller can resolve it.
+   * Preview drafts and live runtimes address the same agent with different
+   * widget-agent ids, and a draft expires while its preview token is still
+   * valid, so a browser can legitimately send an id from the other shape.
+   */
+  requestedAgentId?: string | null;
 }) {
   const {
     widgetAgents,
     activeWidgetAgentId,
     activeAgentId,
     requestedWidgetAgentId,
+    requestedAgentId = null,
   } = args;
 
   if (widgetAgents.length === 0) {
@@ -344,7 +353,10 @@ function resolveSelectedWidgetAgent(args: {
   }
 
   const selectedFromRequest = requestedWidgetAgentId
-    ? widgetAgents.find((item) => item.widgetAgentId === requestedWidgetAgentId) ?? null
+    ? widgetAgents.find((item) => item.widgetAgentId === requestedWidgetAgentId) ??
+      (requestedAgentId
+        ? widgetAgents.find((item) => item.agent.id === requestedAgentId) ?? null
+        : null)
     : null;
 
   if (requestedWidgetAgentId && !selectedFromRequest) {
@@ -560,11 +572,22 @@ export async function POST(
           preview.previewDraft.payload,
         )
       : buildStoredWidgetRuntimeAgents(loaded.widgetAgents);
+    // Resolve the requested id to its agent so a request still matches when the
+    // runtime has switched between the draft and stored shapes mid-conversation
+    // (draft ids carry the agent id; stored ids resolve through widget_agents).
+    const requestedAgentId = requestedWidgetAgentId
+      ? readAgentIdFromDraftPreviewWidgetAgentId(requestedWidgetAgentId) ??
+        loaded.widgetAgents.find(
+          (entry) => entry.widgetAgent.id === requestedWidgetAgentId,
+        )?.agent.id ??
+        null
+      : null;
     const selection = resolveSelectedWidgetAgent({
       widgetAgents: runtimeWidgetAgents,
       activeWidgetAgentId: existingSession?.active_widget_agent_id ?? null,
       activeAgentId: existingSession?.active_agent_id ?? null,
       requestedWidgetAgentId,
+      requestedAgentId,
     });
 
     if (!("selected" in selection)) {

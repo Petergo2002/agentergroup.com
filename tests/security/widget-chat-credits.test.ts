@@ -62,12 +62,16 @@ function createHarness(options: {
       buildConversationTitle: (value: string) => value,
       buildConversationPreview: (value: string) => value,
     },
+    "@/lib/widgets": {
+      readAgentIdFromDraftPreviewWidgetAgentId: () => null,
+    },
     "@/lib/widgets/server": {
       resolveWidgetRuntimeRequestOrigin: () => ({ ok: true }),
       buildWidgetRuntimeCorsHeaders: () => ({}),
       loadWidgetByPublicKey: async () => ({
         widget: { id: "widget", workspace_id: "workspace", status: "deployed" },
-        widgetAgents: [selection],
+        // Mirrors loadWidgetAgentsWithAgents' { widgetAgent, agent } shape.
+        widgetAgents: [{ widgetAgent: { id: "widget-agent" }, agent }],
       }),
       resolveWidgetPreviewContext: async () => ({ isPreview: source === "preview" }),
       resolveWidgetRuntimeAccess: async () => ({ ok: true, source }),

@@ -3,6 +3,7 @@ import { buildDisabledEndChatPolicy } from "@/lib/end-chat";
 import { buildDefaultGmailRecipientPolicy } from "@/lib/gmail";
 import { buildDefaultGoogleCalendarSelection } from "@/lib/google-calendar";
 import { buildDefaultCalSelection } from "@/lib/cal";
+import { buildDraftPreviewWidgetAgentId } from "./widgets/draft-agent-id";
 import {
   normalizeAllowedOrigin,
   normalizeAllowedOrigins,
@@ -54,9 +55,10 @@ export function getPlaceholderDefault(language: string) {
   return language === "sv" ? WIDGET_DEFAULT_PLACEHOLDER_SV : WIDGET_DEFAULT_PLACEHOLDER;
 }
 
-export function buildDraftPreviewWidgetAgentId(agentId: string, sortOrder: number) {
-  return `draft:${sortOrder}:${agentId}`;
-}
+export {
+  buildDraftPreviewWidgetAgentId,
+  readAgentIdFromDraftPreviewWidgetAgentId,
+} from "./widgets/draft-agent-id";
 
 export interface WidgetAgentWithAgent {
   widgetAgent: WidgetAgentRecord;
