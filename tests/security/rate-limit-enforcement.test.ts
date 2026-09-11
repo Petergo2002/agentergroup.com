@@ -80,15 +80,16 @@ test("widget chat consumes its scopes concurrently, not one round trip each", as
   assert.equal(rules.length, 3, "chat should carry three independent scopes");
 
   const stub = createRpcStub({}, 20);
-  const started = Date.now();
   const decision = await enforceRateLimits(stub.client, rules);
-  const elapsed = Date.now() - started;
 
   assert.equal(decision.allowed, true);
   assert.equal(stub.calls.length, 3);
+  // maxConcurrency is the actual proof of concurrency: it is 3 only if all
+  // three calls overlapped, and 1 under serial execution. A wall-clock bound
+  // used to be asserted alongside it, but it restated the same fact more
+  // weakly and failed whenever a loaded machine stretched three 20ms timers
+  // past the threshold.
   assert.equal(stub.maxConcurrency, 3, "all three rules should be in flight together");
-  // Serial execution would take at least 60ms for three 20ms calls.
-  assert.ok(elapsed < 55, `expected concurrent execution, took ${elapsed}ms`);
 });
 
 test("the denying rule and its payload match the sequential behaviour", async () => {

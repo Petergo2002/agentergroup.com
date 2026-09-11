@@ -26,10 +26,21 @@ test("legal consent tokens are signed, versioned, and time limited", () => {
     assert.equal(consent?.privacyVersion, LEGAL_DOCUMENT_VERSIONS.privacy);
     assert.equal(consent?.acceptedAt, acceptedAt.toISOString());
     assert.equal(consent?.method, "email_signup");
-    assert.equal(
-      verifyLegalConsentToken(`${token.slice(0, -1)}x`, acceptedAt),
-      null,
-    );
+    // Tamper with the first signature character, not the last. Verification
+    // compares the base64url-DECODED signature bytes, and the final character
+    // of a 32-byte HMAC only carries four meaningful bits — four different
+    // trailing characters decode to identical bytes. Editing the last
+    // character therefore left the signature unchanged often enough to make
+    // this assertion pass intermittently without tampering with anything. The
+    // first character contributes all six of its bits to the first byte, so
+    // changing it always changes what is verified.
+    const [encodedPayload, encodedSignature] = token.split(".");
+    const tamperedSignature = `${
+      encodedSignature.startsWith("A") ? "B" : "A"
+    }${encodedSignature.slice(1)}`;
+    const tamperedToken = `${encodedPayload}.${tamperedSignature}`;
+    assert.notEqual(tamperedToken, token);
+    assert.equal(verifyLegalConsentToken(tamperedToken, acceptedAt), null);
     assert.equal(
       verifyLegalConsentToken(token, new Date("2026-08-10T10:00:01.000Z")),
       null,
