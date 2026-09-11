@@ -6,6 +6,8 @@ import {
   Loader2,
   MessageSquare,
   Phone,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import {
@@ -37,6 +39,12 @@ import { createJsonError, hasErrorCode, getRetryAfterSeconds, buildRequestContex
 import { buildChatRateLimitMessage } from "./lib/localization";
 import { normalizeWidgetConfig, resolveWidgetLanguage, resolveSelectedAgent } from "./lib/config";
 import { widgetDebug } from "./lib/debug";
+import {
+  isNotificationSoundMuted,
+  playNotificationSound,
+  primeNotificationSound,
+  setNotificationSoundMuted,
+} from "./lib/notification-sound";
 import { buildLocalizedPrivacyPolicyUrl } from "./lib/localization";
 import {
   PREVIEW_REQUEST_MESSAGE_TYPE,
@@ -123,6 +131,9 @@ export default function Widget({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"home" | "messages" | "contact">("home");
   const [hasUnread, setHasUnread] = useState(false);
+  const [isSoundMuted, setIsSoundMuted] = useState(() =>
+    isNotificationSoundMuted(widgetPublicKey),
+  );
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isConversationCompleted, setIsConversationCompleted] = useState(false);
   const [conversationEndReason, setConversationEndReason] =
@@ -154,6 +165,11 @@ export default function Widget({
   const bootstrapRefreshPromiseRef = useRef<Promise<WidgetBootstrapResponse> | null>(null);
   const activeStreamAbortControllerRef = useRef<AbortController | null>(null);
   const hasRestoredConversationRef = useRef(false);
+  // Whether the visitor can already see the reply land. Held in a ref because
+  // the check happens inside the async stream handler, where captured state
+  // would be stale by the time the reply completes.
+  const isWatchingConversationRef = useRef(false);
+  const isSoundMutedRef = useRef(isSoundMuted);
   // Rendered rows are the source of truth for whether a refresh is a first load
   // or a silent revalidation, read from a ref so refreshes stay callback-stable.
   const conversationsRef = useRef<WidgetConversationSummary[]>([]);
@@ -181,6 +197,26 @@ export default function Widget({
   useEffect(() => {
     configRef.current = config;
   }, [config]);
+
+  useEffect(() => {
+    isSoundMutedRef.current = isSoundMuted;
+  }, [isSoundMuted]);
+
+  useEffect(() => {
+    const syncWatchingState = () => {
+      isWatchingConversationRef.current =
+        isWidgetOpen &&
+        activeTab === "messages" &&
+        !showConversationList &&
+        (typeof document === "undefined" ||
+          document.visibilityState === "visible");
+    };
+
+    syncWatchingState();
+    document.addEventListener("visibilitychange", syncWatchingState);
+    return () =>
+      document.removeEventListener("visibilitychange", syncWatchingState);
+  }, [activeTab, isWidgetOpen, showConversationList]);
 
   useEffect(() => {
     setPreviewTokenKey(previewToken);
@@ -1117,6 +1153,10 @@ export default function Widget({
       return;
     }
 
+    // Sending is a real user gesture, which is what lets the browser unsuspend
+    // the audio context before the reply arrives.
+    primeNotificationSound();
+
     if (
       (isConversationCompleted && !options?.allowCompletedConversation) ||
       isLoading ||
@@ -1323,6 +1363,12 @@ export default function Widget({
       updateAssistantMessage(fullText, false);
       setIsStreaming(false);
 
+      // Only chime when the reply arrives somewhere the visitor is not looking:
+      // widget closed, another browser tab, or a different tab within the widget.
+      if (!isSoundMutedRef.current && !isWatchingConversationRef.current) {
+        playNotificationSound();
+      }
+
       if (
         !streamCompleted &&
         activeEndChatPolicy?.enabled &&
@@ -1400,6 +1446,7 @@ export default function Widget({
 
     const nextSessionId = resetConversation();
     setSelectedWidgetAgentId(activeAgent.widgetAgentId);
+    primeNotificationSound();
     await sendMessage(trimmedMessage, {
       sessionId: nextSessionId,
       widgetAgentId: activeAgent.widgetAgentId,
@@ -1414,6 +1461,13 @@ export default function Widget({
   const navLabelMessages = widgetLanguage === "sv" ? "Meddelanden" : "Messages";
   const navLabelContact = widgetLanguage === "sv" ? "Kontakt" : "Contact";
   const historyLabel = widgetLanguage === "sv" ? "Tidigare chattar" : "Previous chats";
+  const soundLabel = isSoundMuted
+    ? widgetLanguage === "sv"
+      ? "Slå på notisljud"
+      : "Turn notification sound on"
+    : widgetLanguage === "sv"
+      ? "Stäng av notisljud"
+      : "Turn notification sound off";
   const showStandaloneDesktopShell = !isEmbedded;
   const showSurfaceNav =
     Boolean(selectedAgent) &&
@@ -1640,6 +1694,29 @@ export default function Widget({
                 <History className="h-5 w-5" />
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                const nextMuted = !isSoundMuted;
+                setIsSoundMuted(nextMuted);
+                setNotificationSoundMuted(widgetPublicKey, nextMuted);
+                if (!nextMuted) {
+                  // Confirm the choice audibly, and unsuspend on this gesture.
+                  primeNotificationSound();
+                  playNotificationSound();
+                }
+              }}
+              className="widget-icon-button p-2"
+              aria-label={soundLabel}
+              aria-pressed={!isSoundMuted}
+              title={soundLabel}
+            >
+              {isSoundMuted ? (
+                <VolumeX className="h-5 w-5" />
+              ) : (
+                <Volume2 className="h-5 w-5" />
+              )}
+            </button>
             {isEmbedded ? (
               <button
                 onClick={handleClose}

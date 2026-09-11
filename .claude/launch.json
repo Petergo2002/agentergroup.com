@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "widget-v2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "apps/widget-v2", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}
