@@ -26,6 +26,7 @@ import {
 import {
   buildMeetingDurationArguments,
   extractGoogleCalendarListItems,
+  isSupportedTimeZone,
 } from "@/lib/google-calendar";
 import type {
   CalSelection,
@@ -1416,13 +1417,24 @@ function applyGoogleCalendarSelectionToCompletion(
 
     const nextArguments = { ...arguments_ };
 
+    // The model states which zone its naive datetime is in, and it does not
+    // always pick the calendar's zone — it frequently sends an already
+    // UTC-converted time with timezone:"UTC". Anchoring every naive value to
+    // the calendar zone silently shifted those bookings by the UTC offset,
+    // which is why a meeting agreed as 15:00 could land at 13:00. Convert from
+    // the zone the model actually meant, then let the calendar zone below
+    // govern how Google presents it.
+    const declaredTimezone = isSupportedTimeZone(nextArguments.timezone)
+      ? (nextArguments.timezone as string)
+      : selectedCalendarTimezone;
+
     if (
       typeof nextArguments.start_datetime === "string" &&
       !hasExplicitOffset(nextArguments.start_datetime)
     ) {
       nextArguments.start_datetime = localDateTimeToOffsetIso(
         nextArguments.start_datetime,
-        selectedCalendarTimezone,
+        declaredTimezone,
       );
     }
 
@@ -1432,7 +1444,7 @@ function applyGoogleCalendarSelectionToCompletion(
     ) {
       nextArguments.end_datetime = localDateTimeToOffsetIso(
         nextArguments.end_datetime,
-        selectedCalendarTimezone,
+        declaredTimezone,
       );
     }
 
@@ -1442,7 +1454,7 @@ function applyGoogleCalendarSelectionToCompletion(
     ) {
       nextArguments.time_min = localDateTimeToOffsetIso(
         nextArguments.time_min,
-        selectedCalendarTimezone,
+        declaredTimezone,
       );
     }
 
@@ -1452,7 +1464,7 @@ function applyGoogleCalendarSelectionToCompletion(
     ) {
       nextArguments.time_max = localDateTimeToOffsetIso(
         nextArguments.time_max,
-        selectedCalendarTimezone,
+        declaredTimezone,
       );
     }
 

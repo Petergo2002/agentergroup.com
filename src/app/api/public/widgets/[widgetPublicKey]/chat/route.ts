@@ -30,6 +30,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
 import { buildWidgetGenerativeUi } from "@/lib/widgets/generative-ui";
 import {
+  buildConversationPreview,
+  buildConversationTitle,
+  hashWidgetVisitorToken,
+  readWidgetVisitorToken,
+} from "@/lib/widgets/visitor";
+import {
   validateBody,
   validateWidgetChatBody,
 } from "@/lib/validation/widget-schemas";
@@ -519,6 +525,24 @@ export async function POST(
       loaded.widget.id,
       sessionId,
     );
+    // Builder previews are bound to the visitor capability too, so the preview
+    // surface gets the same real conversation history as a live visitor.
+    const visitorToken = readWidgetVisitorToken(request);
+    const visitorTokenHash = visitorToken
+      ? hashWidgetVisitorToken(loaded.widget.id, visitorToken)
+      : null;
+
+    if (
+      existingSession?.visitor_token_hash &&
+      existingSession.visitor_token_hash !== visitorTokenHash
+    ) {
+      return buildErrorResponse(
+        request,
+        403,
+        "This chat belongs to a different browser session.",
+        "CONVERSATION_ACCESS_DENIED",
+      );
+    }
 
     if (existingSession?.status === "completed") {
       return buildErrorResponse(
@@ -575,6 +599,8 @@ export async function POST(
       origin: access.origin,
       activeWidgetAgentId: selected!.persistedWidgetAgentId,
       activeAgentId: selected!.agent.id,
+      visitorTokenHash:
+        existingSession?.visitor_token_hash ?? visitorTokenHash,
     });
     let attachments: Awaited<ReturnType<typeof resolveWidgetAttachments>>;
 
@@ -657,6 +683,10 @@ export async function POST(
         activeWidgetAgentId: widgetSession.active_widget_agent_id,
         activeAgentId: widgetSession.active_agent_id,
         lastUserMessageAt: userMessageTimestamp,
+        visitorTokenHash: widgetSession.visitor_token_hash,
+        conversationTitle:
+          widgetSession.conversation_title ?? buildConversationTitle(message),
+        lastMessagePreview: buildConversationPreview(message),
       }),
       insertWidgetMessages(supabase, {
         widgetSessionId: widgetSession.id,
@@ -892,6 +922,12 @@ export async function POST(
             activeWidgetAgentId: widgetSession.active_widget_agent_id,
             activeAgentId: widgetSession.active_agent_id,
             lastAssistantMessageAt: assistantMessageTimestamp,
+            visitorTokenHash: widgetSession.visitor_token_hash,
+            conversationTitle:
+              widgetSession.conversation_title ?? buildConversationTitle(message),
+            lastMessagePreview: buildConversationPreview(
+              result.assistantContent,
+            ),
           });
 
           if (result.endChat?.sessionCompleted) {

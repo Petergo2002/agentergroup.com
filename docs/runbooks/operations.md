@@ -66,6 +66,8 @@ After deploying the dashboard app:
 10. Confirm Leads, Analytics, and Improve Milo still resolve records from the active workspace only.
 11. In Website Chat preview, change the theme/colors after opening a conversation and confirm the live preview updates without resetting chat; then save again after token rotation and confirm preview chat still succeeds.
 12. Confirm canonical domain routing: `https://avenro.se` serves the Next.js app, `https://www.avenro.se` redirects to `https://avenro.se`, and `https://widget.avenro.se` serves Widget V2.
+13. Confirm functions still execute in the database region. `curl -s -D - -o /dev/null https://avenro.se/login | grep -i x-vercel-id` must report `arn1::arn1`; the second code is the execution region. A value other than `arn1` means functions drifted away from the `eu-west-1` Supabase project and every query became a transatlantic round trip — see [Performance Audit 2026-09-11](../PERFORMANCE_AUDIT_2026-09-11.md).
+14. For returning-visitor chat history, confirm a conversation started in one browser is not listed in another, and that the builder preview lists only preview conversations.
 
 ## Widget Runtime Deployment
 

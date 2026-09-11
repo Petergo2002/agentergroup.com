@@ -41,10 +41,15 @@ Practical instructions for common tasks:
 - **[Manual Plan Activation](./guides/manual-plan-activation.md)** - Managed pilot onboarding, Admin plan approval, hidden self-serve billing, and future reactivation steps.
 - **[Widget Realtime Voice](./guides/widget-realtime-voice.md)** - Product decision and future implementation direction for Gemini Live voice mode in the public widget.
 - **[Widget Security](./guides/widget-embed-security.md)** - Security protocols for public embeds.
+- **[Widget Conversation History](./guides/widget-conversation-history.md)** - Anonymous visitor capability tokens, preview/live source scoping, and returning-visitor chat history.
 - **[Privacy Operations](./guides/privacy-operations.md)** - GDPR and data processing details.
 - **[Operations Runbook](./runbooks/operations.md)** - Release verification, health checks, backup/restore, and widget-runtime deploy notes.
 - **[avenro.se: Vercel och one.com](./runbooks/avenro-domain-setup.md)** - Domäner, DNS, Widget V2, inloggning och e-post vid domänbytet.
 - **[Production Readiness](./runbooks/production-readiness.md)** - Hardening migration order, RLS verification, billing/upload rollout, and known manual steps.
+
+## 📈 Performance
+- **[Performance Audit 2026-09-11](./PERFORMANCE_AUDIT_2026-09-11.md)** - Function/database region mismatch, the per-navigation waterfall, and the remaining prioritized findings.
+- **[Performance Audit Report (2026-08-05)](./PERFORMANCE_AUDIT_REPORT.md)** - Earlier point-in-time implementation report.
 
 ## 🔑 Key Pages
 Public-facing legal and auth pages:
@@ -54,4 +59,4 @@ Public-facing legal and auth pages:
 - `/invite/accept` — Public workspace invite acceptance page (unauthenticated-friendly; moved from the `(app)` route group)
 
 ---
-*Last updated: September 7, 2026.*
+*Last updated: September 11, 2026.*

@@ -33,6 +33,20 @@ Signed widget-builder preview traffic is different from customer-facing hosted/e
 - preview-token chat still calls the same OpenRouter-backed runtime path and must consume workspace message credits before model execution
 - exhausted workspaces receive the same `402 MESSAGE_LIMIT_REACHED` semantics as live widget chat
 
+## Visitor conversation ownership
+
+Returning-visitor chat history is gated by an anonymous capability token, not a login:
+
+- the browser sends `x-ag-widget-visitor-token`; the server stores only `sha256("widget-visitor-v1:<widgetId>:<token>")` and never the raw token
+- the hash is salted with the widget id, so one browser's history cannot be correlated across widgets
+- `chat`, `complete`, `leads`, and `upload` reject a session whose stored hash does not match with `403 CONVERSATION_ACCESS_DENIED`
+- the history route requires a token outright (`401 VISITOR_TOKEN_REQUIRED`) and filters every query by the hash
+- sessions predating the feature have a null hash and stay reachable; once a hash is set, only that browser can continue the session
+- history reads are pinned to one `source`: preview tokens see only `source = 'preview'`, live runtimes see only non-preview, so operator testing and customer conversations can never mix
+- restored attachments are re-signed per read (1h TTL) instead of persisting URLs
+
+This is additive to origin and access-token checks — a visitor token on its own grants nothing. See [Widget Conversation History](./widget-conversation-history.md).
+
 ## Browser and API protections
 
 - the dashboard app sends baseline browser protections through CSP, HSTS, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`

@@ -97,6 +97,9 @@ export interface WidgetSessionRecord {
   end_reason: ConversationEndReason | null;
   last_user_message_at: string | null;
   last_assistant_message_at: string | null;
+  visitor_token_hash: string | null;
+  conversation_title: string | null;
+  last_message_preview: string | null;
   first_seen_at: string;
   last_seen_at: string;
 }

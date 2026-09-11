@@ -795,7 +795,7 @@ export function ChatView({
               ))}
             </div>
           )}
-          {isConversationCompleted && (
+          {isConversationCompleted ? (
             <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-widget-border bg-widget-card px-4 py-3 text-sm text-widget-fg">
               <div>
                 <p className="font-medium">
@@ -811,83 +811,83 @@ export function ChatView({
                 {t.completedButton}
               </button>
             </div>
-          )}
-          <form
-            onSubmit={handleSubmit}
-            className="widget-input-shell relative flex items-center rounded-2xl px-1.5 shadow-lg"
-          >
-            {onAttachFile && (
-              <label
-                className={`p-2.5 rounded-xl bg-transparent text-widget-muted hover:text-[var(--widget-secondary)] transition-colors shrink-0 ml-1 ${
-                  isConversationCompleted || isLoading || isStreaming || isUploadingAttachment
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer"
-                }`}
-                aria-label={t.attachFile}
-                title={t.attachFile}
-              >
-                <input
-                  type="file"
-                  className="hidden"
-                  disabled={isConversationCompleted || isLoading || isStreaming || isUploadingAttachment}
-                  onChange={onAttachFile}
-                  accept="image/*,application/pdf,text/plain"
-                />
-                <Paperclip className={`w-5 h-5 ${isUploadingAttachment ? "animate-pulse" : ""}`} />
-              </label>
-            )}
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onFocus={handleInputFocus}
-              placeholder={
-                isConversationCompleted
-                  ? t.completedPlaceholder
-                  : selectedAgent.placeholder || "Enter your message..."
-              }
-              disabled={isConversationCompleted}
-              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-widget-fg placeholder:text-widget-muted py-3 min-h-12 text-[15px] px-4 widget-chat-input"
-              inputMode="text"
-              enterKeyHint="send"
-              autoComplete="off"
-            />
-            <button
-              type="submit"
-              disabled={
-                isConversationCompleted ||
-                (!input.trim() && (!pendingAttachments || pendingAttachments.length === 0)) ||
-                isLoading ||
-                isStreaming
-              }
-              className="p-2.5 rounded-xl bg-transparent text-widget-muted hover:text-[var(--widget-secondary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 mr-1"
-              aria-label={t.sendMessage}
-              title={t.sendMessage}
+          ) : null}
+            <form
+              onSubmit={handleSubmit}
+              className="widget-input-shell relative flex items-center rounded-2xl px-1.5 shadow-lg"
             >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
+          {onAttachFile && (
+            <label
+              className={`p-2.5 rounded-xl bg-transparent text-widget-muted hover:text-[var(--widget-secondary)] transition-colors shrink-0 ml-1 ${
+                isConversationCompleted || isLoading || isStreaming || isUploadingAttachment
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer"
+              }`}
+              aria-label={t.attachFile}
+              title={t.attachFile}
+            >
+              <input
+                type="file"
+                className="hidden"
+                disabled={isConversationCompleted || isLoading || isStreaming || isUploadingAttachment}
+                onChange={onAttachFile}
+                accept="image/*,application/pdf,text/plain"
+              />
+              <Paperclip className={`w-5 h-5 ${isUploadingAttachment ? "animate-pulse" : ""}`} />
+            </label>
+          )}
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onFocus={handleInputFocus}
+            placeholder={
+              isConversationCompleted
+                ? t.completedPlaceholder
+                : selectedAgent.placeholder || "Enter your message..."
+            }
+            disabled={isConversationCompleted}
+            className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-widget-fg placeholder:text-widget-muted py-3 min-h-12 text-[15px] px-4 widget-chat-input"
+            inputMode="text"
+            enterKeyHint="send"
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            disabled={
+              isConversationCompleted ||
+              (!input.trim() && (!pendingAttachments || pendingAttachments.length === 0)) ||
+              isLoading ||
+              isStreaming
+            }
+            className="p-2.5 rounded-xl bg-transparent text-widget-muted hover:text-[var(--widget-secondary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 mr-1"
+            aria-label={t.sendMessage}
+            title={t.sendMessage}
+          >
+            <Send className="w-5 h-5" />
+          </button>
+            </form>
 
-          <div className="mt-3 text-center">
-            <p className="mx-auto max-w-2xl text-xs leading-5 text-widget-muted">
-              {privacyPolicyUrl ? (
-                <>
-                  {t.privacyText}
-                  <a
-                    href={privacyPolicyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-widget-fg transition-colors"
-                  >
-                    {t.privacyLink}
-                  </a>
-                </>
-              ) : (
-                <>{t.automatedWarning}</>
-              )}
-            </p>
-          </div>
+            <div className="mt-3 text-center">
+              <p className="mx-auto max-w-2xl text-xs leading-5 text-widget-muted">
+                {privacyPolicyUrl ? (
+                  <>
+                    {t.privacyText}
+                    <a
+                      href={privacyPolicyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-widget-fg transition-colors"
+                    >
+                      {t.privacyLink}
+                    </a>
+                  </>
+                ) : (
+                  <>{t.automatedWarning}</>
+                )}
+              </p>
+            </div>
         </div>
       </div>
     </div>

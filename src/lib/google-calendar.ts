@@ -51,6 +51,24 @@ export function buildMeetingDurationArguments(
   };
 }
 
+/**
+ * True when the value is a timezone the Intl engine can actually resolve.
+ * Used to decide whether a model-supplied `timezone` argument can be trusted
+ * as the zone its naive datetime was written in.
+ */
+export function isSupportedTimeZone(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim()) {
+    return false;
+  }
+
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: value.trim() });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function pickString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }

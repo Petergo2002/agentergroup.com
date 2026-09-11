@@ -169,9 +169,64 @@ function collectAvailabilityCandidates(
   return candidates;
 }
 
+/**
+ * Google's freeBusy reports every minute nobody has a meeting, so a normal
+ * calendar is "free" all night. Offering a visitor 03:00 is never right, and
+ * because the first free window of the day starts at local midnight it used to
+ * consume the whole slot budget before reaching working hours.
+ */
+const DEFAULT_BOOKING_HOUR_START = 8;
+const DEFAULT_BOOKING_HOUR_END = 18;
+const MAX_SLOTS = 8;
+
+/** Hour-of-day (0-23) and minutes for an instant, in the given IANA timezone. */
+function getLocalTimeParts(date: Date, timeZone: string) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(date);
+    const lookup = Object.fromEntries(
+      parts.filter((part) => part.type !== "literal").map((p) => [p.type, p.value]),
+    ) as Record<string, string>;
+    return { hour: Number(lookup.hour), minute: Number(lookup.minute) };
+  } catch {
+    return { hour: date.getUTCHours(), minute: date.getUTCMinutes() };
+  }
+}
+
+function isWithinBookingHours(
+  slotStart: Date,
+  slotEnd: Date,
+  timezone: string,
+  hourStart: number,
+  hourEnd: number,
+) {
+  const start = getLocalTimeParts(slotStart, timezone);
+  const end = getLocalTimeParts(slotEnd, timezone);
+  const startMinutes = start.hour * 60 + start.minute;
+  const endMinutes = end.hour * 60 + end.minute;
+
+  // A slot ending exactly at midnight reports 00:00, which would otherwise look
+  // like it falls before the window rather than closing the day.
+  const normalizedEnd = endMinutes === 0 ? 24 * 60 : endMinutes;
+
+  return (
+    startMinutes >= hourStart * 60 &&
+    normalizedEnd <= hourEnd * 60 &&
+    normalizedEnd > startMinutes
+  );
+}
+
 function findSlots(
   messages: ToolMessageLike[],
   durationMinutes: number,
+  timezone: string,
+  nowMs: number,
+  hourStart: number,
+  hourEnd: number,
 ): WidgetCalendarSlot[] {
   const slots = new Map<string, WidgetCalendarSlot>();
 
@@ -202,16 +257,53 @@ function findSlots(
         slotStartMs + durationMs <= new Date(end).getTime();
         slotStartMs += durationMs
       ) {
-        const slotStart = new Date(slotStartMs).toISOString();
-        const slotEnd = new Date(slotStartMs + durationMs).toISOString();
+        // Never offer a time that has already passed.
+        if (slotStartMs <= nowMs) continue;
+
+        const slotStartDate = new Date(slotStartMs);
+        const slotEndDate = new Date(slotStartMs + durationMs);
+
+        if (
+          !isWithinBookingHours(
+            slotStartDate,
+            slotEndDate,
+            timezone,
+            hourStart,
+            hourEnd,
+          )
+        ) {
+          continue;
+        }
+
+        const slotStart = slotStartDate.toISOString();
+        const slotEnd = slotEndDate.toISOString();
         slots.set(`${slotStart}:${slotEnd}`, { start: slotStart, end: slotEnd });
       }
     }
   }
 
-  return Array.from(slots.values())
-    .sort((left, right) => left.start.localeCompare(right.start))
-    .slice(0, 8);
+  const eligible = Array.from(slots.values()).sort((left, right) =>
+    left.start.localeCompare(right.start),
+  );
+
+  if (eligible.length <= MAX_SLOTS) {
+    return eligible;
+  }
+
+  // Taking the first N consecutive slots buries the whole day under one hour of
+  // the morning, so an afternoon request sees nothing it asked for. Sample
+  // evenly across the day instead, always keeping the earliest option.
+  const spread: WidgetCalendarSlot[] = [];
+  const step = (eligible.length - 1) / (MAX_SLOTS - 1);
+
+  for (let index = 0; index < MAX_SLOTS; index += 1) {
+    const slot = eligible[Math.round(index * step)];
+    if (slot && !spread.some((existing) => existing.start === slot.start)) {
+      spread.push(slot);
+    }
+  }
+
+  return spread;
 }
 
 function findBookingConfirmation(
@@ -255,6 +347,10 @@ export function buildWidgetGenerativeUi(input: {
   toolMessages: ToolMessageLike[];
   timezone?: string | null;
   durationMinutes?: number | null;
+  /** Overridable so tests are deterministic and hours can become configurable. */
+  nowMs?: number;
+  bookingHourStart?: number;
+  bookingHourEnd?: number;
 }): WidgetGenerativeUi | null {
   const timezone = input.timezone?.trim() || "UTC";
   const durationMinutes =
@@ -263,11 +359,27 @@ export function buildWidgetGenerativeUi(input: {
     input.durationMinutes > 0
       ? Math.round(input.durationMinutes)
       : 30;
+  const nowMs = typeof input.nowMs === "number" ? input.nowMs : Date.now();
+  const hourStart =
+    typeof input.bookingHourStart === "number"
+      ? input.bookingHourStart
+      : DEFAULT_BOOKING_HOUR_START;
+  const hourEnd =
+    typeof input.bookingHourEnd === "number"
+      ? input.bookingHourEnd
+      : DEFAULT_BOOKING_HOUR_END;
 
   const confirmation = findBookingConfirmation(input.toolMessages, timezone);
   if (confirmation) return confirmation;
 
-  const slots = findSlots(input.toolMessages, durationMinutes);
+  const slots = findSlots(
+    input.toolMessages,
+    durationMinutes,
+    timezone,
+    nowMs,
+    hourStart,
+    hourEnd,
+  );
   return slots.length > 0
     ? {
         type: "calendar_availability",

@@ -41,7 +41,13 @@ export interface WidgetInSelectBuilder<TData> {
 
 export interface WidgetOrderedInSelectBuilder<TData> extends WidgetOrderedSelectBuilder<TData> {
   eq: (column: string, value: string) => WidgetOrderedInSelectBuilder<TData>;
-  in: (column: string, values: string[]) => Promise<WidgetQueryResult<TData[]>>;
+  in: (column: string, values: string[]) => WidgetOrderedInSelectBuilder<TData>;
+  neq: (column: string, value: string) => WidgetOrderedInSelectBuilder<TData>;
+  not: (
+    column: string,
+    operator: string,
+    value: unknown,
+  ) => WidgetOrderedInSelectBuilder<TData>;
 }
 
 export interface WidgetMutationBuilder<TData> extends PromiseLike<WidgetQueryResult<TData>> {

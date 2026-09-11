@@ -102,7 +102,23 @@ export type WidgetGenerativeUi =
 export interface Message {
   role: "user" | "agent";
   content: string;
+  createdAt?: string;
   isStreaming?: boolean;
   attachments?: WidgetAttachment[];
   ui?: WidgetGenerativeUi;
+}
+
+export interface WidgetConversationSummary {
+  sessionId: string;
+  widgetAgentId: string | null;
+  status: "active" | "completed";
+  title: string;
+  preview: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WidgetConversationDetail extends WidgetConversationSummary {
+  endReason: WidgetEndChatReason | null;
+  messages: Message[];
 }

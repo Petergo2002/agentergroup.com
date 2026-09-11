@@ -1,4 +1,9 @@
-import type { WidgetBootstrapResponse, WidgetConfig } from "../types";
+import type {
+  WidgetBootstrapResponse,
+  WidgetConfig,
+  WidgetConversationDetail,
+  WidgetConversationSummary,
+} from "../types";
 
 /** Public API helpers used by the standalone widget runtime. */
 
@@ -7,6 +12,7 @@ export interface WidgetRequestContext {
   previewToken?: string;
   previewSource?: string;
   previewRevision?: string;
+  visitorToken?: string | null;
 }
 
 /**
@@ -64,6 +70,10 @@ function buildWidgetHeaders(
 
   if (context.previewRevision) {
     headers["x-ag-preview-revision"] = context.previewRevision;
+  }
+
+  if (context.visitorToken) {
+    headers["x-ag-widget-visitor-token"] = context.visitorToken;
   }
 
   return headers;
@@ -131,6 +141,46 @@ export async function getWidgetConfig(
   }
 
   return (await response.json()) as WidgetConfig;
+}
+
+export async function getWidgetConversations(
+  widgetPublicKey: string,
+  context: WidgetRequestContext,
+): Promise<WidgetConversationSummary[]> {
+  const response = await fetch(buildWidgetUrl(widgetPublicKey, "/conversations"), {
+    headers: buildWidgetHeaders(context, { includeContentType: false }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    await parseError(response);
+  }
+
+  const payload = (await response.json()) as {
+    conversations?: WidgetConversationSummary[];
+  };
+  return Array.isArray(payload.conversations) ? payload.conversations : [];
+}
+
+export async function getWidgetConversation(
+  widgetPublicKey: string,
+  sessionId: string,
+  context: WidgetRequestContext,
+): Promise<WidgetConversationDetail> {
+  const path = `/conversations?sessionId=${encodeURIComponent(sessionId)}`;
+  const response = await fetch(buildWidgetUrl(widgetPublicKey, path), {
+    headers: buildWidgetHeaders(context, { includeContentType: false }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    await parseError(response);
+  }
+
+  const payload = (await response.json()) as {
+    conversation: WidgetConversationDetail;
+  };
+  return payload.conversation;
 }
 
 export async function sendWidgetMessage(

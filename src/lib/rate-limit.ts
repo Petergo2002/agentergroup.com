@@ -22,6 +22,7 @@ interface RateLimitRpcClient {
 
 export type PublicWidgetRateLimitEndpoint =
   | "chat"
+  | "history"
   | "events"
   | "complete"
   | "leads"
@@ -100,6 +101,28 @@ const PUBLIC_WIDGET_RATE_LIMITS: Record<
           } satisfies RateLimitRule,
         ]
       : []),
+  ],
+  history: (context) => [
+    {
+      endpoint: "public_widget_history",
+      scopeKind: "ip_global",
+      scopeKey: context.ipHash,
+      windowSeconds: 60,
+      limit: 120,
+      code: "RATE_LIMITED_HISTORY",
+      message:
+        "Too many conversations are being loaded right now. Please wait a moment and try again.",
+    },
+    {
+      endpoint: "public_widget_history",
+      scopeKind: "widget_ip",
+      scopeKey: context.widgetIpHash,
+      windowSeconds: 60,
+      limit: 60,
+      code: "RATE_LIMITED_HISTORY",
+      message:
+        "Conversation history is being refreshed too quickly. Please wait a moment and try again.",
+    },
   ],
   events: (context) => [
     {

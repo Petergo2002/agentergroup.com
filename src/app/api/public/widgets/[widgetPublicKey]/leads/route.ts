@@ -27,6 +27,11 @@ import {
   type WidgetAdminSupabase,
   upsertWidgetSession,
 } from "@/lib/widgets/server";
+import {
+  canAccessWidgetSession,
+  hashWidgetVisitorToken,
+  readWidgetVisitorToken,
+} from "@/lib/widgets/visitor";
 
 function buildErrorResponse(
   request: NextRequest,
@@ -257,6 +262,24 @@ export async function POST(
       loaded.widget.id,
       sessionId,
     );
+    // Builder previews are bound to the visitor capability too, so the preview
+    // surface gets the same real conversation history as a live visitor.
+    const visitorToken = readWidgetVisitorToken(request);
+    const visitorTokenHash = visitorToken
+      ? hashWidgetVisitorToken(loaded.widget.id, visitorToken)
+      : null;
+
+    if (
+      existingSession &&
+      !canAccessWidgetSession(existingSession.visitor_token_hash, visitorTokenHash)
+    ) {
+      return buildErrorResponse(
+        request,
+        403,
+        "This chat belongs to a different browser session.",
+        "CONVERSATION_ACCESS_DENIED",
+      );
+    }
     const runtimeWidgetAgents = preview.previewDraft
       ? await buildDraftWidgetRuntimeAgents(
           supabase,
@@ -290,6 +313,8 @@ export async function POST(
       origin: access.origin,
       activeWidgetAgentId: selected!.persistedWidgetAgentId,
       activeAgentId: selected!.agent.id,
+      visitorTokenHash:
+        existingSession?.visitor_token_hash ?? visitorTokenHash,
     });
 
     const leadMessage = message?.trim()

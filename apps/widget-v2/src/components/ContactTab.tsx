@@ -165,7 +165,7 @@ export function ContactTab({
       key="contact-tab"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
+      exit={{ opacity: 0, y: -12, transition: { duration: 0.12 } }}
       transition={{ duration: 0.22 }}
       className="absolute inset-0 flex flex-col overflow-y-auto widget-scroll px-5 py-3"
     >

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { type EmailOtpType } from "@supabase/supabase-js";
+import { resolveAuthConfirmationDestination } from "@/lib/auth-confirmation";
 import { sanitizePostAuthRedirectTo } from "@/lib/auth-redirect";
 import { recordLegalAcceptance } from "@/lib/legal-consent";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -19,16 +20,11 @@ export async function GET(request: NextRequest) {
   const token_hash = searchParams.get("token_hash");
   const code = searchParams.get("code");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = sanitizePostAuthRedirectTo(searchParams.get("next"));
-
-  // Remove the short-lived signed consent token before the browser reaches the page.
-  const nextUrl = new URL(next, request.nextUrl.origin);
-  const legalConsent = nextUrl.searchParams.get("legalConsent");
-  nextUrl.searchParams.delete("legalConsent");
-  const redirectTo = new URL(
-    `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
-    request.nextUrl.origin,
-  );
+  const { redirectTo, legalConsent, isEmailSignupConfirmation } =
+    resolveAuthConfirmationDestination(
+      sanitizePostAuthRedirectTo(searchParams.get("next")),
+      request.nextUrl.origin,
+    );
 
   const supabase = await createClient();
 
@@ -63,7 +59,7 @@ export async function GET(request: NextRequest) {
   );
 
   async function recordSignupConsent() {
-    if (!legalConsent || nextUrl.pathname !== "/complete-signup") {
+    if (!legalConsent || !isEmailSignupConfirmation) {
       await supabase.auth.signOut();
       return false;
     }

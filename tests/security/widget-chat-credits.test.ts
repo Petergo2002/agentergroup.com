@@ -56,6 +56,12 @@ function createHarness(options: {
       getPublicWidgetRateLimitRules: () => [],
       enforceRateLimits: async () => ({ allowed: true }),
     },
+    "@/lib/widgets/visitor": {
+      readWidgetVisitorToken: () => null,
+      hashWidgetVisitorToken: () => null,
+      buildConversationTitle: (value: string) => value,
+      buildConversationPreview: (value: string) => value,
+    },
     "@/lib/widgets/server": {
       resolveWidgetRuntimeRequestOrigin: () => ({ ok: true }),
       buildWidgetRuntimeCorsHeaders: () => ({}),

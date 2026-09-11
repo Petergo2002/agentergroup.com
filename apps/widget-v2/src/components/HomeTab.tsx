@@ -7,8 +7,7 @@ interface HomeTabProps {
   selectedAgent: WidgetAgentConfig | null;
   isChooserMode: boolean;
   onSelectAgent: (widgetAgentId: string) => void;
-  onSendMessage: (text?: string) => void;
-  onSwitchToMessages: () => void;
+  onStartConversation: (text: string) => void;
   onSwitchToContact?: () => void;
 }
 
@@ -56,15 +55,15 @@ export function HomeTab({
   selectedAgent,
   isChooserMode,
   onSelectAgent,
-  onSendMessage,
-  onSwitchToMessages,
+  onStartConversation,
   onSwitchToContact,
 }: HomeTabProps) {
   const t = TRANSLATIONS[config.widget.language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
 
   const handleQuickAction = (prompt: string) => {
-    onSendMessage(prompt);
-    onSwitchToMessages();
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt) return;
+    onStartConversation(trimmedPrompt);
   };
 
   if (isChooserMode || !selectedAgent) {
@@ -73,7 +72,7 @@ export function HomeTab({
         key="chooser"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.98 }}
+        exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.12 } }}
         transition={{ duration: 0.25 }}
         className="absolute inset-0 flex flex-col overflow-hidden bg-transparent"
       >
@@ -161,7 +160,7 @@ export function HomeTab({
       key={`agent-${selectedAgent.widgetAgentId}`}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.98 }}
+      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.12 } }}
       transition={{ duration: 0.25 }}
       className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto px-5 py-3 widget-scroll"
     >
@@ -184,12 +183,8 @@ export function HomeTab({
               const formData = new FormData(event.currentTarget);
               const text = formData.get("message") as string;
               if (text?.trim()) {
-                onSendMessage(text.trim());
-                onSwitchToMessages();
-                return;
+                onStartConversation(text.trim());
               }
-
-              onSwitchToMessages();
             }}
             className="relative mt-5 w-full max-w-sm shadow-lg shadow-black/5"
           >
@@ -202,6 +197,11 @@ export function HomeTab({
             <button
               type="submit"
               className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-xl bg-transparent p-2 text-widget-muted transition-colors hover:text-[var(--widget-secondary)] active:scale-95 disabled:opacity-50"
+              aria-label={
+                config.widget.language === "sv"
+                  ? "Starta ny konversation"
+                  : "Start a new conversation"
+              }
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

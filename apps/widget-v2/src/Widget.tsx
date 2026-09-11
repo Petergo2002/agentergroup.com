@@ -1,11 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronLeft,
+  History,
   Home,
   Loader2,
   MessageSquare,
   Phone,
-  RotateCcw,
   X,
 } from "lucide-react";
 import {
@@ -17,6 +17,7 @@ import {
   useState,
 } from "react";
 import { ContactTab } from "./components/ContactTab";
+import { ConversationList } from "./components/ConversationList";
 import { HomeTab } from "./components/HomeTab";
 import { MessagesTab } from "./components/MessagesTab";
 import { WidgetMark } from "./components/WidgetMark";
@@ -24,6 +25,8 @@ import { useSession } from "./hooks/useSession";
 import { useWidgetViewportUnit } from "./hooks/useWidgetViewportUnit";
 import {
   completeWidgetSession as requestWidgetSessionCompletion,
+  getWidgetConversation,
+  getWidgetConversations,
   getWidgetBootstrap,
   sendWidgetEvent,
   sendWidgetMessage,
@@ -62,6 +65,8 @@ import type {
   WidgetAttachment,
   WidgetBootstrapResponse,
   WidgetConfig,
+  WidgetConversationDetail,
+  WidgetConversationSummary,
   WidgetEndChatReason,
   WidgetGenerativeUi,
 } from "./types";
@@ -79,6 +84,7 @@ interface WidgetProps {
 const MIN_INTERIM_STREAM_RENDER_DELAY_MS = 0;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const PRESENCE_DEDUPE_MS = 1_500;
+const PREFETCHED_CONVERSATIONS = 3;
 
 function isAbortError(error: unknown) {
   return (
@@ -122,6 +128,11 @@ export default function Widget({
   const [isConversationCompleted, setIsConversationCompleted] = useState(false);
   const [conversationEndReason, setConversationEndReason] =
     useState<WidgetEndChatReason | null>(null);
+  const [conversations, setConversations] = useState<WidgetConversationSummary[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [showConversationList, setShowConversationList] = useState(false);
+  const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
   const [isWidgetOpen, setIsWidgetOpen] = useState(() =>
     previewMode || (typeof window !== "undefined" ? window.parent === window : true),
   );
@@ -132,14 +143,23 @@ export default function Widget({
   const embeddedParentOrigin = isEmbedded
     ? resolveEmbeddedParentOrigin(parentOrigin)
     : null;
-  const { sessionId, reset: resetWidgetSession } = useSession(widgetPublicKey, {
-    persist: !previewMode,
-  });
+  const {
+    sessionId,
+    visitorToken,
+    reset: resetWidgetSession,
+    select: selectWidgetSession,
+  } = useSession(widgetPublicKey, { persist: !previewMode });
   const sessionEventDedupRef = useRef<Record<string, number>>({});
   const previousWidgetOpenRef = useRef<boolean | null>(null);
   const inactivityTimerRef = useRef<number | null>(null);
   const bootstrapRefreshPromiseRef = useRef<Promise<WidgetBootstrapResponse> | null>(null);
   const activeStreamAbortControllerRef = useRef<AbortController | null>(null);
+  const hasRestoredConversationRef = useRef(false);
+  // Rendered rows are the source of truth for whether a refresh is a first load
+  // or a silent revalidation, read from a ref so refreshes stay callback-stable.
+  const conversationsRef = useRef<WidgetConversationSummary[]>([]);
+  const conversationCacheRef = useRef(new Map<string, WidgetConversationDetail>());
+  const conversationPrefetchRef = useRef(new Set<string>());
   useWidgetViewportUnit();
 
   const bootstrapContext = useMemo<WidgetRequestContext>(
@@ -148,12 +168,14 @@ export default function Widget({
       previewSource:
         previewMode ? previewSource || "widget_preview" : undefined,
       previewRevision: previewMode ? previewRevisionKey : undefined,
+      visitorToken,
     }),
     [
       previewMode,
       previewRevisionKey,
       previewSource,
       previewTokenKey,
+      visitorToken,
     ],
   );
 
@@ -176,6 +198,13 @@ export default function Widget({
     () => resolveSelectedAgent(config, selectedWidgetAgentId),
     [config, selectedWidgetAgentId],
   );
+  const widgetLanguage = config ? resolveWidgetLanguage(config) : "en";
+  // Preview and live runtimes authenticate differently: previews carry a preview
+  // token and never receive a widget access token, so history readiness is
+  // resolved per runtime rather than assuming an access token exists.
+  const hasRuntimeAccess = previewMode
+    ? Boolean(previewTokenKey)
+    : Boolean(accessToken);
 
   const applyBootstrapPayload = useCallback((payload: WidgetBootstrapResponse) => {
     setConfig(normalizeWidgetConfig(payload.config));
@@ -355,6 +384,160 @@ export default function Widget({
     }
   }, []);
 
+  const loadConversationsWithRetry = useCallback(async () => {
+    let activeContext = requestContext;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await getWidgetConversations(
+          widgetPublicKey,
+          activeContext,
+        );
+      } catch (loadError) {
+        if (
+          attempt === 0 &&
+          hasErrorCode(loadError, "WIDGET_ACCESS_TOKEN_INVALID")
+        ) {
+          activeContext = await refreshWidgetAccess();
+          continue;
+        }
+        throw loadError;
+      }
+    }
+
+    return [];
+  }, [refreshWidgetAccess, requestContext, widgetPublicKey]);
+
+  const loadConversationWithRetry = useCallback(
+    async (targetSessionId: string) => {
+      let activeContext = requestContext;
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          return await getWidgetConversation(
+            widgetPublicKey,
+            targetSessionId,
+            activeContext,
+          );
+        } catch (loadError) {
+          if (
+            attempt === 0 &&
+            hasErrorCode(loadError, "WIDGET_ACCESS_TOKEN_INVALID")
+          ) {
+            activeContext = await refreshWidgetAccess();
+            continue;
+          }
+          throw loadError;
+        }
+      }
+
+      throw new Error("Failed to load conversation.");
+    },
+    [refreshWidgetAccess, requestContext, widgetPublicKey],
+  );
+
+  const refreshConversationList = useCallback(async () => {
+    if (!visitorToken || !hasRuntimeAccess) {
+      return [] as WidgetConversationSummary[];
+    }
+
+    // Only the very first load blocks on skeletons. Every later refresh — on
+    // open, after a turn, on retry — revalidates underneath the rendered rows,
+    // so the list never flashes back to placeholders.
+    const isFirstLoad = conversationsRef.current.length === 0;
+    if (isFirstLoad) {
+      setIsHistoryLoading(true);
+    }
+    setHistoryError(null);
+    try {
+      const nextConversations = await loadConversationsWithRetry();
+      conversationsRef.current = nextConversations;
+      setConversations(nextConversations);
+      return nextConversations;
+    } catch (loadError) {
+      widgetDebug.error("Failed to load conversation history:", loadError);
+      // A failed background refresh keeps the rows it already had; only an
+      // empty list has nothing better to show than the error.
+      if (conversationsRef.current.length === 0) {
+        setHistoryError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Could not load conversations.",
+        );
+      }
+      return [] as WidgetConversationSummary[];
+    } finally {
+      if (isFirstLoad) {
+        setIsHistoryLoading(false);
+      }
+    }
+  }, [hasRuntimeAccess, loadConversationsWithRetry, visitorToken]);
+
+  const applyConversation = useCallback(
+    (conversation: WidgetConversationDetail) => {
+      if (activeStreamAbortControllerRef.current) {
+        activeStreamAbortControllerRef.current.abort();
+        activeStreamAbortControllerRef.current = null;
+      }
+      clearInactivityTimer();
+      selectWidgetSession(conversation.sessionId);
+      setMessages(conversation.messages);
+      setHasStarted(conversation.messages.length > 0);
+      setInput("");
+      setPendingAttachments([]);
+      setUploadError(null);
+      setIsLoading(false);
+      setIsStreaming(false);
+      setStreamPhase(null);
+      setIsConversationCompleted(conversation.status === "completed");
+      setConversationEndReason(conversation.endReason);
+      setOpeningSessionId(null);
+      setShowConversationList(false);
+      setActiveTab("messages");
+      setHasUnread(false);
+      setError(null);
+
+      const matchingAgent = configRef.current?.agents.find(
+        (agent) => agent.widgetAgentId === conversation.widgetAgentId,
+      );
+      if (matchingAgent) {
+        setSelectedWidgetAgentId(matchingAgent.widgetAgentId);
+      }
+    },
+    [clearInactivityTimer, selectWidgetSession],
+  );
+
+  const openConversation = useCallback(
+    async (conversation: WidgetConversationSummary) => {
+      // Prefetched conversations open with no network wait at all.
+      const cached = conversationCacheRef.current.get(conversation.sessionId);
+      if (cached) {
+        applyConversation(cached);
+        return;
+      }
+
+      // Keep the list on screen while the conversation loads — swapping it for
+      // skeletons reads as a slower transition than a spinner on the row.
+      setOpeningSessionId(conversation.sessionId);
+      setHistoryError(null);
+      try {
+        const detail = await loadConversationWithRetry(conversation.sessionId);
+        conversationCacheRef.current.set(conversation.sessionId, detail);
+        applyConversation(detail);
+      } catch (loadError) {
+        widgetDebug.error("Failed to open conversation:", loadError);
+        setHistoryError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Could not open this conversation.",
+        );
+      } finally {
+        setOpeningSessionId(null);
+      }
+    },
+    [applyConversation, loadConversationWithRetry],
+  );
+
   const markConversationCompleted = useCallback(
     (reason: WidgetEndChatReason | null) => {
       clearInactivityTimer();
@@ -365,7 +548,10 @@ export default function Widget({
   );
 
   const armInactivityTimer = useCallback(
-    (timeoutSeconds: number | null | undefined) => {
+    (
+      timeoutSeconds: number | null | undefined,
+      targetSessionId: string = sessionId,
+    ) => {
       clearInactivityTimer();
 
       if (!timeoutSeconds || timeoutSeconds <= 0) {
@@ -374,7 +560,7 @@ export default function Widget({
 
       inactivityTimerRef.current = window.setTimeout(() => {
         void completeSessionWithRetry({
-          sessionId,
+          sessionId: targetSessionId,
           reason: "inactivity_timeout",
         })
           .then((payload) => {
@@ -408,18 +594,24 @@ export default function Widget({
         activeStreamAbortControllerRef.current = null;
       }
       clearInactivityTimer();
-      resetWidgetSession();
+      const nextSessionId = resetWidgetSession();
       setMessages([]);
       setHasStarted(false);
       setInput("");
+      setPendingAttachments([]);
+      setIsUploadingAttachment(false);
+      setUploadError(null);
       setIsLoading(false);
       setIsStreaming(false);
       setIsConversationCompleted(false);
       setConversationEndReason(null);
+      setShowConversationList(false);
       setHasUnread(false);
       setActiveTab("home");
       setError(null);
-      setAccessToken(null);
+      if (previewMode) {
+        setAccessToken(null);
+      }
       const currentConfig = configRef.current;
       setSelectedWidgetAgentId(
         currentConfig?.home.mode === "single_auto"
@@ -427,16 +619,30 @@ export default function Widget({
           : null,
       );
 
-      if (!previewMode) return;
-      const fallbackRevision = `${Date.now()}`;
-      setPreviewRevisionKey(
-        nextPreviewRevision !== undefined
-          ? String(nextPreviewRevision)
-          : fallbackRevision,
-      );
+      if (previewMode) {
+        // A new draft revision re-authenticates the preview runtime, so let the
+        // history list reload against the refreshed preview token.
+        hasRestoredConversationRef.current = false;
+        const fallbackRevision = `${Date.now()}`;
+        setPreviewRevisionKey(
+          nextPreviewRevision !== undefined
+            ? String(nextPreviewRevision)
+            : fallbackRevision,
+        );
+      }
+
+      return nextSessionId;
     },
     [clearInactivityTimer, previewMode, resetWidgetSession],
   );
+
+  const startNewConversation = useCallback(() => {
+    resetConversation();
+    const currentConfig = configRef.current;
+    if (currentConfig?.home.mode === "single_auto") {
+      setActiveTab("messages");
+    }
+  }, [resetConversation]);
 
   useEffect(() => {
     if (!previewMode) return;
@@ -594,6 +800,91 @@ export default function Widget({
       return null;
     });
   }, [config]);
+
+  useEffect(() => {
+    if (
+      !config ||
+      !visitorToken ||
+      !hasRuntimeAccess ||
+      hasRestoredConversationRef.current
+    ) {
+      return;
+    }
+
+    hasRestoredConversationRef.current = true;
+    let cancelled = false;
+
+    void refreshConversationList().then(async (nextConversations) => {
+      if (cancelled) return;
+      const activeConversation = nextConversations.find(
+        (conversation) => conversation.sessionId === sessionId,
+      );
+      if (!activeConversation) return;
+
+      try {
+        const detail = await loadConversationWithRetry(sessionId);
+        if (!cancelled) {
+          applyConversation(detail);
+          setActiveTab("home");
+        }
+      } catch (loadError) {
+        widgetDebug.error("Failed to restore the active conversation:", loadError);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    applyConversation,
+    config,
+    hasRuntimeAccess,
+    loadConversationWithRetry,
+    refreshConversationList,
+    sessionId,
+    visitorToken,
+  ]);
+
+  // Warm the conversations a visitor is most likely to reopen while they are
+  // still reading the list, so the tap itself costs nothing.
+  useEffect(() => {
+    if (activeTab !== "messages" || !showConversationList) {
+      return;
+    }
+
+    const targets = conversations
+      .slice(0, PREFETCHED_CONVERSATIONS)
+      .filter(
+        (conversation) =>
+          !conversationCacheRef.current.has(conversation.sessionId) &&
+          !conversationPrefetchRef.current.has(conversation.sessionId),
+      );
+
+    if (targets.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    for (const conversation of targets) {
+      conversationPrefetchRef.current.add(conversation.sessionId);
+      void loadConversationWithRetry(conversation.sessionId)
+        .then((detail) => {
+          if (!cancelled) {
+            conversationCacheRef.current.set(conversation.sessionId, detail);
+          }
+        })
+        .catch((prefetchError) => {
+          widgetDebug.error("Failed to prefetch conversation:", prefetchError);
+        })
+        .finally(() => {
+          conversationPrefetchRef.current.delete(conversation.sessionId);
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, conversations, loadConversationWithRetry, showConversationList]);
 
   useEffect(() => {
     const handleWidgetStateChange = (event: MessageEvent) => {
@@ -798,35 +1089,56 @@ export default function Widget({
     }
   };
 
-  const sendMessage = async (text: string = input) => {
+  const sendMessage = async (
+    text: string = input,
+    options?: {
+      sessionId?: string;
+      widgetAgentId?: string;
+      allowCompletedConversation?: boolean;
+      includePendingAttachments?: boolean;
+    },
+  ) => {
     const activeLanguage = resolveWidgetLanguage(config);
-    const activeAgent = resolveSelectedAgent(config, selectedWidgetAgentId);
+    const activeAgent = options?.widgetAgentId
+      ? config?.agents.find(
+          (agent) => agent.widgetAgentId === options.widgetAgentId,
+        ) ?? null
+      : resolveSelectedAgent(config, selectedWidgetAgentId);
     const activeEndChatPolicy =
       activeAgent?.interactionMode === "chat"
         ? activeAgent.endChatPolicy
         : null;
     const trimmedMessage = text.trim();
+    const currentAttachments =
+      options?.includePendingAttachments === false
+        ? []
+        : [...pendingAttachments];
+    const activeSessionId = options?.sessionId ?? sessionId;
 
-    if (!trimmedMessage && pendingAttachments.length === 0) {
+    if (!trimmedMessage && currentAttachments.length === 0) {
       return;
     }
 
     if (
-      isConversationCompleted ||
+      (isConversationCompleted && !options?.allowCompletedConversation) ||
       isLoading ||
       isStreaming ||
+      activeStreamAbortControllerRef.current ||
       !widgetPublicKey ||
       !activeAgent
     ) {
       return;
     }
 
+    const streamAbortController = new AbortController();
+    activeStreamAbortControllerRef.current = streamAbortController;
     clearInactivityTimer();
     if (!hasStarted) setHasStarted(true);
+    setSelectedWidgetAgentId(activeAgent.widgetAgentId);
+    setShowConversationList(false);
     setActiveTab("messages");
 
     const userMessage = trimmedMessage;
-    const currentAttachments = [...pendingAttachments];
     setInput("");
     setPendingAttachments([]);
     setUploadError(null);
@@ -835,12 +1147,10 @@ export default function Widget({
       { role: "user", content: userMessage, attachments: currentAttachments.length > 0 ? currentAttachments : undefined },
     ]);
     setIsLoading(true);
-    const streamAbortController = new AbortController();
-    activeStreamAbortControllerRef.current = streamAbortController;
 
     try {
       const response = await sendMessageRequestWithRetry({
-        sessionId,
+        sessionId: activeSessionId,
         message: userMessage,
         widgetAgentId: activeAgent.widgetAgentId,
         language: activeLanguage,
@@ -1020,7 +1330,10 @@ export default function Widget({
         activeEndChatPolicy?.enabled &&
         activeEndChatPolicy.inactivityTimeoutSeconds
       ) {
-        armInactivityTimer(activeEndChatPolicy.inactivityTimeoutSeconds);
+        armInactivityTimer(
+          activeEndChatPolicy.inactivityTimeoutSeconds,
+          activeSessionId,
+        );
       } else if (streamCompleted) {
         setConversationEndReason(streamEndReason);
       }
@@ -1066,29 +1379,62 @@ export default function Widget({
       }
       setIsLoading(false);
       setStreamPhase(null);
+      // The stored transcript just changed, so drop the cached copy and let the
+      // list prefetch re-warm it.
+      conversationCacheRef.current.delete(activeSessionId);
+      void refreshConversationList();
     }
   };
 
-  const widgetLanguage = config ? resolveWidgetLanguage(config) : "en";
+  const startConversationFromHome = async (text: string) => {
+    const trimmedMessage = text.trim();
+    if (
+      !trimmedMessage ||
+      isLoading ||
+      isStreaming ||
+      isUploadingAttachment ||
+      activeStreamAbortControllerRef.current
+    ) {
+      return;
+    }
+
+    const activeAgent = resolveSelectedAgent(config, selectedWidgetAgentId);
+    if (!activeAgent) return;
+
+    const nextSessionId = resetConversation();
+    setSelectedWidgetAgentId(activeAgent.widgetAgentId);
+    await sendMessage(trimmedMessage, {
+      sessionId: nextSessionId,
+      widgetAgentId: activeAgent.widgetAgentId,
+      allowCompletedConversation: true,
+      includePendingAttachments: false,
+    });
+  };
+
   const isChooserMode =
     config?.home.mode === "chooser" && selectedAgent === null;
   const navLabelHome = widgetLanguage === "sv" ? "Hem" : "Home";
   const navLabelMessages = widgetLanguage === "sv" ? "Meddelanden" : "Messages";
   const navLabelContact = widgetLanguage === "sv" ? "Kontakt" : "Contact";
-  const newChatLabel = widgetLanguage === "sv" ? "Starta ny chatt" : "Start a new chat";
+  const historyLabel = widgetLanguage === "sv" ? "Tidigare chattar" : "Previous chats";
   const showStandaloneDesktopShell = !isEmbedded;
   const showSurfaceNav =
     Boolean(selectedAgent) &&
     !isChooserMode &&
-    !(activeTab === "messages" && hasStarted);
+    !(activeTab === "messages" && hasStarted && !showConversationList);
 
 
 
   useEffect(() => {
-    if (config?.home.mode === "chooser" && !selectedAgent && activeTab !== "home") {
+    if (
+      config?.home.mode === "chooser" &&
+      !selectedAgent &&
+      activeTab !== "home" &&
+      !(activeTab === "messages" && showConversationList)
+    ) {
       setActiveTab("home");
     }
-  }, [activeTab, config?.home.mode, selectedAgent]);
+  }, [activeTab, config?.home.mode, selectedAgent, showConversationList]);
 
   if (!config) {
     return (
@@ -1179,7 +1525,22 @@ export default function Widget({
         >
           <div className="flex items-center gap-2">
             <AnimatePresence mode="wait">
-              {(activeTab === "home" && selectedAgent && config.home.mode === "chooser" && !hasStarted) && (
+              {showConversationList ? (
+                <motion.button
+                  key="history-back-button"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  onClick={() => {
+                    setShowConversationList(false);
+                    setActiveTab("home");
+                  }}
+                  className="widget-icon-button mr-1 p-1"
+                  aria-label={navLabelHome}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </motion.button>
+              ) : (activeTab === "home" && selectedAgent && config.home.mode === "chooser" && !hasStarted) ? (
                 <motion.button
                   key="back-button"
                   initial={{ opacity: 0, x: -10 }}
@@ -1191,7 +1552,7 @@ export default function Widget({
                 >
                   <ChevronLeft className="w-6 h-6" />
                 </motion.button>
-              )}
+              ) : null}
             </AnimatePresence>
 
             {config.brand.logoUrl ? (
@@ -1230,7 +1591,10 @@ export default function Widget({
             {showStandaloneDesktopShell && showSurfaceNav ? (
               <div className="hidden lg:flex items-center rounded-full border border-[var(--widget-border)] bg-[color:var(--widget-input-surface)] p-1 shadow-sm">
                 <button
-                  onClick={() => setActiveTab("home")}
+                  onClick={() => {
+                    setShowConversationList(false);
+                    setActiveTab("home");
+                  }}
                   data-active={activeTab === "home" ? "true" : "false"}
                   className="widget-nav-button rounded-full px-4 py-2 text-xs font-semibold"
                   style={activeTab === "home" ? { color: palette.secondary } : undefined}
@@ -1238,7 +1602,11 @@ export default function Widget({
                   {navLabelHome}
                 </button>
                 <button
-                  onClick={() => setActiveTab("messages")}
+                  onClick={() => {
+                    setShowConversationList(true);
+                    setActiveTab("messages");
+                    void refreshConversationList();
+                  }}
                   data-active={activeTab === "messages" ? "true" : "false"}
                   className="widget-nav-button rounded-full px-4 py-2 text-xs font-semibold"
                   style={activeTab === "messages" ? { color: palette.secondary } : undefined}
@@ -1246,7 +1614,10 @@ export default function Widget({
                   {navLabelMessages}
                 </button>
                 <button
-                  onClick={() => setActiveTab("contact")}
+                  onClick={() => {
+                    setShowConversationList(false);
+                    setActiveTab("contact");
+                  }}
                   data-active={activeTab === "contact" ? "true" : "false"}
                   className="widget-nav-button rounded-full px-4 py-2 text-xs font-semibold"
                   style={activeTab === "contact" ? { color: palette.secondary } : undefined}
@@ -1255,17 +1626,23 @@ export default function Widget({
                 </button>
               </div>
             ) : null}
-            {hasStarted && (
+            {!showConversationList &&
+            (hasStarted || conversations.length > 0) ? (
               <button
-                onClick={() => resetConversation()}
-                disabled={isLoading || isStreaming}
+                type="button"
+                onClick={() => {
+                  setShowConversationList(true);
+                  setActiveTab("messages");
+                  void refreshConversationList();
+                }}
+                disabled={isLoading || isStreaming || isUploadingAttachment}
                 className="widget-icon-button p-2 disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label={newChatLabel}
-                title={newChatLabel}
+                aria-label={historyLabel}
+                title={historyLabel}
               >
-                <RotateCcw className="w-5 h-5" />
+                <History className="h-5 w-5" />
               </button>
-            )}
+            ) : null}
             {isEmbedded ? (
               <button
                 onClick={handleClose}
@@ -1280,18 +1657,32 @@ export default function Widget({
 
         <main className="relative min-h-0 flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
-            {activeTab === "home" || !selectedAgent ? (
+            {activeTab === "messages" && showConversationList ? (
+              <ConversationList
+                key="conversation-list"
+                config={config}
+                language={widgetLanguage}
+                conversations={conversations}
+                isLoading={isHistoryLoading}
+                error={historyError}
+                onRetry={() => void refreshConversationList()}
+                onSelect={(conversation) => void openConversation(conversation)}
+                onStartNew={startNewConversation}
+                openingSessionId={openingSessionId}
+              />
+            ) : activeTab === "home" || !selectedAgent ? (
               <HomeTab
                 key="home"
                 config={config}
                 selectedAgent={selectedAgent}
                 isChooserMode={isChooserMode}
-                onSendMessage={sendMessage}
+                onStartConversation={(text) => {
+                  void startConversationFromHome(text);
+                }}
                 onSelectAgent={(widgetAgentId) => {
                   setSelectedWidgetAgentId(widgetAgentId);
                   setActiveTab("home");
                 }}
-                onSwitchToMessages={() => setActiveTab("messages")}
                 onSwitchToContact={() => setActiveTab("contact")}
               />
             ) : activeTab === "contact" ? (
@@ -1303,7 +1694,10 @@ export default function Widget({
                 sessionId={sessionId}
                 requestContext={requestContext}
                 palette={palette}
-                onSwitchToChat={() => setActiveTab("messages")}
+                onSwitchToChat={() => {
+                  setShowConversationList(false);
+                  setActiveTab("messages");
+                }}
               />
             ) : (
               <MessagesTab
@@ -1320,7 +1714,7 @@ export default function Widget({
                 hasStarted={hasStarted}
                 isConversationCompleted={isConversationCompleted}
                 endReason={conversationEndReason}
-                onStartNewChat={() => resetConversation()}
+                onStartNewChat={startNewConversation}
                 sendMessage={sendMessage}
                 pendingAttachments={pendingAttachments}
                 isUploadingAttachment={isUploadingAttachment}
@@ -1374,7 +1768,10 @@ export default function Widget({
                 />
 
                 <button
-                  onClick={() => setActiveTab("home")}
+                  onClick={() => {
+                    setShowConversationList(false);
+                    setActiveTab("home");
+                  }}
                   data-active={activeTab === "home" ? "true" : "false"}
                   className="widget-nav-button relative z-10 flex h-full w-1/3 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
                   style={activeTab === "home" ? { color: palette.secondary } : undefined}
@@ -1386,7 +1783,11 @@ export default function Widget({
                 </button>
 
                 <button
-                  onClick={() => setActiveTab("messages")}
+                  onClick={() => {
+                    setShowConversationList(true);
+                    setActiveTab("messages");
+                    void refreshConversationList();
+                  }}
                   data-active={activeTab === "messages" ? "true" : "false"}
                   className="widget-nav-button relative z-10 flex h-full w-1/3 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
                   style={activeTab === "messages" ? { color: palette.secondary } : undefined}
@@ -1406,7 +1807,10 @@ export default function Widget({
                 </button>
 
                 <button
-                  onClick={() => setActiveTab("contact")}
+                  onClick={() => {
+                    setShowConversationList(false);
+                    setActiveTab("contact");
+                  }}
                   data-active={activeTab === "contact" ? "true" : "false"}
                   className="widget-nav-button relative z-10 flex h-full w-1/3 flex-col items-center justify-center gap-0.5 transition-colors duration-200"
                   style={activeTab === "contact" ? { color: palette.secondary } : undefined}

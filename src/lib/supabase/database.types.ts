@@ -2893,11 +2893,13 @@ export type Database = {
           active_turn_request_id: string | null
           active_turn_started_at: string | null
           active_widget_agent_id: string | null
+          conversation_title: string | null
           end_reason: string | null
           ended_at: string | null
           first_seen_at: string
           id: string
           last_assistant_message_at: string | null
+          last_message_preview: string | null
           last_seen_at: string
           last_user_message_at: string | null
           origin: string | null
@@ -2906,6 +2908,7 @@ export type Database = {
           session_id: string
           source: string
           status: string
+          visitor_token_hash: string | null
           widget_id: string
         }
         Insert: {
@@ -2913,11 +2916,13 @@ export type Database = {
           active_turn_request_id?: string | null
           active_turn_started_at?: string | null
           active_widget_agent_id?: string | null
+          conversation_title?: string | null
           end_reason?: string | null
           ended_at?: string | null
           first_seen_at?: string
           id?: string
           last_assistant_message_at?: string | null
+          last_message_preview?: string | null
           last_seen_at?: string
           last_user_message_at?: string | null
           origin?: string | null
@@ -2926,6 +2931,7 @@ export type Database = {
           session_id: string
           source: string
           status?: string
+          visitor_token_hash?: string | null
           widget_id: string
         }
         Update: {
@@ -2933,11 +2939,13 @@ export type Database = {
           active_turn_request_id?: string | null
           active_turn_started_at?: string | null
           active_widget_agent_id?: string | null
+          conversation_title?: string | null
           end_reason?: string | null
           ended_at?: string | null
           first_seen_at?: string
           id?: string
           last_assistant_message_at?: string | null
+          last_message_preview?: string | null
           last_seen_at?: string
           last_user_message_at?: string | null
           origin?: string | null
@@ -2946,6 +2954,7 @@ export type Database = {
           session_id?: string
           source?: string
           status?: string
+          visitor_token_hash?: string | null
           widget_id?: string
         }
         Relationships: [

@@ -22,6 +22,21 @@ export const login = {
   signIn: "Sign In",
   createAccount: "Create Account",
   confirmEmailNotice: "Check your email to confirm your account.",
+  verifyEmailEyebrow: "One quick check",
+  verifyEmailTitle: "Check your inbox",
+  verifyEmailSubtitle:
+    "We sent you a secure confirmation link. Open the email from Avenro and confirm your address to continue.",
+  verifyEmailNextTitle: "Your signup details are already saved",
+  verifyEmailNextBody:
+    "After confirming your email, we will take you straight to workspace verification. You will not need to enter your name, company, or password again.",
+  verifyEmailHelp:
+    "The email can take a minute to arrive. If you cannot find it, check your spam or junk folder.",
+  backToSignIn: "Back to sign in",
+  secureVerification: "Secure email verification",
+  accountProtected: "Account protected",
+  verifyEmailVisualTitle: "One click, then you are in",
+  verifyEmailVisualBody:
+    "Confirming your email protects your workspace and makes sure only you can access it.",
   signInError: "We could not sign you in with those credentials.",
   createAccountError: "We could not create your account right now. Please try again.",
   signupTitle: "Create your account",

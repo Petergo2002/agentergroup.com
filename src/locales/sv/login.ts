@@ -22,6 +22,21 @@ export const login = {
   signIn: "Logga in",
   createAccount: "Skapa konto",
   confirmEmailNotice: "Kontrollera din e-post för att bekräfta ditt konto.",
+  verifyEmailEyebrow: "En snabb kontroll",
+  verifyEmailTitle: "Kontrollera din inkorg",
+  verifyEmailSubtitle:
+    "Vi har skickat en säker bekräftelselänk. Öppna mejlet från Avenro och bekräfta din e-postadress för att fortsätta.",
+  verifyEmailNextTitle: "Dina registreringsuppgifter är redan sparade",
+  verifyEmailNextBody:
+    "När du har bekräftat mejlet skickas du direkt till verifieringen av ditt workspace. Du behöver inte ange namn, företag eller lösenord igen.",
+  verifyEmailHelp:
+    "Det kan ta någon minut innan mejlet kommer. Kontrollera skräpposten om du inte hittar det.",
+  backToSignIn: "Tillbaka till inloggning",
+  secureVerification: "Säker e-postverifiering",
+  accountProtected: "Kontot är skyddat",
+  verifyEmailVisualTitle: "Ett klick, sedan är du inne",
+  verifyEmailVisualBody:
+    "Bekräftelsen skyddar ditt workspace och säkerställer att bara du får åtkomst.",
   signInError: "Det gick inte att logga in med de uppgifterna.",
   createAccountError: "Det gick inte att skapa kontot just nu. Försök igen.",
   signupTitle: "Skapa ditt konto",

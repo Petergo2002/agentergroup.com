@@ -6,7 +6,7 @@ export interface WidgetRequestLike {
 
 export const WIDGET_CORS_ALLOW_METHODS = "GET,POST,PATCH,DELETE,OPTIONS";
 export const WIDGET_CORS_ALLOW_HEADERS =
-  "Content-Type,x-ag-widget-access-token,x-ag-preview-token,x-ag-preview-source,x-ag-preview-revision,x-ag-widget-context,x-ag-parent-origin";
+  "Content-Type,x-ag-widget-access-token,x-ag-widget-visitor-token,x-ag-preview-token,x-ag-preview-source,x-ag-preview-revision,x-ag-widget-context,x-ag-parent-origin";
 
 export function normalizeAllowedOrigin(value: string | null | undefined) {
   if (!value) {

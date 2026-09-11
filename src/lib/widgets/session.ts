@@ -26,6 +26,9 @@ export async function upsertWidgetSession(
     endReason?: ConversationEndReason | null;
     lastUserMessageAt?: string | null;
     lastAssistantMessageAt?: string | null;
+    visitorTokenHash?: string | null;
+    conversationTitle?: string | null;
+    lastMessagePreview?: string | null;
   },
 ) {
   const timestamp = new Date().toISOString();
@@ -65,6 +68,18 @@ export async function upsertWidgetSession(
 
   if (input.lastAssistantMessageAt !== undefined) {
     payload.last_assistant_message_at = input.lastAssistantMessageAt;
+  }
+
+  if (input.visitorTokenHash !== undefined) {
+    payload.visitor_token_hash = input.visitorTokenHash;
+  }
+
+  if (input.conversationTitle !== undefined) {
+    payload.conversation_title = input.conversationTitle;
+  }
+
+  if (input.lastMessagePreview !== undefined) {
+    payload.last_message_preview = input.lastMessagePreview;
   }
 
   const { data, error } = await supabase
@@ -109,6 +124,9 @@ export async function completeWidgetSession(
     endReason: input.reason,
     lastAssistantMessageAt:
       input.lastAssistantMessageAt ?? input.session.last_assistant_message_at,
+    visitorTokenHash: input.session.visitor_token_hash,
+    conversationTitle: input.session.conversation_title,
+    lastMessagePreview: input.session.last_message_preview,
   });
 }
 

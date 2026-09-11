@@ -23,6 +23,11 @@ import {
   upsertWidgetSession,
   type WidgetAdminSupabase,
 } from "@/lib/widgets/server";
+import {
+  canAccessWidgetSession,
+  hashWidgetVisitorToken,
+  readWidgetVisitorToken,
+} from "@/lib/widgets/visitor";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
@@ -170,6 +175,24 @@ export async function POST(
       loaded.widget.id,
       sessionId,
     );
+    // Builder previews are bound to the visitor capability too, so the preview
+    // surface gets the same real conversation history as a live visitor.
+    const visitorToken = readWidgetVisitorToken(request);
+    const visitorTokenHash = visitorToken
+      ? hashWidgetVisitorToken(loaded.widget.id, visitorToken)
+      : null;
+
+    if (
+      existingSession &&
+      !canAccessWidgetSession(existingSession.visitor_token_hash, visitorTokenHash)
+    ) {
+      return buildErrorResponse(
+        request,
+        403,
+        "This chat belongs to a different browser session.",
+        "CONVERSATION_ACCESS_DENIED",
+      );
+    }
 
     if (existingSession?.status === "completed") {
       return buildErrorResponse(
@@ -211,6 +234,7 @@ export async function POST(
         sessionId,
         source: access.source,
         origin: access.origin,
+        visitorTokenHash,
       }));
     const { data: existingAttachments, error: existingAttachmentsError } =
       await supabase

@@ -24,12 +24,21 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
   const error = getSearchValue(params.error);
   const redirectTo = getSearchValue(params.redirectTo);
   const isInviteSignup = redirectTo.startsWith("/invite/accept");
+  const isLegacyPasswordSignup = Boolean(redirectTo) && !isInviteSignup;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login?error=Session+expired.+Please+sign+up+again.");
+  }
+
+  // Email/password signup now collects these details on the first form. This
+  // catches users who already confirmed an older link and are currently stuck
+  // on the obsolete duplicate-password screen. Password recovery has no
+  // redirectTo value, while invite completion keeps its dedicated path.
+  if (isLegacyPasswordSignup) {
+    redirect("/onboarding");
   }
 
   return (

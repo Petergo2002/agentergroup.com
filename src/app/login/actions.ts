@@ -55,17 +55,12 @@ function buildLoginRedirectUrl(args: {
 
 function buildCompleteSignupRedirectUrl(args: {
   error?: string;
-  legalConsent?: string;
   redirectTo?: string;
 }) {
   const params = new URLSearchParams();
 
   if (args.error) {
     params.set("error", args.error);
-  }
-
-  if (args.legalConsent) {
-    params.set("legalConsent", args.legalConsent);
   }
 
   const redirectTo = sanitizePostAuthRedirectTo(args.redirectTo, "/onboarding");
@@ -162,7 +157,7 @@ export async function signup(formData: FormData) {
         workspace_name: companyName,
       },
       emailRedirectTo: `${getAppUrl()}/auth/confirm?next=${encodeURIComponent(
-        buildCompleteSignupRedirectUrl({ legalConsent, redirectTo }),
+        `/onboarding?legalConsent=${encodeURIComponent(legalConsent)}`,
       )}`,
     },
   });
@@ -190,18 +185,12 @@ export async function signup(formData: FormData) {
     }
 
     revalidatePath("/", "layout");
-    redirect(redirectTo);
+    redirect("/onboarding");
   }
 
   revalidatePath("/", "layout");
 
-  redirect(
-    buildLoginRedirectUrl({
-      notice: messages.confirmEmailNotice,
-      redirectTo,
-      view: "signup",
-    }),
-  );
+  redirect("/verify-email");
 }
 
 export async function updatePassword(formData: FormData) {

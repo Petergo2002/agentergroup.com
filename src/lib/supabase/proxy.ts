@@ -34,6 +34,7 @@ import {
 const PUBLIC_EXACT_PATHS = [
   "/",
   "/signup",
+  "/verify-email",
   "/api/health",
   "/privacy-policy",
   "/terms-of-service",
