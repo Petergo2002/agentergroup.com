@@ -17,7 +17,24 @@ Improve Milo is the Milo-mode operator surface for unanswered Website Chat quest
 
 ## Detection Rules
 
-Detection is deterministic. There is no paid or remote classifier in the current implementation.
+Detection has two layers. The model reports its own knowledge gaps; prose pattern matching remains as a fallback.
+
+### Layer 1 — the model reports the gap (primary)
+
+`src/lib/runtime/agent-chat.ts` exposes an internal tool, `flag_missing_knowledge`, alongside `suggest_end_chat`. The model calls it during the same completion whenever it cannot fully answer from verified knowledge — including partial answers, deflections to a human, and offers to take contact details. It costs no extra model call.
+
+The tool takes the visitor's question **rewritten as a standalone question**, so follow-ups are usable on their own: `"what year?"` is stored as `"What year did Agenter Group release its SaaS platform?"`.
+
+A model report sets `source: "model_tool"` at confidence 0.95 and bypasses the "is this concrete enough" gate, because the model has already made that judgement. It is ignored if it arrives without a usable question, so a bare greeting is never captured.
+
+This layer exists because the patterns below are phrasing-bound. Two failure modes they cannot cover:
+
+- questions with no `?` and no WH word, whose topic is not in the keyword list (`"i want to know the networth"`)
+- warm deflections, which the Milo personality explicitly instructs (`"Let me get someone from the team to send you exact pricing — what's your email?"`)
+
+### Layer 2 — prose patterns (fallback)
+
+Used when the model does not call the tool. Deterministic, no remote classifier.
 
 `src/lib/flywheel/detection.ts` captures:
 
@@ -32,6 +49,25 @@ Detection is deterministic. There is no paid or remote classifier in the current
 Detection ignores conversational noise such as greetings, thanks, `Can you help?`, and `Are you there?`.
 
 Mixed visitor messages are cleaned before storage. For example, `Hi, can I pay by invoice thanks` is stored as `can I pay by invoice`.
+
+### Comparing the two layers
+
+Every capture records both verdicts in `unanswered_queries.metadata`:
+
+- `detectionSource` — which signal fired (`model_tool`, `fallback_pattern`, `no_knowledge_match`, `runtime_error`, `empty_answer`)
+- `patternWouldCreate` — whether the legacy patterns would have caught it alone
+
+Both detectors therefore run on all live traffic without a feature flag or a divergent code path. To measure how much the model layer adds:
+
+```sql
+select metadata->>'detectionSource' as source,
+       metadata->>'patternWouldCreate' as pattern_alone,
+       count(*)
+from public.unanswered_queries
+group by 1, 2 order by 3 desc;
+```
+
+Rows with `source = model_tool` and `pattern_alone = false` are captures the old detector would have missed entirely.
 
 ## Database Model
 

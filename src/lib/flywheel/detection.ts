@@ -5,13 +5,37 @@ export interface UnansweredQueryDetectionInput {
   assistantAnswer: string;
   knowledgeMatchCount: number;
   runtimeHadError?: boolean;
+  /**
+   * Set when the model called the flag_missing_knowledge tool during the same
+   * completion. A first-party report beats inferring the same thing from the
+   * wording of the reply, so it takes precedence over every pattern below.
+   */
+  modelFlaggedGap?: { question?: string | null; reason?: string | null } | null;
 }
+
+/**
+ * Which signal decided the outcome. Recorded on every capture so the model tool
+ * and the legacy patterns can be compared on real traffic.
+ */
+export type UnansweredQueryDetectionSource =
+  | "model_tool"
+  | "runtime_error"
+  | "empty_answer"
+  | "fallback_pattern"
+  | "no_knowledge_match"
+  | "none";
 
 export interface UnansweredQueryDetectionResult {
   shouldCreate: boolean;
   question: string;
   reason: string;
   confidence: number;
+  source: UnansweredQueryDetectionSource;
+  /**
+   * True when the legacy pattern matching would have fired on its own, so the
+   * two detectors can be compared without running them as separate code paths.
+   */
+  patternWouldCreate: boolean;
 }
 
 const FALLBACK_PATTERNS = [
@@ -279,15 +303,96 @@ export function areSimilarQuestionsForDedupe(left: string, right: string) {
   return sameSmallQuestion || similarity >= 0.78 || (smallerSetSize >= 3 && containment >= 0.9);
 }
 
+/**
+ * The legacy prose-matching heuristics, kept as a fallback for models that do
+ * not call the tool and retained so its verdict can be compared against the
+ * model's own report.
+ */
+function detectByPatterns(input: {
+  normalizedQuestion: string;
+  normalizedAnswer: string;
+  knowledgeMatchCount: number;
+}): { shouldCreate: boolean; reason: string; confidence: number; source: UnansweredQueryDetectionSource } {
+  if (!input.normalizedAnswer) {
+    return {
+      shouldCreate: true,
+      reason: "The assistant returned an empty answer.",
+      confidence: 0.95,
+      source: "empty_answer",
+    };
+  }
+
+  if (FALLBACK_PATTERNS.some((pattern) => pattern.test(input.normalizedAnswer))) {
+    return {
+      shouldCreate: true,
+      reason:
+        "The assistant answer stated that the requested fact was missing or uncertain.",
+      confidence: input.knowledgeMatchCount === 0 ? 0.9 : 0.82,
+      source: "fallback_pattern",
+    };
+  }
+
+  if (input.knowledgeMatchCount === 0 && input.normalizedQuestion.length >= 16) {
+    return {
+      shouldCreate: true,
+      reason: "No knowledge matched a concrete visitor question.",
+      confidence: 0.66,
+      source: "no_knowledge_match",
+    };
+  }
+
+  return {
+    shouldCreate: false,
+    reason: "The answer did not look like a missed knowledge question.",
+    confidence: 0.35,
+    source: "none",
+  };
+}
+
 export function detectUnansweredQueryCandidate({
   question,
   assistantAnswer,
   knowledgeMatchCount,
   runtimeHadError = false,
+  modelFlaggedGap = null,
 }: UnansweredQueryDetectionInput): UnansweredQueryDetectionResult {
-  const normalizedQuestion = extractQuestionText(question);
   const normalizedAnswer = normalizeWhitespace(assistantAnswer);
-  const isConcreteQuestion = looksLikeConcreteQuestion(normalizedQuestion);
+  const flaggedQuestion = modelFlaggedGap?.question
+    ? normalizeWhitespace(modelFlaggedGap.question)
+    : "";
+
+  // The model resolves pronouns and follow-ups ("what year?") into a standalone
+  // question, so prefer its wording when it gave one.
+  const extractedQuestion = extractQuestionText(question);
+  const normalizedQuestion = flaggedQuestion || extractedQuestion;
+
+  const patternVerdict = detectByPatterns({
+    normalizedQuestion: extractedQuestion,
+    normalizedAnswer,
+    knowledgeMatchCount,
+  });
+  const isConcreteQuestion = looksLikeConcreteQuestion(extractedQuestion);
+  const patternWouldCreate = isConcreteQuestion && patternVerdict.shouldCreate;
+
+  // A first-party report from the model outranks every heuristic, and is not
+  // gated on the question looking "concrete" — the model already judged that.
+  // But a flag with no usable question must not fall back to raw visitor text,
+  // or a bare "Hello" would be captured as a knowledge gap.
+  const hasUsableFlaggedQuestion =
+    Boolean(flaggedQuestion) || (Boolean(normalizedQuestion) && isConcreteQuestion);
+
+  if (modelFlaggedGap && hasUsableFlaggedQuestion) {
+    return {
+      shouldCreate: true,
+      question: normalizedQuestion,
+      reason:
+        modelFlaggedGap.reason?.trim() ||
+        "The assistant reported it could not answer from verified knowledge.",
+      confidence: 0.95,
+      source: "model_tool",
+      patternWouldCreate,
+    };
+  }
 
   if (!isConcreteQuestion) {
     return {
@@ -295,6 +400,8 @@ export function detectUnansweredQueryCandidate({
       question: normalizedQuestion,
       reason: "Question is not concrete enough for the knowledge queue.",
       confidence: 0.2,
+      source: "none",
+      patternWouldCreate,
     };
   }
 
@@ -304,41 +411,18 @@ export function detectUnansweredQueryCandidate({
       question: normalizedQuestion,
       reason: "The runtime reported an error while answering.",
       confidence: 0.9,
-    };
-  }
-
-  if (!normalizedAnswer) {
-    return {
-      shouldCreate: true,
-      question: normalizedQuestion,
-      reason: "The assistant returned an empty answer.",
-      confidence: 0.95,
-    };
-  }
-
-  if (FALLBACK_PATTERNS.some((pattern) => pattern.test(normalizedAnswer))) {
-    return {
-      shouldCreate: true,
-      question: normalizedQuestion,
-      reason: "The assistant answer stated that the requested fact was missing or uncertain.",
-      confidence: knowledgeMatchCount === 0 ? 0.9 : 0.82,
-    };
-  }
-
-  if (knowledgeMatchCount === 0 && normalizedQuestion.length >= 16) {
-    return {
-      shouldCreate: true,
-      question: normalizedQuestion,
-      reason: "No knowledge matched a concrete visitor question.",
-      confidence: 0.66,
+      source: "runtime_error",
+      patternWouldCreate,
     };
   }
 
   return {
-    shouldCreate: false,
+    shouldCreate: patternVerdict.shouldCreate,
     question: normalizedQuestion,
-    reason: "The answer did not look like a missed knowledge question.",
-    confidence: 0.35,
+    reason: patternVerdict.reason,
+    confidence: patternVerdict.confidence,
+    source: patternVerdict.source,
+    patternWouldCreate,
   };
 }
 

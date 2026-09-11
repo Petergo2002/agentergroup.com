@@ -187,6 +187,17 @@ export interface AgentRuntimeResult {
   connectedToolkits: string[];
   debugTrace?: import("@/lib/types").DebugTrace;
   endChat: EndChatMetadata | null;
+  knowledgeGap: KnowledgeGapSignal | null;
+}
+
+/**
+ * Emitted when the model itself reports that it could not answer from verified
+ * knowledge. This is a first-party signal from the same completion, so it does
+ * not depend on pattern-matching the prose of the reply.
+ */
+export interface KnowledgeGapSignal {
+  question: string | null;
+  reason: string | null;
 }
 
 const MAX_TOOL_ITERATIONS = 6;
@@ -198,6 +209,7 @@ const OMITTED_ASSISTANT_HISTORY_MESSAGES = new Set([
   "This is rarely an acceptable response and a retry should be issued.",
 ]);
 const INTERNAL_END_CHAT_TOOL_NAME = "suggest_end_chat";
+const INTERNAL_FLAG_KNOWLEDGE_GAP_TOOL_NAME = "flag_missing_knowledge";
 const GMAIL_REPLY_TO_THREAD_TOOL = "GMAIL_REPLY_TO_THREAD";
 export const FALLBACK_AGENT_INSTRUCTIONS = [
   "You are a dedicated, warm, and highly capable AI team member for this company.",
@@ -260,6 +272,36 @@ const INTERNAL_END_CHAT_TOOL_DEFINITION = {
     },
   },
 } satisfies Record<string, unknown>;
+const INTERNAL_FLAG_KNOWLEDGE_GAP_TOOL_DEFINITION = {
+  type: "function",
+  function: {
+    name: INTERNAL_FLAG_KNOWLEDGE_GAP_TOOL_NAME,
+    description:
+      "Report that the visitor asked a real question you could not answer from verified knowledge. Call this whenever you lack the facts to answer, including when you deflect to a human, offer to take contact details, or answer only partially.",
+    parameters: {
+      type: "object",
+      properties: {
+        question: {
+          type: "string",
+          description:
+            "The visitor's question, rewritten as a clear standalone question in the visitor's own language. Resolve pronouns and follow-ups using the conversation so it makes sense on its own.",
+        },
+        reason: {
+          type: "string",
+          description:
+            "Short internal note on what fact was missing. Never shown to the visitor.",
+        },
+      },
+      required: ["question"],
+      additionalProperties: false,
+    },
+  },
+} satisfies Record<string, unknown>;
+const INTERNAL_TOOL_NAMES = new Set([
+  INTERNAL_END_CHAT_TOOL_NAME,
+  INTERNAL_CREATE_PDF_TOOL_NAME,
+  INTERNAL_FLAG_KNOWLEDGE_GAP_TOOL_NAME,
+]);
 const INTERNAL_CREATE_PDF_TOOL_DEFINITION = {
   type: "function",
   function: {
@@ -560,6 +602,16 @@ function buildEndChatGuidance(policy: EndChatPolicy) {
     "Use it only when the conversation is clearly complete, such as after a goodbye or when the user's goal has been fully resolved.",
     "Do not use it when more clarification, follow-up, or work is still needed.",
     "After using it, send a short natural closing message without mentioning tools or internal state.",
+  ].join(" ");
+}
+
+function buildKnowledgeGapGuidance() {
+  return [
+    `An internal tool named ${INTERNAL_FLAG_KNOWLEDGE_GAP_TOOL_NAME} is available.`,
+    "Call it whenever the visitor asks a genuine question you cannot fully answer from verified knowledge —",
+    "including when you answer only partially, deflect to a human, or offer to take their contact details.",
+    "Call it in addition to replying, never instead of replying, and never mention it to the visitor.",
+    "Do not call it for greetings, small talk, thanks, or questions you did answer from knowledge.",
   ].join(" ");
 }
 
@@ -898,6 +950,7 @@ export async function runAgentChat({
     systemInstructionBlocks.push(toolGuidance);
   }
 
+  systemInstructionBlocks.push(buildKnowledgeGapGuidance());
   const endChatGuidance = buildEndChatGuidance(effectiveEndChatPolicy);
   if (endChatGuidance) {
     systemInstructionBlocks.push(endChatGuidance);
@@ -977,6 +1030,7 @@ export async function runAgentChat({
     effectiveEndChatPolicy.allowAssistantSuggestion
       ? [INTERNAL_END_CHAT_TOOL_DEFINITION]
       : []),
+    INTERNAL_FLAG_KNOWLEDGE_GAP_TOOL_DEFINITION,
   ];
   const conversationMessages = [...modelMessages];
   const toolMessages: ToolMessage[] = [];
@@ -984,6 +1038,7 @@ export async function runAgentChat({
   let finalAssistantMessage: Record<string, unknown> | null = null;
   let assistantContent = "";
   let endChat: EndChatMetadata | null = null;
+  let knowledgeGap: KnowledgeGapSignal | null = null;
 
   const debugEvents: import("@/lib/types").DebugEvent[] = [];
   const startTimeMs = Date.now();
@@ -1105,22 +1160,24 @@ export async function runAgentChat({
     }
 
     const internalToolCalls = toolCallsArray.filter((toolCall) =>
-      [INTERNAL_END_CHAT_TOOL_NAME, INTERNAL_CREATE_PDF_TOOL_NAME].includes(
-        toolCall.function.name,
-      ),
+      INTERNAL_TOOL_NAMES.has(toolCall.function.name),
     );
     const externalToolCalls = toolCallsArray.filter(
-      (toolCall) =>
-        ![INTERNAL_END_CHAT_TOOL_NAME, INTERNAL_CREATE_PDF_TOOL_NAME].includes(
-          toolCall.function.name,
-        ),
+      (toolCall) => !INTERNAL_TOOL_NAMES.has(toolCall.function.name),
     );
     const internalToolMessages: ToolMessage[] = [];
     let externalToolMessages: ToolMessage[] = [];
 
-    if (internalToolCalls.length > 0 && !endChat) {
+    // Only the end-chat tool may complete the session. This previously keyed off
+    // "any internal tool", which meant generating a PDF silently ended the
+    // visitor's conversation.
+    const endChatToolCall = internalToolCalls.find(
+      (toolCall) => toolCall.function.name === INTERNAL_END_CHAT_TOOL_NAME,
+    );
+
+    if (endChatToolCall && !endChat) {
       const parsedArgs = parseInternalToolArguments(
-        internalToolCalls[0]?.function.arguments ?? "",
+        endChatToolCall.function.arguments ?? "",
       );
       const summary =
         typeof parsedArgs?.summary === "string" && parsedArgs.summary.trim()
@@ -1144,6 +1201,33 @@ export async function runAgentChat({
           name: toolCall.function.name,
           content:
             "The conversation has been marked complete. Write a brief natural closing message to the user.",
+        });
+        continue;
+      }
+
+      if (toolCall.function.name === INTERNAL_FLAG_KNOWLEDGE_GAP_TOOL_NAME) {
+        if (!knowledgeGap) {
+          const parsedArgs = parseInternalToolArguments(
+            toolCall.function.arguments ?? "",
+          );
+          const flaggedQuestion =
+            typeof parsedArgs?.question === "string" && parsedArgs.question.trim()
+              ? parsedArgs.question.trim()
+              : null;
+          const flaggedReason =
+            typeof parsedArgs?.reason === "string" && parsedArgs.reason.trim()
+              ? parsedArgs.reason.trim()
+              : null;
+
+          knowledgeGap = { question: flaggedQuestion, reason: flaggedReason };
+        }
+
+        internalToolMessages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          name: toolCall.function.name,
+          content:
+            "Logged for the workspace owner. Continue answering the visitor normally and do not mention this.",
         });
         continue;
       }
@@ -1271,8 +1355,11 @@ export async function runAgentChat({
       ...externalToolMessages,
     ];
     toolMessages.push(
+      // Control-signal tools produce no content worth persisting as a result.
       ...internalToolMessages.filter(
-        (message) => message.name !== INTERNAL_END_CHAT_TOOL_NAME,
+        (message) =>
+          message.name !== INTERNAL_END_CHAT_TOOL_NAME &&
+          message.name !== INTERNAL_FLAG_KNOWLEDGE_GAP_TOOL_NAME,
       ),
       ...externalToolMessages,
     );
@@ -1358,6 +1445,7 @@ export async function runAgentChat({
       knowledgeMatches: getKnowledgeCitationSummary(knowledgeMatches),
       ...(persistedDebugTrace ? { debugTrace: persistedDebugTrace } : {}),
       ...(endChat ? { endChat } : {}),
+      ...(knowledgeGap ? { knowledgeGap } : {}),
     },
     finalCompletion,
     toolMessages,
@@ -1365,5 +1453,6 @@ export async function runAgentChat({
     connectedToolkits: enabledToolkits,
     debugTrace,
     endChat,
+    knowledgeGap,
   };
 }

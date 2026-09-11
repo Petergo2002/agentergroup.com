@@ -772,6 +772,10 @@ export async function POST(
           runtimeHadError: boolean;
           detectionReason?: string;
           confidence?: number;
+          modelFlaggedGap?: {
+            question: string | null;
+            reason: string | null;
+          } | null;
           metadata?: Record<string, unknown>;
         }) => {
           if (access.source === "preview") {
@@ -784,6 +788,7 @@ export async function POST(
               assistantAnswer: input.assistantAnswer,
               knowledgeMatchCount: input.knowledgeMatchCount,
               runtimeHadError: input.runtimeHadError,
+              modelFlaggedGap: input.modelFlaggedGap ?? null,
             });
 
             if (!detection.shouldCreate) {
@@ -814,6 +819,10 @@ export async function POST(
                   requestId: chatRequestId,
                   knowledgeMatchCount: input.knowledgeMatchCount,
                   runtimeHadError: input.runtimeHadError,
+                  // Comparison data: which signal fired, and whether the legacy
+                  // patterns would have caught this on their own.
+                  detectionSource: detection.source,
+                  patternWouldCreate: detection.patternWouldCreate,
                   ...(input.metadata ?? {}),
                 },
               });
@@ -971,6 +980,7 @@ export async function POST(
             assistantMessageId,
             knowledgeMatchCount: result.knowledgeMatches.length,
             runtimeHadError: result.debugTrace?.hadError ?? false,
+            modelFlaggedGap: result.knowledgeGap,
             metadata: result.debugTrace?.errorSummary
               ? { runtimeErrorSummary: result.debugTrace.errorSummary }
               : undefined,
