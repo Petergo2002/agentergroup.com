@@ -16,7 +16,9 @@
     "widget:load-test": "node scripts/widget-load-test.mjs",
     "widget:dev": "npm --prefix apps/widget-v2 run dev",
     "widget:typecheck": "npm --prefix apps/widget-v2 run typecheck",
-    "widget:build": "npm --prefix apps/widget-v2 run build"
+    "widget:build": "npm --prefix apps/widget-v2 run build",
+    "email:templates": "node --experimental-strip-types scripts/build-email-templates.ts",
+    "email:preview": "node --experimental-strip-types scripts/preview-emails.ts"
   },
   "dependencies": {
     "@composio/core": "^0.10.0",

@@ -122,16 +122,18 @@ test("widget v2 integrates contact tab and exports submitWidgetLead", () => {
 });
 
 test("lead notification email template normalizes to Milo, strips raw tags, and uses brand orange", () => {
-  const emailSource = readFileSync("src/lib/email.ts", "utf8");
+  const senderSource = readFileSync("src/lib/email/index.ts", "utf8");
+  const templateSource = readFileSync("src/lib/email/templates/lead-notification.ts", "utf8");
+  const themeSource = readFileSync("src/lib/email/theme.ts", "utf8");
 
   // Verify normalization to Milo
-  assert.match(emailSource, /Milo/);
-  assert.match(emailSource, /maja/i);
+  assert.match(senderSource, /Milo/);
+  assert.match(senderSource, /maja/i);
   // Verify technical tag stripping
-  assert.match(emailSource, /Kontaktformulär/);
-  assert.match(emailSource, /replace/);
+  assert.match(templateSource, /Kontaktformulär/);
+  assert.match(templateSource, /replace/);
   // Verify brand orange accent
-  assert.match(emailSource, /#ff5c00/);
+  assert.match(themeSource, /#ff5c02/);
 });
 
 test("leads and analytics notifications clear smartly on click and route visit", () => {

@@ -3,6 +3,7 @@ import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 import { sendInviteEmail } from "@/lib/email";
 import { getAppUrl } from "@/lib/env";
+import { getServerLanguage } from "@/lib/i18n-server";
 import {
   buildTeamMemberLimitError,
   getTeamMemberLimitForPlan,
@@ -148,6 +149,8 @@ export async function POST(
     workspaceName: targetWorkspace.workspace.name,
     inviterName,
     inviteToken: inviteRecord.token,
+    // The invitee has no account yet, so the inviter's language is the best guess.
+    locale: await getServerLanguage(),
   });
 
   return NextResponse.json({

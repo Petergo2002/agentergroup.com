@@ -74,6 +74,7 @@ website is a **roadmap proposal**, not part of the current Website Chat release.
 | **[Operations](./runbooks/operations.md)** | Running it. Release verification, health checks, backup/restore, and widget-runtime deploy notes. |
 | **[Demo Tester Release Checklist](./runbooks/demo-tester-release-checklist.md)** | Before inviting testers. Gate list that must be complete and verified from a clean build. |
 | **[avenro.se: Vercel och one.com](./runbooks/avenro-domain-setup.md)** | Domains and DNS. Domäner, DNS, Widget V2, inloggning och e-post. *(Svenska)* |
+| **[Transactional Email](./runbooks/transactional-email.md)** | Email design. The shared template system, Resend setup, and installing the Supabase Auth templates. |
 
 ## 🔒 Security & Compliance
 

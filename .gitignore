@@ -53,3 +53,6 @@ lint_output.txt
 
 # Claude Code personal settings (permissions etc.), not shared with the team
 /.claude/settings.local.json
+
+# email previews
+/.email-preview
