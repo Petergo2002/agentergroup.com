@@ -68,6 +68,9 @@ export function EntityActionsMenu({
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsOpen(false);
+        // Escape should hand the keyboard back to the control that opened the
+        // menu, not drop focus on the body.
+        buttonRef.current?.focus();
       }
     };
 
@@ -87,11 +90,20 @@ export function EntityActionsMenu({
 
     updatePosition();
 
+    // The menu is portaled to the end of <body>, so without moving focus into
+    // it a keyboard user tabs straight past it into the rest of the page.
+    const focusFrame = window.requestAnimationFrame(() => {
+      menuRef.current
+        ?.querySelector<HTMLButtonElement>('[role="menuitem"]:not([disabled])')
+        ?.focus();
+    });
+
     const handleViewportChange = () => updatePosition();
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
 
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };
@@ -130,6 +142,7 @@ export function EntityActionsMenu({
               role="menuitem"
               onClick={() => {
                 setIsOpen(false);
+                buttonRef.current?.focus();
                 onArchiveToggle();
               }}
               disabled={archiveDisabled}
@@ -145,6 +158,7 @@ export function EntityActionsMenu({
               role="menuitem"
               onClick={() => {
                 setIsOpen(false);
+                buttonRef.current?.focus();
                 onEdit();
               }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:text-on-surface-variant/40"
@@ -159,6 +173,7 @@ export function EntityActionsMenu({
               role="menuitem"
               onClick={() => {
                 setIsOpen(false);
+                buttonRef.current?.focus();
                 onDelete();
               }}
               disabled={deleteDisabled}

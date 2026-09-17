@@ -693,7 +693,7 @@ export default function WidgetsPageClient({
             <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
               {t('widgets.title')}
             </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">
               {t('widgets.description')}
             </p>
           </div>
@@ -859,7 +859,7 @@ export default function WidgetsPageClient({
                     
                     <div className="flex items-center gap-2">
                        {widget.needsRedeploy && (
-                         <button
+                         <button type="button"
                            onClick={() => void handleSync(widget.id)}
                            disabled={syncingWidgetId === widget.id || togglingWidgetId === widget.id || deletingWidgetId === widget.id}
                            title={t('widgetBuilder.syncChanges')}

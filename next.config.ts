@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import { getAppSecurityHeaders } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
@@ -40,4 +41,44 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Source maps are uploaded to Sentry so production stack traces are readable.
+ * Without this, browser errors arrive as `a.b is not a function` at
+ * chunk-4f2a.js:1:88213, which makes the frontend half of error tracking close
+ * to worthless. (Server frames stay readable either way.)
+ *
+ * Three deliberate safety properties:
+ *
+ *  - Upload only happens when SENTRY_AUTH_TOKEN is present, so CI and local
+ *    builds behave exactly as before.
+ *  - errorHandler downgrades plugin failures to a warning. The default is to
+ *    throw, which would let a Sentry outage or an expired token break a
+ *    production deploy — an unacceptable coupling for a monitoring tool.
+ *  - deleteSourcemapsAfterUpload keeps the maps out of the deployed bundle, so
+ *    uploading them to Sentry never means publishing our source to the web.
+ */
+const hasSentryUploadCredentials = Boolean(
+  process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT,
+);
+
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Uploads a wider set of client files so more frames resolve to real source.
+  widenClientFileUpload: true,
+
+  sourcemaps: {
+    disable: !hasSentryUploadCredentials,
+    deleteSourcemapsAfterUpload: true,
+  },
+
+  // Monitoring must never be able to fail a deploy.
+  errorHandler: (error) => {
+    console.warn("[sentry] build plugin warning:", error.message);
+  },
+
+  silent: !process.env.CI,
+  telemetry: false,
+});

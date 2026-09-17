@@ -18,8 +18,10 @@ import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
 import { hasAutomationsEnabled } from "@/lib/assistants/feature-flags";
 import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
 import { formatRelativeDate } from "@/lib/utils";
+import { formatLocaleDate, formatLocaleNumber } from "@/lib/i18n";
 import type {
   DashboardAnalyticsAppliedFilters,
+  DashboardAutomationTrendPoint,
   DashboardAnalyticsConversationListItem,
   DashboardAnalyticsResponse,
   DashboardConversationDetailResponse,
@@ -32,13 +34,18 @@ import {
   BarChart3,
   Bot,
   Bug,
+  CheckCircle2,
   ChevronRight,
   MessageSquare,
   MessagesSquare,
   Paperclip,
+  Search,
+  TrendingUp,
   UserCheck,
+  Users,
   Workflow,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
@@ -191,12 +198,61 @@ interface DashboardAnalyticsState {
   detailCache: Record<string, DashboardConversationDetailResponse>;
 }
 
-type HeaderMetricItem = {
+type AnalyticsStatItem = {
+  key: string;
   label: string;
   value: ReactNode;
-  sublabel?: string;
-  tone?: "neutral" | "success" | "warning" | "error";
+  meta: string;
+  icon: LucideIcon;
+  tone?: "brand" | "success" | "error";
+  /** Daily series for this metric, server-aggregated over the filtered set. */
+  sparkline?: number[];
 };
+
+/**
+ * Shape-only trend for a stat tile.
+ *
+ * No axes or labels by design: the tile already carries the number, and this
+ * only has to answer "rising or falling". The exact per-day values live in the
+ * tooltip-bearing charts, not here.
+ */
+function StatSparkline({ series }: { series: number[] }) {
+  if (series.length < 2) {
+    return null;
+  }
+
+  const max = Math.max(...series, 1);
+  const width = 64;
+  const height = 20;
+  const step = width / (series.length - 1);
+  const points = series
+    .map((value, index) => {
+      const x = index * step;
+      const y = height - (value / max) * (height - 2) - 1;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="h-5 w-16 shrink-0 overflow-visible text-primary"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polyline
+        points={points}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
 
 function buildAnalyticsUrl(
   filters: DashboardAnalyticsAppliedFilters,
@@ -402,19 +458,13 @@ function ConversationInboxPane({
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-surface-container-lowest">
-      <div className="border-b border-outline-variant/10 px-5 py-5">
-        <h2 className="text-lg font-semibold tracking-normal text-on-surface">
-          Conversations
+      <div className="flex items-baseline justify-between gap-3 border-b border-outline-variant/10 px-5 py-4">
+        <h2 className="truncate text-sm font-semibold tracking-normal text-on-surface">
+          {t("analytics.inboxTitle")}
         </h2>
-        <div className="mb-5 mt-1.5 flex items-center gap-2">
-          <span className="text-xs font-semibold text-primary">
-            Reporting
-          </span>
-          <span className="h-1 w-1 rounded-full bg-outline-variant/30" />
-          <span className="text-xs font-medium text-on-surface-variant">
-            {t("analytics.conversationResults", { count: conversations.length })}
-          </span>
-        </div>
+        <span className="shrink-0 rounded-full border border-outline-variant/15 bg-surface-container-low px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-on-surface-variant">
+          {t("analytics.conversationResults", { count: conversations.length })}
+        </span>
       </div>
 
       <div className="flex-1 overflow-y-auto hide-scrollbar">
@@ -672,41 +722,71 @@ function ConversationDetail({
   );
 }
 
-function HeaderMetric({
-  label,
-  value,
-  sublabel,
-  tone = "neutral",
+/**
+ * One headline number.
+ *
+ * A handful of totals is a KPI row, not a chart — so these stay tiles. They are
+ * deliberately one line tall: this page's main job is the conversation inbox
+ * below, and a dashboard-sized card row would eat the space the inbox needs.
+ */
+function AnalyticsStat({
+  item,
+  isLoading,
 }: {
-  label: string;
-  value: ReactNode;
-  sublabel?: string;
-  tone?: "neutral" | "success" | "warning" | "error";
+  item: AnalyticsStatItem;
+  isLoading: boolean;
 }) {
+  const Icon = item.icon;
   const toneClass =
-    tone === "success"
-      ? "text-success"
-      : tone === "warning"
-        ? "text-warning"
-        : tone === "error"
-          ? "text-error"
-          : "text-on-surface";
+    item.tone === "success"
+      ? "bg-success-container text-success"
+      : item.tone === "error"
+        ? "bg-error-container text-error"
+        : "bg-primary/10 text-primary";
 
   return (
-    <div className="min-w-0 rounded-lg border border-outline-variant/12 bg-surface px-3 py-2.5">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="truncate text-[11px] font-semibold text-on-surface-variant/65">
-          {label}
-        </p>
-        <p className={`shrink-0 text-base font-semibold tabular-nums ${toneClass}`}>
-          {value}
-        </p>
+    <article className="flex min-w-[9.5rem] shrink-0 items-center gap-3 rounded-xl border border-outline-variant/25 bg-surface-container-low px-3.5 py-3 sm:min-w-0 sm:shrink">
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
+      >
+        <Icon className="h-4 w-4" strokeWidth={2.1} aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="truncate text-[11px] font-semibold text-on-surface-variant">
+            {item.label}
+          </p>
+          <span className="shrink-0 truncate text-[11px] font-medium text-on-surface-variant/55">
+            {item.meta}
+          </span>
+        </div>
+        {isLoading ? (
+          <span className="mt-1.5 block h-5 w-14 animate-pulse rounded bg-surface-container" />
+        ) : (
+          <div className="mt-0.5 flex items-center justify-between gap-2">
+            <span className="font-headline text-xl font-extrabold tabular-nums tracking-tight text-on-surface">
+              {item.value}
+            </span>
+            {item.sparkline ? <StatSparkline series={item.sparkline} /> : null}
+          </div>
+        )}
       </div>
-      {sublabel ? (
-        <p className="mt-1 truncate text-[11px] font-medium text-on-surface-variant/50">
-          {sublabel}
-        </p>
-      ) : null}
+    </article>
+  );
+}
+
+function AnalyticsStatRow({
+  items,
+  isLoading,
+}: {
+  items: AnalyticsStatItem[];
+  isLoading: boolean;
+}) {
+  return (
+    <div className="flex gap-2.5 overflow-x-auto pb-0.5 hide-scrollbar sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4">
+      {items.map((item) => (
+        <AnalyticsStat key={item.key} item={item} isLoading={isLoading} />
+      ))}
     </div>
   );
 }
@@ -722,11 +802,13 @@ function AnalyticsViewSwitch({
   automations: number;
   onChange: (view: "conversations" | "automations") => void;
 }) {
+  const { t } = useLanguage();
+
   return (
     <div className="inline-flex rounded-xl border border-outline-variant/15 bg-surface-container-low p-1 sm:inline-grid sm:grid-cols-2">
       {([
-        ["conversations", "Conversations", conversations],
-        ["automations", "Automations", automations],
+        ["conversations", t("analytics.conversationsView"), conversations],
+        ["automations", t("analytics.automationsView"), automations],
       ] as const).map(([value, label, count]) => {
         const selected = activeView === value;
 
@@ -773,129 +855,310 @@ function AnalyticsFilterBar({
   onChange: (filters: DashboardAnalyticsAppliedFilters) => void;
 }) {
   const { t } = useLanguage();
-  const rangeOptions: Array<{ value: DashboardAnalyticsAppliedFilters["range"]; label: string }> = [
-    { value: "7d", label: "7 days" },
-    { value: "30d", label: "30 days" },
-    { value: "90d", label: "90 days" },
+  const rangeOptions: Array<{
+    value: DashboardAnalyticsAppliedFilters["range"];
+    label: string;
+  }> = [
+    { value: "7d", label: t("analytics.range7d") },
+    { value: "30d", label: t("analytics.range30d") },
+    { value: "90d", label: t("analytics.range90d") },
   ];
   const agentOptions = (data?.filters.agents ?? []).filter((agent) =>
     activeView === "automations"
       ? agent.surface === "automation"
       : agent.surface === "widget",
   );
+  const selectClass =
+    "h-9 min-w-0 rounded-lg border border-outline-variant/25 bg-surface-container-low py-0 pl-2.5 pr-7 text-xs font-semibold text-on-surface outline-none transition-colors hover:border-outline-variant/40 focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/20";
 
   return (
-    <div className="rounded-xl border border-outline-variant/12 bg-surface p-2.5">
-      <div className="grid gap-2.5 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="hidden text-xs font-semibold text-on-surface-variant/55 sm:inline">
-            Range
-          </span>
-          {rangeOptions.map((option) => (
+    <div className="flex flex-wrap items-center gap-2">
+      <div
+        role="group"
+        aria-label={t("analytics.filterRange")}
+        className="inline-flex shrink-0 rounded-lg border border-outline-variant/15 bg-surface-container-low p-0.5"
+      >
+        {rangeOptions.map((option) => {
+          const selected = filters.range === option.value;
+
+          return (
             <button
               key={option.value}
               type="button"
+              aria-pressed={selected}
               onClick={() => onChange({ ...filters, range: option.value })}
-              className={`h-8 rounded-lg px-3 text-xs font-semibold transition-all duration-150 focus:outline-none ${
-                filters.range === option.value
-                  ? "bg-primary/12 text-primary font-bold ring-1 ring-primary/20"
-                  : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+              className={`h-8 rounded-[7px] px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 ${
+                selected
+                  ? "bg-surface-container-lowest text-on-surface shadow-xs ring-1 ring-outline-variant/15"
+                  : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               {option.label}
             </button>
-          ))}
-        </div>
+          );
+        })}
+      </div>
 
-        <div
-          className={`grid min-w-0 gap-2 ${
-            activeView === "automations"
-              ? "sm:grid-cols-2 lg:min-w-[420px]"
-              : "sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(180px,1.2fr)]"
-          }`}
+      <select
+        aria-label={t("analytics.filterAgent")}
+        value={filters.agentId ?? ""}
+        onChange={(event) =>
+          onChange({ ...filters, agentId: event.target.value || null })
+        }
+        className={selectClass}
+      >
+        <option value="">
+          {miloMode && activeView === "conversations"
+            ? t("nav.milo")
+            : t("analytics.allAgents")}
+        </option>
+        {agentOptions.map((agent) => (
+          <option key={agent.id} value={agent.id}>
+            {agent.name}
+          </option>
+        ))}
+      </select>
+
+      {activeView === "automations" ? (
+        <select
+          aria-label={t("analytics.filterStatus")}
+          value={filters.automationStatus}
+          onChange={(event) =>
+            onChange({
+              ...filters,
+              automationStatus: event.target
+                .value as DashboardAnalyticsAppliedFilters["automationStatus"],
+            })
+          }
+          className={selectClass}
         >
+          <option value="all">{t("analytics.allStatuses")}</option>
+          <option value="processed">{t("analytics.automationStatusProcessed")}</option>
+          <option value="failed">{t("analytics.automationStatusFailed")}</option>
+          <option value="ignored">{t("analytics.automationStatusIgnored")}</option>
+          <option value="processing">{t("analytics.automationStatusProcessing")}</option>
+          <option value="received">{t("analytics.automationStatusReceived")}</option>
+        </select>
+      ) : (
+        <>
           <select
-            aria-label="Agent filter"
-            value={filters.agentId ?? ""}
-            onChange={(event) => onChange({ ...filters, agentId: event.target.value || null })}
-            className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
+            aria-label={t("analytics.filterWidget")}
+            value={filters.widgetId ?? ""}
+            onChange={(event) =>
+              onChange({ ...filters, widgetId: event.target.value || null })
+            }
+            className={selectClass}
           >
             <option value="">
-              {miloMode && activeView === "conversations"
-                ? t("nav.milo")
-                : t("analytics.allAgents")}
+              {miloMode ? t("nav.websiteChat") : t("analytics.allWidgets")}
             </option>
-            {agentOptions.map((agent) => (
-              <option key={agent.id} value={agent.id}>{agent.name}</option>
+            {(data?.filters.widgets ?? []).map((widget) => (
+              <option key={widget.id} value={widget.id}>
+                {widget.name}
+              </option>
             ))}
           </select>
 
-          {activeView === "automations" ? (
-            <select
-              aria-label="Automation status filter"
-              value={filters.automationStatus}
-              onChange={(event) => onChange({
+          <select
+            aria-label={t("analytics.filterStatus")}
+            value={filters.sessionStatus}
+            onChange={(event) =>
+              onChange({
                 ...filters,
-                automationStatus: event.target.value as DashboardAnalyticsAppliedFilters["automationStatus"],
-              })}
-              className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
-            >
-              <option value="all">All statuses</option>
-              <option value="processed">Processed</option>
-              <option value="failed">Failed</option>
-              <option value="ignored">Ignored</option>
-              <option value="processing">Processing</option>
-              <option value="received">Received</option>
-            </select>
-          ) : (
-            <>
-              <select
-                aria-label="Widget filter"
-                value={filters.widgetId ?? ""}
-                onChange={(event) => onChange({ ...filters, widgetId: event.target.value || null })}
-                className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
-              >
-                <option value="">
-                  {miloMode ? t("nav.websiteChat") : t("analytics.allWidgets")}
-                </option>
-                {(data?.filters.widgets ?? []).map((widget) => (
-                  <option key={widget.id} value={widget.id}>{widget.name}</option>
-                ))}
-              </select>
-              <select
-                aria-label="Conversation status filter"
-                value={filters.sessionStatus}
-                onChange={(event) => onChange({
-                  ...filters,
-                  sessionStatus: event.target.value as DashboardAnalyticsAppliedFilters["sessionStatus"],
-                })}
-                className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-2.5 text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
-              >
-                <option value="all">All statuses</option>
-                <option value="live">Live visitors</option>
-                <option value="idle">Idle sessions</option>
-                <option value="completed">Completed conversations</option>
-              </select>
-              <input
-                aria-label="Search conversations"
-                value={filters.search}
-                onChange={(event) => onChange({ ...filters, search: event.target.value })}
-                placeholder="Search conversations"
-                className="h-8 min-w-0 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/45 focus:border-primary"
-              />
-            </>
-          )}
-        </div>
-      </div>
+                sessionStatus: event.target
+                  .value as DashboardAnalyticsAppliedFilters["sessionStatus"],
+              })
+            }
+            className={selectClass}
+          >
+            <option value="all">{t("analytics.allStatuses")}</option>
+            <option value="live">{t("analytics.statusLive")}</option>
+            <option value="idle">{t("analytics.statusIdle")}</option>
+            <option value="completed">{t("analytics.statusCompleted")}</option>
+          </select>
+
+          <div className="relative min-w-[11rem] flex-1 sm:max-w-xs">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-on-surface-variant/50"
+              aria-hidden="true"
+            />
+            <input
+              aria-label={t("analytics.searchLabel")}
+              value={filters.search}
+              onChange={(event) =>
+                onChange({ ...filters, search: event.target.value })
+              }
+              placeholder={t("analytics.searchPlaceholder")}
+              className="h-9 w-full rounded-lg border border-outline-variant/25 bg-surface-container-low pl-8 pr-3 text-xs font-semibold text-on-surface outline-none transition-colors placeholder:font-medium placeholder:text-on-surface-variant/45 hover:border-outline-variant/40 focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
+/** Groups large totals so a four-figure count stays scannable at a glance. */
+function formatStatNumber(value: number, language: "en" | "sv") {
+  return formatLocaleNumber(value, language);
+}
+
 function formatTrendDate(value: string, language: "en" | "sv") {
-  return new Intl.DateTimeFormat(language === "sv" ? "sv-SE" : "en-US", {
+  return formatLocaleDate(`${value}T00:00:00`, language, {
     month: "short",
     day: "numeric",
-  }).format(new Date(`${value}T00:00:00`));
+  });
+}
+
+/**
+ * Daily processed-vs-failed outcomes as a stacked column chart.
+ *
+ * Replaces a row-per-day bar list, which at a 90 day range was 90 rows of
+ * scrolling — a table pretending to be a chart.
+ *
+ * Processed and failed are status colors, and green-vs-red is the worst case
+ * for red-green color blindness: the app's own success/error tokens measure
+ * only ΔE 5.0 (light) and 6.5 (dark) apart under deuteranopia. So hue never
+ * carries the distinction alone here — a labelled legend, a fixed stacking
+ * order, a 2px surface gap between the two segments, and exact numbers in every
+ * tooltip all repeat the same information.
+ */
+function AutomationTrendChart({
+  trend,
+  language,
+}: {
+  trend: DashboardAutomationTrendPoint[];
+  language: "en" | "sv";
+}) {
+  const { t } = useLanguage();
+  const maxEvents = Math.max(1, ...trend.map((point) => point.totalEvents));
+  // The cap only exists so a 7 day range does not render as slabs; at longer
+  // ranges the columns shrink below it on their own.
+  const barMaxWidth =
+    trend.length <= 10 ? 40 : trend.length <= 31 ? 26 : 14;
+  // Only the ends and the middle are labelled, and they are laid out across the
+  // whole plot rather than inside one column — at a 90 day range a column is a
+  // few pixels wide and a per-column label truncates to an unreadable sliver.
+  const axisLabels = Array.from(
+    new Set(
+      trend.length <= 1
+        ? [0]
+        : [0, Math.floor((trend.length - 1) / 2), trend.length - 1],
+    ),
+  )
+    .map((index) => trend[index])
+    .filter(Boolean);
+
+  return (
+    <div className="px-5 py-4">
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-on-surface-variant">
+          <span className="h-2.5 w-2.5 rounded-[3px] bg-success" aria-hidden="true" />
+          {t("analytics.legendProcessed")}
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-on-surface-variant">
+          <span className="h-2.5 w-2.5 rounded-[3px] bg-error" aria-hidden="true" />
+          {t("analytics.legendFailed")}
+        </span>
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex h-36 w-7 shrink-0 flex-col justify-between py-0 text-right">
+          <span className="text-[10px] font-medium tabular-nums text-on-surface-variant/50">
+            {maxEvents}
+          </span>
+          <span className="text-[10px] font-medium tabular-nums text-on-surface-variant/50">
+            0
+          </span>
+        </div>
+
+        <div className="relative min-w-0 flex-1">
+          {/* Recessive magnitude reference: a ceiling at the max and a baseline. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-outline-variant/30"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 border-t border-outline-variant/30"
+          />
+
+          <div className="flex h-36 items-end gap-[3px]">
+            {trend.map((point) => {
+              const failedHeight =
+                point.failedEvents > 0
+                  ? Math.max(3, (point.failedEvents / maxEvents) * 100)
+                  : 0;
+              const processedHeight =
+                point.processedEvents > 0
+                  ? Math.max(3, (point.processedEvents / maxEvents) * 100)
+                  : 0;
+              const tooltip = t("analytics.trendTooltip", {
+                processed: point.processedEvents,
+                failed: point.failedEvents,
+              });
+
+              return (
+                <div
+                  key={point.date}
+                  className="group relative flex h-full min-w-[3px] flex-1 justify-center"
+                >
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-2.5 py-1.5 text-[11px] shadow-panel group-hover:block">
+                    <span className="block font-semibold text-on-surface">
+                      {formatTrendDate(point.date, language)}
+                    </span>
+                    <span className="mt-0.5 block font-medium text-on-surface-variant">
+                      {tooltip}
+                    </span>
+                  </span>
+
+                  {/* Thin marks: a wide range must not inflate into slab bars. */}
+                  <div
+                    className="flex h-full w-full flex-col justify-end gap-[2px]"
+                    style={{ maxWidth: `${barMaxWidth}px` }}
+                  >
+                    {failedHeight > 0 ? (
+                      <div
+                        className="w-full rounded-t-[4px] bg-error"
+                        style={{ height: `${failedHeight}%` }}
+                      />
+                    ) : null}
+                    {processedHeight > 0 ? (
+                      <div
+                        className={`w-full bg-success ${failedHeight > 0 ? "" : "rounded-t-[4px]"}`}
+                        style={{ height: `${processedHeight}%` }}
+                      />
+                    ) : null}
+                    {failedHeight === 0 && processedHeight === 0 ? (
+                      <div className="h-[3px] w-full rounded-[2px] bg-surface-container-high" />
+                    ) : null}
+                  </div>
+
+                  <span className="sr-only">
+                    {formatTrendDate(point.date, language)}: {tooltip}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-2 flex gap-2">
+        <div className="w-7 shrink-0" aria-hidden="true" />
+        <div className="flex min-w-0 flex-1 items-center justify-between">
+          {axisLabels.map((point) => (
+            <span
+              key={point.date}
+              className="whitespace-nowrap text-[10px] font-medium text-on-surface-variant/55"
+            >
+              {formatTrendDate(point.date, language)}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function AutomationPerformancePanel({
@@ -907,11 +1170,8 @@ function AutomationPerformancePanel({
   isLoading: boolean;
   language: "en" | "sv";
 }) {
+  const { t } = useLanguage();
   const automation = data?.automation ?? null;
-  const maxTrendEvents = Math.max(
-    1,
-    ...(automation?.trend ?? []).map((point) => point.totalEvents),
-  );
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-surface px-4 py-5 lg:px-6">
@@ -927,9 +1187,9 @@ function AutomationPerformancePanel({
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant/55 ring-1 ring-outline-variant/15">
             <Workflow className="h-5 w-5" aria-hidden="true" />
           </div>
-          <h2 className="text-base font-semibold text-on-surface">No automation events in this range</h2>
+          <h2 className="text-base font-semibold text-on-surface">{t("analytics.automationEmptyTitle")}</h2>
           <p className="mt-2 max-w-md text-sm leading-6 text-on-surface-variant/70">
-            Automation performance appears after active automation agents receive trigger events.
+            {t("analytics.automationEmptyBody")}
           </p>
         </div>
       ) : (
@@ -938,20 +1198,20 @@ function AutomationPerformancePanel({
           <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
             <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
               <div className="border-b border-outline-variant/10 px-5 py-4">
-                <h2 className="text-sm font-semibold text-on-surface">Automation agents</h2>
-                <p className="mt-1 text-xs text-on-surface-variant/60">Workspace-level automation performance for the selected range.</p>
+                <h2 className="text-sm font-semibold text-on-surface">{t("analytics.automationAgentsTitle")}</h2>
+                <p className="mt-1 text-xs text-on-surface-variant/60">{t("analytics.automationAgentsSubtitle")}</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] text-left text-sm">
                   <thead className="bg-surface-container-low text-xs font-semibold text-on-surface-variant">
                     <tr>
-                      <th className="px-5 py-3">Agent</th>
-                      <th className="px-3 py-3">Events</th>
-                      <th className="px-3 py-3">Processed</th>
-                      <th className="px-3 py-3">Failed</th>
-                      <th className="px-3 py-3">Action</th>
-                      <th className="px-3 py-3">Last event</th>
-                      <th className="px-5 py-3 text-right">Activity</th>
+                      <th className="px-5 py-3">{t("analytics.automationColAgent")}</th>
+                      <th className="px-3 py-3">{t("analytics.automationColEvents")}</th>
+                      <th className="px-3 py-3">{t("analytics.automationColProcessed")}</th>
+                      <th className="px-3 py-3">{t("analytics.automationColFailed")}</th>
+                      <th className="px-3 py-3">{t("analytics.automationColAction")}</th>
+                      <th className="px-3 py-3">{t("analytics.automationColLastEvent")}</th>
+                      <th className="px-5 py-3 text-right">{t("analytics.automationColActivity")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/10">
@@ -965,14 +1225,14 @@ function AutomationPerformancePanel({
                         <td className="px-3 py-4 tabular-nums text-success">{agent.processedEvents}</td>
                         <td className="px-3 py-4 tabular-nums text-error">{agent.failedEvents}</td>
                         <td className="px-3 py-4 text-on-surface-variant">
-                          {agent.actionTaken} taken / {agent.noAction} none
+                          {t("analytics.automationActionSummary", { taken: agent.actionTaken, none: agent.noAction })}
                         </td>
                         <td className="px-3 py-4 text-xs text-on-surface-variant">
-                          {agent.lastEventAt ? formatRelativeDate(agent.lastEventAt, language) : "Never"}
+                          {agent.lastEventAt ? formatRelativeDate(agent.lastEventAt, language) : t("analytics.automationNever")}
                         </td>
                         <td className="px-5 py-4 text-right">
                           <Link href={agent.activityHref} className="text-xs font-semibold text-primary hover:underline">
-                            View activity
+                            {t("analytics.automationViewActivity")}
                           </Link>
                         </td>
                       </tr>
@@ -984,13 +1244,13 @@ function AutomationPerformancePanel({
 
             <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
               <div className="border-b border-outline-variant/10 px-5 py-4">
-                <h2 className="text-sm font-semibold text-on-surface">Recent failures</h2>
-                <p className="mt-1 text-xs text-on-surface-variant/60">Open Activity to inspect the exact run and diagnostics.</p>
+                <h2 className="text-sm font-semibold text-on-surface">{t("analytics.automationRecentFailuresTitle")}</h2>
+                <p className="mt-1 text-xs text-on-surface-variant/60">{t("analytics.automationRecentFailuresSubtitle")}</p>
               </div>
               {automation.recentFailures.length === 0 ? (
                 <div className="px-5 py-12 text-center">
-                  <p className="text-sm font-semibold text-on-surface">No failures in this range</p>
-                  <p className="mt-1 text-sm text-on-surface-variant/65">Failed runs will appear here when they need investigation.</p>
+                  <p className="text-sm font-semibold text-on-surface">{t("analytics.automationNoFailuresTitle")}</p>
+                  <p className="mt-1 text-sm text-on-surface-variant/65">{t("analytics.automationNoFailuresBody")}</p>
                 </div>
               ) : (
                 <div className="divide-y divide-outline-variant/10">
@@ -1006,7 +1266,7 @@ function AutomationPerformancePanel({
                           <p className="mt-1 truncate text-xs text-on-surface-variant/65">{failure.summary ?? failure.errorMessage ?? failure.triggerLabel}</p>
                         </div>
                         <span className="shrink-0 rounded-full bg-error/10 px-2.5 py-1 text-xs font-semibold text-error ring-1 ring-error/15">
-                          Failed
+                          {t("analytics.automationFailedBadge")}
                         </span>
                       </div>
                       <p className="mt-2 text-xs text-on-surface-variant/55">
@@ -1021,43 +1281,10 @@ function AutomationPerformancePanel({
 
           <section className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
             <div className="border-b border-outline-variant/10 px-5 py-4">
-              <h2 className="text-sm font-semibold text-on-surface">Success and failure trend</h2>
-              <p className="mt-1 text-xs text-on-surface-variant/60">Daily automation outcomes for the selected range.</p>
+              <h2 className="text-sm font-semibold text-on-surface">{t("analytics.automationTrendTitle")}</h2>
+              <p className="mt-1 text-xs text-on-surface-variant/60">{t("analytics.automationTrendSubtitle")}</p>
             </div>
-            <div className="divide-y divide-outline-variant/10">
-              {automation.trend.map((point) => {
-                const processedWidth = point.processedEvents > 0
-                  ? Math.max(4, Math.round((point.processedEvents / maxTrendEvents) * 100))
-                  : 0;
-                const failedWidth = Math.max(
-                  point.failedEvents > 0 ? 4 : 0,
-                  Math.round((point.failedEvents / maxTrendEvents) * 100),
-                );
-
-                return (
-                  <div key={point.date} className="grid gap-3 px-5 py-3 sm:grid-cols-[120px_minmax(0,1fr)_160px] sm:items-center">
-                    <p className="text-xs font-semibold text-on-surface">{formatTrendDate(point.date, language)}</p>
-                    <div className="flex h-2 overflow-hidden rounded-full bg-surface-container-low">
-                      <div
-                        className="bg-success"
-                        style={{ width: `${processedWidth}%` }}
-                        aria-label={`${point.processedEvents} processed events`}
-                      />
-                      {point.failedEvents > 0 ? (
-                        <div
-                          className="bg-error"
-                          style={{ width: `${failedWidth}%` }}
-                          aria-label={`${point.failedEvents} failed events`}
-                        />
-                      ) : null}
-                    </div>
-                    <p className="text-xs font-medium text-on-surface-variant sm:text-right">
-                      {point.processedEvents} processed / {point.failedEvents} failed
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+            <AutomationTrendChart trend={automation.trend} language={language} />
           </section>
         </div>
       )}
@@ -1076,7 +1303,6 @@ export function AnalyticsWorkspaceView() {
     process.env.NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED !== "false";
   const automationsEnabled = hasAutomationsEnabled(workspace);
   const [activeView, setActiveView] = useState<"conversations" | "automations">("conversations");
-  const [isHeaderDetailsOpen, setIsHeaderDetailsOpen] = useState(false);
   const [filters, setFilters] = useState<DashboardAnalyticsAppliedFilters>({
     range: "30d",
     widgetId: null,
@@ -1423,72 +1649,77 @@ export function AnalyticsWorkspaceView() {
     }
   }, [hasActiveAutomations, filters.automationStatus, filters.agentId, state.data?.filters.agents]);
 
-  const conversationHeaderMetrics: HeaderMetricItem[] = [
+  const isOverviewLoading = state.isLoading && !state.data;
+  const trend = state.data?.trend ?? [];
+  const conversationStats: AnalyticsStatItem[] = [
     {
-      label: "Conversations",
-      value: overview?.conversations ?? 0,
-      sublabel: `${overview?.messages ?? 0} messages`,
+      key: "conversations",
+      sparkline: trend.map((point) => point.conversations),
+      label: t("analytics.statConversations"),
+      value: formatStatNumber(overview?.conversations ?? 0, language),
+      meta: t("analytics.statConversationsMeta"),
+      icon: MessagesSquare,
     },
     {
-      label: "Leads",
-      value: overview?.leads ?? 0,
-      sublabel: `${overview?.activeWidgets ?? 0} live widgets`,
+      key: "leads",
+      sparkline: trend.map((point) => point.leads),
+      label: t("analytics.statLeads"),
+      value: formatStatNumber(overview?.leads ?? 0, language),
+      meta: t("analytics.statLeadsMeta"),
+      icon: Users,
     },
     {
-      label: "Messages",
-      value: overview?.messages ?? 0,
-      sublabel: "Across selected sessions",
+      key: "messages",
+      sparkline: trend.map((point) => point.messages),
+      label: t("analytics.statMessages"),
+      value: formatStatNumber(overview?.messages ?? 0, language),
+      meta: t("analytics.statMessagesMeta"),
+      icon: MessageSquare,
+    },
+    {
+      key: "widgets",
+      label: t("analytics.statLiveWidgets"),
+      value: formatStatNumber(overview?.activeWidgets ?? 0, language),
+      meta: t("analytics.statLiveWidgetsMeta"),
+      icon: Activity,
+      tone: "success",
     },
   ];
-  const automationHeaderMetrics: HeaderMetricItem[] = [
+  const automationFailures = automation?.failedEvents ?? 0;
+  const automationStats: AnalyticsStatItem[] = [
     {
-      label: "Events",
-      value: automation?.totalEvents ?? 0,
-      sublabel: `${automation?.processedEvents ?? 0} processed`,
-      tone: "neutral",
+      key: "events",
+      label: t("analytics.statEvents"),
+      value: formatStatNumber(automation?.totalEvents ?? 0, language),
+      meta: t("analytics.statEventsMeta", {
+        count: automation?.processedEvents ?? 0,
+      }),
+      icon: Workflow,
     },
     {
-      label: "Success rate",
+      key: "successRate",
+      label: t("analytics.statSuccessRate"),
       value: `${automation?.successRate ?? 0}%`,
-      sublabel: `${automation?.actionTaken ?? 0} actions taken`,
+      meta: t("analytics.statSuccessRateMeta", {
+        count: automation?.actionTaken ?? 0,
+      }),
+      icon: TrendingUp,
       tone: "success",
     },
     {
-      label: "Failures",
-      value: automation?.failedEvents ?? 0,
-      sublabel: "Open Activity to debug",
-      tone: (automation?.failedEvents ?? 0) > 0 ? "error" : "neutral",
+      key: "failures",
+      label: t("analytics.statFailures"),
+      value: formatStatNumber(automationFailures, language),
+      meta:
+        automationFailures > 0
+          ? t("analytics.statFailuresMeta")
+          : t("analytics.statFailuresNoneMeta"),
+      icon: automationFailures > 0 ? AlertCircle : CheckCircle2,
+      tone: automationFailures > 0 ? "error" : "success",
     },
   ];
-  const headerMetrics =
-    effectiveActiveView === "automations" ? automationHeaderMetrics : conversationHeaderMetrics;
-  const selectedAgentName =
-    state.data?.filters.agents.find((agent) => agent.id === filters.agentId)?.name ??
-    (miloMode ? t("nav.milo") : t("analytics.allAgents"));
-  const selectedWidgetName =
-    state.data?.filters.widgets.find((widget) => widget.id === filters.widgetId)?.name ??
-    (miloMode ? t("nav.websiteChat") : t("analytics.allWidgets"));
-  const rangeLabel =
-    filters.range === "7d" ? "7 days" : filters.range === "90d" ? "90 days" : "30 days";
-  const statusLabel =
-    effectiveActiveView === "automations"
-      ? filters.automationStatus === "all"
-        ? "All statuses"
-        : filters.automationStatus
-            .split("_")
-            .map((part) => part[0]?.toUpperCase() + part.slice(1))
-            .join(" ")
-      : filters.sessionStatus === "all"
-        ? "All statuses"
-        : filters.sessionStatus === "live"
-          ? "Live visitors"
-          : filters.sessionStatus === "idle"
-            ? "Idle sessions"
-            : "Completed";
-  const collapsedDetailSummary =
-    effectiveActiveView === "automations"
-      ? `${rangeLabel} · ${selectedAgentName} · ${statusLabel}`
-      : `${rangeLabel} · ${selectedAgentName} · ${selectedWidgetName} · ${statusLabel}`;
+  const stats =
+    effectiveActiveView === "automations" ? automationStats : conversationStats;
 
   const handleViewChange = (view: "conversations" | "automations") => {
     setActiveView(view);
@@ -1511,70 +1742,39 @@ export function AnalyticsWorkspaceView() {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-surface">
-      <header className="shrink-0 border-b border-outline-variant/10 bg-surface-container-lowest px-4 py-3 lg:px-6">
-        <div className="grid gap-3">
-          <div className="grid gap-3 xl:grid-cols-[minmax(360px,0.75fr)_minmax(0,1.25fr)] xl:items-end">
+      <header className="shrink-0 border-b border-outline-variant/10 bg-surface-container-lowest px-4 py-4 lg:px-6">
+        <div className="mx-auto flex w-full max-w-[110rem] flex-col gap-3.5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="truncate text-xl font-bold tracking-tight text-on-surface">
-                {effectiveActiveView === "automations" ? "Automation performance" : "Conversation performance"}
+              <h1 className="truncate font-headline text-xl font-extrabold tracking-tight text-on-surface">
+                {t("analytics.title")}
               </h1>
+              <p className="mt-0.5 hidden truncate text-xs font-medium text-on-surface-variant sm:block">
+                {effectiveActiveView === "automations"
+                  ? t("analytics.automationsSubtitle")
+                  : t("analytics.conversationsSubtitle")}
+              </p>
             </div>
 
-            <div className={`flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center ${hasActiveAutomations ? "lg:justify-between" : "lg:justify-end"}`}>
-              {hasActiveAutomations ? (
-                <AnalyticsViewSwitch
-                  activeView={effectiveActiveView}
-                  conversations={overview?.conversations ?? 0}
-                  automations={automation?.totalEvents ?? 0}
-                  onChange={handleViewChange}
-                />
-              ) : null}
-
-              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                {!isHeaderDetailsOpen ? (
-                  <p className="min-w-0 truncate text-xs font-medium text-on-surface-variant/60">
-                    {collapsedDetailSummary}
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  aria-expanded={isHeaderDetailsOpen}
-                  aria-controls="analytics-header-details"
-                  onClick={() => setIsHeaderDetailsOpen((open) => !open)}
-                  className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-outline-variant/15 bg-surface px-3 text-xs font-semibold text-on-surface-variant transition-colors hover:border-outline-variant/30 hover:bg-surface-container-low hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                >
-                  <ChevronRight
-                    className={`h-3.5 w-3.5 transition-transform ${isHeaderDetailsOpen ? "rotate-90" : ""}`}
-                  />
-                  {isHeaderDetailsOpen ? "Hide details" : "Show details"}
-                </button>
-              </div>
-            </div>
+            {hasActiveAutomations ? (
+              <AnalyticsViewSwitch
+                activeView={effectiveActiveView}
+                conversations={overview?.conversations ?? 0}
+                automations={automation?.totalEvents ?? 0}
+                onChange={handleViewChange}
+              />
+            ) : null}
           </div>
 
-          {isHeaderDetailsOpen ? (
-            <div id="analytics-header-details" className="grid gap-3">
-              <div className="grid min-w-0 gap-2 sm:grid-cols-3">
-                {headerMetrics.map((metric) => (
-                  <HeaderMetric
-                    key={metric.label}
-                    label={metric.label}
-                    value={metric.value}
-                    sublabel={metric.sublabel}
-                    tone={metric.tone}
-                  />
-                ))}
-              </div>
+          <AnalyticsStatRow items={stats} isLoading={isOverviewLoading} />
 
-              <AnalyticsFilterBar
-                filters={filters}
-                data={state.data}
-                activeView={effectiveActiveView}
-                miloMode={miloMode}
-                onChange={(nextFilters) => setFilters(nextFilters)}
-              />
-            </div>
-          ) : null}
+          <AnalyticsFilterBar
+            filters={filters}
+            data={state.data}
+            activeView={effectiveActiveView}
+            miloMode={miloMode}
+            onChange={(nextFilters) => setFilters(nextFilters)}
+          />
         </div>
       </header>
 

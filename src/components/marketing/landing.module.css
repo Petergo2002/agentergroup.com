@@ -14,6 +14,15 @@
   --mkt-orange-text: #b93800;
   --mkt-success: #12805c;
   --mkt-success-soft: #eaf7f1;
+  /*
+   * Film grain, drawn as a tiled SVG so it costs no request and no dependency.
+   * It lives in background stacks only, never as an overlay, so it gives flat
+   * page surfaces some tooth without ever sitting on top of type. Product
+   * mockups deliberately stay clean: real product UI has no grain.
+   */
+  --mkt-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='0.17'/%3E%3C/svg%3E");
+  --mkt-grain-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='0.22'/%3E%3C/svg%3E");
+  --mkt-grain-size: 160px 160px;
   --mkt-radius-control: 0.75rem;
   --mkt-radius-card: 1.125rem;
   --mkt-radius-panel: 1.5rem;
@@ -30,8 +39,10 @@
   min-height: 100vh;
   overflow: clip;
   background:
+    var(--mkt-grain),
     radial-gradient(circle at 84% 2%, rgba(255, 92, 2, 0.07), transparent 25rem),
     var(--mkt-bg);
+  background-size: var(--mkt-grain-size), auto;
   color: var(--mkt-ink);
   color-scheme: light;
 }
@@ -54,10 +65,31 @@
 .siteHeader {
   position: sticky;
   top: 0;
-  border-color: rgba(24, 24, 24, 0.07);
-  background: rgba(250, 250, 249, 0.92);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset;
-  animation: header-enter 420ms var(--ease-enter) both;
+  border-bottom: 1px solid var(--mkt-border);
+  background: var(--mkt-bg);
+  /*
+   * `backwards`, not `both`: a retained transform from the entrance animation
+   * would make the header the containing block for its fixed-position
+   * descendants, clipping the mobile menu scrim to the header strip.
+   */
+  animation: header-enter 420ms var(--ease-enter) backwards;
+}
+
+/* The blur sits on a pseudo-element for the same containing-block reason. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .siteHeader {
+    background: transparent;
+  }
+
+  .siteHeader::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    background: rgba(250, 250, 249, 0.84);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    content: "";
+  }
 }
 
 .scrollProgressTrack {
@@ -127,67 +159,14 @@
   transform: scaleX(1);
 }
 
-.site[data-active-section="product"] .navLink[data-nav="product"],
-.site[data-active-section="how-it-works"] .navLink[data-nav="how-it-works"],
-.site[data-active-section="use-cases"] .navLink[data-nav="use-cases"],
-.site[data-active-section="security"] .navLink[data-nav="security"],
-.site[data-active-section="faq"] .navLink[data-nav="faq"] {
+.navLink[aria-current] {
   color: var(--mkt-ink);
   background: var(--mkt-soft);
 }
 
-.site[data-active-section="product"] .navLink[data-nav="product"]::after,
-.site[data-active-section="how-it-works"] .navLink[data-nav="how-it-works"]::after,
-.site[data-active-section="use-cases"] .navLink[data-nav="use-cases"]::after,
-.site[data-active-section="security"] .navLink[data-nav="security"]::after,
-.site[data-active-section="faq"] .navLink[data-nav="faq"]::after {
+.navLink[aria-current]::after {
   opacity: 1;
   transform: scaleX(1);
-}
-
-.securityPanel {
-  border: 1px solid var(--mkt-border);
-  border-radius: var(--mkt-radius-panel);
-  background: var(--mkt-warm);
-}
-
-.securityGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1px;
-  border-top: 1px solid var(--mkt-border);
-  background: var(--mkt-border);
-}
-
-.securityCard {
-  min-width: 0;
-  padding: 1.75rem;
-  background: var(--mkt-card);
-}
-
-.securityLink {
-  color: var(--mkt-ink);
-  transition: color var(--motion-fast) var(--ease-ui);
-}
-
-.securityLink:hover {
-  color: var(--mkt-orange-text);
-}
-
-@media (min-width: 640px) {
-  .securityGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .securityCard {
-    padding: 2rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .securityGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 .heroCopy > * {
@@ -212,10 +191,6 @@
 
 .heroCopy > :nth-child(5) {
   animation-delay: 260ms;
-}
-
-.heroPreview {
-  animation: hero-preview-enter var(--motion-demo) var(--ease-enter) 120ms both;
 }
 
 .dashboardScrollStage {
@@ -287,28 +262,6 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   display: inline;
-}
-
-.sectionTitle {
-  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(1.6rem, 4.2vw, 2.75rem);
-  font-weight: 720;
-  line-height: 1.12;
-  letter-spacing: -0.038em;
-  color: var(--mkt-ink);
-  text-wrap: balance;
-}
-
-.heroLead,
-.sectionLead {
-  color: var(--mkt-muted);
-  font-size: clamp(1rem, 1.4vw, 1.125rem);
-  line-height: 1.72;
-  text-wrap: pretty;
-}
-
-.sectionLead {
-  max-width: 42rem;
 }
 
 .eyebrow {
@@ -421,227 +374,6 @@
   color: var(--mkt-success);
 }
 
-.heroGrid {
-  background-image:
-    linear-gradient(rgba(24, 24, 24, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(24, 24, 24, 0.035) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: linear-gradient(to bottom, black 20%, transparent 92%);
-}
-
-.previewGlow {
-  background:
-    radial-gradient(circle at 82% 22%, rgba(255, 92, 2, 0.12), transparent 34%),
-    linear-gradient(145deg, #fffdfb 0%, #f7f3ef 100%);
-}
-
-.demoChat {
-  animation: demo-panel-enter 560ms var(--ease-enter) 360ms both;
-}
-
-.demoVisitor {
-  animation: demo-message-enter 460ms var(--ease-enter) 560ms both;
-}
-
-.demoMilo {
-  animation: demo-message-enter 480ms var(--ease-enter) 720ms both;
-}
-
-.floatingStatus {
-  animation: status-card-enter 460ms var(--ease-enter) both;
-  animation-delay: calc(780ms + var(--motion-order, 0) * 85ms);
-}
-
-.miloPulse {
-  position: relative;
-  display: inline-flex;
-}
-
-.miloPulse::after {
-  position: absolute;
-  inset: -2px;
-  border: 1px solid rgba(255, 92, 2, 0.26);
-  border-radius: 9999px;
-  content: "";
-  pointer-events: none;
-  animation: milo-pulse 2.4s var(--ease-ui) 1.15s 2;
-}
-
-.workflowCard,
-.featureCard,
-.useCaseCard {
-  border: 1px solid var(--mkt-border);
-  border-radius: var(--mkt-radius-card);
-}
-
-.workflowCard,
-.useCaseCard {
-  background: color-mix(in srgb, var(--mkt-bg) 88%, white);
-  transition:
-    transform var(--motion-ui) var(--ease-ui),
-    border-color var(--motion-ui) var(--ease-ui),
-    box-shadow var(--motion-ui) var(--ease-ui);
-}
-
-.cardTitle {
-  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 1.125rem;
-  font-weight: 700;
-  line-height: 1.45;
-  letter-spacing: -0.02em;
-  color: var(--mkt-ink);
-}
-
-.cardBody {
-  color: var(--mkt-muted);
-  font-size: 0.9375rem;
-  line-height: 1.75;
-  text-wrap: pretty;
-}
-
-.productGrid {
-  display: grid;
-  gap: 1.25rem;
-}
-
-.featureCard {
-  background: var(--mkt-card);
-  transition:
-    transform var(--motion-ui) var(--ease-ui),
-    border-color var(--motion-ui) var(--ease-ui),
-    box-shadow var(--motion-ui) var(--ease-ui);
-}
-
-.featureVisual > span:first-child,
-.signalLine {
-  transform-origin: left center;
-  transition: transform var(--motion-ui) var(--ease-ui);
-}
-
-.featureVisual {
-  display: flex;
-  min-height: 6.5rem;
-  align-items: flex-start;
-  gap: 1rem;
-  overflow: hidden;
-  border: 1px solid rgba(24, 24, 24, 0.055);
-  border-radius: 0.875rem;
-  background:
-    linear-gradient(rgba(24, 24, 24, 0.027) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(24, 24, 24, 0.027) 1px, transparent 1px),
-    var(--mkt-soft);
-  background-size: 20px 20px;
-  padding: 1rem;
-}
-
-.featureCard:nth-child(2n) .featureVisual {
-  background:
-    linear-gradient(rgba(185, 56, 0, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(185, 56, 0, 0.025) 1px, transparent 1px),
-    var(--mkt-warm);
-  background-size: 20px 20px;
-}
-
-.featureMeta {
-  display: block;
-  min-height: 2rem;
-  color: var(--mkt-ink);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  line-height: 1rem;
-  letter-spacing: 0.04em;
-  text-wrap: balance;
-}
-
-.signalLine {
-  display: block;
-  width: 100%;
-  height: 0.5rem;
-  margin-top: 0.75rem;
-  border-radius: 9999px;
-  background: rgba(24, 24, 24, 0.09);
-}
-
-.signalLineShort {
-  width: 68%;
-  margin-top: 0.45rem;
-  background: rgba(24, 24, 24, 0.055);
-}
-
-.integrationTile {
-  display: flex;
-  min-height: 5rem;
-  align-items: center;
-  gap: 0.75rem;
-  border: 1px solid var(--mkt-border);
-  border-radius: 1rem;
-  background: white;
-  padding: 0.875rem 1rem;
-  transition:
-    transform var(--motion-fast) var(--ease-ui),
-    border-color var(--motion-fast) var(--ease-ui),
-    box-shadow var(--motion-fast) var(--ease-ui);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .workflowCard:hover,
-  .useCaseCard:hover {
-    transform: translateY(-4px);
-    border-color: rgba(255, 92, 2, 0.28);
-    box-shadow: 0 16px 36px -18px rgba(24, 24, 24, 0.14), 0 0 0 1px rgba(255, 92, 2, 0.08);
-  }
-
-  .featureCard:hover {
-    transform: translateY(-4px);
-    border-color: rgba(255, 92, 2, 0.3);
-    box-shadow: 0 18px 42px -20px rgba(24, 24, 24, 0.16), 0 0 0 1px rgba(255, 92, 2, 0.09);
-  }
-
-  .featureCard:hover .featureVisual > span:first-child {
-    transform: translateY(-2px) scale(1.05);
-  }
-
-  .featureCard:hover .signalLine {
-    transform: scaleX(1.03);
-  }
-
-  .integrationTile:hover {
-    transform: translateY(-3px);
-    border-color: rgba(255, 92, 2, 0.35);
-    box-shadow: 0 12px 28px -14px rgba(24, 24, 24, 0.18), 0 0 0 1px rgba(255, 92, 2, 0.08);
-  }
-}
-
-.integrationRail {
-  border: 1px solid var(--mkt-border);
-  border-radius: var(--mkt-radius-panel);
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.72), transparent 12%, transparent 88%, rgba(255, 255, 255, 0.72)),
-    var(--mkt-card);
-  box-shadow: var(--mkt-shadow-sm);
-}
-
-.faqSummary {
-  transition: color var(--motion-fast) var(--ease-ui), background-color var(--motion-fast) var(--ease-ui);
-}
-
-.faqSummary:hover {
-  background: color-mix(in srgb, var(--mkt-soft) 62%, transparent);
-}
-
-.faqChevron {
-  transition: color var(--motion-ui) var(--ease-ui), background-color var(--motion-ui) var(--ease-ui), transform var(--motion-ui) var(--ease-enter);
-}
-
-.faqItem[open] .faqChevron {
-  background: var(--mkt-warm);
-  color: var(--mkt-orange-text);
-}
-
-.faqItem[open] .faqAnswer {
-  animation: faq-answer-enter 260ms var(--ease-enter) both;
-}
-
 .menuTrigger {
   transition: background-color var(--motion-fast) var(--ease-ui), border-color var(--motion-fast) var(--ease-ui), transform var(--motion-fast) var(--ease-ui);
 }
@@ -659,19 +391,34 @@
   animation: mobile-menu-enter var(--motion-ui) var(--ease-enter) both;
 }
 
+/*
+ * Quietens the page behind the open menu so the panel reads as the only layer.
+ * Portalled to <body> and kept under the header's z-index so the brand row and
+ * the close button stay legible.
+ */
+.mobileMenuScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(24, 24, 24, 0.3);
+  animation: scrim-enter var(--motion-ui) var(--ease-ui) both;
+}
+
+@keyframes scrim-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .mobileMenuLink {
   transition: color var(--motion-fast) var(--ease-ui), background-color var(--motion-fast) var(--ease-ui), transform var(--motion-fast) var(--ease-ui);
 }
 
 .mobileMenuLink:active {
   transform: translateX(2px);
-}
-
-.ctaPanel {
-  background:
-    radial-gradient(circle at 84% 18%, rgba(255, 92, 2, 0.18), transparent 26rem),
-    radial-gradient(circle at 18% 100%, rgba(255, 92, 2, 0.08), transparent 22rem),
-    #181818;
 }
 
 @media (max-width: 47.999rem) {
@@ -687,31 +434,9 @@
   }
 }
 
-@media (min-width: 48rem) {
-  .productGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (min-width: 64rem) {
   .trustList {
     justify-content: center;
-  }
-
-  .productGrid {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-  }
-
-  .featureCard {
-    grid-column: span 3;
-  }
-
-  .featureCard:nth-child(-n + 2) {
-    grid-column: span 6;
-  }
-
-  .featureCard:nth-child(-n + 2) .featureVisual {
-    min-height: 7.25rem;
   }
 }
 
@@ -730,73 +455,6 @@
   from {
     opacity: 0;
     transform: translate3d(0, 10px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes hero-preview-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 14px, 0) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes demo-panel-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 10px, 0) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes demo-message-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 7px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes status-card-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 8px, 0) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes milo-pulse {
-  0% {
-    opacity: 0.5;
-    transform: scale(0.92);
-  }
-  65%,
-  100% {
-    opacity: 0;
-    transform: scale(1.4);
-  }
-}
-
-@keyframes faq-answer-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, -4px, 0);
   }
   to {
     opacity: 1;
@@ -829,15 +487,9 @@
 @media (prefers-reduced-motion: reduce) {
   .siteHeader,
   .heroCopy > *,
-  .heroPreview,
-  .demoChat,
-  .demoVisitor,
-  .demoMilo,
-  .floatingStatus,
-  .miloPulse::after,
-  .faqItem[open] .faqAnswer,
   .menuTrigger svg,
-  .mobileMenuPanel {
+  .mobileMenuPanel,
+  .mobileMenuScrim {
     animation: none;
   }
 
@@ -860,25 +512,11 @@
   .secondaryButton,
   .primaryButton svg,
   .secondaryButton svg,
-  .featureCard,
-  .workflowCard,
-  .useCaseCard,
-  .integrationTile,
-  .featureVisual > span:first-child,
-  .signalLine,
-  .faqSummary,
-  .faqChevron,
   .menuTrigger,
   .mobileMenuLink {
     transition: none;
   }
 
-  .featureCard:hover,
-  .workflowCard:hover,
-  .useCaseCard:hover,
-  .integrationTile:hover,
-  .featureCard:hover .featureVisual > span:first-child,
-  .featureCard:hover .signalLine,
   .primaryButton:hover,
   .primaryButton:hover svg,
   .secondaryButton:hover,

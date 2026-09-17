@@ -1,0 +1,29 @@
+-- widget_sessions carries a heartbeat-driven write load: every open widget
+-- updates last_seen_at every 30 seconds. Because last_seen_at is indexed those
+-- updates can never be HOT, so each one rewrites an entry in *every* index on
+-- the table. Measured on production: 5,211 updates, only 509 of them HOT (~10%).
+--
+-- widget_sessions_widget_id_idx is an exact duplicate of the index backing the
+-- widget_id/session_id unique constraint — identical columns, identical order,
+-- no predicate, no expression:
+--
+--   widget_sessions_widget_id_session_id_key  UNIQUE btree (widget_id, session_id)
+--   widget_sessions_widget_id_idx                    btree (widget_id, session_id)
+--
+-- Confirmed with a pg_index self-join on (indrelid, indkey, indpred, indexprs).
+-- Every lookup it serves — the session load in the chat/events/complete routes —
+-- is served identically by the unique index, which cannot be dropped because it
+-- enforces the constraint. Dropping the redundant copy removes one index write
+-- per session row change without changing any query plan's capability.
+--
+-- The remaining 14 indexes were all checked against pg_stat_user_indexes and
+-- are genuinely scanned, so none of them are dropped here.
+
+-- Plain DROP (not CONCURRENTLY): migrations run inside a transaction, where
+-- CONCURRENTLY is not permitted. The ACCESS EXCLUSIVE lock is held only for the
+-- catalog update, which is negligible at this table's size.
+--
+-- Rollback, if ever needed:
+--   create index widget_sessions_widget_id_idx
+--     on public.widget_sessions using btree (widget_id, session_id);
+drop index if exists public.widget_sessions_widget_id_idx;

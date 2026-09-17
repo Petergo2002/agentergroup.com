@@ -10,6 +10,7 @@ import { shouldRefreshConnections } from '@/lib/connections';
 import type { ConnectionAuthLinkRecord, ConnectionRecord } from '@/lib/types';
 import { useAppContext } from '@/components/app/AppContext';
 
+import { formatLocaleDate } from "@/lib/i18n";
 interface ConnectionToolkitCard {
   slug: string;
   displayName: string;
@@ -264,10 +265,10 @@ export default function ConnectionsPageClient({
 
   const formatDateTime = useCallback(
     (value: string) =>
-      new Intl.DateTimeFormat(language === 'sv' ? 'sv-SE' : 'en-US', {
+      formatLocaleDate(value, language, {
         dateStyle: 'medium',
         timeStyle: 'short',
-      }).format(new Date(value)),
+      }),
     [language],
   );
 
@@ -491,7 +492,7 @@ export default function ConnectionsPageClient({
             <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
               {t('connections.title')}
             </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant/75">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">
               {t('connections.description')}
             </p>
           </div>

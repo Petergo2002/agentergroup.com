@@ -27,7 +27,7 @@ import { updateSession } from "@/lib/supabase/proxy";
  *
  * Auth-gated route prefixes still live in src/lib/supabase/proxy.ts.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   return updateSession(request);
 }
 

@@ -15,6 +15,10 @@ const chatRoute = readFileSync(
   "src/app/api/public/widgets/[widgetPublicKey]/chat/route.ts",
   "utf8",
 );
+const attachmentUrlsSource = readFileSync(
+  "src/lib/widgets/attachment-urls.ts",
+  "utf8",
+);
 const privacySource = readFileSync("src/lib/privacy.ts", "utf8");
 const analyticsSource = readFileSync("src/lib/dashboard/analytics.ts", "utf8");
 const migration = readFileSync(
@@ -111,7 +115,16 @@ test("widget attachment storage is private, quota-bound, and deleted with sessio
   assert.match(uploadRoute, /getPublicWidgetRateLimitRules\([\s\S]*"uploads"/);
   assert.match(uploadRoute, /inspectWidgetAttachment/);
   assert.match(uploadRoute, /id: attachmentId/);
-  assert.match(chatRoute, /\.in\("id", attachmentIds\)/);
+  // Signing is shared by the chat turn and the restored transcript, so the
+  // ownership scope lives with it: an attachment is only ever signed when it
+  // belongs to both this widget and this session.
+  assert.match(attachmentUrlsSource, /\.eq\("widget_id", input\.widgetId\)/);
+  assert.match(
+    attachmentUrlsSource,
+    /\.eq\("widget_session_id", input\.widgetSessionId\)/,
+  );
+  assert.match(attachmentUrlsSource, /\.in\("id", attachmentIds\)/);
+  assert.match(chatRoute, /resolveWidgetAttachmentUrls/);
   assert.match(chatRoute, /refreshWidgetHistoryAttachments/);
   assert.match(analyticsSource, /refreshTranscriptAttachmentUrls/);
   assert.match(analyticsSource, /createSignedUrl/);

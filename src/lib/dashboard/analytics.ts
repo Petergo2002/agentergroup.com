@@ -6,6 +6,7 @@ import {
   type LeadConversationSummaryRow,
 } from "@/lib/leads/conversation-summary";
 import type {
+  DashboardConversationTrendPoint,
   AutomationEventStatus,
   AutomationDecision,
   DashboardAnalyticsAppliedFilters,
@@ -130,6 +131,7 @@ interface DashboardConversationAggregationResult {
     leadCount: number;
     activeWidgetIds: string[];
   };
+  trend: DashboardConversationTrendPoint[];
   conversations: DashboardAnalyticsConversationListItem[];
   pageInfo: {
     nextCursor: string | null;
@@ -778,6 +780,56 @@ async function fetchSummaryTotals(
   };
 }
 
+interface SummaryTrendRow {
+  bucket_date: string;
+  conversation_count: number | string;
+  message_count: number | string;
+  lead_count: number | string;
+}
+
+/**
+ * Daily conversation trend over the same filtered population as the totals.
+ *
+ * Deliberately a server aggregate: the paged conversation list is a page, not
+ * the population, so a client-derived trend would be wrong.
+ */
+async function fetchSummaryTrend(
+  supabase: AdminSupabase,
+  input: {
+    workspaceId: string;
+    startIso: string;
+    widgetId: string | null;
+    agentId: string | null;
+    search: string;
+    sessionStatus: DashboardAnalyticsAppliedFilters["sessionStatus"];
+    liveCutoffIso: string;
+  },
+): Promise<DashboardConversationTrendPoint[]> {
+  const { data, error } = await supabase.rpc(
+    "dashboard_conversation_analytics_trend",
+    {
+      p_workspace_id: input.workspaceId,
+      p_start: input.startIso,
+      p_live_cutoff: input.liveCutoffIso,
+      p_widget_id: input.widgetId,
+      p_agent_id: input.agentId,
+      p_search: input.search ? escapeIlikePattern(input.search) : null,
+      p_session_status: input.sessionStatus ?? null,
+    },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as SummaryTrendRow[]).map((row) => ({
+    date: String(row.bucket_date),
+    conversations: Number(row.conversation_count ?? 0),
+    messages: Number(row.message_count ?? 0),
+    leads: Number(row.lead_count ?? 0),
+  }));
+}
+
 async function fetchPagedSummaryRows(
   supabase: AdminSupabase,
   input: {
@@ -1333,6 +1385,7 @@ export async function listDashboardConversations(
         leadCount: 0,
         activeWidgetIds: [],
       },
+      trend: [],
       conversations: [],
       pageInfo: {
         nextCursor: null,
@@ -1342,8 +1395,17 @@ export async function listDashboardConversations(
   }
 
   const limit = normalizeLimit(input.limit);
-  const [summaryTotals, pagedSummaries] = await Promise.all([
+  const [summaryTotals, summaryTrend, pagedSummaries] = await Promise.all([
     fetchSummaryTotals(supabase, {
+      workspaceId: input.workspaceId,
+      widgetId: input.appliedFilters.widgetId,
+      agentId: input.appliedFilters.agentId,
+      search: input.appliedFilters.search,
+      sessionStatus: input.appliedFilters.sessionStatus,
+      liveCutoffIso,
+      startIso,
+    }),
+    fetchSummaryTrend(supabase, {
       workspaceId: input.workspaceId,
       widgetId: input.appliedFilters.widgetId,
       agentId: input.appliedFilters.agentId,
@@ -1375,6 +1437,7 @@ export async function listDashboardConversations(
         leadCount: 0,
         activeWidgetIds: [],
       },
+      trend: [],
       conversations: [],
       pageInfo: {
         nextCursor: null,
@@ -1408,6 +1471,7 @@ export async function listDashboardConversations(
       leadCount: summaryTotals.leadCount,
       activeWidgetIds,
     },
+    trend: summaryTrend,
     conversations,
     pageInfo: {
       nextCursor:

@@ -8,6 +8,7 @@ import {
   getPublicWidgetRateLimitRules,
 } from "@/lib/rate-limit";
 import { createClientSafeError } from "@/lib/server-errors";
+import { reportError } from "@/lib/observability/report";
 import { readAgentIdFromDraftPreviewWidgetAgentId } from "@/lib/widgets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -271,9 +272,11 @@ export async function POST(
           leadId: lead.id,
         });
       } catch (error) {
-        console.error("Background lead summary generation failed.", {
+        reportError(error, {
+          operation: "leads.conversation_summary",
+          jobType: "after",
+          route: "/api/public/widgets/[widgetPublicKey]/leads",
           leadId: lead.id,
-          error: error instanceof Error ? error.message : String(error),
         });
       }
 
@@ -311,9 +314,12 @@ export async function POST(
           }
         }
       } catch (emailError) {
-        console.error("Background lead notification email failed.", {
+        // The customer never learns the notification did not arrive.
+        reportError(emailError, {
+          operation: "leads.notification_email",
+          jobType: "after",
+          route: "/api/public/widgets/[widgetPublicKey]/leads",
           leadId: lead.id,
-          error: emailError instanceof Error ? emailError.message : String(emailError),
         });
       }
     });

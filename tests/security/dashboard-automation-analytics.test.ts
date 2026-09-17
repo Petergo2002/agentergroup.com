@@ -18,6 +18,10 @@ const dashboardTypesSource = readFileSync(
   "src/lib/types/dashboard.ts",
   "utf8",
 );
+// The analytics view renders through the translation layer, so its user-facing
+// copy is asserted where it now lives — in both locales, not inline in the JSX.
+const analyticsEnSource = readFileSync("src/locales/en/analytics.ts", "utf8");
+const analyticsSvSource = readFileSync("src/locales/sv/analytics.ts", "utf8");
 const automationAnalyticsStart = analyticsHelperSource.indexOf(
   "async function fetchAutomationEventsForAnalytics",
 );
@@ -54,9 +58,12 @@ test("dashboard analytics route exposes automation summaries with status filteri
 
 test("analytics workspace shows automation summaries and links failures back to Activity", () => {
   assert.match(analyticsViewSource, /AutomationPerformancePanel/);
-  assert.match(analyticsViewSource, /Automation agents/);
-  assert.match(analyticsViewSource, /Recent failures/);
-  assert.match(analyticsViewSource, /Success and failure trend/);
+  assert.match(analyticsViewSource, /analytics\.automationAgentsTitle/);
+  assert.match(analyticsViewSource, /analytics\.automationRecentFailuresTitle/);
+  assert.match(analyticsViewSource, /analytics\.automationTrendTitle/);
+  assert.match(analyticsEnSource, /automationAgentsTitle: "Automation agents"/);
+  assert.match(analyticsEnSource, /automationRecentFailuresTitle: "Recent failures"/);
+  assert.match(analyticsSvSource, /automationAgentsTitle: "Automationsagenter"/);
   assert.match(analyticsViewSource, /href=\{failure\.activityHref\}/);
   assert.match(analyticsViewSource, /automationStatus/);
   assert.match(dashboardTypesSource, /DashboardAutomationAnalytics/);
@@ -69,8 +76,18 @@ test("dashboard analytics separates live, idle, and completed conversation state
   assert.match(analyticsHelperSource, /\.gt\("last_activity_at", input\.liveCutoffIso\)/);
   assert.match(analyticsHelperSource, /\.lte\("last_activity_at", input\.liveCutoffIso\)/);
   assert.match(analyticsRouteSource, /value === "active"[\s\S]*return "live"/);
-  assert.match(analyticsViewSource, /<option value="live">Live visitors<\/option>/);
-  assert.match(analyticsViewSource, /<option value="idle">Idle sessions<\/option>/);
+  assert.match(
+    analyticsViewSource,
+    /<option value="live">\{t\("analytics\.statusLive"\)\}<\/option>/,
+  );
+  assert.match(
+    analyticsViewSource,
+    /<option value="idle">\{t\("analytics\.statusIdle"\)\}<\/option>/,
+  );
+  assert.match(analyticsEnSource, /statusLive: "Live visitors"/);
+  assert.match(analyticsEnSource, /statusIdle: "Idle sessions"/);
+  assert.match(analyticsSvSource, /statusLive: "Live-besökare"/);
+  assert.match(analyticsSvSource, /statusIdle: "Inaktiva sessioner"/);
   assert.match(analyticsViewSource, /conversationResults/);
   assert.match(dashboardTypesSource, /DashboardConversationPresenceStatus = "live" \| "idle" \| "completed"/);
 });

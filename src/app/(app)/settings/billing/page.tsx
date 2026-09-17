@@ -7,6 +7,7 @@ import { useAppContext } from '@/components/app/AppContext';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { EXTRA_MESSAGE_CREDIT_PACK_AMOUNT } from '@/lib/billing-credits';
 
+import { formatLocaleDate } from "@/lib/i18n";
 // ─── Static plan data ─────────────────────────────────────────────────────────
 
 const PLAN_FEATURES = {
@@ -224,7 +225,7 @@ export default function BillingSettingsPage() {
             {subscription && (
               <p className="text-[10px] font-medium text-on-surface-variant uppercase tracking-wider">
                 {t('settings.billing.messagesReset', {
-                  date: new Date(subscription.billing_cycle_end).toLocaleDateString(language === 'sv' ? 'sv-SE' : 'en-US')
+                  date: formatLocaleDate(subscription.billing_cycle_end, language)
                 })}
               </p>
             )}
@@ -447,13 +448,13 @@ export default function BillingSettingsPage() {
               <div>
                 {currentPlan === 'free' ? (
                   <>
-                    <p className="text-sm font-bold text-on-surface-variant">No payment method</p>
-                    <p className="text-xs text-on-surface-variant">Upgrade to a paid plan to add a card</p>
+                    <p className="text-sm font-bold text-on-surface-variant">{t('settings.billing.noPaymentMethod')}</p>
+                    <p className="text-xs text-on-surface-variant">{t('settings.billing.noPaymentMethodHint')}</p>
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-bold text-on-surface">Card on file</p>
-                    <p className="text-xs text-on-surface-variant">Managed securely through Stripe</p>
+                    <p className="text-sm font-bold text-on-surface">{t('settings.billing.cardOnFile')}</p>
+                    <p className="text-xs text-on-surface-variant">{t('settings.billing.cardManagedByStripe')}</p>
                   </>
                 )}
               </div>
@@ -481,19 +482,21 @@ export default function BillingSettingsPage() {
             {invoicesLoading ? (
               <div className="flex items-center justify-center py-8 gap-2 text-on-surface-variant text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading invoices…
+                {t('settings.billing.invoicesLoading')}
               </div>
             ) : invoices.length === 0 ? (
               <p className="py-8 text-center text-sm text-on-surface-variant">
-                No invoices yet.{currentPlan === 'free' ? ' Upgrade to a paid plan to see your billing history.' : ''}
+                {t('settings.billing.invoicesEmpty')}
+                {currentPlan === 'free' ? t('settings.billing.invoicesEmptyFreeHint') : ''}
               </p>
             ) : (
-              <table className="w-full text-left border-collapse">
+              <div className="-mx-1 overflow-x-auto px-1">
+                <table className="w-full min-w-[30rem] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-outline-variant/10">
-                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Date</th>
-                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Amount</th>
-                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Status</th>
+                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.billing.invoiceColumnDate')}</th>
+                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.billing.invoiceColumnAmount')}</th>
+                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.billing.invoiceColumnStatus')}</th>
                     <th className="pb-4 text-right" />
                   </tr>
                 </thead>
@@ -529,7 +532,8 @@ export default function BillingSettingsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </div>
         </div>

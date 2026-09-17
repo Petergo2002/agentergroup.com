@@ -201,6 +201,15 @@ export interface KnowledgeGapSignal {
 }
 
 const MAX_TOOL_ITERATIONS = 6;
+/**
+ * Ceiling on one batch of external tool calls.
+ *
+ * The tool provider has no timeout of its own, so a hung integration used to
+ * pin the whole request until the platform killed it — taking the turn lock
+ * with it. On expiry the turn continues with a failed tool result so the model
+ * can still tell the visitor something useful.
+ */
+const TOOL_EXECUTION_TIMEOUT_MS = 60_000;
 const KNOWLEDGE_SEARCH_TIMEOUT_MS = 8_000;
 const EMPTY_ASSISTANT_RESPONSE_FALLBACK =
   "Sorry, I had trouble answering that. Please try again.";
@@ -639,6 +648,36 @@ interface WorkspaceConnectionRow {
   toolkit_slug: string;
   status: string;
   toolkit_data: Record<string, unknown> | null;
+}
+
+const TOOL_EXECUTION_TIMED_OUT = Symbol("tool-execution-timed-out");
+
+/**
+ * Resolves with the tool result, or with TOOL_EXECUTION_TIMED_OUT once the
+ * budget is spent.
+ *
+ * The underlying call keeps running — the provider SDK takes no abort signal —
+ * but the turn stops waiting on it, which is what matters: the request finishes
+ * normally and its `finally` releases the session turn lock.
+ */
+async function withToolExecutionTimeout<TResult>(
+  work: Promise<TResult>,
+): Promise<TResult | typeof TOOL_EXECUTION_TIMED_OUT> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      work,
+      new Promise<typeof TOOL_EXECUTION_TIMED_OUT>((resolve) => {
+        timer = setTimeout(
+          () => resolve(TOOL_EXECUTION_TIMED_OUT),
+          TOOL_EXECUTION_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function loadRuntimeContext(
@@ -1253,75 +1292,93 @@ export async function runAgentChat({
           ],
         } as OpenAI.Chat.ChatCompletion;
 
-        const toolCallResult = await handleChatToolCalls(
-          toolUserId,
-          externalCompletion,
-          {
+        const toolCallResult = await withToolExecutionTimeout(
+          handleChatToolCalls(toolUserId, externalCompletion, {
             gmailRecipientPolicy: effectiveGmailRecipientPolicy,
             googleCalendarSelection: googleCalendarSelection ?? null,
             calSelection: calSelection ?? null,
-          },
+          }),
         );
-        const { results, sessionWasRecreated } = toolCallResult as unknown as {
-          results: ToolMessage[];
-          sessionWasRecreated: boolean;
-        };
 
-        if (sessionWasRecreated) {
+        if (toolCallResult === TOOL_EXECUTION_TIMED_OUT) {
+          hadError = true;
+          errorSummary = "Tool execution timed out";
           debugEvents.push({
-            type: "session_miss",
+            type: "tool_error",
             ts: Date.now() - startTimeMs,
-            error: "Connection session cache missed. Recreated session successfully.",
-            iterationIndex: iteration
-          });
-        }
-
-        if (!results || results.length === 0) {
-          debugEvents.push({
-            type: "tool_empty_result",
-            ts: Date.now() - startTimeMs,
-            error: "Connection provider returned 0 results for the tool calls. Synthesizing empty results.",
-            iterationIndex: iteration
+            error: `Tool execution exceeded ${TOOL_EXECUTION_TIMEOUT_MS}ms. Continuing without the result.`,
+            iterationIndex: iteration,
           });
 
           externalToolMessages = externalToolCalls.map((toolCall) => ({
             role: "tool",
             tool_call_id: toolCall.id,
             name: toolCall.function.name,
-            content: "Tool executed, but no result was returned.",
+            content:
+              "Tool call timed out before returning a result. Tell the user this step could not be completed right now and offer to try again.",
           }));
         } else {
-          const toolNamesByCallId = new Map(
-            externalToolCalls.map((toolCall) => [
-              toolCall.id,
-              toolCall.function.name,
-            ]),
-          );
-          externalToolMessages = results.map((message, index) => {
-            const toolCallId =
-              typeof message.tool_call_id === "string"
-                ? message.tool_call_id.replace(/_primary$/, "")
-                : null;
-            const name =
-              (typeof message.name === "string" && message.name) ||
-              (toolCallId ? toolNamesByCallId.get(toolCallId) : null) ||
-              externalToolCalls[index]?.function.name;
+          const { results, sessionWasRecreated } = toolCallResult as unknown as {
+            results: ToolMessage[];
+            sessionWasRecreated: boolean;
+          };
 
-            return name ? { ...message, name } : message;
-          });
-
-          for (const msg of externalToolMessages) {
-            let abbrResult = msg.content;
-            if (typeof abbrResult === "string" && abbrResult.length > 300) {
-              abbrResult = abbrResult.substring(0, 300) + "...";
-            }
+          if (sessionWasRecreated) {
             debugEvents.push({
-              type: "tool_result",
+              type: "session_miss",
               ts: Date.now() - startTimeMs,
-              name: String(msg.name ?? "unknown"),
-              result: abbrResult,
+              error: "Connection session cache missed. Recreated session successfully.",
               iterationIndex: iteration
             });
+          }
+
+          if (!results || results.length === 0) {
+            debugEvents.push({
+              type: "tool_empty_result",
+              ts: Date.now() - startTimeMs,
+              error: "Connection provider returned 0 results for the tool calls. Synthesizing empty results.",
+              iterationIndex: iteration
+            });
+
+            externalToolMessages = externalToolCalls.map((toolCall) => ({
+              role: "tool",
+              tool_call_id: toolCall.id,
+              name: toolCall.function.name,
+              content: "Tool executed, but no result was returned.",
+            }));
+          } else {
+            const toolNamesByCallId = new Map(
+              externalToolCalls.map((toolCall) => [
+                toolCall.id,
+                toolCall.function.name,
+              ]),
+            );
+            externalToolMessages = results.map((message, index) => {
+              const toolCallId =
+                typeof message.tool_call_id === "string"
+                  ? message.tool_call_id.replace(/_primary$/, "")
+                  : null;
+              const name =
+                (typeof message.name === "string" && message.name) ||
+                (toolCallId ? toolNamesByCallId.get(toolCallId) : null) ||
+                externalToolCalls[index]?.function.name;
+
+              return name ? { ...message, name } : message;
+            });
+
+            for (const msg of externalToolMessages) {
+              let abbrResult = msg.content;
+              if (typeof abbrResult === "string" && abbrResult.length > 300) {
+                abbrResult = abbrResult.substring(0, 300) + "...";
+              }
+              debugEvents.push({
+                type: "tool_result",
+                ts: Date.now() - startTimeMs,
+                name: String(msg.name ?? "unknown"),
+                result: abbrResult,
+                iterationIndex: iteration
+              });
+            }
           }
         }
       }

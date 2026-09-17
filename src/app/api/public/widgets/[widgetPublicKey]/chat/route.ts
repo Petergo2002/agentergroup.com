@@ -26,10 +26,16 @@ import {
 } from "@/lib/rate-limit";
 import { runAgentChat } from "@/lib/runtime/agent-chat";
 import { createClientSafeError } from "@/lib/server-errors";
+import { reportError } from "@/lib/observability/report";
 import { readAgentIdFromDraftPreviewWidgetAgentId } from "@/lib/widgets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEnabledToolsFromDefinition } from "@/lib/tool-actions";
 import { buildWidgetGenerativeUi } from "@/lib/widgets/generative-ui";
+import {
+  readWidgetAttachmentIds,
+  resolveWidgetAttachmentUrls,
+  type WidgetAttachmentUrl,
+} from "@/lib/widgets/attachment-urls";
 import {
   buildConversationPreview,
   buildConversationTitle,
@@ -62,6 +68,7 @@ import {
   type WidgetAdminSupabase,
   upsertWidgetSession,
 } from "@/lib/widgets/server";
+import { WIDGET_TURN_DEADLINE_MS } from "@/lib/widgets/server-types";
 
 function sseChunk(payload: Record<string, unknown>) {
   return `data: ${JSON.stringify(payload)}\n\n`;
@@ -155,22 +162,13 @@ function buildRateLimitedResponse(
 
 const SESSION_BUSY_ERROR =
   "Another reply is already being generated for this chat. Please wait for the current response to finish.";
-const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 60 * 60;
-
-interface RequestedWidgetAttachment {
-  id: string;
-  url: string;
-  name: string;
-  type: string;
-  size: number;
-}
 
 async function resolveWidgetAttachments(
   supabase: WidgetAdminSupabase,
   input: {
     widgetId: string;
     widgetSessionId: string;
-    attachments: Array<Pick<RequestedWidgetAttachment, "id">> | undefined;
+    attachments: Array<{ id: string }> | undefined;
   },
 ) {
   if (!input.attachments || input.attachments.length === 0) {
@@ -178,74 +176,42 @@ async function resolveWidgetAttachments(
   }
 
   const attachmentIds = input.attachments.map((attachment) => attachment.id);
-  const { data, error } = await supabase
-    .from("widget_attachments")
-    .select<{
-      id: string;
-      widget_id: string;
-      widget_session_id: string;
-      storage_bucket: string;
-      storage_path: string;
-      original_name: string;
-      mime_type: string;
-      file_size_bytes: number;
-    }>(
-      "id, widget_id, widget_session_id, storage_bucket, storage_path, original_name, mime_type, file_size_bytes",
-    )
-    .eq("widget_id", input.widgetId)
-    .eq("widget_session_id", input.widgetSessionId)
-    .in("id", attachmentIds);
+  const { byId, missingIds, unsignedIds } = await resolveWidgetAttachmentUrls(
+    supabase,
+    {
+      widgetId: input.widgetId,
+      widgetSessionId: input.widgetSessionId,
+      attachmentIds,
+    },
+  );
 
-  if (error) {
-    throw new Error("Failed to validate attachments.");
-  }
-
-  const rows = (data ?? []) as Array<{
-    id: string;
-    widget_id: string;
-    widget_session_id: string;
-    storage_bucket: string;
-    storage_path: string;
-    original_name: string;
-    mime_type: string;
-    file_size_bytes: number;
-  }>;
-  const rowById = new Map(rows.map((row) => [row.id, row]));
-
-  if (rowById.size !== attachmentIds.length) {
+  if (missingIds.length > 0) {
     throw new Error("One or more attachments do not belong to this chat.");
   }
 
-  return Promise.all(
-    attachmentIds.map(async (attachmentId) => {
-      const row = rowById.get(attachmentId);
-      if (!row) {
-        throw new Error("Attachment not found.");
-      }
+  if (unsignedIds.length > 0) {
+    throw new Error("Failed to create a secure attachment URL.");
+  }
 
-      const { data: signedUrlData, error: signedUrlError } =
-        await supabase.storage
-          .from(row.storage_bucket)
-          .createSignedUrl(
-            row.storage_path,
-            ATTACHMENT_SIGNED_URL_TTL_SECONDS,
-          );
+  return attachmentIds.map((attachmentId) => {
+    const attachment = byId.get(attachmentId);
 
-      if (signedUrlError || !signedUrlData?.signedUrl) {
-        throw new Error("Failed to create a secure attachment URL.");
-      }
+    if (!attachment) {
+      throw new Error("Attachment not found.");
+    }
 
-      return {
-        id: row.id,
-        url: signedUrlData.signedUrl,
-        name: row.original_name,
-        type: row.mime_type,
-        size: row.file_size_bytes,
-      };
-    }),
-  );
+    return attachment;
+  });
 }
 
+/**
+ * Re-signs every attachment in the stored transcript in one table read and one
+ * signing batch, rather than one read plus one signing call per message.
+ *
+ * Stored metadata carries the signed URL that was valid when the message was
+ * written, so the history handed to the model has to be refreshed — and that
+ * refresh sits directly in front of the model call.
+ */
 async function refreshWidgetHistoryAttachments(
   supabase: WidgetAdminSupabase,
   input: {
@@ -254,56 +220,50 @@ async function refreshWidgetHistoryAttachments(
     history: Awaited<ReturnType<typeof loadOrderedWidgetSessionHistory>>;
   },
 ) {
-  return Promise.all(
-    input.history.map(async (message) => {
-      const rawAttachments = message.metadata?.attachments;
-
-      if (!Array.isArray(rawAttachments)) {
-        return message;
-      }
-
-      const attachmentIds = rawAttachments.flatMap((attachment) => {
-        if (
-          !attachment ||
-          typeof attachment !== "object" ||
-          !("id" in attachment) ||
-          typeof attachment.id !== "string"
-        ) {
-          return [];
-        }
-
-        return [{ id: attachment.id }];
-      });
-
-      if (attachmentIds.length === 0) {
-        return message;
-      }
-
-      try {
-        const attachments = await resolveWidgetAttachments(supabase, {
-          widgetId: input.widgetId,
-          widgetSessionId: input.widgetSessionId,
-          attachments: attachmentIds,
-        });
-
-        return {
-          ...message,
-          metadata: {
-            ...message.metadata,
-            attachments,
-          },
-        };
-      } catch {
-        return {
-          ...message,
-          metadata: {
-            ...message.metadata,
-            attachments: [],
-          },
-        };
-      }
-    }),
+  const attachmentIdsByMessage = input.history.map((message) =>
+    readWidgetAttachmentIds(message.metadata?.attachments),
   );
+
+  if (attachmentIdsByMessage.every((ids) => ids.length === 0)) {
+    return input.history;
+  }
+
+  // Re-signing is a convenience for the model, never a reason to fail the turn:
+  // an unresolvable attachment drops out of the history, exactly as it did when
+  // each message resolved its own attachments behind a catch.
+  let byId = new Map<string, WidgetAttachmentUrl>();
+
+  try {
+    ({ byId } = await resolveWidgetAttachmentUrls(supabase, {
+      widgetId: input.widgetId,
+      widgetSessionId: input.widgetSessionId,
+      attachmentIds: attachmentIdsByMessage.flat(),
+    }));
+  } catch (attachmentError) {
+    console.error(
+      "Failed to refresh widget history attachments.",
+      attachmentError,
+    );
+  }
+
+  return input.history.map((message, index) => {
+    const attachmentIds = attachmentIdsByMessage[index];
+
+    if (attachmentIds.length === 0) {
+      return message;
+    }
+
+    return {
+      ...message,
+      metadata: {
+        ...message.metadata,
+        attachments: attachmentIds.flatMap((attachmentId) => {
+          const attachment = byId.get(attachmentId);
+          return attachment ? [attachment] : [];
+        }),
+      },
+    };
+  });
 }
 
 
@@ -351,7 +311,12 @@ export async function POST(
         requestId: turnRequestId,
       });
     } catch (error) {
-      console.error("Failed to release widget turn lock:", error);
+      reportError(error, {
+        operation: "widget.chat.turn_lock_release",
+        route: "/api/public/widgets/[widgetPublicKey]/chat",
+        widgetId,
+        requestId: turnRequestId,
+      });
     } finally {
       turnLockHeld = false;
     }
@@ -635,8 +600,12 @@ export async function POST(
       getPublishedAgentVersion(supabase, selectedVersionId),
     ]);
 
-    try {
-      await autoCaptureLead(supabase, {
+    // Lead capture and attachment re-signing both read the same history and
+    // nothing else, and both sit in front of the model call, so they run
+    // together instead of stacking their round trips on the visitor's wait.
+    // Capture still completes before the turn's background lead summary runs.
+    const [, historyWithSecureAttachments] = await Promise.all([
+      autoCaptureLead(supabase, {
         widgetId: loaded.widget.id,
         widgetSessionId: widgetSession.id,
         widgetAgentId: selected!.persistedWidgetAgentId,
@@ -645,19 +614,22 @@ export async function POST(
           role: item.role,
           content: item.content,
         })),
-      });
-    } catch (leadCaptureError) {
-      console.error("Failed to auto-capture widget lead.", leadCaptureError);
-    }
-
-    const historyWithSecureAttachments = await refreshWidgetHistoryAttachments(
-      supabase,
-      {
+      }).catch((leadCaptureError) => {
+        // A swallowed failure here silently loses a captured lead.
+        reportError(leadCaptureError, {
+          operation: "widget.chat.auto_capture_lead",
+          route: "/api/public/widgets/[widgetPublicKey]/chat",
+          workspaceId: loaded.widget.workspace_id,
+          widgetId: loaded.widget.id,
+          widgetSessionId: widgetSession.id,
+        });
+      }),
+      refreshWidgetHistoryAttachments(supabase, {
         widgetId: loaded.widget.id,
         widgetSessionId: widgetSession.id,
         history,
-      },
-    );
+      }),
+    ]);
     const runtimeAgent = getWidgetRuntimeAgent(selected!.agent, publishedVersion);
     const previewRuntimeAgent = preview.runtimeConfig?.agents.find(
       (agentConfig) => agentConfig.agentId === selected!.agent.id,
@@ -684,6 +656,11 @@ export async function POST(
 
     const stream = new ReadableStream({
       async start(controller) {
+        // A turn that runs past its deadline is ended here rather than by the
+        // host killing the process, so the `finally` below still runs and the
+        // session turn lock is released instead of being left for the next
+        // visitor message to wait out.
+        let turnDeadlineExceeded = false;
         const abortStream = () => {
           if (!streamAbortController.signal.aborted) {
             streamAbortController.abort();
@@ -692,6 +669,10 @@ export async function POST(
         const handleRequestAbort = () => {
           abortStream();
         };
+        const turnDeadlineTimer = setTimeout(() => {
+          turnDeadlineExceeded = true;
+          abortStream();
+        }, WIDGET_TURN_DEADLINE_MS);
 
         request.signal.addEventListener("abort", handleRequestAbort, {
           once: true,
@@ -758,11 +739,15 @@ export async function POST(
                 },
               });
             } catch (error) {
-              console.error("[flywheel] Failed to create unanswered query.", {
-                requestId: chatRequestId,
+              reportError(error, {
+                operation: "flywheel.create_unanswered_query",
+                jobType: "after",
+                route: "/api/public/widgets/[widgetPublicKey]/chat",
+                workspaceId: loaded.widget.workspace_id,
                 widgetId: loaded.widget.id,
                 agentId: selected!.agent.id,
-                error: error instanceof Error ? error.message : String(error),
+                widgetSessionId: widgetSession.id,
+                requestId: chatRequestId,
               });
             }
           });
@@ -919,7 +904,36 @@ export async function POST(
 
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } catch (error) {
-          if (streamAbortController.signal.aborted || isAbortError(error)) {
+          // A silent return is only right when the visitor themselves went
+          // away. A turn we cut off still owes them an explanation, otherwise
+          // the reply just stops mid-sentence with no error in the widget.
+          if (
+            !turnDeadlineExceeded &&
+            (streamAbortController.signal.aborted || isAbortError(error))
+          ) {
+            return;
+          }
+
+          if (turnDeadlineExceeded) {
+            logWidgetChatEvent("error", "widget_chat_turn_deadline_exceeded", {
+              requestId: chatRequestId,
+              widgetId: loaded.widget.id,
+              agentId: selected!.agent.id,
+              durationMs: Date.now() - requestStartedAt,
+              deadlineMs: WIDGET_TURN_DEADLINE_MS,
+            });
+            controller.enqueue(
+              new TextEncoder().encode(
+                sseChunk({
+                  error:
+                    "This reply took too long to finish. Please try sending your message again.",
+                  code: "TURN_DEADLINE_EXCEEDED",
+                  requestId: chatRequestId,
+                  terminal: true,
+                }),
+              ),
+            );
+            controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
             return;
           }
 
@@ -960,6 +974,7 @@ export async function POST(
           );
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } finally {
+          clearTimeout(turnDeadlineTimer);
           request.signal.removeEventListener("abort", handleRequestAbort);
           await releaseTurnLock(loaded.widget.id, sessionId);
           try {
@@ -982,9 +997,13 @@ export async function POST(
           widgetSessionId: widgetSession.id,
         });
       } catch (error) {
-        console.error("Background lead summary generation failed.", {
+        reportError(error, {
+          operation: "leads.conversation_summary",
+          jobType: "after",
+          route: "/api/public/widgets/[widgetPublicKey]/chat",
+          workspaceId: loaded.widget.workspace_id,
+          widgetId: loaded.widget.id,
           widgetSessionId: widgetSession.id,
-          error: error instanceof Error ? error.message : String(error),
         });
       }
     });

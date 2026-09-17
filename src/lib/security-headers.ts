@@ -29,6 +29,13 @@ export function buildAppContentSecurityPolicy({
     ? [supabaseOrigin, `wss://${new URL(supabaseOrigin).host}`]
     : [];
   const supabaseFrameTokens = supabaseOrigin ? [supabaseOrigin] : [];
+  // Without this the browser SDK is silently dead: every event to Sentry's
+  // ingest host is blocked by connect-src and nothing surfaces in the console
+  // of the person who configured it. Derived from the DSN so the allowance
+  // only exists when Sentry is actually configured, and only for that project's
+  // own ingest host.
+  const sentryIngestOrigin = resolveOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN);
+  const sentryIngestTokens = sentryIngestOrigin ? [sentryIngestOrigin] : [];
   const scriptSrcTokens = ["'self'"];
 
   if (process.env.NODE_ENV === "development") {
@@ -48,9 +55,12 @@ export function buildAppContentSecurityPolicy({
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com data:`,
     "img-src 'self' data: blob: https:",
-    `connect-src ${["'self'", widgetAppOrigin, ...supabaseConnectTokens].join(
-      " ",
-    )}`,
+    `connect-src ${[
+      "'self'",
+      widgetAppOrigin,
+      ...supabaseConnectTokens,
+      ...sentryIngestTokens,
+    ].join(" ")}`,
     `frame-src ${[
       "'self'",
       widgetAppOrigin,

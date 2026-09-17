@@ -1,4 +1,6 @@
 export const nav = {
+  backToLanding: "Avenro — tillbaka till startsidan",
+  navigationLandmark: "Navigering",
   dashboard: "Översikt",
   analytics: "Analys",
   newAnalyticsActivity: "Ny analysaktivitet",

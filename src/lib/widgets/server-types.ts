@@ -137,5 +137,25 @@ export interface WidgetSessionTurnLockRow {
 
 export const WIDGET_PREVIEW_TTL_MS = 15 * 60 * 1000;
 export const WIDGET_ACCESS_TTL_MS = 15 * 60 * 1000;
-export const WIDGET_ACTIVE_TURN_STALE_MS = 10 * 60 * 1000;
+/**
+ * Hard ceiling on one widget chat turn.
+ *
+ * Bounds what the session turn lock has to wait out. Measured turns finish in
+ * seconds; a tool-heavy booking flow in well under a minute. Two minutes is
+ * several times the realistic worst case while staying far inside the platform
+ * function limit, so a turn is always ended by this deadline — which runs the
+ * route's own cleanup — rather than by the platform killing the process.
+ */
+export const WIDGET_TURN_DEADLINE_MS = 2 * 60 * 1000;
+
+/**
+ * How long an abandoned turn lock blocks the next message.
+ *
+ * Only reached when a request dies without running its cleanup, e.g. the host
+ * kills the process. It has to exceed WIDGET_TURN_DEADLINE_MS plus the writes
+ * that follow the stream, or a still-running turn could be overwritten by a
+ * second one; beyond that, every extra second is a visitor stuck reading
+ * "another reply is already being generated".
+ */
+export const WIDGET_ACTIVE_TURN_STALE_MS = 3 * 60 * 1000;
 export const DEPLOY_TIMESTAMP_SKEW_MS = 2000;

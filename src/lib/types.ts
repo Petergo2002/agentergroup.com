@@ -121,6 +121,7 @@ export type {
   DashboardAutomationAnalytics,
   DashboardAnalyticsAppliedFilters,
   DashboardAnalyticsConversationListItem,
+  DashboardConversationTrendPoint,
   DashboardAnalyticsResponse,
   DashboardLatestActivityResponse,
   DashboardSummaryResponse,

@@ -158,7 +158,7 @@ export default function AgentsPageClient({
       <header className="relative pb-2 pt-1 transition-all duration-300">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">
-            <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-on-surface sm:text-3xl">
+            <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
               {t('agents.headline')}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">

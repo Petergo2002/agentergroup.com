@@ -4,15 +4,12 @@ import type {
   WidgetPreviewDraftRecord,
   WidgetRecord,
 } from "@/lib/types";
-import { buildDraftPreviewWidgetAgentId, type WidgetAgentWithAgent } from "@/lib/widgets";
 import type {
   WidgetAdminSupabase,
   WidgetPreviewDraftRow,
-  RuntimeWidgetAgentSelection,
 } from "./server-types";
 import { verifyWidgetPreviewToken } from "./tokens";
 import { buildDraftWidgetRuntimeConfig } from "./runtime-config";
-import { loadWidgetAgentsByIds } from "./loader";
 
 export async function createWidgetPreviewDraft(
   supabase: WidgetAdminSupabase,
@@ -143,47 +140,4 @@ export async function resolveWidgetPreviewContext(
     previewDraft,
     runtimeConfig,
   };
-}
-
-export function buildStoredWidgetRuntimeAgents(
-  widgetAgents: WidgetAgentWithAgent[],
-): RuntimeWidgetAgentSelection[] {
-  return widgetAgents.map(({ widgetAgent, agent }) => ({
-    widgetAgentId: widgetAgent.id,
-    persistedWidgetAgentId: widgetAgent.id,
-    publishedVersionId: widgetAgent.published_version_id,
-    agent,
-  }));
-}
-
-export async function buildDraftWidgetRuntimeAgents(
-  supabase: WidgetAdminSupabase,
-  widget: WidgetRecord,
-  draft: WidgetDraftPreviewInput,
-) {
-  const orderedDraftAgents = [...draft.agents].sort(
-    (left, right) => left.sortOrder - right.sortOrder,
-  );
-  const referencedAgents = await loadWidgetAgentsByIds(
-    supabase,
-    widget.workspace_id,
-    orderedDraftAgents.map((agent) => agent.agentId),
-  );
-  const agentMap = new Map(referencedAgents.map((agent) => [agent.id, agent]));
-
-  return orderedDraftAgents
-    .map((agent, index) => {
-      const loadedAgent = agentMap.get(agent.agentId);
-      if (!loadedAgent) {
-        return null;
-      }
-
-      return {
-        widgetAgentId: buildDraftPreviewWidgetAgentId(agent.agentId, index),
-        persistedWidgetAgentId: null,
-        publishedVersionId: loadedAgent.published_version_id,
-        agent: loadedAgent,
-      } satisfies RuntimeWidgetAgentSelection;
-    })
-    .filter(Boolean) as RuntimeWidgetAgentSelection[];
 }

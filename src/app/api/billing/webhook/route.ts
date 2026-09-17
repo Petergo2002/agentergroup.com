@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { reportError } from "@/lib/observability/report";
 import Stripe from "stripe";
 import {
   EXTRA_MESSAGE_CREDIT_PACK_AMOUNT,
@@ -373,19 +374,23 @@ export async function POST(req: Request) {
 
     const message =
       error instanceof Error ? error.message : "Webhook processing failed";
-    console.error("[billing/webhook] Error processing event", {
-      eventId: event.id,
-      eventType: event.type,
-      error: message,
+    reportError(error, {
+      operation: "billing.webhook",
+      route: "/api/billing/webhook",
+      stripeEventId: event.id,
+      stripeEventType: event.type,
     });
 
     try {
       await updateWebhookEvent(event.id, "failed", message);
     } catch (ledgerError) {
-      console.error(
-        "[billing/webhook] Failed to record webhook failure",
-        ledgerError,
-      );
+      // Losing the ledger write can let a failed event be replayed silently.
+      reportError(ledgerError, {
+        operation: "billing.webhook_ledger",
+        route: "/api/billing/webhook",
+        stripeEventId: event.id,
+        stripeEventType: event.type,
+      }, "fatal");
     }
 
     return NextResponse.json(

@@ -22,6 +22,8 @@
 (() => {
   const GLOBAL_INSTANCE_KEY = "__AG_WIDGET_LOADER_INSTANCE__";
   const MOBILE_WIDGET_BREAKPOINT = 640;
+  // Comfortably inside the 15 minute widget access token lifetime.
+  const BOOTSTRAP_REUSE_MS = 5 * 60 * 1000;
   const PREVIEW_OVERRIDE_WINDOW_KEY = "__AG_WIDGET_PREVIEW_OVERRIDE__";
   const PREVIEW_UPDATE_MESSAGE_TYPE = "ag:widget-preview:update-config";
   const PREVIEW_AUTH_UPDATE_MESSAGE_TYPE = "ag:widget-preview:update-auth";
@@ -155,6 +157,8 @@
   let focusListener = null;
   let previewOverrideMessage = null;
   let bootstrapPayload = null;
+  let bootstrapFetchedAt = 0;
+  let bootstrapPromise = null;
 
   let previousFocusedElement = null;
   const scrollLockState = {
@@ -512,7 +516,40 @@
     }
 
     bootstrapPayload = await response.json();
+    bootstrapFetchedAt = Date.now();
     return bootstrapPayload;
+  }
+
+  /**
+   * Returns the bootstrap payload, reusing the one the page-load prefetch
+   * already produced.
+   *
+   * Opening the widget used to call fetchBootstrap() unconditionally, so every
+   * visitor paid for a second bootstrap round trip — with the bubble disabled —
+   * even though the prefetch had already answered, and a click landing while
+   * the prefetch was still in flight started a third request. The access token
+   * in the payload lives for 15 minutes and the widget re-requests a fresh one
+   * through the parent on WIDGET_ACCESS_TOKEN_INVALID, so a payload younger
+   * than BOOTSTRAP_REUSE_MS is safe to open with.
+   */
+  function ensureBootstrap() {
+    if (
+      !previewEnabled &&
+      bootstrapPayload &&
+      Date.now() - bootstrapFetchedAt < BOOTSTRAP_REUSE_MS
+    ) {
+      return Promise.resolve(bootstrapPayload);
+    }
+
+    if (bootstrapPromise) {
+      return bootstrapPromise;
+    }
+
+    bootstrapPromise = fetchBootstrap().finally(() => {
+      bootstrapPromise = null;
+    });
+
+    return bootstrapPromise;
   }
 
   async function refreshBootstrapForIframe() {
@@ -1397,7 +1434,7 @@
     }
 
     runtimeReadyPromise = (async () => {
-      await fetchBootstrap();
+      await ensureBootstrap();
       updateBubbleContent();
       applyWidgetTheme();
       await createIframe();
@@ -1522,7 +1559,7 @@
 
     // Pre-fetch bootstrap config immediately so logo loads on page load
     if (!bootstrapPayload) {
-      fetchBootstrap()
+      ensureBootstrap()
         .then(() => {
           updateBubbleContent();
           applyWidgetTheme();
@@ -1665,6 +1702,8 @@
     iframeContainer = null;
     iframe = null;
     runtimeReadyPromise = null;
+    bootstrapPromise = null;
+    bootstrapFetchedAt = 0;
     isOpen = false;
     unlockBackgroundScroll();
 

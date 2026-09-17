@@ -1,4 +1,15 @@
 export const login = {
+  forgotAccountRecovery: "ACCOUNT RECOVERY",
+  forgotHeroTitle: "Reset your password",
+  forgotHeroBody:
+    "Enter your email and we'll send you a secure link to set a new password.",
+  forgotTitle: "Reset Password",
+  forgotSubtitle: "We will send a password reset link to your email address.",
+  forgotSentTitle: "Reset link sent",
+  forgotSentBody: "Check your inbox for instructions to reset your password.",
+  forgotSubmit: "Send Reset Link",
+  forgotRememberPassword: "Remember your password?",
+  backToLanding: "Back to landing page",
   systemConfiguration: "System Configuration",
   readyToBuild: "Ready to build?",
   setupDatabase:

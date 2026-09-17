@@ -696,6 +696,15 @@ export default function Widget({
     }
   }, [messages, activeTab]);
 
+  /**
+   * Sends one presence event.
+   *
+   * Returns false only when the runtime is not authenticated yet, which is the
+   * one skip a caller can retry: the access token arrives from the bootstrap
+   * response after mount, so an event raised before it lands would otherwise be
+   * silently dropped. Every other skip (no session, preview runtime, dedupe
+   * window) means there is nothing left to send, so it reports true.
+   */
   const sendSessionEvent = useCallback(
     (
       event: SessionPresenceEvent,
@@ -705,9 +714,11 @@ export default function Widget({
         dedupeMs?: number;
       },
     ) => {
-      if (!widgetPublicKey || !sessionId) return;
-      if (previewMode) return;
-      if (!requestContext.accessToken && !requestContext.previewToken) return;
+      if (!widgetPublicKey || !sessionId) return true;
+      if (previewMode) return true;
+      if (!requestContext.accessToken && !requestContext.previewToken) {
+        return false;
+      }
 
       const dedupeKey = options?.dedupeKey || event;
       const dedupeWindowMs = options?.dedupeMs ?? 0;
@@ -715,7 +726,7 @@ export default function Widget({
         const now = Date.now();
         const previous = sessionEventDedupRef.current[dedupeKey];
         if (typeof previous === "number" && now - previous < dedupeWindowMs) {
-          return;
+          return true;
         }
         sessionEventDedupRef.current[dedupeKey] = now;
       }
@@ -738,6 +749,8 @@ export default function Widget({
         requestContext,
         { preferBeacon: options?.preferBeacon },
       );
+
+      return true;
     },
     [previewMode, requestContext, sessionId, widgetPublicKey],
   );
@@ -939,18 +952,32 @@ export default function Widget({
     };
   }, [embeddedParentOrigin]);
 
+  // The open/close event is only recorded once it has actually been sent, so a
+  // widget that was already open before the access token arrived still reports
+  // its open instead of losing it. `sendSessionEvent` changes identity when the
+  // token lands, which re-runs this effect and lets the pending event through.
   useEffect(() => {
     const previousState = previousWidgetOpenRef.current;
+
     if (previousState === null) {
-      previousWidgetOpenRef.current = isWidgetOpen;
-      if (window.parent === window && isWidgetOpen) {
-        sendSessionEvent("widget_open");
+      // Standalone and hosted runtimes render open, so the first observation is
+      // the open itself. Embedded runtimes learn their state from the loader.
+      if (window.parent !== window || !isWidgetOpen) {
+        previousWidgetOpenRef.current = isWidgetOpen;
+        return;
+      }
+
+      if (sendSessionEvent("widget_open")) {
+        previousWidgetOpenRef.current = isWidgetOpen;
       }
       return;
     }
 
-    if (previousState !== isWidgetOpen) {
-      sendSessionEvent(isWidgetOpen ? "widget_open" : "widget_close");
+    if (previousState === isWidgetOpen) {
+      return;
+    }
+
+    if (sendSessionEvent(isWidgetOpen ? "widget_open" : "widget_close")) {
       previousWidgetOpenRef.current = isWidgetOpen;
     }
   }, [isWidgetOpen, sendSessionEvent]);
@@ -1425,7 +1452,14 @@ export default function Widget({
       // The stored transcript just changed, so drop the cached copy and let the
       // list prefetch re-warm it.
       conversationCacheRef.current.delete(activeSessionId);
-      void refreshConversationList();
+      // Every entry point into the history list refreshes it on the way in, and
+      // the list cannot be on screen while a turn is streaming, so refetching
+      // after every turn only ever mattered for the first one — that is what
+      // makes the History affordance appear. Doing it unconditionally spent a
+      // request plus its rate-limit round trips on rows nobody was looking at.
+      if (conversationsRef.current.length === 0) {
+        void refreshConversationList();
+      }
     }
   };
 

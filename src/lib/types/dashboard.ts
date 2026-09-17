@@ -120,8 +120,18 @@ export interface DashboardAnalyticsConversationListItem {
   } | null;
 }
 
+/** One day of conversation activity, produced by a server-side aggregate. */
+export interface DashboardConversationTrendPoint {
+  /** ISO date (YYYY-MM-DD), UTC day boundaries. */
+  date: string;
+  conversations: number;
+  messages: number;
+  leads: number;
+}
+
 export interface DashboardAnalyticsResponse {
   overview: DashboardAnalyticsOverview;
+  trend: DashboardConversationTrendPoint[];
   automation: DashboardAutomationAnalytics;
   filters: {
     widgets: Array<{ id: string; name: string }>;

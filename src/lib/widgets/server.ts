@@ -3,7 +3,7 @@ export { resolveWidgetRuntimeRequestOrigin, buildWidgetRuntimeCorsHeaders, build
 
 export { getWidgetAccessTokenSecret, getPreviewTokenSecret, signWidgetAccessToken, verifyWidgetAccessToken, signWidgetPreviewToken, verifyWidgetPreviewToken, buildWidgetPreviewPayload, buildWidgetAccessPayload } from "./tokens";
 
-export { loadWidgetById, loadWidgetByPublicKey, loadAllWidgetsWithAgents, getPublishedAgentVersion, loadWidgetAgentsByIds, isPremiumBrandingPlan, type WidgetLoaderOptions } from "./loader";
+export { loadWidgetById, loadWidgetByPublicKey, loadWidgetRecordByPublicKey, loadAllWidgetsWithAgents, getPublishedAgentVersion, loadWidgetAgentsByIds, isPremiumBrandingPlan, type WidgetLoaderOptions } from "./loader";
 
 export { getWidgetRuntimeAgent, buildStoredWidgetRuntimeConfig, buildDraftWidgetRuntimeConfig, getWidgetNeedsRedeploy, buildWidgetSummary, buildStoredWidgetRuntimeAgents, buildDraftWidgetRuntimeAgents } from "./runtime-config";
 

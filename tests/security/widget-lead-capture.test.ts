@@ -71,10 +71,13 @@ test("uses the latest contact details while retaining earlier name context", () 
 });
 
 test("captures leads before starting the assistant stream", () => {
-  const captureIndex = chatRouteSource.indexOf("await autoCaptureLead");
+  const captureIndex = chatRouteSource.indexOf("autoCaptureLead(supabase");
   const streamIndex = chatRouteSource.indexOf("const stream = new ReadableStream");
 
   assert.ok(captureIndex >= 0);
+  // Capture runs alongside the other pre-model reads, but the turn still waits
+  // for it: the background lead summary needs the lead to already exist.
+  assert.match(chatRouteSource, /await Promise\.all\(\[\s*autoCaptureLead\(/);
   assert.ok(streamIndex > captureIndex);
   assert.doesNotMatch(chatRouteSource, /void autoCaptureLead/);
 });

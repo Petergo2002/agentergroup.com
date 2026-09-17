@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { forgotPasswordAction } from "@/app/login/actions";
+import { EmailAuthSubmitButton } from "@/app/login/EmailAuthSubmitButton";
 import { BrandLogo } from "@/components/BrandLogo";
+import { getMessages } from "@/lib/i18n";
+import { getServerLanguage } from "@/lib/i18n-server";
 
 interface ForgotPasswordPageProps {
   searchParams: Promise<{
@@ -13,6 +16,8 @@ export default async function ForgotPasswordPage({
   searchParams,
 }: ForgotPasswordPageProps) {
   const { error, success } = await searchParams;
+  const language = await getServerLanguage();
+  const messages = await getMessages(language);
 
   return (
     <main className="relative min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-[#050505] font-body text-[#f5f1eb] selection:bg-[#ff5c00] selection:text-white">
@@ -23,7 +28,7 @@ export default async function ForgotPasswordPage({
           <Link
             href="/"
             title="Avenro Home"
-            aria-label="Back to landing page"
+            aria-label={messages.login.backToLanding}
             className="group inline-flex items-center transition-all duration-200 hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5c00] rounded-xl"
           >
             <BrandLogo
@@ -36,13 +41,13 @@ export default async function ForgotPasswordPage({
         {/* Super Simple Pure Typographic Headline Block with vast negative space */}
         <div className="relative z-10 my-auto w-full space-y-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-[#ff5c00]">
-            ACCOUNT RECOVERY
+            {messages.login.forgotAccountRecovery}
           </p>
           <p className="text-4xl xl:text-5xl font-headline font-extrabold text-white tracking-tight leading-tight max-w-lg">
-            Reset your password
+            {messages.login.forgotHeroTitle}
           </p>
           <p className="text-base text-[#9d948a] font-medium leading-relaxed max-w-md">
-            Enter your email and we&apos;ll send you a secure link to set a new password.
+            {messages.login.forgotHeroBody}
           </p>
         </div>
 
@@ -81,13 +86,13 @@ export default async function ForgotPasswordPage({
           {/* Headline block */}
           <div className="space-y-2 text-center lg:text-left">
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#ff5c00]">
-              ACCOUNT RECOVERY
+              {messages.login.forgotAccountRecovery}
             </p>
             <h1 className="font-headline text-3xl font-extrabold tracking-tight text-white">
-              Reset Password
+              {messages.login.forgotTitle}
             </h1>
             <p className="text-xs text-[#9d948a] font-medium leading-relaxed">
-              We will send a password reset link to your email address.
+              {messages.login.forgotSubtitle}
             </p>
           </div>
 
@@ -109,10 +114,10 @@ export default async function ForgotPasswordPage({
                 className="rounded-[2px] border border-emerald-500/20 bg-emerald-500/10 p-5 text-center space-y-2"
               >
                 <p className="text-sm font-bold text-emerald-400">
-                  Reset link sent
+                  {messages.login.forgotSentTitle}
                 </p>
                 <p className="text-xs text-[#9d948a] leading-relaxed">
-                  Check your inbox for instructions to reset your password.
+                  {messages.login.forgotSentBody}
                 </p>
               </div>
 
@@ -120,7 +125,7 @@ export default async function ForgotPasswordPage({
                 href="/login"
                 className="w-full inline-flex items-center justify-center rounded-[2px] border border-[#222] bg-[#111] px-4 py-3 text-xs font-bold text-white hover:bg-[#1a1a1a] transition-colors"
               >
-                Back to Sign In
+                {messages.login.backToSignIn}
               </Link>
             </div>
           ) : (
@@ -131,7 +136,7 @@ export default async function ForgotPasswordPage({
                     htmlFor="recovery-email"
                     className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1"
                   >
-                    Email Address
+                    {messages.login.emailAddress}
                   </label>
                   <input
                     id="recovery-email"
@@ -145,21 +150,20 @@ export default async function ForgotPasswordPage({
                 </div>
               </div>
 
-              <button
-                type="submit"
-                className="w-full rounded-[2px] bg-[#ff5c00] py-3.5 px-4 text-xs font-bold uppercase tracking-[0.2em] text-white transition-all duration-150 hover:bg-[#ff6d1a] active:scale-[0.99] shadow-lg shadow-[#ff5c00]/20 cursor-pointer"
-              >
-                Send Reset Link
-              </button>
+              <EmailAuthSubmitButton
+                idleLabel={messages.login.forgotSubmit}
+                pendingLabel={messages.common.sending}
+                className="w-full flex items-center justify-center gap-2 rounded-[2px] bg-[#ff5c00] py-3.5 px-4 text-xs font-bold uppercase tracking-[0.2em] text-white transition-all duration-150 hover:bg-[#ff6d1a] active:scale-[0.99] shadow-lg shadow-[#ff5c00]/20 disabled:cursor-wait disabled:opacity-80"
+              />
 
               <div className="text-center pt-2">
                 <p className="text-xs text-[#9d948a]">
-                  Remember your password?{" "}
+                  {messages.login.forgotRememberPassword}{" "}
                   <Link
                     href="/login"
                     className="text-white hover:text-[#ff5c00] transition-colors font-semibold underline underline-offset-4 decoration-white/20 hover:decoration-[#ff5c00]"
                   >
-                    Back to Sign In
+                    {messages.login.backToSignIn}
                   </Link>
                 </p>
               </div>

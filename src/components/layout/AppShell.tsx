@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -10,6 +11,7 @@ import {
 import { usePathname } from "next/navigation";
 import useSWR, { SWRConfig } from "swr";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { Topbar } from "@/components/layout/Topbar";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { ModalProvider } from "@/components/ui/ModalProvider";
@@ -39,6 +41,7 @@ const ANALYTICS_ACTIVITY_SEEN_PREFIX = "agenter_analytics_last_seen_at";
 const LEADS_ACTIVITY_SEEN_PREFIX = "agenter_leads_last_seen_at";
 
 export function AppShell({ children, context, user }: AppShellProps) {
+  const { t } = useLanguage();
   const analyticsStorageKey = `${ANALYTICS_ACTIVITY_SEEN_PREFIX}:${context.workspace.id}`;
   const leadsStorageKey = `${LEADS_ACTIVITY_SEEN_PREFIX}:${context.workspace.id}`;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -150,6 +153,11 @@ export function AppShell({ children, context, user }: AppShellProps) {
   }, [closeMobileSidebar, isSidebarOpen]);
 
   const pathname = usePathname();
+  // Identity-stable so the 60s activity poll does not re-render every consumer.
+  const appContextValue = useMemo(
+    () => ({ ...context, user }),
+    [context, user],
+  );
   const isAnalyticsRoute = pathname.startsWith("/analytics");
   const isLeadsRoute = pathname.startsWith("/leads");
   const primaryWebsiteChatPath =
@@ -208,7 +216,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
   }, [isLeadsRoute, leadsStorageKey]);
 
   return (
-    <AppContextProvider value={{ ...context, user }}>
+    <AppContextProvider value={appContextValue}>
       <SWRConfig
         key={`${user.id}:${context.workspace.id}`}
         value={{
@@ -269,7 +277,7 @@ export function AppShell({ children, context, user }: AppShellProps) {
                 }`}
               >
                 <h2 id="mobile-navigation-title" className="sr-only">
-                  Navigation
+                  {t("nav.navigationLandmark")}
                 </h2>
                 <Sidebar
                   mobile

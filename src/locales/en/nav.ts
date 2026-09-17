@@ -1,4 +1,6 @@
 export const nav = {
+  backToLanding: "Avenro — back to the landing page",
+  navigationLandmark: "Navigation",
   dashboard: "Dashboard",
   analytics: "Analytics",
   newAnalyticsActivity: "New analytics activity",

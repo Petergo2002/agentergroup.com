@@ -1,4 +1,15 @@
 export const login = {
+  forgotAccountRecovery: "KONTOÅTERSTÄLLNING",
+  forgotHeroTitle: "Återställ ditt lösenord",
+  forgotHeroBody:
+    "Ange din e-postadress så skickar vi en säker länk för att välja ett nytt lösenord.",
+  forgotTitle: "Återställ lösenord",
+  forgotSubtitle: "Vi skickar en återställningslänk till din e-postadress.",
+  forgotSentTitle: "Återställningslänk skickad",
+  forgotSentBody: "Kolla din inkorg för instruktioner om hur du återställer lösenordet.",
+  forgotSubmit: "Skicka återställningslänk",
+  forgotRememberPassword: "Kommer du ihåg ditt lösenord?",
+  backToLanding: "Tillbaka till startsidan",
   systemConfiguration: "Systemkonfiguration",
   readyToBuild: "Redo att bygga?",
   setupDatabase:

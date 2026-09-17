@@ -1,561 +1,132 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
-import {
-  ArrowRight,
-  BarChart3,
-  BookOpenCheck,
-  Cable,
-  CalendarCheck2,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  CircleHelp,
-  Clock3,
-  FileKey2,
-  Fingerprint,
-  History,
-  KeyRound,
-  LifeBuoy,
-  MessageCircleReply,
-  MessageSquareText,
-  ShieldCheck,
-  ShieldUser,
-  Sparkles,
-  Target,
-  UserRoundPlus,
-  UsersRound,
-} from "lucide-react";
+import { ArrowDown, ArrowRight, Check, ChevronDown, Clock, FileCheck, FileKey, Lock, ShieldAlert, ShieldCheck } from "lucide-react";
 import { AvenroLogo } from "@/components/brand/AvenroLogo";
 import { MiloLogo } from "@/components/brand/MiloLogo";
-import { SimpleIcon, type SimpleIconKey } from "@/components/icons/SimpleIcon";
+
+const SECURITY_ICONS = [ShieldCheck, Lock, FileKey, ShieldAlert, FileCheck, Clock];
 import type { PlatformLanguage } from "@/lib/i18n";
 import type { Messages } from "@/locales/en";
 import { DashboardHeroPreview } from "./DashboardHeroPreview";
-import { InteractiveProductPreview } from "./InteractiveProductPreview";
 import { MarketingLanguageSwitcher } from "./MarketingLanguageSwitcher";
 import { MarketingMobileMenu } from "./MarketingMobileMenu";
 import { MarketingMotion } from "./MarketingMotion";
+import { StoryProvider } from "./StoryContext";
+import { VisitorScene, KnowledgeScene, NightScene, IntegrationMarquee, PlatformCompatibilityStrip } from "./StorySections";
+import { LazyProductDemo } from "./LazyProductDemo";
+import { ActionStage } from "./ActionStage";
+import { IntegrationScene } from "./IntegrationScene";
+import { DashboardScene } from "./DashboardScene";
+import { ImproveScene } from "./ImproveScene";
+import { demoContactHref, marketingNavItems } from "./marketing-links";
 import styles from "./landing.module.css";
+import s from "./product-story.module.css";
 
-interface LandingPageProps {
-  copy: Messages["landing"];
-  language: PlatformLanguage;
+function Heading({ copy, centered = false }: { copy: { eyebrow: string; title: string; description?: string }; centered?: boolean }) {
+  return <div className={centered ? s.centerHeading : s.sectionHeading} data-reveal><p className={styles.eyebrow}>{copy.eyebrow}</p><h2>{copy.title}</h2>{copy.description && <p>{copy.description}</p>}</div>;
 }
 
-const featureIcons = [
-  BookOpenCheck,
-  MessageSquareText,
-  UserRoundPlus,
-  Sparkles,
-  BarChart3,
-  Cable,
-] as const;
-
-const outcomeIcons = [MessageCircleReply, Target, Clock3] as const;
-const useCaseIcons = [UsersRound, LifeBuoy, CalendarCheck2] as const;
-const securityIcons = [ShieldUser, KeyRound, FileKey2, ShieldCheck, Fingerprint, History] as const;
-
-interface IntegrationItemConfig {
-  iconKey: SimpleIconKey;
-  brandColor: string;
-  bgLight: string;
-}
-
-const integrationConfigs: readonly IntegrationItemConfig[] = [
-  { iconKey: "siGmail", brandColor: "#EA4335", bgLight: "#fef2f2" },
-  { iconKey: "siGooglecalendar", brandColor: "#4285F4", bgLight: "#eff6ff" },
-  { iconKey: "siSlack", brandColor: "#4A154B", bgLight: "#fdf4ff" },
-  { iconKey: "siHubspot", brandColor: "#FF7A59", bgLight: "#fff7ed" },
-  { iconKey: "siShopify", brandColor: "#7AB55C", bgLight: "#f0fdf4" },
-  { iconKey: "siGoogledrive", brandColor: "#0F9D58", bgLight: "#f0fdf4" },
-];
-
-type MotionStyle = CSSProperties & { "--motion-order"?: number };
-
-function motionOrder(order: number): MotionStyle {
-  return { "--motion-order": order };
-}
-
-function SectionHeading({
-  eyebrow,
-  title,
-  description,
-  centered = false,
-}: {
-  eyebrow: string;
-  title: string;
-  description?: string;
-  centered?: boolean;
-}) {
-  return (
-    <div
-      data-reveal
-      className={centered ? "mx-auto max-w-3xl text-center" : "max-w-3xl"}
-    >
-      <p className={styles.eyebrow}>{eyebrow}</p>
-      <h2 className={`${styles.sectionTitle} mt-4`}>{title}</h2>
-      {description ? (
-        <p className={`${styles.sectionLead} mt-5 ${centered ? "mx-auto" : ""}`}>
-          {description}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-export function LandingPage({ copy, language }: LandingPageProps) {
-  const currentYear = new Date().getFullYear();
-
-  // Split title to apply gradient styling to the primary outcome phrase
-  const splitWord = language === "sv" ? " till " : " into ";
-  const titleParts = copy.hero.title.split(splitWord);
-
-  return (
-    <div data-marketing-root className={`${styles.site} font-body`}>
-      <MarketingMotion />
-      <a
-        href="#main-content"
-        className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-xl bg-[var(--mkt-ink)] px-4 py-3 text-sm font-bold text-white transition-transform focus:translate-y-0"
-      >
-        {language === "sv" ? "Hoppa till innehållet" : "Skip to content"}
-      </a>
-
-      <header className={`${styles.siteHeader} sticky top-0 z-40 border-b backdrop-blur-xl`}>
-        <div className={styles.scrollProgressTrack} aria-hidden="true">
-          <div className={styles.scrollProgressBar} />
+export function LandingPage({ copy, language }: { copy: Messages["landing"]; language: PlatformLanguage }) {
+  const story = copy.story;
+  const contact = demoContactHref(language);
+  const nav = marketingNavItems(copy.nav);
+  return <div data-marketing-root className={`${styles.site} ${s.storySite} font-body`}>
+    <MarketingMotion />
+    <a href="#main-content" className={s.skipLink}>{language === "sv" ? "Hoppa till innehållet" : "Skip to content"}</a>
+    <header className={`${styles.siteHeader} ${s.header}`}>
+      <div className={styles.scrollProgressTrack} aria-hidden="true"><div className={styles.scrollProgressBar} /></div>
+      <div className={s.headerInner}>
+        <Link href="/" aria-label="Avenro" className={styles.brandLink}><AvenroLogo className="h-9 w-auto" /></Link>
+        <nav className={s.desktopNav} aria-label={language === "sv" ? "Huvudnavigation" : "Primary navigation"}>{nav.map(item => <a key={item.id} href={`#${item.id}`} data-nav={item.id} className={styles.navLink}>{item.label}</a>)}</nav>
+        <div className={s.headerActions}><MarketingLanguageSwitcher label={copy.nav.language} serverLanguage={language} /><Link href="/login" className={s.loginLink}>{copy.nav.login}</Link><a href={contact} className={styles.primaryButton}>{copy.nav.getStarted}<ArrowRight size={15} /></a></div>
+        <MarketingMobileMenu copy={copy.nav} serverLanguage={language} />
+      </div>
+    </header>
+    <StoryProvider><main id="main-content">
+      <section className={s.hero}>
+        <div className={`${styles.heroCopy} ${s.heroText}`}>
+          <div className={styles.heroBadge}><MiloLogo size={19} />{copy.hero.eyebrow}</div>
+          <h1 className={styles.displayTitle}><span className={styles.heroHeadlineGradient}>MILO</span> {copy.hero.title.replace(/^MILO\s/, "")}</h1>
+          <p className={s.heroDescription}>{copy.hero.description}</p>
+          <div className={s.heroCtas}><a href={contact} className={styles.primaryButton}>{copy.hero.primaryCta}<ArrowRight size={17} /></a><a href="#how-it-works" className={styles.secondaryButton}>{copy.hero.secondaryCta}<ArrowDown size={16} /></a></div>
+          <ul className={styles.trustList}>{copy.hero.trustPoints.map(point => <li key={point}><Check size={14} />{point}</li>)}</ul>
         </div>
-        <div className="mx-auto flex h-[4.75rem] max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            aria-label="Avenro"
-            className={`${styles.brandLink} shrink-0 items-center rounded-xl`}
-          >
-            <AvenroLogo className="h-9 w-auto text-[var(--mkt-ink)] sm:h-10 transition-transform duration-200 hover:scale-[1.02]" />
-          </Link>
-
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary">
-            {[
-              ["#how-it-works", "how-it-works", copy.nav.howItWorks],
-              ["#product", "product", copy.nav.product],
-              ["#security", "security", copy.nav.security],
-              ["#faq", "faq", copy.nav.faq],
-            ].map(([href, sectionId, label]) => (
-              <a
-                key={href}
-                href={href}
-                data-nav={sectionId}
-                className={`${styles.navLink} whitespace-nowrap rounded-lg px-3.5 py-2.5 text-sm font-semibold text-[var(--mkt-muted)]`}
-              >
-                {label}
-              </a>
-            ))}
-          </nav>
-
-          <div className="hidden items-center gap-2 lg:flex">
-            <MarketingLanguageSwitcher label={copy.nav.language} serverLanguage={language} />
-            <Link
-              href="/login"
-              className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--mkt-muted)] transition-colors hover:bg-white hover:text-[var(--mkt-ink)]"
-            >
-              {copy.nav.login}
-            </Link>
-            <Link
-              href="/login?view=signup"
-              className={`${styles.primaryButton} min-h-11 px-5 py-2.5`}
-            >
-              {copy.nav.getStarted}
-            </Link>
+        <DashboardHeroPreview copy={story} />
+        <div className={s.heroFootnote}><span>AVENRO / MILO</span><span>{story.visitor.scrollPrompt}</span><ArrowDown size={17} /></div>
+      </section>
+      <section id="website-chat" className={s.section}>
+        <div className={s.editorialHeading}><Heading copy={story.visitor} /></div>
+        <div data-reveal className={s.sceneSpace}><VisitorScene copy={story} /></div>
+        <p className={s.sceneFootnote}><MiloLogo size={17} />{story.visitor.footnote}</p>
+      </section>
+      <section id="knowledge" className={`${s.section} ${s.knowledgeSection}`}>
+        <div><Heading copy={story.knowledge} /></div>
+        <div data-reveal><KnowledgeScene copy={story} /></div>
+      </section>
+      <section id="how-it-works" className={s.actionSection}>
+        <div className={s.sectionInner}>
+          <Heading copy={story.action} centered />
+          <div className={s.actionDemoFrame}>
+            <div className={s.actionTopline}><span><MiloLogo size={20} />MILO / AVENRO.SE</span><span className={s.example}>{story.example}</span></div>
+            <LazyProductDemo kind="action" copy={story}><ActionStage copy={story} /><div className={s.staticSteps}>{story.action.steps.map((step,i) => <span key={step}>{String(i+1).padStart(2,"0")} {step}</span>)}</div></LazyProductDemo>
+            <noscript><ol className={s.noScriptSteps}>{story.action.details.map(detail => <li key={detail}>{detail}</li>)}</ol><p className={s.demoDisclaimer}>{story.action.available}: {story.action.slots.join(" / ")}</p></noscript>
           </div>
-
-          <MarketingMobileMenu copy={copy.nav} serverLanguage={language} />
+          <p className={s.demoDisclaimer}>{story.exampleNote}</p>
         </div>
-      </header>
-
-      <main id="main-content">
-        <section className="relative px-4 pb-20 pt-14 sm:px-6 sm:pb-24 sm:pt-16 lg:px-8 lg:pb-28 lg:pt-20">
-          <div className={`${styles.heroCopy} relative z-10 mx-auto max-w-4xl text-center`}>
-            <div className={styles.heroBadge}>
-              <MiloLogo size={18} className="h-[18px] w-[18px]" />
-              {copy.hero.eyebrow}
-            </div>
-            <h1 className={`${styles.displayTitle} mx-auto mt-7 text-center`}>
-              {titleParts.length === 2 ? (
-                <>
-                  {titleParts[0]}
-                  {splitWord}
-                  <span className={styles.heroHeadlineGradient}>{titleParts[1]}</span>
-                </>
-              ) : (
-                copy.hero.title
-              )}
-            </h1>
-            <p className={`${styles.heroLead} mx-auto mt-6 max-w-2xl text-center`}>
-              {copy.hero.description}
-            </p>
-
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <Link
-                href="/login?view=signup"
-                className={`${styles.primaryButton} min-h-12 gap-2 px-7 py-3`}
-              >
-                {copy.hero.primaryCta}
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-              <a
-                href="#how-it-works"
-                className={`${styles.secondaryButton} min-h-12 px-7 py-3`}
-              >
-                {copy.hero.secondaryCta}
-              </a>
-            </div>
-
-            <ul className={styles.trustList} aria-label={language === "sv" ? "Tryggt att komma igång" : "Built for a confident start"}>
-              {copy.hero.trustPoints.map((point) => (
-                <li key={point}>
-                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                  {point}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="mt-12 sm:mt-16">
-            <DashboardHeroPreview />
-          </div>
-        </section>
-
-        <section className="px-4 pb-24 sm:px-6 sm:pb-28 lg:px-8">
-          <div data-reveal className="mx-auto max-w-7xl rounded-[1.6rem] border border-[var(--mkt-border)] bg-white p-5 shadow-[var(--mkt-shadow-sm)] sm:p-7 lg:p-8">
-            <p className="mb-5 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--mkt-tertiary)] lg:text-left">
-              {copy.outcomes.label}
-            </p>
-            <div className="grid divide-y divide-[var(--mkt-border)] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
-              {copy.outcomes.items.map((item, index) => {
-                const Icon = outcomeIcons[index];
-                return (
-                  <article key={item.title} className="flex gap-4 py-6 first:pt-2 last:pb-2 lg:px-8 lg:py-3 lg:first:pl-0 lg:last:pr-0">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--mkt-warm)] text-[var(--mkt-orange-text)]">
-                      <Icon className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                      <h3 className="text-sm font-bold text-[var(--mkt-ink)]">{item.title}</h3>
-                      <p className="mt-1.5 text-sm leading-6 text-[var(--mkt-muted)]">{item.description}</p>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section id="how-it-works" className="border-y border-[var(--mkt-border)] bg-white px-4 py-24 sm:px-6 sm:py-28 lg:px-8 lg:py-32">
-          <div className="mx-auto max-w-7xl">
-            <SectionHeading
-              eyebrow={copy.workflow.eyebrow}
-              title={copy.workflow.title}
-              description={copy.workflow.description}
-            />
-
-            <div className="mt-14 grid gap-5 lg:grid-cols-3">
-              {copy.workflow.steps.map((step, index) => (
-                <article
-                  key={step.number}
-                  data-reveal
-                  style={motionOrder(index)}
-                  className={`${styles.workflowCard} relative overflow-hidden p-7 sm:p-8`}
-                >
-                  <div className="absolute right-5 top-2 font-headline text-[5.5rem] font-extrabold leading-none tracking-[-0.08em] text-black/[0.035]" aria-hidden="true">
-                    {step.number}
-                  </div>
-                  <div className="relative">
-                    <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-xl bg-[var(--mkt-ink)] px-3 text-xs font-bold text-white">
-                      {step.number}
-                    </span>
-                    <h3 className={`${styles.cardTitle} mt-8`}>
-                      {step.title}
-                    </h3>
-                    <p className={`${styles.cardBody} mt-3`}>{step.description}</p>
-                    {index < copy.workflow.steps.length - 1 ? (
-                      <ArrowRight className="mt-7 hidden h-5 w-5 text-[var(--mkt-orange)] lg:block" aria-hidden="true" />
-                    ) : (
-                      <CheckCircle2 className="mt-7 hidden h-5 w-5 text-[var(--mkt-success)] lg:block" aria-hidden="true" />
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="product" className="px-4 py-24 sm:px-6 sm:py-28 lg:px-8 lg:py-32">
-          <div className="mx-auto max-w-7xl">
-            <SectionHeading
-              eyebrow={copy.product.eyebrow}
-              title={copy.product.title}
-              description={copy.product.description}
-              centered
-            />
-
-            <div className={`${styles.productGrid} mt-14`}>
-              {copy.product.features.map((feature, index) => {
-                const Icon = featureIcons[index];
-                return (
-                  <article
-                    key={feature.title}
-                    data-reveal
-                    style={motionOrder(index % 4)}
-                    className={`${styles.featureCard} p-7 sm:p-8`}
-                  >
-                    <div className={styles.featureVisual}>
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--mkt-orange-text)] shadow-[0_1px_2px_rgba(24,24,24,0.06)]">
-                        <Icon className="h-5 w-5" aria-hidden="true" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <span className={styles.featureMeta}>{feature.meta}</span>
-                        <span className={styles.signalLine} aria-hidden="true" />
-                        <span className={`${styles.signalLine} ${styles.signalLineShort}`} aria-hidden="true" />
-                      </div>
-                    </div>
-                    <h3 className={`${styles.cardTitle} mt-7`}>
-                      {feature.title}
-                    </h3>
-                    <p className={`${styles.cardBody} mt-3`}>{feature.description}</p>
-                  </article>
-                );
-              })}
-            </div>
-
-            <div data-reveal className="mt-16 flex justify-center">
-              <InteractiveProductPreview copy={copy.preview} />
-            </div>
-          </div>
-        </section>
-
-        <section className="px-4 pb-24 sm:px-6 sm:pb-28 lg:px-8 lg:pb-32">
-          <div data-reveal className={`${styles.integrationRail} mx-auto max-w-7xl overflow-hidden p-7 sm:p-10 lg:p-12`}>
-            <div className="grid items-center gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
-              <SectionHeading
-                eyebrow={copy.integrations.eyebrow}
-                title={copy.integrations.title}
-                description={copy.integrations.description}
-              />
-
-              <div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {copy.integrations.names.map((name, index) => {
-                    const config = integrationConfigs[index] || integrationConfigs[0];
-                    return (
-                      <div key={name} className={styles.integrationTile}>
-                        <span
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-2xs"
-                          style={{ backgroundColor: config.bgLight }}
-                        >
-                          <SimpleIcon
-                            iconKey={config.iconKey}
-                            color={config.brandColor}
-                            size={18}
-                            className="h-[18px] w-[18px]"
-                          />
-                        </span>
-                        <span className="text-xs font-bold leading-4 text-[var(--mkt-ink)] sm:text-sm">{name}</span>
-                        <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-[var(--mkt-success)]" aria-hidden="true" />
-                      </div>
-                    );
-                  })}
+      </section>
+      <section id="integrations" className={s.section}>
+        <Heading copy={story.integrations} centered />
+        <div data-reveal className={s.sceneSpace}><LazyProductDemo kind="integrations" copy={story}><IntegrationScene copy={story} /></LazyProductDemo></div>
+        <IntegrationMarquee copy={story} />
+        <p className={s.integrationFootnote}>{story.integrations.note}</p>
+      </section>
+      <section id="workspace" className={`${s.section} ${s.dashboardSection}`}>
+        <Heading copy={story.dashboard} />
+        <div data-reveal className={s.sceneSpace}><LazyProductDemo kind="dashboard" copy={story}><DashboardScene copy={story} /></LazyProductDemo></div>
+      </section>
+      <section id="improve" className={`${s.section} ${s.improveSection}`}>
+        <Heading copy={story.improve} />
+        <div data-reveal className={s.sceneSpace}><ImproveScene copy={story} /></div>
+      </section>
+      <section id="after-hours" className={`${s.section} ${s.nightSection}`}><Heading copy={story.night} /><div data-reveal><NightScene copy={story} /></div></section>
+      <section id="setup" className={`${s.section} ${s.setupSection}`}>
+        <Heading copy={story.setup} />
+        <ol className={s.setupSteps}>{story.setup.steps.map((step,i) => <li key={step.title} data-reveal><span>{String(i+1).padStart(2,"0")}</span><div><h3>{step.title}</h3><p>{step.description}</p></div>{i < 2 && <ArrowRight size={19} aria-hidden="true" />}</li>)}</ol>
+        <PlatformCompatibilityStrip copy={story} />
+      </section>
+      <section id="security" className={`${s.section} ${s.securitySection}`}>
+        <div className={s.securityTopline}>
+          <Heading copy={copy.security} />
+        </div>
+        <div className={s.securityGrid} data-reveal>
+          {copy.security.items.map((item, i) => {
+            const Icon = SECURITY_ICONS[i] ?? ShieldCheck;
+            return (
+              <div key={item.title} className={s.securityCard}>
+                <div className={s.securityCardHeader}>
+                  <Icon size={18} strokeWidth={1.5} className={s.securityCardIcon} aria-hidden="true" />
+                  <span className={s.securityCardIndex}>{String(i + 1).padStart(2, "0")}</span>
                 </div>
-                <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-[var(--mkt-muted)]">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--mkt-success)]" aria-hidden="true" />
-                  {copy.integrations.note}
-                </p>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
               </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="use-cases" className="border-y border-[var(--mkt-border)] bg-white px-4 py-24 sm:px-6 sm:py-28 lg:px-8 lg:py-32">
-          <div className="mx-auto max-w-7xl">
-            <SectionHeading
-              eyebrow={copy.useCases.eyebrow}
-              title={copy.useCases.title}
-              description={copy.useCases.description}
-              centered
-            />
-
-            <div className="mt-14 grid gap-5 lg:grid-cols-3">
-              {copy.useCases.items.map((item, index) => {
-                const Icon = useCaseIcons[index];
-                return (
-                  <article
-                    key={item.title}
-                    data-reveal
-                    style={motionOrder(index)}
-                    className={`${styles.useCaseCard} flex min-h-full flex-col p-7 sm:p-8`}
-                  >
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--mkt-ink)] text-white">
-                      <Icon className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <h3 className={`${styles.cardTitle} mt-8`}>{item.title}</h3>
-                    <p className={`${styles.cardBody} mt-3 flex-1`}>{item.description}</p>
-                    <p className="mt-7 flex items-center gap-2 border-t border-[var(--mkt-border)] pt-5 text-xs font-bold text-[var(--mkt-ink)]">
-                      <CheckCircle2 className="h-4 w-4 text-[var(--mkt-orange-text)]" aria-hidden="true" />
-                      {item.result}
-                    </p>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section id="security" aria-labelledby="security-heading" className="px-4 pt-24 sm:px-6 sm:pt-28 lg:px-8 lg:pt-32">
-          <div className={`${styles.securityPanel} mx-auto max-w-7xl overflow-hidden`}>
-            <div data-reveal className="flex flex-col gap-7 p-7 sm:p-10 lg:flex-row lg:items-start lg:gap-8 lg:p-12">
-              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--mkt-ink)] text-[var(--mkt-orange)]" aria-hidden="true">
-                <ShieldCheck className="h-8 w-8" strokeWidth={1.5} />
-              </span>
-              <div className="max-w-3xl">
-                <p className={styles.eyebrow}>{copy.security.eyebrow}</p>
-                <h2 id="security-heading" className={`${styles.sectionTitle} mt-4`}>{copy.security.title}</h2>
-                <p className={`${styles.sectionLead} mt-5`}>{copy.security.description}</p>
-              </div>
-            </div>
-
-            <div className={styles.securityGrid}>
-              {copy.security.items.map((item, index) => {
-                const Icon = securityIcons[index];
-                return (
-                  <article key={item.title} data-reveal style={motionOrder(index % 3)} className={styles.securityCard}>
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--mkt-warm)] text-[var(--mkt-orange-text)]">
-                      <Icon className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <h3 className="mt-5 text-base font-bold tracking-[-0.02em] text-[var(--mkt-ink)]">{item.title}</h3>
-                    <p className="mt-3 text-sm leading-7 text-[var(--mkt-muted)]">{item.description}</p>
-                  </article>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-col gap-5 border-t border-[var(--mkt-border)] px-7 py-6 sm:px-10 lg:flex-row lg:items-center lg:justify-between lg:px-12">
-              <Link href="/privacy-policy" className={`${styles.securityLink} inline-flex min-h-11 w-fit items-center gap-2 rounded-lg text-sm font-bold`}>
-                {copy.security.policyLink}
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-              <p className="flex flex-wrap items-center gap-x-2 text-sm text-[var(--mkt-muted)]">
-                {copy.security.contactLabel}
-                <a href="mailto:info@avenro.se" className={`${styles.securityLink} inline-flex min-h-11 items-center rounded-lg font-bold underline underline-offset-4`}>
-                  {copy.security.contactLink}
-                </a>
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section id="faq" className="px-4 py-24 sm:px-6 sm:py-28 lg:px-8 lg:py-32">
-          <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.75fr_1.25fr] lg:gap-20">
-            <SectionHeading eyebrow={copy.faq.eyebrow} title={copy.faq.title} />
-
-            <div data-reveal className="divide-y divide-[var(--mkt-border)] border-y border-[var(--mkt-border)]">
-              {copy.faq.items.map((item) => (
-                <details key={item.question} className={`${styles.faqItem} group py-1`}>
-                  <summary className={`${styles.faqSummary} flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl px-2 py-5 text-left text-base font-semibold text-[var(--mkt-ink)] marker:hidden sm:px-3 sm:py-6 sm:text-lg`}>
-                    {item.question}
-                    <span className={`${styles.faqChevron} flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[var(--mkt-muted)] group-open:rotate-180`}>
-                      <ChevronDown className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                  </summary>
-                  <p className={`${styles.faqAnswer} max-w-2xl px-2 pb-6 pr-12 text-sm leading-7 text-[var(--mkt-muted)] sm:px-3 sm:text-base sm:leading-8`}>
-                    {item.answer}
-                  </p>
-                </details>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="px-4 pb-24 sm:px-6 sm:pb-28 lg:px-8 lg:pb-32">
-          <div data-reveal className={`${styles.ctaPanel} relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] px-6 py-16 text-center shadow-[var(--mkt-shadow-lg)] sm:px-10 sm:py-20 lg:px-16 lg:py-24`}>
-            <div className="relative z-10 mx-auto max-w-3xl">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--mkt-orange)] text-[var(--mkt-ink)]">
-                <MiloLogo size={36} color="var(--mkt-ink)" className="h-9 w-9" />
-              </div>
-              <p className="mt-7 text-[11px] font-bold uppercase tracking-[0.22em] text-[#ff9a5f]">
-                {copy.closing.eyebrow}
-              </p>
-              <h2 className="mt-4 font-headline text-3xl font-extrabold leading-tight tracking-[-0.04em] text-white sm:text-5xl">
-                {copy.closing.title}
-              </h2>
-              <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-white/68 sm:text-lg sm:leading-8">
-                {copy.closing.description}
-              </p>
-              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-                <Link
-                  href="/login?view=signup"
-                  className={`${styles.primaryButton} min-h-12 gap-2 px-6 py-3`}
-                >
-                  {copy.closing.primaryCta}
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/18 bg-white/8 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/14"
-                >
-                  {copy.closing.secondaryCta}
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-[var(--mkt-border)] bg-white px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid gap-10 lg:grid-cols-[1.5fr_0.7fr_0.8fr] lg:gap-16">
-            <div>
-              <Link
-                href="/"
-                aria-label="Avenro"
-                className="inline-flex items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mkt-orange)]"
-              >
-                <AvenroLogo className="h-9 sm:h-10 w-auto text-[var(--mkt-ink)] transition-transform duration-200 hover:scale-[1.02]" />
-              </Link>
-              <p className="mt-5 max-w-md text-sm leading-7 text-[var(--mkt-muted)]">{copy.footer.description}</p>
-              <div className="mt-6">
-                <MarketingLanguageSwitcher label={copy.nav.language} serverLanguage={language} />
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mkt-ink)]">{copy.footer.product}</h2>
-              <div className="mt-5 grid gap-3 text-sm text-[var(--mkt-muted)]">
-                <a href="#how-it-works" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.howItWorks}</a>
-                <a href="#product" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.product}</a>
-                <a href="#use-cases" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.useCases}</a>
-                <Link href="/login" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.login}</Link>
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mkt-ink)]">{copy.footer.legal}</h2>
-              <div className="mt-5 grid gap-3 text-sm text-[var(--mkt-muted)]">
-                <a href="#security" className="w-fit hover:text-[var(--mkt-ink)]">{copy.nav.security}</a>
-                <Link href="/privacy-policy" className="w-fit hover:text-[var(--mkt-ink)]">{copy.footer.privacy}</Link>
-                <Link href="/terms-of-service" className="w-fit hover:text-[var(--mkt-ink)]">{copy.footer.terms}</Link>
-                <Link href="/data-processing" className="w-fit hover:text-[var(--mkt-ink)]">{copy.footer.dataProcessing}</Link>
-                <Link href="/subprocessors" className="w-fit hover:text-[var(--mkt-ink)]">{copy.footer.subprocessors}</Link>
-                <a href="mailto:info@avenro.se" className="w-fit hover:text-[var(--mkt-ink)]">{copy.footer.contact}</a>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-12 flex flex-col gap-3 border-t border-[var(--mkt-border)] pt-6 text-xs text-[var(--mkt-muted)] sm:flex-row sm:items-center sm:justify-between">
-            <p>© {currentYear} Avenro. {copy.footer.rights}</p>
-            <p className="flex items-center gap-2">
-              <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
-              info@avenro.se
-            </p>
-          </div>
+            );
+          })}
         </div>
-      </footer>
-    </div>
-  );
+        <div className={s.securityFooter} data-reveal>
+          <Link href="/privacy-policy" className={s.textLink}>
+            {copy.security.policyLink}
+            <ArrowRight size={15} strokeWidth={1.6} />
+          </Link>
+          <p className={s.securityContactText}>
+            {copy.security.contactLabel} <a href="mailto:info@avenro.se">{copy.security.contactLink}</a>
+          </p>
+        </div>
+      </section>
+      <section id="faq" className={`${s.section} ${s.faqSection}`}><Heading copy={copy.faq} /><div className={s.faqList}>{copy.faq.items.map(item => <details key={item.question}><summary>{item.question}<ChevronDown size={18} /></summary><p>{item.answer}</p></details>)}</div></section>
+      <section className={s.closingSection}>
+        <div className={s.closingInner}><MiloLogo size={65} /><p className={styles.eyebrow}>{copy.closing.eyebrow}</p><h2>{copy.closing.title}</h2><p>{copy.closing.description}</p><div className={s.heroCtas}><a href={contact} className={styles.primaryButton}>{copy.closing.primaryCta}<ArrowRight size={17} /></a><a className={s.textLink} href="mailto:info@avenro.se">{copy.closing.secondaryCta}<ArrowRight size={16} /></a></div></div>
+      </section>
+    </main></StoryProvider>
+    <footer className={s.footer}><div className={s.footerGrid}><div><Link href="/" aria-label="Avenro"><AvenroLogo className="h-10 w-auto" /></Link><p>{copy.footer.description}</p><MarketingLanguageSwitcher label={copy.nav.language} serverLanguage={language} /></div><div><h2>{copy.footer.product}</h2>{nav.map(item => <a href={`#${item.id}`} key={item.id}>{item.label}</a>)}<Link href="/login">{copy.nav.login}</Link></div><div><h2>{copy.footer.legal}</h2><Link href="/privacy-policy">{copy.footer.privacy}</Link><Link href="/terms-of-service">{copy.footer.terms}</Link><Link href="/data-processing">{copy.footer.dataProcessing}</Link><Link href="/subprocessors">{copy.footer.subprocessors}</Link><a href="mailto:info@avenro.se">{copy.footer.contact}</a></div></div><div className={s.footerBottom}><span>© {new Date().getFullYear()} Avenro. {copy.footer.rights}</span><a href="mailto:info@avenro.se">info@avenro.se</a></div></footer>
+  </div>;
 }
