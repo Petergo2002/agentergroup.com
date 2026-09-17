@@ -15,7 +15,7 @@ import {
 } from "@/lib/widget-attachments";
 import {
   buildWidgetRuntimeCorsHeaders,
-  loadWidgetByPublicKey,
+  loadWidgetRecordByPublicKey,
   loadWidgetSession,
   resolveWidgetRuntimeRequestOrigin,
   resolveWidgetPreviewContext,
@@ -103,20 +103,20 @@ export async function POST(
       );
     }
 
-    const loaded = await loadWidgetByPublicKey(supabase, widgetPublicKey);
+    const widget = await loadWidgetRecordByPublicKey(supabase, widgetPublicKey);
 
-    if (!loaded) {
+    if (!widget) {
       return buildErrorResponse(request, 404, "Widget not found.");
     }
 
     const preview = await resolveWidgetPreviewContext(
       supabase,
-      loaded.widget,
+      widget,
       request,
     );
     const access = await resolveWidgetRuntimeAccess({
       request,
-      widget: loaded.widget,
+      widget,
       preview,
     });
 
@@ -129,7 +129,7 @@ export async function POST(
       );
     }
 
-    if (access.source !== "preview" && loaded.widget.status !== "deployed") {
+    if (access.source !== "preview" && widget.status !== "deployed") {
       return buildErrorResponse(request, 404, "Widget is not deployed.");
     }
 
@@ -153,7 +153,7 @@ export async function POST(
           "uploads",
           buildPublicWidgetRateLimitContext({
             request,
-            widgetId: loaded.widget.id,
+            widgetId: widget.id,
             sessionId,
           }),
         ),
@@ -172,14 +172,14 @@ export async function POST(
 
     const existingSession = await loadWidgetSession(
       supabase,
-      loaded.widget.id,
+      widget.id,
       sessionId,
     );
     // Builder previews are bound to the visitor capability too, so the preview
     // surface gets the same real conversation history as a live visitor.
     const visitorToken = readWidgetVisitorToken(request);
     const visitorTokenHash = visitorToken
-      ? hashWidgetVisitorToken(loaded.widget.id, visitorToken)
+      ? hashWidgetVisitorToken(widget.id, visitorToken)
       : null;
 
     if (
@@ -230,7 +230,7 @@ export async function POST(
     const widgetSession =
       existingSession ??
       (await upsertWidgetSession(supabase, {
-        widgetId: loaded.widget.id,
+        widgetId: widget.id,
         sessionId,
         source: access.source,
         origin: access.origin,
@@ -273,7 +273,7 @@ export async function POST(
 
     const attachmentId = crypto.randomUUID();
     const safeName = sanitizeWidgetAttachmentName(file.name);
-    const storagePath = `${loaded.widget.workspace_id}/${loaded.widget.id}/${widgetSession.id}/${attachmentId}/${safeName}`;
+    const storagePath = `${widget.workspace_id}/${widget.id}/${widgetSession.id}/${attachmentId}/${safeName}`;
     uploadedStoragePath = storagePath;
 
     const { error: uploadError } = await supabase.storage
@@ -291,8 +291,8 @@ export async function POST(
       .from("widget_attachments")
       .insert({
         id: attachmentId,
-        workspace_id: loaded.widget.workspace_id,
-        widget_id: loaded.widget.id,
+        workspace_id: widget.workspace_id,
+        widget_id: widget.id,
         widget_session_id: widgetSession.id,
         storage_bucket: "widget-attachments",
         storage_path: storagePath,
@@ -329,7 +329,7 @@ export async function POST(
         const workspaceResult = await supabase
           .from("workspaces")
           .select("owner_id")
-          .eq("id", loaded.widget.workspace_id)
+          .eq("id", widget.workspace_id)
           .maybeSingle();
         const workspaceOwner = workspaceResult.data as
           | { owner_id: string | null }
@@ -345,7 +345,7 @@ export async function POST(
         const { data: source, error: sourceError } = await supabase
           .from("knowledge_sources")
           .insert({
-            workspace_id: loaded.widget.workspace_id,
+            workspace_id: widget.workspace_id,
             created_by: workspaceOwner.owner_id,
             name: file.name,
             description: "",
@@ -358,7 +358,7 @@ export async function POST(
             widget_session_id: widgetSession.id,
             metadata: {
               sessionId,
-              widgetId: loaded.widget.id,
+              widgetId: widget.id,
               attachmentId,
               ephemeral: true,
             },

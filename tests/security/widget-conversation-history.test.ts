@@ -23,6 +23,10 @@ const sessionHook = readFileSync(
 );
 const apiClient = readFileSync("apps/widget-v2/src/lib/api.ts", "utf8");
 const widgetHttp = readFileSync("src/lib/widgets/http.ts", "utf8");
+const attachmentUrls = readFileSync(
+  "src/lib/widgets/attachment-urls.ts",
+  "utf8",
+);
 const widgetRuntime = readFileSync("apps/widget-v2/src/Widget.tsx", "utf8");
 const homeTab = readFileSync(
   "apps/widget-v2/src/components/HomeTab.tsx",
@@ -155,7 +159,7 @@ test("builder previews read real history, scoped away from live visitor chats", 
   // Previews run against drafts, so only live runtimes require a deployed widget.
   assert.match(
     historyRoute,
-    /!isPreviewAccess && loaded\.widget\.status !== "deployed"/,
+    /!isPreviewAccess && widget\.status !== "deployed"/,
   );
 
   // Every session-writing route binds the visitor capability in both runtimes.
@@ -209,10 +213,16 @@ test("opening history and switching conversations avoids avoidable waits", () =>
     assert.match(view, /exit=\{\{[^}]*transition: \{ duration: 0\.12 \}/);
   }
 
-  // Attachments are restored with one table read and one signing batch.
-  assert.match(historyRoute, /createSignedUrls\(paths, ATTACHMENT_SIGNED_URL_TTL_SECONDS\)/);
-  assert.doesNotMatch(historyRoute, /createSignedUrl\(/);
-  assert.equal(historyRoute.match(/restoreTranscriptAttachments\(/g)?.length, 2);
+  // Attachments are restored with one table read and one signing batch, shared
+  // with the chat turn so neither surface can drift back to per-item signing.
+  assert.match(attachmentUrls, /createSignedUrls\(paths, ttlSeconds\)/);
+  assert.doesNotMatch(attachmentUrls, /\.createSignedUrl\(/);
+  assert.doesNotMatch(historyRoute, /createSignedUrl/);
+  assert.doesNotMatch(chatRoute, /createSignedUrl/);
+  assert.equal(
+    historyRoute.match(/resolveWidgetAttachmentUrls\(/g)?.length,
+    1,
+  );
 });
 
 test("conversation history uses a compact list, skeleton loading, and one empty-state action", () => {

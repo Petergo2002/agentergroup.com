@@ -9,7 +9,7 @@ import { createClientSafeError } from "@/lib/server-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildWidgetRuntimeCorsHeaders,
-  loadWidgetByPublicKey,
+  loadWidgetRecordByPublicKey,
   resolveWidgetPreviewContext,
   resolveWidgetRuntimeAccess,
   resolveWidgetRuntimeRequestOrigin,
@@ -21,29 +21,14 @@ import {
   readWidgetVisitorToken,
 } from "@/lib/widgets/visitor";
 import type { WidgetGenerativeUi } from "@/lib/widgets/generative-ui";
+import {
+  readWidgetAttachmentIds,
+  resolveWidgetAttachmentUrls,
+  type WidgetAttachmentUrl,
+} from "@/lib/widgets/attachment-urls";
 
 const MAX_CONVERSATIONS = 20;
 const MAX_MESSAGES_PER_CONVERSATION = 100;
-const ATTACHMENT_SIGNED_URL_TTL_SECONDS = 60 * 60;
-
-interface RestoredWidgetAttachment {
-  id: string;
-  url: string;
-  name: string;
-  type: string;
-  size: number;
-}
-
-interface AttachmentRow {
-  id: string;
-  widget_id: string;
-  widget_session_id: string;
-  storage_bucket: string;
-  storage_path: string;
-  original_name: string;
-  mime_type: string;
-  file_size_bytes: number;
-}
 
 interface ConversationSummaryRow {
   session_id: string;
@@ -112,21 +97,6 @@ function scopeToRuntimeSource<TData>(
     : query.neq("source", "preview");
 }
 
-function readAttachments(value: unknown) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.flatMap((item) => {
-    if (!item || typeof item !== "object") {
-      return [];
-    }
-
-    const record = item as Record<string, unknown>;
-    return typeof record.id === "string" ? [{ id: record.id }] : [];
-  });
-}
-
 function readGenerativeUi(value: unknown): WidgetGenerativeUi | undefined {
   if (!value || typeof value !== "object" || !("type" in value)) {
     return undefined;
@@ -137,91 +107,6 @@ function readGenerativeUi(value: unknown): WidgetGenerativeUi | undefined {
     type === "calendar_booking_confirmation"
     ? (value as WidgetGenerativeUi)
     : undefined;
-}
-
-/**
- * Resolves every attachment in a transcript with one table read and one signing
- * batch per bucket. Doing this per message turned a single conversation into a
- * burst of round trips, which is what made reopening a chat feel slow.
- */
-async function restoreTranscriptAttachments(
-  supabase: WidgetAdminSupabase,
-  input: {
-    widgetId: string;
-    widgetSessionId: string;
-    attachmentIds: string[];
-  },
-): Promise<Map<string, RestoredWidgetAttachment>> {
-  const restored = new Map<string, RestoredWidgetAttachment>();
-  if (input.attachmentIds.length === 0) {
-    return restored;
-  }
-
-  const { data, error } = await supabase
-    .from("widget_attachments")
-    .select<AttachmentRow>(
-      "id, widget_id, widget_session_id, storage_bucket, storage_path, original_name, mime_type, file_size_bytes",
-    )
-    .eq("widget_id", input.widgetId)
-    .eq("widget_session_id", input.widgetSessionId)
-    .in("id", input.attachmentIds);
-
-  if (error) {
-    throw new Error("Failed to restore conversation attachments.");
-  }
-
-  const rows = data ?? [];
-  if (rows.length === 0) {
-    return restored;
-  }
-
-  const pathsByBucket = new Map<string, string[]>();
-  for (const row of rows) {
-    const paths = pathsByBucket.get(row.storage_bucket);
-    if (paths) {
-      paths.push(row.storage_path);
-    } else {
-      pathsByBucket.set(row.storage_bucket, [row.storage_path]);
-    }
-  }
-
-  const signedUrlByPath = new Map<string, string>();
-  await Promise.all(
-    [...pathsByBucket].map(async ([bucket, paths]) => {
-      const { data: signedUrls, error: signedUrlError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrls(paths, ATTACHMENT_SIGNED_URL_TTL_SECONDS);
-
-      if (signedUrlError || !Array.isArray(signedUrls)) {
-        return;
-      }
-
-      for (const entry of signedUrls as {
-        path?: string | null;
-        signedUrl?: string | null;
-        error?: string | null;
-      }[]) {
-        if (entry.path && entry.signedUrl && !entry.error) {
-          signedUrlByPath.set(`${bucket}:${entry.path}`, entry.signedUrl);
-        }
-      }
-    }),
-  );
-
-  for (const row of rows) {
-    const url = signedUrlByPath.get(`${row.storage_bucket}:${row.storage_path}`);
-    if (url) {
-      restored.set(row.id, {
-        id: row.id,
-        url,
-        name: row.original_name,
-        type: row.mime_type,
-        size: row.file_size_bytes,
-      });
-    }
-  }
-
-  return restored;
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -259,19 +144,19 @@ export async function GET(
       );
     }
 
-    const loaded = await loadWidgetByPublicKey(supabase, widgetPublicKey);
-    if (!loaded) {
+    const widget = await loadWidgetRecordByPublicKey(supabase, widgetPublicKey);
+    if (!widget) {
       return buildErrorResponse(request, 404, "Widget not found.");
     }
 
     const preview = await resolveWidgetPreviewContext(
       supabase,
-      loaded.widget,
+      widget,
       request,
     );
     const access = await resolveWidgetRuntimeAccess({
       request,
-      widget: loaded.widget,
+      widget,
       preview,
     });
 
@@ -288,7 +173,7 @@ export async function GET(
 
     // Previews run against unpublished drafts, so only live runtimes require a
     // deployed widget.
-    if (!isPreviewAccess && loaded.widget.status !== "deployed") {
+    if (!isPreviewAccess && widget.status !== "deployed") {
       return buildErrorResponse(request, 404, "Widget is not deployed.");
     }
 
@@ -308,7 +193,7 @@ export async function GET(
         "history",
         buildPublicWidgetRateLimitContext({
           request,
-          widgetId: loaded.widget.id,
+          widgetId: widget.id,
           sessionId: request.nextUrl.searchParams.get("sessionId"),
         }),
       ),
@@ -326,7 +211,7 @@ export async function GET(
     }
 
     const visitorTokenHash = hashWidgetVisitorToken(
-      loaded.widget.id,
+      widget.id,
       visitorToken,
     );
     const requestedSessionId = request.nextUrl.searchParams
@@ -340,7 +225,7 @@ export async function GET(
           .select<ConversationSummaryRow>(
             "session_id, active_widget_agent_id, status, conversation_title, last_message_preview, first_seen_at, last_seen_at",
           )
-          .eq("widget_id", loaded.widget.id)
+          .eq("widget_id", widget.id)
           .eq("visitor_token_hash", visitorTokenHash),
         isPreviewAccess,
       )
@@ -374,7 +259,7 @@ export async function GET(
         .select<ConversationDetailRow>(
           "id, session_id, active_widget_agent_id, status, end_reason, conversation_title, last_message_preview, first_seen_at, last_seen_at",
         )
-        .eq("widget_id", loaded.widget.id)
+        .eq("widget_id", widget.id)
         .eq("session_id", requestedSessionId)
         .eq("visitor_token_hash", visitorTokenHash),
       isPreviewAccess,
@@ -396,7 +281,7 @@ export async function GET(
     const { data: messageRows, error: messagesError } = await supabase
       .from("widget_session_messages")
       .select<ConversationMessageRow>("role, content, metadata, created_at")
-      .eq("widget_id", loaded.widget.id)
+      .eq("widget_id", widget.id)
       .eq("widget_session_id", session.id)
       .in("role", ["user", "assistant"])
       .order("created_at", { ascending: false })
@@ -416,23 +301,24 @@ export async function GET(
 
     const attachmentIdsByMessage = orderedMessages.map((message) =>
       message.role === "user"
-        ? readAttachments(message.metadata.attachments).map(
-            (attachment) => attachment.id,
-          )
+        ? readWidgetAttachmentIds(message.metadata.attachments)
         : [],
     );
 
-    const restoredAttachments = await restoreTranscriptAttachments(supabase, {
-      widgetId: loaded.widget.id,
-      widgetSessionId: session.id,
-      attachmentIds: [...new Set(attachmentIdsByMessage.flat())],
-    });
+    const { byId: restoredAttachments } = await resolveWidgetAttachmentUrls(
+      supabase,
+      {
+        widgetId: widget.id,
+        widgetSessionId: session.id,
+        attachmentIds: attachmentIdsByMessage.flat(),
+      },
+    );
 
     const messages = orderedMessages.map((message, index) => {
       const attachments = attachmentIdsByMessage[index]
         .map((attachmentId) => restoredAttachments.get(attachmentId))
         .filter(
-          (attachment): attachment is RestoredWidgetAttachment =>
+          (attachment): attachment is WidgetAttachmentUrl =>
             attachment !== undefined,
         );
 

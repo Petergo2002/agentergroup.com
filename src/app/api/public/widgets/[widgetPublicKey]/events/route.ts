@@ -13,13 +13,16 @@ import {
 } from "@/lib/validation/widget-schemas";
 import {
   buildWidgetRuntimeCorsHeaders,
-  loadWidgetByPublicKey,
+  loadWidgetRecordByPublicKey,
   resolveWidgetRuntimeRequestOrigin,
   resolveWidgetPreviewContext,
   resolveWidgetRuntimeAccess,
   type WidgetAdminSupabase,
   upsertWidgetSession,
 } from "@/lib/widgets/server";
+
+/** Events that evidence a visitor leaving, which must not refresh presence. */
+const EXIT_EVENT_TYPES = new Set(["page_hidden", "page_unload"]);
 
 function buildErrorResponse(
   request: NextRequest,
@@ -91,21 +94,21 @@ export async function POST(
       );
     }
 
-    const loaded = await loadWidgetByPublicKey(supabase, widgetPublicKey);
+    const widget = await loadWidgetRecordByPublicKey(supabase, widgetPublicKey);
 
-    if (!loaded) {
+    if (!widget) {
       return buildErrorResponse(request, 404, "Widget not found.");
     }
 
     const preview = await resolveWidgetPreviewContext(
       supabase,
-      loaded.widget,
+      widget,
       request,
     );
 
     const access = await resolveWidgetRuntimeAccess({
       request,
-      widget: loaded.widget,
+      widget,
       preview,
     });
 
@@ -118,7 +121,7 @@ export async function POST(
       );
     }
 
-    if (access.source !== "preview" && loaded.widget.status !== "deployed") {
+    if (access.source !== "preview" && widget.status !== "deployed") {
       return buildErrorResponse(request, 404, "Widget is not deployed.");
     }
 
@@ -138,7 +141,7 @@ export async function POST(
           "events",
           buildPublicWidgetRateLimitContext({
             request,
-            widgetId: loaded.widget.id,
+            widgetId: widget.id,
             sessionId: bodyValidation.value.sessionId,
           }),
         ),
@@ -155,16 +158,29 @@ export async function POST(
       }
     }
 
-    const { sessionId, pageUrl, referrer } = bodyValidation.value;
+    const { sessionId, eventType, pageUrl, referrer } = bodyValidation.value;
 
-    await upsertWidgetSession(supabase, {
-      widgetId: loaded.widget.id,
-      sessionId,
-      source: access.source,
-      pageUrl,
-      referrer,
-      origin: access.origin,
-    });
+    // This endpoint is presence tracking, not an analytics event stream: the
+    // only thing any consumer reads is widget_sessions.last_seen_at, which
+    // drives the live/idle badge in analytics and the stale-session sweep.
+    // The event type is still validated (an allowlist is a cheap input
+    // control) but it is not stored, because nothing reads it.
+    //
+    // Exit events are the exception that matters. page_hidden and page_unload
+    // mean the visitor has gone, so refreshing last_seen_at on them marked a
+    // departed visitor as "live" for another 90 seconds and pushed back the
+    // 30-minute inactivity sweep. Presence is only refreshed by events that
+    // actually evidence presence.
+    if (!EXIT_EVENT_TYPES.has(eventType)) {
+      await upsertWidgetSession(supabase, {
+        widgetId: widget.id,
+        sessionId,
+        source: access.source,
+        pageUrl,
+        referrer,
+        origin: access.origin,
+      });
+    }
 
     return NextResponse.json(
       { ok: true },

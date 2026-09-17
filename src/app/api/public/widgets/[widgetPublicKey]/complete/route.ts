@@ -12,7 +12,7 @@ import {
   completeWidgetSession,
   handleConversationCompleted,
   isWidgetSessionTurnLocked,
-  loadWidgetByPublicKey,
+  loadWidgetRecordByPublicKey,
   loadWidgetSession,
   resolveWidgetRuntimeRequestOrigin,
   resolveWidgetPreviewContext,
@@ -95,21 +95,21 @@ export async function POST(
       );
     }
 
-    const loaded = await loadWidgetByPublicKey(supabase, widgetPublicKey);
+    const widget = await loadWidgetRecordByPublicKey(supabase, widgetPublicKey);
 
-    if (!loaded) {
+    if (!widget) {
       return buildErrorResponse(request, 404, "Widget not found.");
     }
 
     const preview = await resolveWidgetPreviewContext(
       supabase,
-      loaded.widget,
+      widget,
       request,
     );
 
     const access = await resolveWidgetRuntimeAccess({
       request,
-      widget: loaded.widget,
+      widget,
       preview,
     });
 
@@ -122,7 +122,7 @@ export async function POST(
       );
     }
 
-    if (access.source !== "preview" && loaded.widget.status !== "deployed") {
+    if (access.source !== "preview" && widget.status !== "deployed") {
       return buildErrorResponse(request, 404, "Widget is not deployed.");
     }
 
@@ -150,7 +150,7 @@ export async function POST(
           "complete",
           buildPublicWidgetRateLimitContext({
             request,
-            widgetId: loaded.widget.id,
+            widgetId: widget.id,
             sessionId,
           }),
         ),
@@ -167,7 +167,7 @@ export async function POST(
       }
     }
 
-    const session = await loadWidgetSession(supabase, loaded.widget.id, sessionId);
+    const session = await loadWidgetSession(supabase, widget.id, sessionId);
 
     if (!session) {
       return buildErrorResponse(
@@ -182,7 +182,7 @@ export async function POST(
     // surface gets the same real conversation history as a live visitor.
     const visitorToken = readWidgetVisitorToken(request);
     const visitorTokenHash = visitorToken
-      ? hashWidgetVisitorToken(loaded.widget.id, visitorToken)
+      ? hashWidgetVisitorToken(widget.id, visitorToken)
       : null;
     if (!canAccessWidgetSession(session.visitor_token_hash, visitorTokenHash)) {
       return buildErrorResponse(
@@ -210,7 +210,7 @@ export async function POST(
 
     if (!wasCompleted) {
       await handleConversationCompleted({
-        widget: loaded.widget,
+        widget,
         session: completedSession,
         reason: "inactivity_timeout",
       });

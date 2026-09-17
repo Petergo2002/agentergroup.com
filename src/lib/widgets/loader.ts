@@ -151,6 +151,33 @@ export async function loadWidgetById(
   };
 }
 
+/**
+ * Loads only the widget row for a public key.
+ *
+ * Runtime endpoints that authenticate, rate limit, and write session state
+ * (events, conversation history, complete, upload) never read the attached
+ * agents or the branding entitlement, so paying for the widget_agents, agents,
+ * and workspace_subscriptions reads on every request — including every 30s
+ * presence heartbeat — is pure waste. Use `loadWidgetByPublicKey` when the
+ * attached agents or the resolved `show_branding` value are actually needed.
+ */
+export async function loadWidgetRecordByPublicKey(
+  supabase: WidgetAdminSupabase,
+  widgetPublicKey: string,
+) {
+  const { data, error } = await supabase
+    .from("widgets")
+    .select("*")
+    .eq("widget_public_key", widgetPublicKey)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? null) as WidgetRecord | null;
+}
+
 export async function loadWidgetByPublicKey(
   supabase: WidgetAdminSupabase,
   widgetPublicKey: string,

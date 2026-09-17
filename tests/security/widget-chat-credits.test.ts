@@ -135,6 +135,8 @@ function createHarness(options: {
     exports,
     require: (name: string) => modules[name] ?? {},
     crypto, Response, ReadableStream, TextEncoder, AbortController, DOMException, Error,
+    // The route arms a turn deadline, so the sandbox has to provide timers.
+    setTimeout, clearTimeout,
     console: { info() {}, error() {} },
   }, { filename: routePath });
 
