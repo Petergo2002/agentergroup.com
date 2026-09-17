@@ -18,11 +18,13 @@
     "widget:typecheck": "npm --prefix apps/widget-v2 run typecheck",
     "widget:build": "npm --prefix apps/widget-v2 run build",
     "email:templates": "node --experimental-strip-types scripts/build-email-templates.ts",
-    "email:preview": "node --experimental-strip-types scripts/preview-emails.ts"
+    "email:preview": "node --experimental-strip-types scripts/preview-emails.ts",
+    "verify:sentry": "node --experimental-strip-types scripts/verify-sentry.mjs"
   },
   "dependencies": {
     "@composio/core": "^0.10.0",
     "@mendable/firecrawl-js": "^4.32.0",
+    "@sentry/nextjs": "^10.75.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.112.2",
     "@xyflow/react": "^12.11.2",

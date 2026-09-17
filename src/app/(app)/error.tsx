@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 export default function ErrorState({
   error,
@@ -9,6 +10,8 @@ export default function ErrorState({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useLanguage();
+
   useEffect(() => {
     // Optionally log the error to an error reporting service
     if (process.env.NODE_ENV !== 'production') {
@@ -25,16 +28,17 @@ export default function ErrorState({
           </svg>
         </div>
         <div className="space-y-2">
-          <h2 className="text-xl font-bold tracking-tight text-on-surface">Something went wrong</h2>
+          <h2 className="text-xl font-bold tracking-tight text-on-surface">{t('common.errorBoundaryTitle')}</h2>
           <p className="text-sm text-on-surface-variant">
-            An unexpected error occurred while loading this page. Please try again.
+            {t('common.errorBoundaryBody')}
           </p>
         </div>
         <button
+          type="button"
           onClick={() => reset()}
           className="app-primary-surface rounded-full px-6 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all active:scale-95"
         >
-          Try again
+          {t('common.tryAgain')}
         </button>
       </div>
     </div>

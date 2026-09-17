@@ -1,4 +1,5 @@
 import { after, NextRequest, NextResponse } from "next/server";
+import { reportError } from "@/lib/observability/report";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
@@ -169,11 +170,13 @@ function queueKnowledgeProcessing(
       const failure = await knowledgeProcessingError(invocationError, failedSource?.error_message);
       const errorMessage = failure.message;
 
-      console.error("[knowledge/sources] Background processing failed", {
-        sourceId,
-        message: errorMessage,
-        status: failure.status,
-        code: failure.code,
+      reportError(invocationError, {
+        operation: "knowledge.background_processing",
+        jobType: "after",
+        route: "/api/knowledge/sources",
+        knowledgeSourceId: sourceId,
+        failureStatus: failure.status,
+        failureCode: failure.code,
       });
 
       // A gateway/network interruption may leave the worker running. Never clobber
