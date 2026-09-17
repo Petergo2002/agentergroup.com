@@ -113,6 +113,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       overview,
+      trend: conversationResult.trend,
       automation,
       filters: {
         widgets: conversationResult.widgetOptions,
