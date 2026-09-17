@@ -11,16 +11,16 @@ import {
 } from "react";
 import {
   createTranslator,
-  DEFAULT_PLATFORM_LANGUAGE,
   getMessages,
+  LEGACY_PLATFORM_LANGUAGE_COOKIE,
   LEGACY_PLATFORM_LANGUAGE_STORAGE_KEY,
   PLATFORM_LANGUAGE_COOKIE,
   PLATFORM_LANGUAGE_COOKIE_MAX_AGE,
   PLATFORM_LANGUAGE_STORAGE_KEY,
-  resolvePlatformLanguage,
   type PlatformLanguage,
 } from "@/lib/i18n";
 import type { Messages } from "@/locales/en";
+import { resolveStoredLanguage, validLanguage } from "@/lib/language-preference";
 
 interface LanguageContextValue {
   language: PlatformLanguage;
@@ -32,7 +32,7 @@ interface LanguageContextValue {
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 
 function persistLanguage(language: PlatformLanguage) {
-  window.localStorage.setItem(PLATFORM_LANGUAGE_STORAGE_KEY, language);
+  try { window.localStorage.setItem(PLATFORM_LANGUAGE_STORAGE_KEY, language); } catch { /* Storage may be unavailable. */ }
   document.cookie = `${PLATFORM_LANGUAGE_COOKIE}=${language}; path=/; max-age=${PLATFORM_LANGUAGE_COOKIE_MAX_AGE}; samesite=lax`;
   document.documentElement.lang = language;
 }
@@ -46,19 +46,9 @@ export function LanguageProvider({
   initialLanguage: PlatformLanguage;
   initialMessages: Messages;
 }) {
-  const [language, setLanguageState] = useState<PlatformLanguage>(() => {
-    if (typeof window === "undefined") {
-      return initialLanguage;
-    }
-
-    const stored =
-      window.localStorage.getItem(PLATFORM_LANGUAGE_STORAGE_KEY) ||
-      window.localStorage.getItem(LEGACY_PLATFORM_LANGUAGE_STORAGE_KEY);
-    return resolvePlatformLanguage(stored) || initialLanguage;
-  });
+  const [language, setLanguageState] = useState<PlatformLanguage>(initialLanguage);
   const [messages, setMessages] = useState<Messages>(initialMessages);
   const languageRequestRef = useRef(0);
-  const didResolveInitialMessagesRef = useRef(false);
 
   const loadLanguageMessages = useCallback(
     async (nextLanguage: PlatformLanguage) => {
@@ -92,26 +82,22 @@ export function LanguageProvider({
   );
 
   useEffect(() => {
+    // Start with the server render, then recover browser-only preferences.
+    const hasCookie = document.cookie.split(";").some((part) => {
+      const [key, value] = part.trim().split("=");
+      return (key === PLATFORM_LANGUAGE_COOKIE || key === LEGACY_PLATFORM_LANGUAGE_COOKIE) && validLanguage(value);
+    });
+    if (!hasCookie) {
+      try {
+        const stored = resolveStoredLanguage(window.localStorage.getItem(PLATFORM_LANGUAGE_STORAGE_KEY), window.localStorage.getItem(LEGACY_PLATFORM_LANGUAGE_STORAGE_KEY), initialLanguage);
+        if (stored !== initialLanguage) {
+          const timer = window.setTimeout(() => { void applyLanguage(stored); }, 0);
+          return () => window.clearTimeout(timer);
+        }
+      } catch { /* Keep the server language when browser storage is disabled. */ }
+    }
     persistLanguage(language);
-  }, [language]);
-
-  useEffect(() => {
-    if (didResolveInitialMessagesRef.current) {
-      return;
-    }
-
-    didResolveInitialMessagesRef.current = true;
-
-    if (language === initialLanguage) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void loadLanguageMessages(language);
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [initialLanguage, language, loadLanguageMessages]);
+  }, [applyLanguage, initialLanguage, language]);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -122,7 +108,8 @@ export function LanguageProvider({
         return;
       }
 
-      const next = resolvePlatformLanguage(event.newValue) || DEFAULT_PLATFORM_LANGUAGE;
+      if (!validLanguage(event.newValue)) return;
+      const next = event.newValue;
       if (next === language) {
         persistLanguage(next);
         return;

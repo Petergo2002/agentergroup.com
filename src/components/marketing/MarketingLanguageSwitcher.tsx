@@ -48,7 +48,7 @@ export function MarketingLanguageSwitcher({
             key={option}
             type="button"
             onClick={() => selectLanguage(option)}
-            className={`rounded-full px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
+            className={`min-h-11 min-w-11 rounded-full px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
               selected
                 ? "bg-[var(--mkt-ink)] text-white"
                 : "text-[var(--mkt-muted)] hover:bg-[var(--mkt-soft)] hover:text-[var(--mkt-ink)]"

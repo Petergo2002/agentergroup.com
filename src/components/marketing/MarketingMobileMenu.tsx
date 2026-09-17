@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Menu, X } from "lucide-react";
 import type { Messages } from "@/locales/en";
 import type { PlatformLanguage } from "@/lib/i18n";
 import styles from "./landing.module.css";
+import { demoContactHref, marketingNavItems } from "./marketing-links";
 import { MarketingLanguageSwitcher } from "./MarketingLanguageSwitcher";
 
 interface MarketingMobileMenuProps {
@@ -48,13 +50,7 @@ export function MarketingMobileMenu({ copy, serverLanguage }: MarketingMobileMen
     };
   }, [open]);
 
-  const links = [
-    { href: "#how-it-works", label: copy.howItWorks },
-    { href: "#product", label: copy.product },
-    { href: "#use-cases", label: copy.useCases },
-    { href: "#security", label: copy.security },
-    { href: "#faq", label: copy.faq },
-  ];
+  const links = marketingNavItems(copy);
 
   function closeMenu() {
     setOpen(false);
@@ -75,17 +71,20 @@ export function MarketingMobileMenu({ copy, serverLanguage }: MarketingMobileMen
       </button>
 
       {open ? (
+        <>
+        {/* The panel only ever renders after a click, so document.body exists here. */}
+        {createPortal(<div className={styles.mobileMenuScrim} aria-hidden="true" />, document.body)}
         <div
           ref={menuRef}
           id="marketing-mobile-navigation"
           className={`${styles.mobileMenuPanel} absolute right-0 top-14 z-50 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-[var(--mkt-border)] bg-white p-3 shadow-[var(--mkt-shadow-lg)]`}
         >
-          <nav aria-label="Mobile">
+          <nav aria-label={serverLanguage === "sv" ? "Mobilnavigation" : "Mobile navigation"}>
             <div className="grid gap-1">
               {links.map((link) => (
                 <a
-                  key={link.href}
-                  href={link.href}
+                  key={link.id}
+                  href={`#${link.id}`}
                   onClick={closeMenu}
                   className={`${styles.mobileMenuLink} rounded-xl px-4 py-3 text-sm font-semibold text-[var(--mkt-ink)] hover:bg-[var(--mkt-soft)]`}
                 >
@@ -106,20 +105,21 @@ export function MarketingMobileMenu({ copy, serverLanguage }: MarketingMobileMen
             <Link
               href="/login"
               onClick={closeMenu}
-              className="px-3 py-2 text-sm font-semibold text-[var(--mkt-muted)] hover:text-[var(--mkt-ink)]"
+              className="inline-flex min-h-11 items-center px-3 py-2 text-sm font-semibold text-[var(--mkt-muted)] hover:text-[var(--mkt-ink)]"
             >
               {copy.login}
             </Link>
           </div>
 
-          <Link
-            href="/login?view=signup"
+          <a
+            href={demoContactHref(serverLanguage)}
             onClick={closeMenu}
-            className={`${styles.primaryButton} mt-3 flex min-h-11 px-4 py-3`}
+            className={`${styles.primaryButton} mt-3 flex min-h-11 w-full px-4 py-3`}
           >
             {copy.getStarted}
-          </Link>
+          </a>
         </div>
+        </>
       ) : null}
     </div>
   );
