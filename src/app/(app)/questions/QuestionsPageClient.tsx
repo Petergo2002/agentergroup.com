@@ -64,6 +64,8 @@ const copy = {
   en: {
     badge: "Learning queue",
     title: "Questions",
+    miloTitle: "Improve Milo",
+    openLabel: "open",
     description: "Review visitor questions the agent could not answer confidently.",
     search: "Search questions, pages, agents",
     miloDescription: "Review visitor questions Milo could not answer confidently.",
@@ -136,6 +138,8 @@ const copy = {
   sv: {
     badge: "Lärande kö",
     title: "Frågor",
+    miloTitle: "Förbättra Milo",
+    openLabel: "öppna",
     description: "Granska besökarfrågor som agenten inte kunde svara säkert på.",
     search: "Sök frågor, sidor, agenter",
     miloDescription: "Granska besökarfrågor som Milo inte kunde svara säkert på.",
@@ -676,11 +680,11 @@ export default function QuestionsPageClient({
           <div className="min-w-0 max-w-xl">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
-                {miloMode ? (language === "sv" ? "Förbättra Milo" : "Improve Milo") : text.title}
+                {miloMode ? text.miloTitle : text.title}
               </h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[0.08] px-2.5 py-0.5 text-xs font-semibold text-primary">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[0.08] px-2.5 py-1 text-xs font-semibold text-primary">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                {counts.open} {language === "sv" ? "öppna" : "open"}
+                {counts.open} {text.openLabel}
               </span>
             </div>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant/75">

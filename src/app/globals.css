@@ -58,6 +58,7 @@
   --error: #dc2626;
   --error-container: #fee2e2;
   --on-error: #ffffff;
+  --on-error-container: #991b1b;
   
   --success: #16a34a;
   --success-container: #f0fdf4;
@@ -111,6 +112,7 @@
   --error: #f87171;
   --error-container: rgba(248, 113, 113, 0.12);
   --on-error: #ffffff;
+  --on-error-container: #fca5a5;
   
   --success: #34d399;
   --success-container: rgba(52, 211, 153, 0.12);
@@ -168,6 +170,7 @@
   --color-error: var(--error);
   --color-error-container: var(--error-container);
   --color-on-error: var(--on-error);
+  --color-on-error-container: var(--on-error-container);
   
   --color-success: var(--success);
   --color-success-container: var(--success-container);
@@ -183,6 +186,37 @@
   --radius-full: 9999px;
 
   --shadow-premium: 0 12px 40px -12px rgba(0, 0, 0, 0.08);
+}
+
+@layer base {
+  /*
+   * Keyboard focus fallback.
+   *
+   * Most interactive elements in the app style their own focus ring, but a
+   * large number never did, leaving keyboard users with no visible position.
+   * This sits in the base layer on purpose: any element that declares its own
+   * focus utilities still wins, so nothing that was already styled changes.
+   */
+  :where(button, [role="button"], a[href], summary):focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+
+  /*
+   * Tailwind's Preflight resets buttons to `cursor: default`, and only a
+   * handful of call sites re-added `cursor-pointer` — so most buttons in the
+   * app showed an arrow instead of a hand.
+   */
+  :where(button, [role="button"], summary):not(:disabled):not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  /* A disabled control should never look clickable. */
+  :where(button, [role="button"], input, textarea, select):disabled,
+  :where(button, [role="button"])[aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 @layer utilities {
@@ -924,7 +958,8 @@
 }
 
 .animate-toast-progress {
-  animation: toastProgress 3s linear forwards;
+  /* Duration is set per toast so the bar always matches its real lifetime. */
+  animation: toastProgress 4s linear forwards;
 }
 
 body {

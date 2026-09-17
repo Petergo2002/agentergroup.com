@@ -1,4 +1,9 @@
 export const common = {
+  errorBoundaryTitle: "Något gick fel",
+  errorBoundaryBody:
+    "Ett oväntat fel inträffade när sidan laddades. Försök igen.",
+  tryAgain: "Försök igen",
+  sending: "Skickar...",
   appName: "Avenro",
   save: "Spara",
   saveChanges: "Spara ändringar",

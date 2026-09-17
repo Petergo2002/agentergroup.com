@@ -1,9 +1,7 @@
-'use client';
-
 export default function AgentsLoading() {
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="app-page">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="h-[100px] w-full max-w-md animate-pulse rounded-2xl bg-surface-container-low" />
         <div className="h-[48px] w-[140px] animate-pulse rounded-full bg-surface-container-low" />
       </div>

@@ -395,7 +395,7 @@ export default function LeadsPageClient({
               <h1 className="text-2xl font-bold leading-tight tracking-normal text-on-surface sm:text-3xl">
                 {t("leads.title")}
               </h1>
-              <span className="rounded-full border border-primary/15 bg-primary/[0.08] px-2.5 py-1 text-xs font-semibold text-primary">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[0.08] px-2.5 py-1 text-xs font-semibold text-primary">
                 {t("leads.capturedCount", { count: leads?.length ?? 0 })}
               </span>
             </div>

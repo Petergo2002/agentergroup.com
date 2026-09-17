@@ -51,7 +51,9 @@ import {
 } from '@/lib/agents/defaults';
 import {
   getSingleToolConnection,
+  getToolConnectionsByKind,
   resolveToolNodeConnection,
+  type ToolConnectionKind,
 } from '@/lib/builder-connection-resolver';
 import { getEffectiveConnectionStatus } from '@/lib/connections';
 import { DEFAULT_END_CHAT_INACTIVITY_TIMEOUT_SECONDS } from '@/lib/end-chat';
@@ -112,7 +114,8 @@ import type {
 
 type BuilderFlowNode = Node<BuilderNodeData>;
 type BuilderFlowEdge = Edge;
-type ToolNodeKind = 'gmail' | 'outlook' | 'slack' | 'hubspot' | 'shopify' | 'googleads' | 'googlecalendar' | 'cal';
+/** Same union as the builder-connection resolver's; aliased so they cannot drift. */
+type ToolNodeKind = ToolConnectionKind;
 type ToolNodeData = GmailBuilderNodeData | OutlookBuilderNodeData | SlackBuilderNodeData | HubSpotBuilderNodeData | ShopifyBuilderNodeData | GoogleAdsBuilderNodeData | GoogleCalendarBuilderNodeData | CalBuilderNodeData;
 type LibraryItemKey = 'trigger' | 'knowledge' | 'tools' | 'endchat' | 'annotation' | 'agent';
 type Translate = (key: string, values?: Record<string, string | number>) => string;
@@ -1219,12 +1222,6 @@ function inferNodeKind(node: BuilderFlowNode) {
   }
 
   return null;
-}
-
-function getToolConnectionsByKind(connections: ConnectionRecord[], kind: ToolNodeKind) {
-  return connections
-    .filter((connection) => connection.toolkit_slug === kind)
-    .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
 }
 
 function pickPreferredConnectionId(
@@ -4945,7 +4942,14 @@ export default function AgentBuilderClient() {
               </div>
             </div>
 
-            {agent?.surface !== 'automation' ? <div>
+            {/*
+              Website-chat agents configure their conversation starters in the
+              website chat builder (widget_agents.quick_actions), which takes
+              precedence over this field at runtime — so editing it here was
+              duplicate, competing UI. Assistants have no other editor for it
+              and their chat renders these, so they keep it.
+            */}
+            {agent?.surface === 'assistant' ? <div>
               <label className="mb-3 block text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/50 ml-1">
                 {t('agentBuilder.conversationStarters')}
               </label>

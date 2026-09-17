@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 
@@ -10,7 +10,19 @@ interface Toast {
   id: string;
   message: string;
   type: ToastType;
+  durationMs: number;
 }
+
+/**
+ * Errors are the one kind a user has to read before acting, and three seconds
+ * was not enough to read and understand one.
+ */
+const TOAST_DURATION_MS: Record<ToastType, number> = {
+  success: 4000,
+  info: 4000,
+  warning: 6000,
+  error: 8000,
+};
 
 interface ToastContextType {
   showToast: (message: string, type?: ToastType) => void;
@@ -30,18 +42,24 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const { t } = useLanguage();
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, message, type }]);
-
-    // Auto-remove after 3 seconds
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3000);
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
+  const showToast = useCallback(
+    (message: string, type: ToastType = 'info') => {
+      const id = Math.random().toString(36).substring(2, 9);
+      const durationMs = TOAST_DURATION_MS[type];
+      setToasts((prev) => [...prev, { id, message, type, durationMs }]);
+      setTimeout(() => dismissToast(id), durationMs);
+    },
+    [dismissToast],
+  );
+
+  const contextValue = useMemo(() => ({ showToast }), [showToast]);
+
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       {/* Toast Container */}
       <div className="pointer-events-none fixed inset-x-4 bottom-4 z-[60] flex flex-col items-end gap-3 sm:inset-x-auto sm:bottom-6 sm:right-6">
@@ -89,7 +107,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             </div>
             <button
               type="button"
-              onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+              onClick={() => dismissToast(toast.id)}
               aria-label={t('common.close')}
               className="ml-2 flex h-7 w-7 items-center justify-center rounded-lg text-on-surface-variant/60 hover:bg-surface-container-high hover:text-on-surface transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
@@ -99,6 +117,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             {/* Auto-dismiss countdown bar */}
             <div
               aria-hidden="true"
+              style={{ animationDuration: `${toast.durationMs}ms` }}
               className={`absolute bottom-0 left-0 h-0.5 animate-toast-progress opacity-80 ${
                 toast.type === 'success' ? 'bg-emerald-500' : ''
               } ${toast.type === 'error' ? 'bg-error' : ''} ${

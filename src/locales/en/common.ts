@@ -1,8 +1,13 @@
 export const common = {
+  errorBoundaryTitle: "Something went wrong",
+  errorBoundaryBody:
+    "An unexpected error occurred while loading this page. Please try again.",
+  tryAgain: "Try again",
   appName: "Avenro",
   save: "Save",
   saveChanges: "Save Changes",
   saving: "Saving...",
+  sending: "Sending...",
   cancel: "Cancel",
   close: "Close",
   open: "Open",

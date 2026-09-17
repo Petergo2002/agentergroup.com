@@ -22,6 +22,7 @@ import { useAppContext } from "@/components/app/AppContext";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { hasInternalAssistantsEnabled } from "@/lib/assistants/feature-flags";
 import { formatRelativeDate } from "@/lib/utils";
+import { formatLocaleDate } from "@/lib/i18n";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { SELF_SERVE_BILLING_ENABLED } from "@/lib/billing-mode";
@@ -176,8 +177,8 @@ export function Sidebar({
       <div className={`px-4 pt-6 pb-4 flex flex-col items-center ${contentFade} ${isCollapsed && !mobile ? 'gap-6' : 'gap-5'}`}>
         <Link
           href="/"
-          title="Avenro - Back to landing page"
-          aria-label="Avenro - Back to landing page"
+          title={t("nav.backToLanding")}
+          aria-label={t("nav.backToLanding")}
           className="group relative flex flex-col items-center shrink-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <div className="flex items-center justify-center shrink-0">
@@ -254,6 +255,7 @@ export function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={isActive ? "page" : undefined}
                   onClick={() => {
                     onNavigate?.();
                     if (item.href === "/analytics") {
@@ -438,7 +440,7 @@ export function Sidebar({
                   </div>
                   <p className="mt-2 text-[9px] font-medium text-on-surface-variant leading-tight">
                     {t('settings.billing.messagesReset', {
-                      date: new Date(subscription.billing_cycle_end).toLocaleDateString(language === 'sv' ? 'sv-SE' : 'en-US', { day: 'numeric', month: 'short' })
+                      date: formatLocaleDate(subscription.billing_cycle_end, language, { day: 'numeric', month: 'short' })
                     })}
                   </p>
                   {SELF_SERVE_BILLING_ENABLED && isFreePlan && (

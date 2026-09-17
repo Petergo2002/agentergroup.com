@@ -105,7 +105,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
   return (
     <div className={`relative w-full ${isMinimized ? 'flex justify-center' : ''}`} ref={dropdownRef}>
       {/* Switcher Button */}
-      <button
+      <button type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`depth-button group flex items-center gap-2.5 rounded-xl border border-outline-variant/10 bg-surface-container-lowest transition-all duration-200 active:scale-[0.98] hover:border-primary/15 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
           isOpen ? 'border-primary/20 bg-surface-container-low' : ''
@@ -163,7 +163,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
               const isActive = ws.id === workspace.id;
               
               return (
-                <button
+                <button type="button"
                   key={ws.id}
                   onClick={() => handleSwitchWorkspace(ws.id)}
                   disabled={isActive || isSwitching}
@@ -206,7 +206,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
           </Link>
 
           {/* Create New Workspace */}
-          <button
+          <button type="button"
             onClick={() => {
               setIsOpen(false);
               if (hasWorkspaceCapacity) {

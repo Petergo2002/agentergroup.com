@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import type { AgentSurface } from '@/lib/types';
 
 const CreateAgentModal = dynamic(
@@ -30,18 +30,19 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
   const [hasOpenedCreateAgent, setHasOpenedCreateAgent] = useState(false);
   const [initialSurface, setInitialSurface] = useState<AgentSurface>('widget');
 
-  const openCreateAgent = (surface: AgentSurface = 'widget') => {
+  const openCreateAgent = useCallback((surface: AgentSurface = 'widget') => {
     setHasOpenedCreateAgent(true);
     setInitialSurface(surface);
     setIsCreateAgentOpen(true);
-  };
-  const closeCreateAgent = () => {
+  }, []);
+  const closeCreateAgent = useCallback(() => {
     setIsCreateAgentOpen(false);
     setInitialSurface('widget');
-  };
+  }, []);
+  const contextValue = useMemo(() => ({ openCreateAgent }), [openCreateAgent]);
 
   return (
-    <ModalContext.Provider value={{ openCreateAgent }}>
+    <ModalContext.Provider value={contextValue}>
       {children}
       {hasOpenedCreateAgent ? (
         <CreateAgentModal 
