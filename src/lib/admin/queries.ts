@@ -2,6 +2,11 @@ import type { PlanTier } from "@/lib/types/subscription";
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  buildLeadAnalytics,
+  type AdminLeadAnalytics,
+  type LeadRow,
+} from "@/lib/admin/lead-analytics";
 import type {
   AdminDailyMessageActivityPoint,
   AdminOverviewData,
@@ -52,6 +57,7 @@ type WidgetMessageRow = {
 type WidgetLeadRow = {
   widget_id: string;
   created_at: string;
+  widget_session_id: string | null;
 };
 
 const LIVE_WIDGET_SOURCES = new Set(["embedded", "hosted"]);
@@ -419,7 +425,7 @@ export async function getWorkspaceWidgets(
       .from("widget_session_messages")
       .select("widget_session_id, widget_id, agent_id, created_at")
       .in("widget_id", widgetIds),
-    admin.from("widget_leads").select("widget_id, created_at").in("widget_id", widgetIds),
+    admin.from("widget_leads").select("widget_id, created_at, widget_session_id").in("widget_id", widgetIds),
   ]);
 
   throwOnError(sessionsResult.error, "Failed to load widget sessions.");
@@ -453,6 +459,11 @@ export async function getWorkspaceWidgets(
   }
 
   for (const lead of (widgetLeadsResult.data ?? []) as WidgetLeadRow[]) {
+    // Preview leads are the owner talking to themselves. Sessions and messages
+    // beside this already exclude them; leads did not.
+    if (!lead.widget_session_id || !liveSessionIds.has(lead.widget_session_id)) {
+      continue;
+    }
     incrementCount(leadCountByWidget, lead.widget_id);
     lastActiveByWidget.set(
       lead.widget_id,
@@ -531,4 +542,65 @@ export async function getDailyMessageActivity(
     label: point.label,
     messageCount: countsByDay.get(point.dateKey) ?? 0,
   }));
+}
+
+/**
+ * Lead outcomes for one workspace: how many the product has actually produced,
+ * how that compares to conversations held, and whether they are still arriving.
+ *
+ * Preview sessions are excluded throughout — see buildLeadAnalytics.
+ */
+export async function getWorkspaceLeadAnalytics(
+  workspaceId: string,
+  days: number,
+): Promise<AdminLeadAnalytics> {
+  const admin = createAdminClient();
+  const dayWindow = buildDayWindow(days);
+
+  const widgetsResult = await admin
+    .from("widgets")
+    .select("id")
+    .eq("workspace_id", workspaceId);
+
+  throwOnError(widgetsResult.error, "Failed to load widgets.");
+
+  const widgetIds = ((widgetsResult.data ?? []) as Array<{ id: string }>).map(
+    (widget) => widget.id,
+  );
+
+  if (widgetIds.length === 0) {
+    return buildLeadAnalytics({
+      leads: [],
+      liveSessionIds: new Set(),
+      conversations: 0,
+      dayWindow,
+    });
+  }
+
+  const [sessionsResult, leadsResult] = await Promise.all([
+    admin
+      .from("widget_sessions")
+      .select("id, source")
+      .in("widget_id", widgetIds),
+    admin
+      .from("widget_leads")
+      .select("created_at, widget_session_id")
+      .in("widget_id", widgetIds),
+  ]);
+
+  throwOnError(sessionsResult.error, "Failed to load widget sessions.");
+  throwOnError(leadsResult.error, "Failed to load widget leads.");
+
+  const liveSessionIds = new Set(
+    ((sessionsResult.data ?? []) as Array<{ id: string; source: string }>)
+      .filter((session) => LIVE_WIDGET_SOURCES.has(session.source))
+      .map((session) => session.id),
+  );
+
+  return buildLeadAnalytics({
+    leads: (leadsResult.data ?? []) as LeadRow[],
+    liveSessionIds,
+    conversations: liveSessionIds.size,
+    dayWindow,
+  });
 }

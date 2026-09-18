@@ -5,6 +5,7 @@ import {
   type AdminWorkspaceTab,
 } from "@/components/admin/AdminTabs";
 import { AdminWidgetsTable } from "@/components/admin/AdminWidgetsTable";
+import { AdminLeadOutcomes } from "@/components/admin/AdminLeadOutcomes";
 import { AdminWorkspaceAnalytics } from "@/components/admin/AdminWorkspaceAnalytics";
 import { AdminWorkspaceSummaryPanel } from "@/components/admin/AdminWorkspaceSummaryPanel";
 import { AdminExtraCreditsGrant } from "@/components/admin/AdminExtraCreditsGrant";
@@ -15,6 +16,7 @@ import { AdminPlanSelector } from "@/components/admin/AdminPlanSelector";
 import { requireAdminUser } from "@/lib/admin/auth";
 import {
   getDailyMessageActivity,
+  getWorkspaceLeadAnalytics,
   getWorkspaceDetail,
   getWorkspaceWidgets,
 } from "@/lib/admin/queries";
@@ -24,6 +26,9 @@ interface AdminWorkspaceDetailPageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }
+
+/** Reporting window for both the lead outcomes and the activity chart. */
+const ANALYTICS_WINDOW_DAYS = 30;
 
 function resolveTab(tab: string | undefined): AdminWorkspaceTab {
   if (tab === "agents" || tab === "widgets" || tab === "analytics") {
@@ -42,11 +47,13 @@ export default async function AdminWorkspaceDetailPage({
 
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const currentTab = resolveTab(resolvedSearchParams.tab);
-  const [workspaceDetail, activityPoints, widgets] = await Promise.all([
-    getWorkspaceDetail(id),
-    getDailyMessageActivity(id, 30),
-    getWorkspaceWidgets(id),
-  ]);
+  const [workspaceDetail, activityPoints, leadAnalytics, widgets] =
+    await Promise.all([
+      getWorkspaceDetail(id),
+      getDailyMessageActivity(id, ANALYTICS_WINDOW_DAYS),
+      getWorkspaceLeadAnalytics(id, ANALYTICS_WINDOW_DAYS),
+      getWorkspaceWidgets(id),
+    ]);
 
   if (!workspaceDetail) {
     notFound();
@@ -131,7 +138,16 @@ export default async function AdminWorkspaceDetailPage({
         ) : null}
 
         {currentTab === "analytics" ? (
-          <AdminWorkspaceAnalytics workspace={workspace} points={activityPoints} language={language} />
+          <div className="space-y-6">
+            {/* Outcomes before volume: message counts say the platform is busy,
+                leads say it is working for the customer. */}
+            <AdminLeadOutcomes
+              analytics={leadAnalytics}
+              windowDays={ANALYTICS_WINDOW_DAYS}
+              language={language}
+            />
+            <AdminWorkspaceAnalytics workspace={workspace} points={activityPoints} language={language} />
+          </div>
         ) : null}
 
         {currentTab === "agents" ? (
