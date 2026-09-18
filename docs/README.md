@@ -5,9 +5,9 @@ describes the **current, verified state** of the codebase. Anything that no
 longer does has been moved to [`archive/`](./archive/README.md) with a banner
 explaining what superseded it.
 
-**Verified on 17 September 2026:** Next.js 16.3.4 · React 19.2.8 · Tailwind CSS v4
-· Supabase with 107 migrations and RLS tenant isolation · Vite/React 18 widget
-runtime in `apps/widget-v2` · 402/402 tests passing · 0 TypeScript errors · 0
+**Verified on 18 September 2026:** Next.js 16.3.4 · React 19.2.8 · Tailwind CSS v4
+· Supabase with 108 migrations and RLS tenant isolation · Vite/React 18 widget
+runtime in `apps/widget-v2` · 424/424 tests passing · 0 TypeScript errors · 0
 ESLint warnings.
 
 ## Current Product Model
@@ -88,6 +88,7 @@ website is a **roadmap proposal**, not part of the current Website Chat release.
 | --- | --- |
 | **[Performance Audit 2026-09-11](./roadmap/performance-audit-2026-09-11.md)** | **Active.** Function/database region mismatch and the per-navigation waterfall. A1 (loader concurrency), A2 (verified single-call auth), and analytics aggregation are done; the remaining findings table is the live backlog. |
 | **[UI & UX Refinement Board](./roadmap/ui-ux-refinement-board.md)** | **Active.** Phase 1 complete; Phases 2–5 (Agents, Leads, Knowledge, Analytics) open. |
+| [Pre-Launch Hardening 2026-09-18](./roadmap/pre-launch-hardening-2026-09-18.md) | **Complete & merged.** Multi-call tool dispatch, interrupted-stream detection, billing usage reset on renewal, raw debug-trace removal on the public path, immediate revocation, document uploads gated off. Retained as the implementation record; carries what was deliberately left gated. |
 | [Production Hardening 2026-09-17](./roadmap/production-hardening-2026-09-17.md) | **Complete & merged** (PR #7). Observability, bounded upstream calls, server-side analytics aggregation, behavioural security tests, duplicate-index removal. Retained as the implementation record; carries the remaining deferred items. |
 | [Widget V2 Remediation](./roadmap/widget-v2-remediation.md) | **Complete & verified.** Trigger fast-paths, dynamic summary refresh, loader query concurrency, dead-code cleanup. Retained as the implementation record. |
 | [Milo Single-Agent Implementation Plan](./roadmap/milo-single-agent-experience-implementation-plan.md) | **Implemented.** Product contract, migration phases, verification, compatibility, and rollback. |
@@ -120,4 +121,4 @@ report**. If an archived document contradicts one above, the document above wins
    python3 scripts/check-doc-links.py
    ```
 
-*Last updated: September 17, 2026.*
+*Last updated: September 18, 2026.*
