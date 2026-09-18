@@ -8,6 +8,9 @@ export interface WorkspacePlanLimits {
   team_member_limit: number;
 }
 
+/** How long a granted trial lasts before it stops allowing messages. */
+export const TRIAL_DURATION_DAYS = 30;
+
 export const PLAN_LIMITS: Record<PlanTier, WorkspacePlanLimits> = {
   free: {
     messages_limit: 50,
@@ -15,6 +18,15 @@ export const PLAN_LIMITS: Record<PlanTier, WorkspacePlanLimits> = {
     integrations_enabled: false,
     storage_limit_bytes: 10485760,
     team_member_limit: 0,
+  },
+  // Starter's capabilities on a 30-day clock: a trial that cannot use
+  // integrations is not a trial of the product anyone would buy.
+  trial: {
+    messages_limit: 500,
+    agents_limit: 3,
+    integrations_enabled: true,
+    storage_limit_bytes: 26214400,
+    team_member_limit: 2,
   },
   starter: {
     messages_limit: 500,

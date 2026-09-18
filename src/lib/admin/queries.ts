@@ -1,3 +1,4 @@
+import type { PlanTier } from "@/lib/types/subscription";
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -246,7 +247,7 @@ export async function getWorkspaceDetail(
       admin.from("chat_threads").select("id, workspace_id, agent_id").eq("workspace_id", workspaceId),
       admin.from("messages").select("thread_id, workspace_id, created_at").eq("workspace_id", workspaceId),
       admin.from("widgets").select("id, workspace_id, name, widget_public_key, created_at, status").eq("workspace_id", workspaceId),
-      admin.from("workspace_subscriptions").select("plan_tier, messages_limit, messages_used, agents_limit, integrations_enabled").eq("workspace_id", workspaceId).maybeSingle(),
+      admin.from("workspace_subscriptions").select("plan_tier, messages_limit, messages_used, agents_limit, integrations_enabled, trial_ends_at").eq("workspace_id", workspaceId).maybeSingle(),
     ]);
 
   throwOnError(ownerResult.error, "Failed to load workspace owner.");
@@ -344,6 +345,7 @@ export async function getWorkspaceDetail(
     messages_used: number;
     agents_limit: number;
     integrations_enabled: boolean;
+    trial_ends_at: string | null;
   } | null;
 
   return {
@@ -359,7 +361,8 @@ export async function getWorkspaceDetail(
       conversationCount: totalConversationCount,
       messageCount: totalMessageCount,
       lastActiveAt: workspaceLastActiveAt,
-      planTier: (sub?.plan_tier ?? "free") as "free" | "starter" | "premium",
+      planTier: (sub?.plan_tier ?? "free") as PlanTier,
+      trialEndsAt: sub?.trial_ends_at ?? null,
       messagesLimit: sub?.messages_limit ?? 50,
       messagesUsed: sub?.messages_used ?? 0,
       agentsLimit: sub?.agents_limit ?? 1,

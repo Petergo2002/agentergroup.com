@@ -10,6 +10,8 @@ interface AdminPlanSelectorProps {
   currentPlan: PlanTier;
   /** Whether the workspace owner has been granted product access. */
   isActivated: boolean;
+  /** When the current trial expires. Null unless currentPlan is "trial". */
+  trialEndsAt?: string | null;
 }
 
 /** Visual metadata for each plan tier. */
@@ -21,6 +23,11 @@ const PLAN_META: Record<
     label: "Free",
     badgeClasses: "bg-surface-container-high text-on-surface-variant",
     description: "50 messages / 1 agent / No integrations",
+  },
+  trial: {
+    label: "Trial",
+    badgeClasses: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    description: "500 messages / 3 agents / Integrations — 30 days",
   },
   starter: {
     label: "Starter",
@@ -34,7 +41,36 @@ const PLAN_META: Record<
   },
 };
 
-const ALL_PLANS: PlanTier[] = ["free", "starter", "premium"];
+const ALL_PLANS: PlanTier[] = ["free", "trial", "starter", "premium"];
+
+/** "in 12 days", "today", or "expired 3 days ago" for a trial deadline. */
+function describeTrialDeadline(trialEndsAt: string | null) {
+  if (!trialEndsAt) {
+    return "No end date set — this trial cannot send messages.";
+  }
+
+  const endsAt = new Date(trialEndsAt);
+  if (Number.isNaN(endsAt.getTime())) {
+    return "No end date set — this trial cannot send messages.";
+  }
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const days = Math.ceil((endsAt.getTime() - Date.now()) / dayMs);
+  const on = endsAt.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+  if (days < 0) {
+    return `Trial ended ${on}. Messages are blocked until a plan is assigned.`;
+  }
+  if (days === 0) {
+    return `Trial ends today (${on}).`;
+  }
+
+  return `${days} day${days === 1 ? "" : "s"} left — ends ${on}.`;
+}
 
 /**
  * Admin-only component that lets an internal admin change the subscription
@@ -47,9 +83,13 @@ export function AdminPlanSelector({
   workspaceId,
   currentPlan,
   isActivated,
+  trialEndsAt = null,
 }: AdminPlanSelectorProps) {
   const router = useRouter();
   const [activePlan, setActivePlan] = useState<PlanTier>(currentPlan);
+  const [activeTrialEndsAt, setActiveTrialEndsAt] = useState<string | null>(
+    trialEndsAt,
+  );
   const [isWorkspaceActivated, setIsWorkspaceActivated] = useState(isActivated);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -84,6 +124,7 @@ export function AdminPlanSelector({
       }
 
       setIsWorkspaceActivated(payload.activation.onboarding_completed === true);
+      setActiveTrialEndsAt(payload.subscription.trial_ends_at ?? null);
       router.refresh();
     } catch (error) {
       setActivePlan(previous);
@@ -123,11 +164,17 @@ export function AdminPlanSelector({
               ? meta.description
               : "Choose a plan to activate this workspace and unlock customer access."}
           </p>
+          {isWorkspaceActivated && activePlan === "trial" ? (
+            <p className="text-[11px] font-medium text-on-surface">
+              {describeTrialDeadline(activeTrialEndsAt)}
+            </p>
+          ) : null}
         </div>
       </div>
 
-      {/* Plan selector buttons */}
-      <div className="mt-4 flex gap-2">
+      {/* Plan selector buttons. Two columns: four "Activate Premium"-length
+          labels do not fit across a panel this narrow in a single row. */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
         {ALL_PLANS.map((plan) => {
           const isActive = plan === activePlan && isWorkspaceActivated;
           return (
@@ -136,14 +183,16 @@ export function AdminPlanSelector({
               type="button"
               disabled={isSaving}
               onClick={() => void handlePlanChange(plan)}
-              className={`flex-1 rounded-xl px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] transition-all
+              className={`rounded-xl px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] transition-all
                 ${
                   isActive
                     ? plan === "premium"
                       ? "bg-amber-500/20 text-amber-700 ring-1 ring-amber-500/30 dark:text-amber-300"
                       : plan === "starter"
                         ? "bg-sky-500/20 text-sky-700 ring-1 ring-sky-500/30 dark:text-sky-300"
-                        : "bg-surface-container-high text-on-surface ring-1 ring-outline"
+                        : plan === "trial"
+                          ? "bg-emerald-500/20 text-emerald-700 ring-1 ring-emerald-500/30 dark:text-emerald-300"
+                          : "bg-surface-container-high text-on-surface ring-1 ring-outline"
                     : "bg-transparent text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
                 } disabled:cursor-not-allowed disabled:opacity-50`}
             >

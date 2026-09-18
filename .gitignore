@@ -56,3 +56,6 @@ lint_output.txt
 
 # email previews
 /.email-preview
+
+# Supabase CLI scratch state (version-check cache, linked project ref)
+supabase/.temp/
