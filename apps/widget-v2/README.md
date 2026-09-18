@@ -10,7 +10,7 @@ cp apps/widget-v2/.env.example apps/widget-v2/.env.local
 npm run widget:dev
 ```
 
-The widget will be available at `http://localhost:5173/`.
+The widget will be available at `http://localhost:5174/`.
 
 For a static local embed page, use `apps/widget-v2/examples/local-loader-test.html`.
 
@@ -18,10 +18,10 @@ For a static local embed page, use `apps/widget-v2/examples/local-loader-test.ht
 
 Add `?widget=YOUR_WIDGET_PUBLIC_KEY` to the URL:
 ```
-http://localhost:5173/?widget=wgt_example123
+http://localhost:5174/?widget=wgt_example123
 ```
 
-For hosted-widget testing against the local Next.js app, keep the hosted origin aligned with `NEXT_PUBLIC_WIDGET_APP_URL`. With the default repo setup, use `http://localhost:5173`, not `http://127.0.0.1:5173`.
+For hosted-widget testing against the local Next.js app, keep the hosted origin aligned with `NEXT_PUBLIC_WIDGET_APP_URL`. With the default repo setup, use `http://localhost:5174`, not `http://127.0.0.1:5174`.
 
 Hosted standalone mode is desktop-first on large breakpoints. When you open `/?widget=...` locally, the expected behavior is a wide desktop surface on `lg+`, while the compact mobile shell remains for narrow screens.
 
@@ -99,7 +99,7 @@ The repo includes a load-test harness for the public widget runtime:
 npm run widget:load-test -- \
   --base-url http://localhost:3000 \
   --widget-public-key wgt_example123 \
-  --widget-origin http://localhost:5173 \
+  --widget-origin http://localhost:5174 \
   --mode hosted
 ```
 
@@ -124,7 +124,7 @@ The harness exercises `bootstrap` and `chat`, records latency, and includes a sa
 
 ```html
 <script
-  src="http://localhost:5173/loader.js"
+  src="http://localhost:5174/loader.js"
   data-widget="CUSTOMER_WIDGET_PUBLIC_KEY"
   data-api-url="http://localhost:3000"
 ></script>

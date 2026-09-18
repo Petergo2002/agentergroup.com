@@ -80,9 +80,9 @@ test("generated embeds route the existing widget key to the configured API and w
 });
 
 test("preview/local embed generation preserves its configured API instead of using production", () => {
-  const widgets = loadWidgets("http://localhost:3000", "http://localhost:5173");
+  const widgets = loadWidgets("http://localhost:3000", "http://localhost:5174");
   assert.match(widgets.buildWidgetEmbedSnippet("key"), /data-api-url="http:\/\/localhost:3000"/);
-  assert.equal(widgets.buildHostedWidgetUrl("key"), "http://localhost:5173/?widget=key");
+  assert.equal(widgets.buildHostedWidgetUrl("key"), "http://localhost:5174/?widget=key");
 });
 
 test("static loader defaults to avenro API on a customer website", async () => {

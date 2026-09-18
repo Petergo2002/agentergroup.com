@@ -24,8 +24,8 @@ function getWidgetRuntimeAllowedOrigins() {
   }
 
   if (process.env.NODE_ENV !== "production") {
-    origins.add("http://localhost:5173");
-    origins.add("http://127.0.0.1:5173");
+    origins.add("http://localhost:5174");
+    origins.add("http://127.0.0.1:5174");
   }
 
   return Array.from(origins);

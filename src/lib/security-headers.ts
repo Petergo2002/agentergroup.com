@@ -22,7 +22,7 @@ export function buildAppContentSecurityPolicy({
 }: AppContentSecurityPolicyOptions = {}) {
   const widgetAppOrigin = resolveOrigin(
     process.env.NEXT_PUBLIC_WIDGET_APP_URL ?? process.env.WIDGET_APP_URL,
-    "http://localhost:5173",
+    "http://localhost:5174",
   );
   const supabaseOrigin = resolveOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const supabaseConnectTokens = supabaseOrigin

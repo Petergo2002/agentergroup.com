@@ -85,7 +85,7 @@ Root app variables:
 | `COMPOSIO_SHOPIFY_OAUTH_REDIRECT_URI` | Required for custom Shopify OAuth | Shopify OAuth callback |
 | `COMPOSIO_SHOPIFY_SCOPES` | No | Optional Shopify OAuth scope override |
 | `NEXT_PUBLIC_APP_URL` | No | Dashboard origin, defaults to `http://localhost:3000` |
-| `NEXT_PUBLIC_WIDGET_APP_URL` | No | Hosted widget origin, defaults to `http://localhost:5173` |
+| `NEXT_PUBLIC_WIDGET_APP_URL` | No | Hosted widget origin, defaults to `http://localhost:5174` |
 | `NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED` | No | Milo UI kill switch. Milo is enabled unless this is explicitly set to `false`; classic navigation returns without deleting Milo mappings or data. |
 | `NEXT_PUBLIC_SELF_SERVE_BILLING_ENABLED` | No | Enables customer-facing Stripe checkout only when set to `true`; managed plan activation is the default |
 | `WIDGET_APP_URL` | No | Legacy fallback alias for the hosted widget origin |
@@ -116,7 +116,7 @@ npm run dev
 npm run widget:dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) for the dashboard and [http://localhost:5173](http://localhost:5173) for the hosted widget runtime.
+Open [http://localhost:3000](http://localhost:3000) for the dashboard and [http://localhost:5174](http://localhost:5174) for the hosted widget runtime.
 
 ## Scripts
 

@@ -194,7 +194,7 @@ export function getWidgetAppUrl(): string {
   return (
     process.env.NEXT_PUBLIC_WIDGET_APP_URL ??
     process.env.WIDGET_APP_URL ??
-    "http://localhost:5173"
+    "http://localhost:5174"
   );
 }
 
