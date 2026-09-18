@@ -10,6 +10,7 @@ import { AdminWorkspaceSummaryPanel } from "@/components/admin/AdminWorkspaceSum
 import { AdminExtraCreditsGrant } from "@/components/admin/AdminExtraCreditsGrant";
 import { AdminInternalAssistantsToggle } from "@/components/admin/AdminInternalAssistantsToggle";
 import { AdminAutomationsToggle } from "@/components/admin/AdminAutomationsToggle";
+import { AdminMessageUsageCard } from "@/components/admin/AdminMessageUsageCard";
 import { AdminPlanSelector } from "@/components/admin/AdminPlanSelector";
 import { requireAdminUser } from "@/lib/admin/auth";
 import {
@@ -104,6 +105,13 @@ export default async function AdminWorkspaceDetailPage({
                 billingCycleEnd={workspace.billingCycleEnd}
                 messagesUsed={workspace.messagesUsed}
                 agentCount={workspace.agentCount}
+              />
+              <AdminMessageUsageCard
+                messagesUsed={workspace.messagesUsed}
+                messagesLimit={workspace.messagesLimit}
+                planTier={workspace.planTier}
+                billingCycleEnd={workspace.billingCycleEnd}
+                trialEndsAt={workspace.trialEndsAt}
               />
               <AdminExtraCreditsGrant
                 workspaceId={workspace.id}
