@@ -59,6 +59,18 @@ Use the **Plan & Access** panel. Pending workspaces can be activated on any
 plan, including Free and Trial. Active workspaces can be moved between plans
 using the same control.
 
+Every plan change opens a confirmation first. It is not a generic "are you
+sure" — it lists what the change actually does to that workspace: the limits
+before and after, whether usage carries over or is wiped, whether the trial
+deadline is set or cleared, and whether the workspace is already over the new
+limits (for example "this workspace has 7 agents but Starter allows 3"). A
+change that removes access the customer is using right now — integrations
+switching off, or usage already past the new ceiling — is marked destructive
+and its confirm button turns red.
+
+The panel also shows when the current allowance next resets, or how many days
+a trial has left.
+
 The admin plan endpoint does not call Stripe. It applies the limits defined in
 `src/lib/plan-limits.ts`.
 

@@ -96,7 +96,7 @@ export async function PATCH(
       updated_at: now.toISOString(),
     })
     .eq("workspace_id", workspaceId)
-    .select("plan_tier, messages_limit, messages_used, agents_limit, integrations_enabled, storage_limit_bytes, trial_ends_at")
+    .select("plan_tier, messages_limit, messages_used, agents_limit, integrations_enabled, storage_limit_bytes, trial_ends_at, billing_cycle_end")
     .maybeSingle();
 
   if (error) {

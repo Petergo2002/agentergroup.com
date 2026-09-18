@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Modal } from "@/components/ui/Modal";
+import {
+  describeCycleReset,
+  describePlanChange,
+  describeTrialDeadline,
+} from "@/lib/admin/plan-change";
 import type { PlanTier } from "@/lib/types/subscription";
 
 interface AdminPlanSelectorProps {
@@ -12,6 +18,12 @@ interface AdminPlanSelectorProps {
   isActivated: boolean;
   /** When the current trial expires. Null unless currentPlan is "trial". */
   trialEndsAt?: string | null;
+  /** When the monthly message allowance next returns to zero. */
+  billingCycleEnd?: string | null;
+  /** Messages already spent in the current cycle. */
+  messagesUsed?: number;
+  /** Agents this workspace has actually built. */
+  agentCount?: number;
 }
 
 /** Visual metadata for each plan tier. */
@@ -43,35 +55,6 @@ const PLAN_META: Record<
 
 const ALL_PLANS: PlanTier[] = ["free", "trial", "starter", "premium"];
 
-/** "in 12 days", "today", or "expired 3 days ago" for a trial deadline. */
-function describeTrialDeadline(trialEndsAt: string | null) {
-  if (!trialEndsAt) {
-    return "No end date set — this trial cannot send messages.";
-  }
-
-  const endsAt = new Date(trialEndsAt);
-  if (Number.isNaN(endsAt.getTime())) {
-    return "No end date set — this trial cannot send messages.";
-  }
-
-  const dayMs = 24 * 60 * 60 * 1000;
-  const days = Math.ceil((endsAt.getTime() - Date.now()) / dayMs);
-  const on = endsAt.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
-  if (days < 0) {
-    return `Trial ended ${on}. Messages are blocked until a plan is assigned.`;
-  }
-  if (days === 0) {
-    return `Trial ends today (${on}).`;
-  }
-
-  return `${days} day${days === 1 ? "" : "s"} left — ends ${on}.`;
-}
-
 /**
  * Admin-only component that lets an internal admin change the subscription
  * plan for a workspace. Changes are applied immediately via a PATCH request.
@@ -84,6 +67,9 @@ export function AdminPlanSelector({
   currentPlan,
   isActivated,
   trialEndsAt = null,
+  billingCycleEnd = null,
+  messagesUsed = 0,
+  agentCount = 0,
 }: AdminPlanSelectorProps) {
   const router = useRouter();
   const [activePlan, setActivePlan] = useState<PlanTier>(currentPlan);
@@ -91,13 +77,23 @@ export function AdminPlanSelector({
     trialEndsAt,
   );
   const [isWorkspaceActivated, setIsWorkspaceActivated] = useState(isActivated);
+  const [activeCycleEnd, setActiveCycleEnd] = useState<string | null>(
+    billingCycleEnd,
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // A plan change hits a live customer immediately, so it goes through a
+  // confirmation that spells out what the change actually does.
+  const [pendingPlan, setPendingPlan] = useState<PlanTier | null>(null);
 
-  const handlePlanChange = async (plan: PlanTier) => {
+  const requestPlanChange = (plan: PlanTier) => {
     // No-op if clicking the already-active plan.
     if ((plan === activePlan && isWorkspaceActivated) || isSaving) return;
+    setErrorMessage(null);
+    setPendingPlan(plan);
+  };
 
+  const handlePlanChange = async (plan: PlanTier) => {
     setIsSaving(true);
     setErrorMessage(null);
 
@@ -125,6 +121,8 @@ export function AdminPlanSelector({
 
       setIsWorkspaceActivated(payload.activation.onboarding_completed === true);
       setActiveTrialEndsAt(payload.subscription.trial_ends_at ?? null);
+      setActiveCycleEnd(payload.subscription.billing_cycle_end ?? null);
+      setPendingPlan(null);
       router.refresh();
     } catch (error) {
       setActivePlan(previous);
@@ -164,9 +162,11 @@ export function AdminPlanSelector({
               ? meta.description
               : "Choose a plan to activate this workspace and unlock customer access."}
           </p>
-          {isWorkspaceActivated && activePlan === "trial" ? (
+          {isWorkspaceActivated ? (
             <p className="text-[11px] font-medium text-on-surface">
-              {describeTrialDeadline(activeTrialEndsAt)}
+              {activePlan === "trial"
+                ? describeTrialDeadline(activeTrialEndsAt)
+                : describeCycleReset(activeCycleEnd)}
             </p>
           ) : null}
         </div>
@@ -182,7 +182,7 @@ export function AdminPlanSelector({
               key={plan}
               type="button"
               disabled={isSaving}
-              onClick={() => void handlePlanChange(plan)}
+              onClick={() => requestPlanChange(plan)}
               className={`rounded-xl px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] transition-all
                 ${
                   isActive
@@ -215,6 +215,93 @@ export function AdminPlanSelector({
       {errorMessage && (
         <p className="mt-3 text-xs text-error">{errorMessage}</p>
       )}
+
+      {pendingPlan ? (
+        <PlanChangeConfirmation
+          change={describePlanChange({
+            from: activePlan,
+            to: pendingPlan,
+            isActivated: isWorkspaceActivated,
+            messagesUsed,
+            agentCount,
+          })}
+          isProcessing={isSaving}
+          onCancel={() => setPendingPlan(null)}
+          onConfirm={() => void handlePlanChange(pendingPlan)}
+        />
+      ) : null}
     </div>
+  );
+}
+
+const TONE_CLASSES: Record<string, string> = {
+  gain: "text-emerald-700 dark:text-emerald-300",
+  loss: "text-error",
+  warn: "text-amber-700 dark:text-amber-300",
+  neutral: "text-on-surface-variant",
+};
+
+function PlanChangeConfirmation({
+  change,
+  isProcessing,
+  onCancel,
+  onConfirm,
+}: {
+  change: ReturnType<typeof describePlanChange>;
+  isProcessing: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal isOpen onClose={onCancel} title={change.title}>
+      <div className="space-y-5">
+        <p className="text-[13px] font-medium leading-relaxed text-on-surface-variant">
+          {change.summary}
+        </p>
+
+        <ul className="space-y-2.5">
+          {change.effects.map((effect) => (
+            <li
+              key={`${effect.label}-${effect.detail}`}
+              className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-3 py-2.5"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                {effect.label}
+              </p>
+              <p
+                className={`mt-0.5 text-[13px] font-medium leading-snug ${
+                  TONE_CLASSES[effect.tone] ?? TONE_CLASSES.neutral
+                }`}
+              >
+                {effect.detail}
+              </p>
+            </li>
+          ))}
+        </ul>
+
+        <div className="flex gap-3 pt-1">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isProcessing}
+            className="flex-1 rounded-xl border border-outline-variant/20 px-4 py-3 text-xs font-bold uppercase tracking-widest text-on-surface transition-all duration-150 hover:bg-surface-container-low active:scale-[0.98] disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isProcessing}
+            className={`flex-1 rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-widest shadow-lg transition-all duration-150 active:scale-[0.98] disabled:opacity-50 ${
+              change.isDestructive
+                ? "bg-error text-white shadow-error/20"
+                : "app-primary-surface"
+            }`}
+          >
+            {isProcessing ? "Applying..." : change.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }

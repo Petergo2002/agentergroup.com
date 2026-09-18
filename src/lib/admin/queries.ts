@@ -247,7 +247,7 @@ export async function getWorkspaceDetail(
       admin.from("chat_threads").select("id, workspace_id, agent_id").eq("workspace_id", workspaceId),
       admin.from("messages").select("thread_id, workspace_id, created_at").eq("workspace_id", workspaceId),
       admin.from("widgets").select("id, workspace_id, name, widget_public_key, created_at, status").eq("workspace_id", workspaceId),
-      admin.from("workspace_subscriptions").select("plan_tier, messages_limit, messages_used, agents_limit, integrations_enabled, trial_ends_at").eq("workspace_id", workspaceId).maybeSingle(),
+      admin.from("workspace_subscriptions").select("plan_tier, messages_limit, messages_used, agents_limit, integrations_enabled, trial_ends_at, billing_cycle_end").eq("workspace_id", workspaceId).maybeSingle(),
     ]);
 
   throwOnError(ownerResult.error, "Failed to load workspace owner.");
@@ -346,6 +346,7 @@ export async function getWorkspaceDetail(
     agents_limit: number;
     integrations_enabled: boolean;
     trial_ends_at: string | null;
+    billing_cycle_end: string | null;
   } | null;
 
   return {
@@ -363,6 +364,7 @@ export async function getWorkspaceDetail(
       lastActiveAt: workspaceLastActiveAt,
       planTier: (sub?.plan_tier ?? "free") as PlanTier,
       trialEndsAt: sub?.trial_ends_at ?? null,
+      billingCycleEnd: sub?.billing_cycle_end ?? null,
       messagesLimit: sub?.messages_limit ?? 50,
       messagesUsed: sub?.messages_used ?? 0,
       agentsLimit: sub?.agents_limit ?? 1,

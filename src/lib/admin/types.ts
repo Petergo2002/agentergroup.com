@@ -50,6 +50,8 @@ export interface AdminWorkspaceDetailSummary {
   planTier: PlanTier;
   /** When a 30-day trial stops allowing messages. Null unless planTier is "trial". */
   trialEndsAt: string | null;
+  /** When the monthly message allowance next returns to zero. */
+  billingCycleEnd: string | null;
   /** Maximum messages allowed in the current billing cycle. */
   messagesLimit: number;
   /** Messages consumed in the current billing cycle. */
