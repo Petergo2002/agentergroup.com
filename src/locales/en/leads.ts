@@ -28,6 +28,11 @@ export const leads = {
   capturedLabel: "Captured",
   sourceLabel: "Source",
   sourceContactForm: "Contact Form",
+  groupByContact: "Group by person",
+  groupByContactHint:
+    "One row per person. A visitor who comes back is one contact with several conversations.",
+  conversationCount: "{count} conversations",
+  contactSummary: "{contacts} contacts · {conversations} conversations",
   sourceChat: "AI Chat",
   sourceAll: "All",
   sourceFilterLabel: "Filter leads by source",

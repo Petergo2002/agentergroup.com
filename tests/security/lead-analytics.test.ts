@@ -155,3 +155,38 @@ test("recency counts calendar days and never goes negative", () => {
   assert.equal(daysSinceLastLead(null, LOCAL_NOW), null);
   assert.equal(daysSinceLastLead("not-a-date", LOCAL_NOW), null);
 });
+
+test("unique contacts use the same identity rule as the customer inbox", () => {
+  // Six captures from two people must report 6 leads and 2 contacts, matching
+  // what the customer sees in their own grouped inbox.
+  const analytics = buildLeadAnalytics({
+    leads: [
+      { created_at: "2026-09-18T09:00:00Z", widget_session_id: "s1", email: "a@x.com", phone: null },
+      { created_at: "2026-09-17T09:00:00Z", widget_session_id: "s2", email: "A@X.com ", phone: null },
+      { created_at: "2026-09-16T09:00:00Z", widget_session_id: "s3", email: "a@x.com", phone: null },
+      { created_at: "2026-09-16T08:00:00Z", widget_session_id: "s4", email: null, phone: "072 322 04 17" },
+      { created_at: "2026-09-16T07:00:00Z", widget_session_id: "s5", email: null, phone: "0723220417" },
+      { created_at: "2026-09-16T06:00:00Z", widget_session_id: "s6", email: "a@x.com", phone: null },
+    ],
+    liveSessionIds: new Set(["s1", "s2", "s3", "s4", "s5", "s6"]),
+    conversations: 6,
+    dayWindow: DAY_WINDOW,
+  });
+
+  assert.equal(analytics.totalLeads, 6);
+  assert.equal(analytics.uniqueContacts, 2);
+});
+
+test("unidentified captures never merge into one anonymous contact", () => {
+  const analytics = buildLeadAnalytics({
+    leads: [
+      { created_at: "2026-09-18T09:00:00Z", widget_session_id: "s1", email: null, phone: null },
+      { created_at: "2026-09-17T09:00:00Z", widget_session_id: "s2", email: null, phone: null },
+    ],
+    liveSessionIds: new Set(["s1", "s2"]),
+    conversations: 2,
+    dayWindow: DAY_WINDOW,
+  });
+
+  assert.equal(analytics.uniqueContacts, 2);
+});

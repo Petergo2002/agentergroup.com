@@ -36,7 +36,9 @@ export function AdminLeadOutcomes({
       key: "total",
       label: isSwedish ? "Totala leads" : "Total leads",
       value: formatAdminNumber(analytics.totalLeads, language),
-      caption: isSwedish ? "Sedan start" : "All time",
+      caption: `${formatAdminNumber(analytics.uniqueContacts, language)} ${
+        isSwedish ? "kontakter" : analytics.uniqueContacts === 1 ? "contact" : "contacts"
+      }`,
       Icon: UserRoundCheck,
     },
     {

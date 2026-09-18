@@ -7,6 +7,13 @@ export interface LeadAnalyticsPoint {
 export interface AdminLeadAnalytics {
   /** Live leads ever captured for this workspace. */
   totalLeads: number;
+  /**
+   * Distinct people behind those captures.
+   *
+   * The customer's own inbox groups by person, so the admin view has to report
+   * the same two numbers or the two screens disagree about what "leads" means.
+   */
+  uniqueContacts: number;
   /** Live leads captured inside the reporting window. */
   leadsInWindow: number;
   /** Live conversations ever held, the denominator for the rate below. */
@@ -26,6 +33,8 @@ export interface AdminLeadAnalytics {
 export interface LeadRow {
   created_at: string;
   widget_session_id: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 /**
@@ -51,6 +60,9 @@ export function buildLeadAnalytics(input: {
   let totalLeads = 0;
   let leadsInWindow = 0;
   let lastLeadAt: string | null = null;
+  // Same identity rule as the customer inbox: email, else phone, else the
+  // capture stands alone rather than merging with other unidentified ones.
+  const contactKeys = new Set<string>();
 
   for (const lead of leads) {
     if (!lead.widget_session_id || !liveSessionIds.has(lead.widget_session_id)) {
@@ -58,6 +70,16 @@ export function buildLeadAnalytics(input: {
     }
 
     totalLeads += 1;
+
+    const email = (lead.email ?? "").trim().toLowerCase();
+    const phone = (lead.phone ?? "").replace(/\s|-|\(|\)|\./g, "").trim();
+    contactKeys.add(
+      email
+        ? `email:${email}`
+        : phone
+          ? `phone:${phone}`
+          : `capture:${lead.created_at}:${lead.widget_session_id ?? ""}`,
+    );
 
     if (!lastLeadAt || lead.created_at > lastLeadAt) {
       lastLeadAt = lead.created_at;
@@ -72,6 +94,7 @@ export function buildLeadAnalytics(input: {
 
   return {
     totalLeads,
+    uniqueContacts: contactKeys.size,
     leadsInWindow,
     conversations,
     conversionRate:

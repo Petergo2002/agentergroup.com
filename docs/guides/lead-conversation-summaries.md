@@ -64,3 +64,36 @@ When changing this feature, verify:
 - manual regeneration replaces stale content;
 - insufficient and failed states render without hiding the transcript; and
 - lead/session deletion cascades to the summary row.
+
+
+## Leads are grouped by person
+
+The leads inbox groups captures into the people who made them. A visitor who
+comes back three times is one contact with three conversations, not three
+leads — the flat list made returning prospects, the most valuable signal there
+is, look like clutter.
+
+Identity is matched on normalized email, falling back to normalized phone, and
+a capture with neither stays its own row. Unidentified is not the same as
+"the same person", so those never merge together.
+
+**Phone normalization strips formatting but never guesses a country code.**
+`0723220417` and `+46723220417` are probably the same Swedish number, but
+inferring that requires assuming a country, and a wrong assumption shows one
+visitor's conversations under another's name. A missed merge is cosmetic; a
+false merge is a privacy problem.
+
+The contact row shows merged details — the name from one capture, the phone
+from another — so it can display information no single capture holds. A newer
+blank never erases what an earlier capture recorded, and the extractor's
+"Website Visitor" placeholder is treated as no name at all.
+
+A returning contact shows its conversation count instead of a source badge: a
+single "Contact Form" badge would be a lie on a contact whose other
+conversations arrived through chat. Each capture carries its own source in the
+expanded list.
+
+Counts are reported as **contacts · conversations** in both the customer inbox
+and the admin analytics, so the two screens never disagree about what a "lead"
+is. Grouping is on by default, with a toggle back to the flat chronological
+list.
