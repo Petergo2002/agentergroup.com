@@ -1,7 +1,14 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Firecrawl from "npm:@mendable/firecrawl-js@4.32.0";
 import { json } from "../_shared/http.ts";
-import { beforeDeadline, generateRemoteEmbedding, ProcessingError } from "../_shared/processing.ts";
+import {
+  beforeDeadline,
+  generateRemoteEmbedding,
+  isRateLimitError,
+  isTransientFailure,
+  ProcessingError,
+  readRateLimitRetryMs,
+} from "../_shared/processing.ts";
 import { chunkKnowledgeText, extractTextFromFile, normalizeKnowledgeText } from "../_shared/knowledge.ts";
 
 function readFirstSupabaseSecretKey() {
@@ -46,6 +53,8 @@ const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
 
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 const MAX_WEBSITE_KNOWLEDGE_PAGES = 30;
+/** Gap between embedding batches; keeps nested worker calls under the limiter. */
+const EMBEDDING_BATCH_GAP_MS = 250;
 
 /**
  * Plans that may crawl more than one page.
@@ -273,6 +282,11 @@ Deno.serve(async (request) => {
   }
   source = current.data as KnowledgeSourceRow;
 
+  // Whether the source text is durably stored. A website crawl writes raw_text
+  // only after every page is scraped, so a timeout before that point genuinely
+  // loses the crawl, while a timeout after it resumes from the saved text.
+  let hasSavedText = Boolean((source.raw_text as string | null)?.trim());
+
   try {
     let finalRawText = source.raw_text as string | null;
 
@@ -454,6 +468,7 @@ Deno.serve(async (request) => {
 
       if (updateError) throw new Error(`DB Update Error: ${updateError.message}`);
       finalRawText = scrapedText;
+      hasSavedText = true;
     } else if (source.source_type === "file") {
       console.log(`[Process] Processing file source...`);
       if (!source.storage_bucket || !source.storage_path || !source.mime_type) {
@@ -501,6 +516,13 @@ Deno.serve(async (request) => {
     console.log(`[Process] Embedding ${pending.length}/${chunks.length} chunks; ${completed.size} already saved.`);
     for (let index = 0; index < pending.length; index += 2) {
       deadline.throwIfAborted();
+      // One worker call per chunk means a 30-chunk page fires 30 nested
+      // invocations as fast as the loop can issue them, which is what trips the
+      // edge runtime's per-trace limiter. A short gap between batches costs a
+      // couple of seconds on a full source and keeps the burst under it.
+      if (index > 0) {
+        await new Promise((resolve) => setTimeout(resolve, EMBEDDING_BATCH_GAP_MS));
+      }
       // Remote inference, with at most two in flight. Each worker performs ONE inference.
       const rows = await Promise.all(pending.slice(index, index + 2).map(async (chunk) => ({
         chunk_index: chunk.chunkIndex,
@@ -526,18 +548,53 @@ Deno.serve(async (request) => {
 
   } catch (error) {
     console.error(`[Process] CRITICAL ERROR for source ${sourceId}:`, error);
-    
-    const message = deadline.aborted
-      ? "Processing reached its time limit. Progress is saved; retry to continue."
-      : error instanceof ProcessingError ? error.message
-      : error instanceof Error && (error.message.startsWith("FIRECRAWL_API_KEY") || error.message.startsWith("Storage limit exceeded"))
-        ? error.message
-        : "Knowledge processing failed. Saved progress can be retried.";
+
+    // A rate limit or an expired budget is a pause, not a failure: the chunks
+    // embedded so far are checkpointed and the next run continues from them.
+    // Marking those "failed" is what made ingestion look unreliable even when
+    // every chunk had in fact been embedded.
+    const rateLimited = isRateLimitError(error);
+    const canResume = rateLimited || deadline.aborted || isTransientFailure(error);
+    const retryAfterMs = readRateLimitRetryMs(error);
+
+    const message = rateLimited
+      ? "Paused by a temporary rate limit. Processing continues automatically."
+      : deadline.aborted
+        // Website text is only saved once the whole crawl finishes, so a
+        // timeout during crawling really does start over; say so rather than
+        // promising progress that was never written.
+        ? (source.source_type === "website" && !hasSavedText
+          // A file is re-read from storage on the next run, so only an
+          // unfinished crawl actually starts over.
+          ? "The website took too long to read. Try again, or select fewer pages."
+          : "Processing reached its time limit. Progress is saved and continues automatically.")
+        : error instanceof ProcessingError ? error.message
+        : error instanceof Error && (error.message.startsWith("FIRECRAWL_API_KEY") || error.message.startsWith("Storage limit exceeded"))
+          ? error.message
+          : "Knowledge processing failed. Saved progress can be retried.";
+
     const failure = await adminClient
       .from("knowledge_sources")
-      .update({ status: "failed", error_message: message, processing_token: null, processing_expires_at: null })
+      .update({
+        // Back to pending so the source reads as still working and the next
+        // invocation can claim it; failed is reserved for what will not heal.
+        status: canResume ? "pending" : "failed",
+        error_message: message,
+        processing_token: null,
+        processing_expires_at: null,
+      })
       .eq("id", sourceId).eq("processing_token", processingToken);
     if (failure.error) console.error("[Process] Could not save failure state", failure.error);
+
+    if (canResume) {
+      // 202, not an error status: the caller re-invokes rather than marking the
+      // source failed, and a supabase-js invoke only surfaces non-2xx as error.
+      return json({
+        ok: false, sourceId, status: "pending", resume: true,
+        retryAfterMs: retryAfterMs ?? null, message,
+        code: rateLimited ? "PROCESSING_RATE_LIMITED" : "PROCESSING_INCOMPLETE",
+      }, 202);
+    }
     return json({ error: message, code: deadline.aborted ? "PROCESSING_TIMEOUT"
       : error instanceof ProcessingError ? error.code : "KNOWLEDGE_PROCESSING_FAILED" },
       error instanceof ProcessingError && error.status < 500 ? error.status : 503);
