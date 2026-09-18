@@ -28,6 +28,11 @@ export const leads = {
   capturedLabel: "Fångad",
   sourceLabel: "Källa",
   sourceContactForm: "Kontaktformulär",
+  groupByContact: "Gruppera per person",
+  groupByContactHint:
+    "En rad per person. En besökare som återkommer är en kontakt med flera konversationer.",
+  conversationCount: "{count} konversationer",
+  contactSummary: "{contacts} kontakter · {conversations} konversationer",
   sourceChat: "AI-chatt",
   sourceAll: "Alla",
   sourceFilterLabel: "Filtrera leads på källa",

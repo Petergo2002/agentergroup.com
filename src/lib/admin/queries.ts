@@ -584,7 +584,7 @@ export async function getWorkspaceLeadAnalytics(
       .in("widget_id", widgetIds),
     admin
       .from("widget_leads")
-      .select("created_at, widget_session_id")
+      .select("created_at, widget_session_id, email, phone")
       .in("widget_id", widgetIds),
   ]);
 

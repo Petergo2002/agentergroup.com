@@ -4,11 +4,14 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Copy,
   Mail,
   MessageSquareText,
   Phone,
   RefreshCw,
+  Layers,
   Search,
   UserCheck,
   X,
@@ -24,6 +27,10 @@ import { formatLocaleDateTime } from "@/lib/i18n";
 import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
 import type { LeadConversationSummary, WidgetLeadListItem } from "@/lib/types";
 import { formatRelativeDate } from "@/lib/utils";
+import {
+  groupLeadsByContact,
+  type LeadContactGroup,
+} from "@/lib/leads/group-by-contact";
 
 interface LeadsPageClientProps {
   workspaceId: string;
@@ -367,6 +374,12 @@ export default function LeadsPageClient({
   const [search, setSearch] = useState("");
   const [selectedLead, setSelectedLead] = useState<WidgetLeadListItem | null>(null);
   const [sourceFilter, setSourceFilter] = useState<LeadSourceFilter>("all");
+  // A visitor who comes back is one prospect with several conversations, not
+  // several leads. Grouped is the default; the flat list stays one click away.
+  const [groupByContact, setGroupByContact] = useState(true);
+  const [expandedContacts, setExpandedContacts] = useState<Set<string>>(
+    () => new Set(),
+  );
   const deferredSearch = useDeferredValue(search);
   const leadsUrl = useMemo(() => buildLeadsUrl(deferredSearch), [deferredSearch]);
   const {
@@ -412,6 +425,47 @@ export default function LeadsPageClient({
         : lead.source_channel !== "contact_form",
     );
   }, [leads, sourceFilter]);
+
+  const contactGroups = useMemo(
+    () => groupLeadsByContact(visibleLeads),
+    [visibleLeads],
+  );
+
+  /**
+   * One entry per rendered row. In grouped mode the row is driven by the
+   * contact's merged details — the name from one capture, the phone from
+   * another — while still opening the most recent capture on click.
+   */
+  const rows = useMemo(() => {
+    if (!groupByContact) {
+      return visibleLeads.map((lead) => ({
+        lead,
+        group: null as LeadContactGroup | null,
+      }));
+    }
+
+    return contactGroups.map((group) => ({
+      lead: {
+        ...group.captures[0],
+        name: group.name ?? group.captures[0].name,
+        email: group.email,
+        phone: group.phone,
+      },
+      group,
+    }));
+  }, [groupByContact, visibleLeads, contactGroups]);
+
+  const toggleContact = useCallback((key: string) => {
+    setExpandedContacts((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
 
   const closeLeadDetails = useCallback(() => setSelectedLead(null), []);
 
@@ -496,6 +550,21 @@ export default function LeadsPageClient({
           />
         </div>
 
+        <button
+          type="button"
+          aria-pressed={groupByContact}
+          onClick={() => setGroupByContact((previous) => !previous)}
+          title={t("leads.groupByContactHint")}
+          className={`inline-flex h-12 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+            groupByContact
+              ? "border-primary/25 bg-primary/10 text-primary"
+              : "border-outline-variant/15 bg-surface-container-low text-on-surface-variant/80 hover:text-on-surface"
+          }`}
+        >
+          <Layers className="h-4 w-4" />
+          {t("leads.groupByContact")}
+        </button>
+
         <div
           role="group"
           aria-label={t("leads.sourceFilterLabel")}
@@ -558,6 +627,15 @@ export default function LeadsPageClient({
         <LeadsEmptyState hasSearch={hasSearch} isFiltered />
       ) : (
         <section className="space-y-4">
+          {groupByContact ? (
+            <p className="px-4 text-xs font-medium text-on-surface-variant/70">
+              {t("leads.contactSummary", {
+                contacts: String(contactGroups.length),
+                conversations: String(visibleLeads.length),
+              })}
+            </p>
+          ) : null}
+
           <div className="hidden gap-4 px-4 py-2 text-xs font-semibold text-on-surface-variant/65 md:grid md:grid-cols-[1.15fr_1.35fr_0.9fr_0.75fr] lg:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.75fr] xl:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.9fr_0.75fr]">
             <span>{t("leads.nameLabel")}</span>
             <span>{t("leads.emailLabel")}</span>
@@ -568,9 +646,9 @@ export default function LeadsPageClient({
           </div>
 
           <div className="space-y-3">
-            {visibleLeads.map((lead) => (
+            {rows.map(({ lead, group }) => (
               <div
-                key={lead.id}
+                key={group ? group.key : lead.id}
                 className="group relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low/45"
               >
                 <button
@@ -588,7 +666,13 @@ export default function LeadsPageClient({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="truncate text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">{lead.name}</p>
-                        {lead.source_channel === "contact_form" ? (
+                        {/* A single source badge would be a lie on a contact
+                            whose other conversations came through a different
+                            channel, so a returning contact shows its
+                            conversation count instead and each capture carries
+                            its own source in the expanded list below. */}
+                        {group?.isReturning ? null : lead.source_channel ===
+                          "contact_form" ? (
                           <span className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                             {t("leads.sourceContactForm")}
                           </span>
@@ -597,6 +681,27 @@ export default function LeadsPageClient({
                             {t("leads.sourceChat")}
                           </span>
                         )}
+                        {group?.isReturning ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              event.preventDefault();
+                              toggleContact(group.key);
+                            }}
+                            aria-expanded={expandedContacts.has(group.key)}
+                            className="pointer-events-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-outline-variant/25 bg-surface-container-low px-2 py-0.5 text-[10px] font-semibold text-on-surface-variant transition-colors hover:border-primary/30 hover:text-primary"
+                          >
+                            {expandedContacts.has(group.key) ? (
+                              <ChevronDown className="h-3 w-3" />
+                            ) : (
+                              <ChevronRight className="h-3 w-3" />
+                            )}
+                            {t("leads.conversationCount", {
+                              count: String(group.captureCount),
+                            })}
+                          </button>
+                        ) : null}
                       </div>
                       <p className="mt-1 truncate text-xs text-on-surface-variant/60 md:hidden">
                         {lead.widget_name}
@@ -688,6 +793,41 @@ export default function LeadsPageClient({
                     </div>
                   </div>
                 </div>
+
+                {group && expandedContacts.has(group.key) ? (
+                  <div className="pointer-events-auto relative z-10 border-t border-outline-variant/15 bg-surface-container-low/40 px-5 py-2 md:px-6">
+                    {group.captures.map((capture) => (
+                      <button
+                        key={capture.id}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleRowClick(capture);
+                        }}
+                        className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-container"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          {capture.source_channel === "contact_form" ? (
+                            <Phone className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <MessageSquareText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          )}
+                          <span className="truncate text-xs text-on-surface-variant">
+                            {capture.source_channel === "contact_form"
+                              ? t("leads.sourceContactForm")
+                              : t("leads.sourceChat")}
+                          </span>
+                        </span>
+                        <span
+                          title={formatLocaleDateTime(capture.created_at, language)}
+                          className="shrink-0 text-xs text-on-surface-variant/70"
+                        >
+                          {formatRelativeDate(capture.created_at, language)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
