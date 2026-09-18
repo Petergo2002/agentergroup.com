@@ -1,4 +1,8 @@
 import { Composio } from "@composio/core";
+import {
+  dispatchToolCalls,
+  getExecutableToolCalls,
+} from "./composio-dispatch.ts";
 import type OpenAI from "openai";
 import {
   buildWorkspaceComposioUserId,
@@ -110,6 +114,8 @@ type ComposioToolMessages = Array<
 export interface HandleChatToolCallsResult {
   results: ComposioToolMessages;
   sessionWasRecreated: boolean;
+  /** True when at least one call returned an error instead of a result. */
+  hadToolFailure: boolean;
 }
 
 export interface ComposioTriggerConnectionRef {
@@ -1219,61 +1225,51 @@ export async function handleChatToolCalls(
     typeof activeComposio.provider
   >;
 
-    const patchedCompletion = applyEmailRecipientPolicyToCompletion(
-      applyCalSelectionToCompletion(
-        applyGoogleCalendarSelectionToCompletion(
-          chatCompletion,
-          options?.googleCalendarSelection ?? null,
-        ),
-        options?.calSelection ?? null,
+  const patchedCompletion = applyEmailRecipientPolicyToCompletion(
+    applyCalSelectionToCompletion(
+      applyGoogleCalendarSelectionToCompletion(
+        chatCompletion,
+        options?.googleCalendarSelection ?? null,
       ),
-      options?.gmailRecipientPolicy ?? null,
-    );
-    let sessionWasRecreated = false;
+      options?.calSelection ?? null,
+    ),
+    options?.gmailRecipientPolicy ?? null,
+  );
 
-    // Retry once if we get a serverless cache miss error from Composio.
-    try {
-      const results = await provider.handleToolCalls(userId, patchedCompletion);
+  const dispatched = await dispatchToolCalls({
+    provider,
+    userId,
+    toolCalls: getExecutableToolCalls(patchedCompletion),
+    recreateSession: async () => {
+      const newSession = await activeComposio
+        .create(userId, { toolkits: COMPOSIO_SESSION_TOOLKITS })
+        .catch((creationError: unknown) => {
+          console.error("[Composio] Session recreation failed:", creationError);
+          return null;
+        });
 
-      return {
-        results: sanitizeEmailToolMessages(results, options?.gmailRecipientPolicy ?? null),
-        sessionWasRecreated,
-      };
-    } catch (error) {
-      if (error && typeof error === "object" && "message" in error) {
-        // Look for typical missing session / unauthorized errors from Composio
-        const msg = String(error.message).toLowerCase();
-        if (msg.includes("session") || msg.includes("unauthorized") || msg.includes("not found")) {
-          console.warn("[Composio] Session appears missing or expired, attempting recreation...", userId);
-          const newSession = await activeComposio.create(userId, {
-            toolkits: COMPOSIO_SESSION_TOOLKITS,
-          });
-          
-          if (newSession) {
-            composioSessionCache.set(userId, {
-              value: newSession,
-              createdAt: Date.now(),
-            });
-            sessionWasRecreated = true;
-
-            // Retry handling tool calls with the new session
-            const retryResults = await provider.handleToolCalls(userId, patchedCompletion);
-            return {
-              results: sanitizeEmailToolMessages(
-                retryResults,
-                options?.gmailRecipientPolicy ?? null,
-              ),
-              sessionWasRecreated,
-            };
-          }
-        }
+      if (!newSession) {
+        return false;
       }
-      
-      // If we made it here, it's either an unrecognized error or recreation failed.
-      console.error("[Composio] Failed to handle tool calls:", error);
-      throw error;
-    }
+
+      composioSessionCache.set(userId, {
+        value: newSession,
+        createdAt: Date.now(),
+      });
+      return true;
+    },
+  });
+
+  return {
+    results: sanitizeEmailToolMessages(
+      dispatched.results,
+      options?.gmailRecipientPolicy ?? null,
+    ),
+    sessionWasRecreated: dispatched.sessionWasRecreated,
+    hadToolFailure: dispatched.hadToolFailure,
+  };
 }
+
 
 function applyGoogleCalendarSelectionToCompletion(
   chatCompletion: OpenAI.Chat.ChatCompletion,
@@ -1693,9 +1689,9 @@ function applyEmailRecipientPolicyToCompletion(
 }
 
 function sanitizeEmailToolMessages(
-  messages: OpenAI.Chat.ChatCompletionToolMessageParam[] | Array<Record<string, unknown>>,
+  messages: ComposioToolMessages,
   emailRecipientPolicy: GmailRecipientPolicy | null,
-) {
+): ComposioToolMessages {
   if (
     emailRecipientPolicy?.mode !== "specific_email" ||
     !normalizeGmailRecipientEmail(emailRecipientPolicy.specificEmail)

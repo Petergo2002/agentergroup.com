@@ -1,3 +1,7 @@
+// Relative: this module is loaded directly by tests under plain `node`, which
+// does not resolve the `@/` path alias.
+import { isDocumentUploadEnabled } from "./upload-mode.ts";
+
 export const MAX_WIDGET_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024;
 export const MAX_WIDGET_ATTACHMENTS_PER_SESSION = 10;
 export const MAX_WIDGET_ATTACHMENT_BYTES_PER_SESSION = 20 * 1024 * 1024;
@@ -137,6 +141,16 @@ export function inspectWidgetAttachment(
     !expectedExtensions[detected.mimeType].includes(extension)
   ) {
     throw new Error("The uploaded file extension does not match its content.");
+  }
+
+  if (
+    !isDocumentUploadEnabled() &&
+    (detected.mimeType === "application/pdf" ||
+      detected.mimeType === "text/plain")
+  ) {
+    throw new Error(
+      "Document uploads are not available right now. You can send an image, or paste the text directly into the chat.",
+    );
   }
 
   return detected;

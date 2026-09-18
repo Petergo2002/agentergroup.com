@@ -40,7 +40,8 @@ runAgentChat(...)
   -> getWrappedTools(userId, enabledToolkits, enabledToolsByToolkit)
   -> OpenRouter model proposes tool calls
   -> handleChatToolCalls(userId, completion, policies)
-  -> Composio provider executes the selected tool calls
+     -> policy wrappers patch arguments (calendar, Cal.com, Gmail recipients)
+     -> dispatchToolCalls() runs EVERY call — see Pitfall 5
   -> tool messages are fed back into the bounded model loop
 ```
 
@@ -300,6 +301,47 @@ The real v2 shape groups event types by team/user:
 
 The implemented extractor in `src/lib/composio.ts` → `extractCalEventTypes()` handles this
 as the primary path before falling back to flat-array buckets.
+
+---
+
+### ⚠️ Pitfall 5: The SDK's `handleToolCalls` executes only the FIRST call
+
+**Never hand a completion to `provider.handleToolCalls`.** In `@composio/core`
+0.10.0 it walks the completion's `choices` but indexes `tool_calls[0]` inside
+each one:
+
+```js
+for (const message of chatCompletion.choices)
+  if (message.message.tool_calls && message.message.tool_calls[0].type === "function") {
+    const toolResult = await this.executeToolCall(userId, message.message.tool_calls[0], ...);
+```
+
+A model that asks to book an event *and* send the confirmation puts both calls
+in **one** choice. Only the booking ran. Nothing reported the dropped call, and
+the returned transcript had two `tool_calls` against one result — which the next
+model call rejects.
+
+This was not only a parallel-tool-call problem. The calendar wrapper
+(`applyGoogleCalendarSelectionToCompletion`) `flatMap`s one requested booking
+into two calls when `includePrimaryCalendar` is on, so the `_primary` mirror was
+dropped **every time** that option was enabled.
+
+**What we do instead:** `dispatchToolCalls()` in `src/lib/composio-dispatch.ts`
+runs every call and returns one result per call. When you touch this path:
+
+- **Account for every original call id.** The wrapper's `<id>_primary`
+  companions must fold back into their parent before the transcript goes to the
+  model — emitting an id the assistant message never contained is invalid.
+- **Never replay the whole batch on retry.** Session recreation retries only the
+  call that failed; replaying would repeat side effects of calls that already
+  succeeded, which is how one booking becomes two.
+- **A failing call must not abort the others.** It returns
+  `{ successful: false, error }` as its own result, and the turn sets
+  `hadToolFailure`.
+
+`src/lib/composio-dispatch.ts` deliberately imports only types, so it loads
+under plain `node --experimental-strip-types` for
+`tests/security/tool-call-dispatch.test.ts`.
 
 ---
 

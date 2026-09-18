@@ -2,7 +2,7 @@ import {
   getOpenRouterModel,
   getOpenRouterProviderPreferences,
   hasOpenRouterEnv,
-} from "@/lib/env";
+} from "./env.ts";
 
 interface OpenRouterChatOptions {
   model?: string;
@@ -299,8 +299,18 @@ export async function* streamOpenRouterResponse(
       throw new Error("OpenRouter ended the response with an error.");
     }
 
-    return { done: false, chunk: parsed } as const;
+    return {
+      done: false,
+      chunk: parsed,
+      finishReason: typeof finishReason === "string" ? finishReason : null,
+    } as const;
   }
+
+  // A socket that simply ends is not a completed answer. Unless the provider
+  // sent `[DONE]` or a finish reason, we cannot tell a finished reply from one
+  // truncated mid-sentence — so treat a bare EOF as the failure it is rather
+  // than persisting half an answer as if the model meant to stop there.
+  let sawTerminalState = false;
 
   try {
     while (true) {
@@ -319,6 +329,9 @@ export async function* streamOpenRouterResponse(
         if (event.done) {
           return;
         }
+        if (event.finishReason) {
+          sawTerminalState = true;
+        }
         if (event.chunk) {
           yield event.chunk;
         }
@@ -328,9 +341,21 @@ export async function* streamOpenRouterResponse(
     buffer += decoder.decode();
     if (buffer.trim()) {
       const event = parseLine(buffer);
+      if (event.done) {
+        return;
+      }
+      if (event.finishReason) {
+        sawTerminalState = true;
+      }
       if (event.chunk) {
         yield event.chunk;
       }
+    }
+
+    if (!sawTerminalState) {
+      throw new Error(
+        "OpenRouter ended the response before it was complete. The reply may be cut off.",
+      );
     }
   } finally {
     clearStallTimer();

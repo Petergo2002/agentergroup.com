@@ -1,6 +1,6 @@
 # Production Readiness And Manual Steps
 
-Last updated: 2026-09-11
+Last updated: 2026-09-18
 
 This document covers the launch-hardening changes that require coordinated
 database, Edge Function, dashboard, and widget deployment. It is not evidence
@@ -25,8 +25,9 @@ Service-role and secret keys must remain server-only. Never expose them through
 
 ## Migration Status
 
-As of September 11, 2026, the repository contains 105 local migrations.
+As of September 18, 2026, the repository contains 108 local migrations.
 Recent hardening migrations applied and verified include:
+- `20260918120000_reset_usage_on_billing_period_advance.sql`: Resets `messages_used` in the same statement that advances the Stripe billing period, guarded by `p_period_start > billing_cycle_start` so replays and same-period plan changes never reset twice. **Applied and verified in the linked project on 18 September 2026** — the deployed function carries the reset, remains `security invoker`, and is executable only by `service_role`.
 - `20260910140100_transactional_agent_save_publish.sql`: Folds agent save and publish into atomic PostgreSQL transactions (`save_agent_v1` and `publish_agent_v1`) with optimistic concurrency locks.
 - `20260911160000_dashboard_analytics_totals_rpc.sql`: SQL aggregate RPC `public.dashboard_conversation_analytics_totals` for analytics totals.
 - `20260911170000_widget_proactive_message.sql`: Proactive teasers and visitor messaging.
@@ -52,6 +53,8 @@ After any future migration, verify:
 - `widget_attachments` quota and scope triggers are active
 - `stripe_webhook_events` is service-role only
 - subscription events with older Stripe timestamps cannot overwrite newer state
+- a renewal that advances the period resets `messages_used`, and a replayed or
+  same-period event does not reset it again
 - `provision_workspace_milo_v1` is executable only by `service_role`
 - Milo primary-resource validation and protection triggers are active
 - ambiguous legacy multi-agent workspaces remain classic and unchanged
@@ -191,28 +194,33 @@ Version `19.2.3` has incomplete React Server Components security fixes.
 
 ## Beta / Test User Readiness Status
 
-**Current Status (September 11, 2026): READY FOR TEST USERS / PRIVATE BETA**
+**Current Status (September 18, 2026): READY FOR TEST USERS / PRIVATE BETA**
 
 The platform has passed all pre-launch verification gates:
-- **Build & Quality:** 0 TypeScript errors (`npm run typecheck`), 0 ESLint warnings (`npm run lint`), **355/355 automated tests passing** (`npm test`, verified across 25 consecutive clean runs with 0 flakes), 0 Widget V2 typecheck errors (`npm run widget:typecheck`), and clean Next.js 16.3.4 Turbopack production build (`npm run build`).
+- **Build & Quality:** 0 TypeScript errors (`npm run typecheck`), 0 ESLint warnings (`npm run lint`), **424/424 automated tests passing** (`npm test`), 0 Widget V2 typecheck errors (`npm run widget:typecheck`), and clean Next.js 16.3.4 Turbopack production build (`npm run build`).
 - **Cryptographic API Auth Hardening:** Route authentication across the 9 high-frequency mutation and chat endpoints uses `getVerifiedApiIdentity()` (`src/lib/app/api-auth.ts`). This verifies the token's cryptographic ES256 signature locally via `supabase.auth.getClaims()` rather than trusting unverified cookie fields, preventing spoofing while eliminating redundant auth server round trips (~40–80ms saved per turn). Tested in `tests/security/api-route-identity-verification.test.ts`.
 - **Transactional Integrity:** Agent draft save and version publishing run as single PostgreSQL transactions (`save_agent_v1` and `publish_agent_v1`) with optimistic concurrency row-locking.
 - **Widget V2 & Database Stability:** Database trigger amplification on `widget_sessions` was resolved via fast-paths (turn-lock no-ops, ~0.1ms heartbeat updates, and fast `pg_cron` inactivity sweep status updates). Lead AI conversation summaries dynamically refresh on new visitor messages and return cached summaries with zero model spend when transcripts are unchanged.
 - **Latency & Concurrency:** Widget loading queries run in parallel with context-threaded branding entitlements (eliminating duplicate `workspace_subscriptions` queries), and independent loader queries execute concurrently with `Promise.all`.
+- **Silent-Failure Hardening (18 September 2026):** Every tool call a turn requests now executes (the Composio SDK helper ran only the first, which also dropped the primary-calendar mirror of every booking); an interrupted model stream is no longer persisted as a completed answer; a Stripe renewal resets the message allowance; raw debug traces no longer persist on the public widget path; revoked members lose cached access immediately on the handling instance. Document (PDF/text) uploads are gated off behind `WIDGET_DOCUMENT_UPLOAD_ENABLED` — image uploads are unaffected. See [Pre-Launch Hardening 2026-09-18](../roadmap/pre-launch-hardening-2026-09-18.md).
 - **Billing Strategy for Test Users:** Self-serve Stripe billing is not required for the initial private beta. Pilot users can be onboarded on the starter plan or granted managed pilot access using the built-in manual plan activation flow (see `docs/guides/manual-plan-activation.md`).
 
 ## Known Open Findings (carried forward from archived audits)
 
-These three findings from the 5 September 2026 project audit were still open
-when that audit was archived on 11 September 2026, and were re-verified against
-the tree on that date. None is a private-beta blocker; all three matter before
-unsupervised, high-volume use.
+Three findings carried forward from the 5 September 2026 project audit, plus
+four left deliberately open by the [18 September 2026 pre-launch
+round](../roadmap/pre-launch-hardening-2026-09-18.md). None is a private-beta
+blocker; all matter before unsupervised, high-volume use.
 
 | Finding | Current behaviour | Why it still matters |
 | --- | --- | --- |
 | **Knowledge outages degrade grounding silently** | When `search-knowledge` times out or errors, the failure is logged and the turn continues with no retrieved Knowledge and no structured outage signal in the model context (`src/lib/runtime/agent-chat.ts:1001`). | A visitor can receive a confident, normal-looking answer composed without the business information that should have grounded it. The default Milo instructions discourage invention, but nothing distinguishes "no matching answer" from "Knowledge was unavailable". Fix by propagating a typed retrieval outcome and surfacing an operator-visible signal. |
 | **Automation events can stick in `processing`** | The executor claims an event by setting `status = 'processing'` (`src/lib/automation/executor.ts:62`). A process termination after the claim leaves it claimed forever; duplicate deliveries only requeue events still in `received`. The leased outbox in migration `20260725221400` covers provider trigger cleanup, not this executor claim. | Automation is deliberately outside the initial Milo pilot, which contains the exposure. Add durable leases, reclaim, dead-letter visibility and action idempotency before automation is offered for time-sensitive business operations. |
 | **No per-turn cost accounting** | The OpenRouter wrapper sets no explicit output-token limit and no provider `usage` is accumulated into a per-turn record (`src/lib/openrouter.ts`). | Message credits cap the *number* of turns, not their size, so turns on different models are not comparable in cost. Capture usage per completion (including recovery attempts), tag it by workspace and model, and report estimated cost per conversation before changing default models or opening self-serve volume. |
+| **Self-serve checkout can create a second subscription** | `/api/billing/checkout` calls Stripe with `mode: 'subscription'` and rejects only an identical plan; it never checks the existing `stripe_subscription_id`. Unreachable while `NEXT_PUBLIC_SELF_SERVE_BILLING_ENABLED` is false. | A Starter customer upgrading to Premium could hold both recurring subscriptions. **Must be fixed before self-serve billing is enabled**, and any pre-existing duplicates reconciled. |
+| **No durable idempotency for external writes** | `withToolExecutionTimeout` stops waiting but cannot cancel — the provider SDK takes no abort signal. The tool message now tells the model the outcome is unconfirmed and not to repeat the action, but no operation ledger or idempotency key exists. | A timed-out booking or email may have succeeded. At pilot volume a daily calendar check is the proportionate control; a durable ledger with reconciliation is required before unattended booking. |
+| **Lead-notification failures are silent** | `deliver()` returns `success: false` rather than throwing, and the lead route discards the result, so the surrounding `catch` never sees a normal delivery failure. Automatic chat lead capture does not send this notification at all. | The lead is still saved, so **the dashboard is the source of truth, not the email**. Do not promise universal email alerts. Add delivery state and retry. |
+| **Revocation is stale across instances for up to 30s** | `DELETE .../members/[memberId]` now invalidates the cached workspace context, but `workspaceContextCache` is process-local, so other warm instances can still serve stale membership for the remainder of the 30s TTL — and service-role reads such as lead listing trust that context. | Narrowed, not closed. Closing it means not caching authorization for service-role-backed reads. Test revocation across warm instances before granting untrusted members access. |
 
 Full reasoning and original evidence: [archived project audit](../archive/project-audit-2026-09-05.md).
 

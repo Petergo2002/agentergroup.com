@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import {
+  ensureWorkspaceContext,
+  invalidateWorkspaceContextCache,
+} from "@/lib/app/bootstrap";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -70,6 +73,10 @@ export async function DELETE(
   if (deleteError) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 });
   }
+
+  // Workspace context is cached for 30s, and service-role reads trust it, so a
+  // removed member keeps working access until it expires unless we drop it now.
+  invalidateWorkspaceContextCache(targetMember.user_id, workspaceId);
 
   return NextResponse.json({ removed: memberId });
 }
