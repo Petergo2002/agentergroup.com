@@ -6,7 +6,29 @@ import {
   describeTrialDeadline,
 } from "../../src/lib/admin/plan-change.ts";
 
-const NOW = new Date("2026-09-18T12:00:00Z");
+// Built in LOCAL time, because the helpers under test compare local calendar
+// days. Any fixed UTC instant lands on a different calendar day somewhere
+// across the 26-hour spread of real offsets, so a hardcoded "...T12:00:00Z"
+// passes in Stockholm and fails in Auckland.
+const NOW = new Date(2026, 8, 18, 12, 0, 0);
+
+/** An ISO stamp for local midday, `offsetDays` from NOW. */
+function localDay(offsetDays: number) {
+  const date = new Date(NOW);
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString();
+}
+
+/** How that same day is rendered, so assertions never hardcode a format. */
+function renderedDay(offsetDays: number) {
+  const date = new Date(NOW);
+  date.setDate(date.getDate() + offsetDays);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 function change(overrides: Partial<Parameters<typeof describePlanChange>[0]>) {
   return describePlanChange({
@@ -91,33 +113,35 @@ test("activating a pending workspace is framed as unlocking access", () => {
 });
 
 test("trial deadlines read correctly either side of the date", () => {
-  assert.match(
-    describeTrialDeadline("2026-09-30T12:00:00Z", NOW),
-    /12 days left — ends Sep 30, 2026/,
+  // Midday UTC throughout: evening stamps roll into the next local day east
+  // of UTC+6 and these assertions would pass here but fail in CI.
+  assert.equal(
+    describeTrialDeadline(localDay(12), NOW),
+    `12 days left — ends ${renderedDay(12)}.`,
   );
-  assert.match(describeTrialDeadline("2026-09-18T18:00:00Z", NOW), /ends today/);
-  assert.match(
-    describeTrialDeadline("2026-09-10T12:00:00Z", NOW),
-    /Trial ended Sep 10, 2026\. Messages are blocked/,
+  assert.match(describeTrialDeadline(localDay(0), NOW), /ends today/);
+  assert.equal(
+    describeTrialDeadline(localDay(-8), NOW),
+    `Trial ended ${renderedDay(-8)}. Messages are blocked until a plan is assigned.`,
   );
   // A trial with no deadline cannot send, so the panel must not imply it can.
   assert.match(describeTrialDeadline(null, NOW), /cannot send messages/);
 });
 
 test("the reset line reads correctly either side of the cycle end", () => {
-  assert.match(
-    describeCycleReset("2026-10-01T12:00:00Z", NOW),
-    /Usage resets in 13 days — Oct 1, 2026/,
+  assert.equal(
+    describeCycleReset(localDay(13), NOW),
+    `Usage resets in 13 days — ${renderedDay(13)}.`,
   );
-  assert.match(describeCycleReset("2026-09-18T20:00:00Z", NOW), /resets today/);
-  assert.match(
-    describeCycleReset("2026-09-01T12:00:00Z", NOW),
-    /Cycle ended Sep 1, 2026 — usage resets on the next message/,
+  assert.match(describeCycleReset(localDay(0), NOW), /resets today/);
+  assert.equal(
+    describeCycleReset(localDay(-17), NOW),
+    `Cycle ended ${renderedDay(-17)} — usage resets on the next message.`,
   );
   assert.match(describeCycleReset(null, NOW), /No billing cycle on record/);
 });
 
 test("a single day is not pluralised", () => {
-  assert.match(describeTrialDeadline("2026-09-19T12:00:00Z", NOW), /1 day left/);
-  assert.match(describeCycleReset("2026-09-19T12:00:00Z", NOW), /in 1 day —/);
+  assert.match(describeTrialDeadline(localDay(1), NOW), /1 day left/);
+  assert.match(describeCycleReset(localDay(1), NOW), /in 1 day —/);
 });

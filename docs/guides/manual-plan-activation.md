@@ -86,6 +86,26 @@ Two cases it handles explicitly, because both are reachable:
 - **A zero limit.** Treated as "no allowance" and shown as critical, rather
   than dividing by zero into an empty meter that looks healthy.
 
+### See how the customer is doing
+
+The **Analytics** tab leads with outcomes rather than volume: total leads,
+leads in the last 30 days, conversion rate against conversations held, when the
+last lead arrived, and a daily leads chart. Message and conversation volume
+still follow underneath — volume says the platform is busy, leads say it is
+working for the customer.
+
+Three deliberate choices:
+
+- **Preview sessions are excluded everywhere.** A lead captured while the owner
+  was testing in preview is the owner talking to themselves. Sessions and
+  messages already excluded preview; leads did not, so the per-widget lead count
+  on the Widgets tab counted them. That is now consistent.
+- **Conversion rate is shown with its denominator, never against a benchmark.**
+  There is no defensible industry number to grade a pilot customer against.
+- **No conversations yields "—", not "0%".** Zero percent reads as "this is
+  converting badly", which is a different and much worse claim than "nobody has
+  talked to it yet".
+
 The admin plan endpoint does not call Stripe. It applies the limits defined in
 `src/lib/plan-limits.ts`.
 
