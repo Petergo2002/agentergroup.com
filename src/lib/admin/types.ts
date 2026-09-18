@@ -1,3 +1,4 @@
+import type { PlanTier } from "@/lib/types/subscription";
 export interface AdminOverviewSummary {
   totalWorkspaces: number;
   totalAgents: number;
@@ -46,7 +47,9 @@ export interface AdminWorkspaceDetailSummary {
   messageCount: number;
   lastActiveAt: string | null;
   /** Current subscription plan tier for this workspace. */
-  planTier: "free" | "starter" | "premium";
+  planTier: PlanTier;
+  /** When a 30-day trial stops allowing messages. Null unless planTier is "trial". */
+  trialEndsAt: string | null;
   /** Maximum messages allowed in the current billing cycle. */
   messagesLimit: number;
   /** Messages consumed in the current billing cycle. */

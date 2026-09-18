@@ -2,6 +2,7 @@ import type { PlanTier } from "@/lib/types/subscription";
 
 export const WORKSPACE_LIMITS_BY_PLAN: Record<PlanTier, number> = {
   free: 1,
+  trial: 1,
   starter: 1,
   premium: 5,
 };

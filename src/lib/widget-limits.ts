@@ -2,6 +2,7 @@ import type { PlanTier } from "@/lib/types/subscription";
 
 export const WIDGET_LIMITS_BY_PLAN: Record<PlanTier, number> = {
   free: 1,
+  trial: 3,
   starter: 3,
   premium: 6,
 };

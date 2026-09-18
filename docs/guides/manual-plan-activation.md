@@ -56,11 +56,34 @@ Open:
 ```
 
 Use the **Plan & Access** panel. Pending workspaces can be activated on any
-plan, including Free. Active workspaces can be moved between plans using the
-same control.
+plan, including Free and Trial. Active workspaces can be moved between plans
+using the same control.
 
 The admin plan endpoint does not call Stripe. It applies the limits defined in
 `src/lib/plan-limits.ts`.
+
+### Grant a 30-day trial
+
+**Activate Trial** gives the workspace Starter's capabilities — 500 messages,
+3 agents, integrations enabled — on a 30-day clock. The panel shows the days
+remaining once the trial is running.
+
+Two things behave differently from the other tiers:
+
+- **Usage starts at zero.** Every other plan change preserves `messages_used`;
+  a trial is a fresh grant, so it resets. The 500 messages cover the whole 30
+  days, not 500 per month.
+- **It ends by itself.** `workspace_subscriptions.trial_ends_at` is set 30 days
+  out and `increment_workspace_message_usage` refuses messages past that date.
+  There is no scheduled job to fail, and nothing to remember to switch off.
+
+When the trial ends the workspace stops sending and the owner sees the ordinary
+message-limit error. **Assign a paid plan to restore access** — that clears
+`trial_ends_at` and applies the new limits. Re-granting Trial starts another
+full 30 days from zero, so only do that deliberately.
+
+A trial row whose `trial_ends_at` is null is treated as expired, not as
+unlimited. A time-boxed grant fails closed.
 
 ### Grant extra message credits
 

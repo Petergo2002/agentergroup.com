@@ -25,8 +25,9 @@ Service-role and secret keys must remain server-only. Never expose them through
 
 ## Migration Status
 
-As of September 18, 2026, the repository contains 108 local migrations.
+As of September 18, 2026, the repository contains 109 local migrations.
 Recent hardening migrations applied and verified include:
+- `20260918140000_thirty_day_trial_plan.sql`: Adds the `trial` plan tier and `workspace_subscriptions.trial_ends_at`, and teaches `increment_workspace_message_usage` to refuse messages once a trial expires. **Applied and verified in the linked project on 18 September 2026**, including a rolled-back transaction proving an expired trial is denied *without* its usage being reset.
 - `20260918120000_reset_usage_on_billing_period_advance.sql`: Resets `messages_used` in the same statement that advances the Stripe billing period, guarded by `p_period_start > billing_cycle_start` so replays and same-period plan changes never reset twice. **Applied and verified in the linked project on 18 September 2026** — the deployed function carries the reset, remains `security invoker`, and is executable only by `service_role`.
 - `20260910140100_transactional_agent_save_publish.sql`: Folds agent save and publish into atomic PostgreSQL transactions (`save_agent_v1` and `publish_agent_v1`) with optimistic concurrency locks.
 - `20260911160000_dashboard_analytics_totals_rpc.sql`: SQL aggregate RPC `public.dashboard_conversation_analytics_totals` for analytics totals.
@@ -55,6 +56,8 @@ After any future migration, verify:
 - subscription events with older Stripe timestamps cannot overwrite newer state
 - a renewal that advances the period resets `messages_used`, and a replayed or
   same-period event does not reset it again
+- an expired trial is refused messages and its usage is NOT reset (the cycle
+  reset must never run for `plan_tier = 'trial'`, or the trial renews itself)
 - `provision_workspace_milo_v1` is executable only by `service_role`
 - Milo primary-resource validation and protection triggers are active
 - ambiguous legacy multi-agent workspaces remain classic and unchanged
