@@ -2,7 +2,10 @@
 
 import { hasPremiumCapabilities } from "@/lib/plan-limits";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+/** How often the list refreshes while a source is still being ingested. */
+const KNOWLEDGE_POLL_INTERVAL_MS = 3_000;
 import {
   ArrowLeft,
   CheckCircle2,
@@ -213,7 +216,9 @@ export default function KnowledgePageClient({
   const stats = useMemo(() => ({
     total: sources.length,
     ready: sources.filter((source) => source.status === "ready").length,
-    processing: sources.filter((source) => source.status === "processing").length,
+    processing: sources.filter(
+      (source) => source.status === "processing" || source.status === "pending",
+    ).length,
     failed: sources.filter((source) => source.status === "failed").length,
   }), [sources]);
 
@@ -229,6 +234,42 @@ export default function KnowledgePageClient({
 
     setSources(payload.sources ?? []);
   }, [t]);
+
+  // Ingestion takes tens of seconds, so a static list meant watching "Pending"
+  // and reloading by hand to find out it had finished. Poll only while
+  // something is actually in flight, and stop as soon as everything settles.
+  const hasWorkInProgress = useMemo(
+    () =>
+      sources.some(
+        (source) => source.status === "pending" || source.status === "processing",
+      ),
+    [sources],
+  );
+
+  useEffect(() => {
+    if (!hasWorkInProgress) {
+      return;
+    }
+
+    const refresh = () => {
+      // A background tab does not need to poll; the visibility listener below
+      // catches it up the moment it is looked at again.
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      void loadSources().catch(() => {
+        // A dropped poll is not worth surfacing; the next tick retries.
+      });
+    };
+
+    const interval = setInterval(refresh, KNOWLEDGE_POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", refresh);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [hasWorkInProgress, loadSources]);
 
   const loadFolders = useCallback(async () => {
     const response = await fetch("/api/knowledge/folders", {
