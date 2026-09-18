@@ -47,6 +47,19 @@ const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 const MAX_WEBSITE_KNOWLEDGE_PAGES = 30;
 
+/**
+ * Plans that may crawl more than one page.
+ *
+ * Mirrors hasPremiumCapabilities() in src/lib/plan-limits.ts. This function
+ * runs in Deno and cannot import from the Next.js app, so the rule is repeated
+ * deliberately — and it has to be, because this check is what actually holds:
+ * the route's decision arrives as source metadata, which this function is right
+ * not to trust. Change both together.
+ */
+function planMayCrawlWholeSite(planTier: string | null | undefined) {
+  return planTier === "premium" || planTier === "trial";
+}
+
 interface KnowledgeSourceRow {
   id: string;
   workspace_id: string;
@@ -293,8 +306,10 @@ Deno.serve(async (request) => {
         throw new Error(`Failed to load workspace subscription: ${subscriptionResult.error.message}`);
       }
 
-      const isPremium = subscriptionResult.data?.plan_tier === "premium";
-      const crawlLimit = isPremium
+      const canCrawlWholeSite = planMayCrawlWholeSite(
+        subscriptionResult.data?.plan_tier,
+      );
+      const crawlLimit = canCrawlWholeSite
         ? Math.min(
             Math.max(
               Number.isFinite(requestedCrawlLimit)
@@ -306,8 +321,10 @@ Deno.serve(async (request) => {
           )
         : 1;
 
-      if (!isPremium && selectedUrls.length > 0) {
-        throw new Error("Selecting multiple website pages requires a Premium plan.");
+      if (!canCrawlWholeSite && selectedUrls.length > 0) {
+        throw new Error(
+          "Selecting multiple website pages requires a Premium or trial plan.",
+        );
       }
 
       let scrapedText = "";
@@ -353,7 +370,7 @@ Deno.serve(async (request) => {
         }
         scrapedText = validResults.join("\n\n---\n\n");
 
-      } else if (crawlLimit > 1 && isPremium) {
+      } else if (crawlLimit > 1 && canCrawlWholeSite) {
         console.log(`[Process] Crawling website: ${targetUrl.toString()} (Limit: ${crawlLimit})`);
         // firecrawl.crawl() polls until done and returns a CrawlJob ({ status, data[], total, completed })
         const crawlResult = await beforeDeadline(firecrawl.crawl(targetUrl.toString(), {

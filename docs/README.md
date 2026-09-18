@@ -7,7 +7,7 @@ explaining what superseded it.
 
 **Verified on 18 September 2026:** Next.js 16.3.4 · React 19.2.8 · Tailwind CSS v4
 · Supabase with 109 migrations and RLS tenant isolation · Vite/React 18 widget
-runtime in `apps/widget-v2` · 483/483 tests passing · 0 TypeScript errors · 0
+runtime in `apps/widget-v2` · 484/484 tests passing · 0 TypeScript errors · 0
 ESLint warnings.
 
 ## Current Product Model
