@@ -1,5 +1,7 @@
 "use client";
 
+import { hasPremiumCapabilities } from "@/lib/plan-limits";
+
 import { useCallback, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -1023,7 +1025,7 @@ export default function KnowledgePageClient({
                       )}
                     </button>
                   </div>
-                  {subscription?.plan_tier !== "premium" && (
+                  {!hasPremiumCapabilities(subscription?.plan_tier) && (
                     <p className="ml-1 mt-2 flex items-center gap-1 text-xs font-medium text-primary">
                       <TriangleAlert className="w-3 h-3" />
                       {t("knowledge.premiumOnly")} - {t("knowledge.sitemapRequiredForMulti")}

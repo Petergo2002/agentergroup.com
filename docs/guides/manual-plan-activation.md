@@ -115,6 +115,23 @@ The admin plan endpoint does not call Stripe. It applies the limits defined in
 3 agents, integrations enabled — on a 30-day clock. The panel shows the days
 remaining once the trial is running.
 
+The trial also unlocks the premium **capability** set — most importantly
+crawling the customer's whole website into Knowledge, rather than the single
+page every other non-premium plan is limited to. A Milo that only knows one
+page of their site cannot demonstrate anything worth paying for, which is the
+entire job of a trial.
+
+Capabilities are unlocked; allowances are not. The trial keeps 500 messages,
+3 agents and 25MB, so it never becomes a way to get Premium volume for free.
+`hasPremiumCapabilities()` in `src/lib/plan-limits.ts` is the single gate —
+both the crawl and the sitemap discovery that feeds it use it, because
+unlocking one without the other leaves "Find pages" returning 403.
+
+**Widget branding removal is deliberately excluded.** A trial that strips
+Avenro branding from a live customer site gives away attribution exactly when
+the product is most visible, and puts the badge back on their site the day the
+trial ends. It stays premium-only until that is decided otherwise.
+
 Two things behave differently from the other tiers:
 
 - **Usage starts at zero.** Every other plan change preserves `messages_used`;

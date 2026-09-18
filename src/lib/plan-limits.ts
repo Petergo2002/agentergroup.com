@@ -48,6 +48,19 @@ export function getTeamMemberLimitForPlan(plan: PlanTier | null | undefined) {
   return PLAN_LIMITS[plan ?? "free"].team_member_limit;
 }
 
+/**
+ * Plans that unlock the premium *capability* set, as opposed to premium limits.
+ *
+ * A trial exists so someone can see what they would be paying for, and the
+ * capability that matters most there is indexing their actual website: a Milo
+ * that only knows one page cannot demonstrate anything. The trial keeps its own
+ * smaller allowances — 500 messages, 3 agents, 25MB — so the capability is
+ * unlocked without the trial becoming a way to get Premium volume for free.
+ */
+export function hasPremiumCapabilities(plan: PlanTier | null | undefined) {
+  return plan === "premium" || plan === "trial";
+}
+
 function formatPlanName(plan: PlanTier | null | undefined) {
   const resolvedPlan = plan ?? "free";
   return resolvedPlan.charAt(0).toUpperCase() + resolvedPlan.slice(1);

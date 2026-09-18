@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Firecrawl from "@mendable/firecrawl-js";
 import { createClient } from "@/lib/supabase/server";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { hasPremiumCapabilities } from "@/lib/plan-limits";
 import {
   normalizeSelectedWebsiteUrls,
   normalizeWebsiteKnowledgeUrl,
@@ -19,8 +20,13 @@ export async function POST(request: NextRequest) {
 
   const context = await ensureWorkspaceContext(supabase as never, user);
 
-  if (context.subscription?.plan_tier !== "premium") {
-    return NextResponse.json({ error: "Sitemap mapping is a premium feature." }, { status: 403 });
+  // Discovery and the crawl itself must agree. Unlocking multi-page crawling
+  // without this leaves the "Find pages" button returning 403 on a trial.
+  if (!hasPremiumCapabilities(context.subscription?.plan_tier)) {
+    return NextResponse.json(
+      { error: "Sitemap mapping is a premium feature." },
+      { status: 403 },
+    );
   }
 
   const body = await request.json().catch(() => ({}));

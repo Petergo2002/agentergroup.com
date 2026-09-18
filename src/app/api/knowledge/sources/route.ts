@@ -3,6 +3,7 @@ import { reportError } from "@/lib/observability/report";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureWorkspaceContext } from "@/lib/app/bootstrap";
+import { hasPremiumCapabilities } from "@/lib/plan-limits";
 import {
   InvalidJsonBodyError,
   readJsonBodyWithLimit,
@@ -430,12 +431,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "FIRECRAWL_API_KEY is not configured." }, { status: 500 });
     }
 
-    const isPremium = context.subscription?.plan_tier === "premium";
+    // Trials unlock this too: a Milo that only knows one page of the
+    // customer's site cannot demonstrate anything worth paying for.
+    const canCrawlWholeSite = hasPremiumCapabilities(
+      context.subscription?.plan_tier,
+    );
     const requestedLimit = Math.min(
       Math.max(Number(body.limit ?? 1), 1),
       MAX_WEBSITE_KNOWLEDGE_PAGES,
     );
-    const crawlLimit = isPremium ? requestedLimit : 1;
+    const crawlLimit = canCrawlWholeSite ? requestedLimit : 1;
     let selectedUrls: string[];
 
     try {
@@ -452,7 +457,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!isPremium && selectedUrls.length > 0) {
+    if (!canCrawlWholeSite && selectedUrls.length > 0) {
       return NextResponse.json(
         { error: "Selecting multiple website pages is a Premium feature." },
         { status: 403 },
