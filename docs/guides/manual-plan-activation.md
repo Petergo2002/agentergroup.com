@@ -71,6 +71,21 @@ and its confirm button turns red.
 The panel also shows when the current allowance next resets, or how many days
 a trial has left.
 
+### See what a workspace has spent
+
+The **Message usage** card on the same page shows messages remaining, a meter
+of the allowance consumed, and when it resets. State is a reserved
+good → warning → serious → critical scale stepping at 75%, 90% and 100%, and
+every state carries an icon and a word — the colour is never the only signal.
+
+Two cases it handles explicitly, because both are reachable:
+
+- **Usage past the ceiling.** A downgrade can leave a workspace over its new
+  limit. The meter caps at 100% rather than overflowing, the remainder shows 0
+  rather than a negative, and a note states how far over they are.
+- **A zero limit.** Treated as "no allowance" and shown as critical, rather
+  than dividing by zero into an empty meter that looks healthy.
+
 The admin plan endpoint does not call Stripe. It applies the limits defined in
 `src/lib/plan-limits.ts`.
 
