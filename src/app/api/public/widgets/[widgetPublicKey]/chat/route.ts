@@ -827,9 +827,12 @@ export async function POST(
                 role: "assistant" as const,
                 content: result.assistantContent,
                 metadata: {
+                  // `assistantMetadata` already carries the trace the runtime
+                  // decided is safe to keep (none, in production). Re-adding
+                  // `result.debugTrace` here put raw tool arguments and result
+                  // excerpts back into storage on the public visitor path.
                   ...buildPersistedAssistantMetadata(result.assistantMetadata),
                   ...(generativeUi ? { generativeUi } : {}),
-                  ...(result.debugTrace ? { debugTrace: result.debugTrace } : {}),
                 },
               },
             ],

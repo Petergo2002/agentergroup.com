@@ -1315,13 +1315,25 @@ export async function runAgentChat({
             tool_call_id: toolCall.id,
             name: toolCall.function.name,
             content:
-              "Tool call timed out before returning a result. Tell the user this step could not be completed right now and offer to try again.",
+              // The provider SDK takes no abort signal, so the operation may
+              // still be running — and may already have succeeded. Prompting a
+              // retry here is how one booking becomes two.
+              "Tool call timed out before confirming a result. The action may or may not have completed, so do not repeat it. Tell the user you could not confirm whether it went through and that someone will verify it shortly.",
           }));
         } else {
-          const { results, sessionWasRecreated } = toolCallResult as unknown as {
-            results: ToolMessage[];
-            sessionWasRecreated: boolean;
-          };
+          const { results, sessionWasRecreated, hadToolFailure } =
+            toolCallResult as unknown as {
+              results: ToolMessage[];
+              sessionWasRecreated: boolean;
+              hadToolFailure?: boolean;
+            };
+
+          if (hadToolFailure) {
+            hadError = true;
+            if (errorSummary === undefined) {
+              errorSummary = "One or more tool calls failed";
+            }
+          }
 
           if (sessionWasRecreated) {
             debugEvents.push({
@@ -1347,23 +1359,46 @@ export async function runAgentChat({
               content: "Tool executed, but no result was returned.",
             }));
           } else {
-            const toolNamesByCallId = new Map(
-              externalToolCalls.map((toolCall) => [
-                toolCall.id,
-                toolCall.function.name,
-              ]),
-            );
-            externalToolMessages = results.map((message, index) => {
-              const toolCallId =
-                typeof message.tool_call_id === "string"
-                  ? message.tool_call_id.replace(/_primary$/, "")
-                  : null;
-              const name =
-                (typeof message.name === "string" && message.name) ||
-                (toolCallId ? toolNamesByCallId.get(toolCallId) : null) ||
-                externalToolCalls[index]?.function.name;
+            // The provider wrapper can expand one requested call into several
+            // (a booking mirrored onto the primary calendar arrives as
+            // `<id>_primary`). The model only ever saw the original ids, so
+            // fold companions back into their parent: emitting an id the
+            // assistant message never contained makes the next call invalid.
+            externalToolMessages = externalToolCalls.map((toolCall, index) => {
+              const matched = results.filter((message) => {
+                const id = message.tool_call_id;
+                if (typeof id !== "string") {
+                  return false;
+                }
+                return id === toolCall.id || id.startsWith(`${toolCall.id}_`);
+              });
 
-              return name ? { ...message, name } : message;
+              const fallback = matched.length === 0 ? results[index] : null;
+              const name = toolCall.function.name;
+
+              if (matched.length === 0) {
+                return {
+                  role: "tool",
+                  tool_call_id: toolCall.id,
+                  name,
+                  content:
+                    typeof fallback?.content === "string"
+                      ? fallback.content
+                      : "Tool executed, but no result was returned.",
+                };
+              }
+
+              const content =
+                matched.length === 1
+                  ? String(matched[0].content ?? "")
+                  : JSON.stringify(
+                      matched.map((message) => ({
+                        call: message.tool_call_id,
+                        result: String(message.content ?? ""),
+                      })),
+                    );
+
+              return { role: "tool", tool_call_id: toolCall.id, name, content };
             });
 
             for (const msg of externalToolMessages) {
