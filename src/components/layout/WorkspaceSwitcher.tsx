@@ -147,7 +147,7 @@ export function WorkspaceSwitcher({ isCollapsed, mobile, onNavigate }: Workspace
       {/* Dropdown Menu */}
       {isOpen && (
         <div
-          className={`depth-panel absolute bottom-full z-50 mb-2 w-[280px] overflow-hidden rounded-2xl glass-panel p-2 animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-200 ease-out origin-bottom-left ${
+          className={`depth-panel absolute bottom-full z-50 mb-2 w-[280px] overflow-hidden rounded-2xl solid-panel p-2 animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-200 ease-out origin-bottom-left ${
             isMinimized ? 'left-full ml-4 bottom-0 origin-bottom-left' : 'left-0'
           }`}
         >

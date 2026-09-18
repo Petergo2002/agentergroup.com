@@ -5,6 +5,7 @@ export const nav = {
   analytics: "Analys",
   newAnalyticsActivity: "Ny analysaktivitet",
   newLeads: "{count} nya leads de senaste 24 timmarna",
+  newQuestions: "{count} frågor väntar på ditt svar",
   agents: "Agenter",
   agentLibrary: "Agentbibliotek",
   assistants: "Assistenter",

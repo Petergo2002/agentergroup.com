@@ -294,7 +294,7 @@ export function CreateAgentDropdown({
       aria-modal="false"
       aria-labelledby={`${dropdownId}-title`}
       style={menuStyle}
-      className={`relative overflow-hidden rounded-2xl border border-outline-variant/20 glass-panel shadow-2xl transition-all duration-200 ${
+      className={`relative overflow-hidden rounded-2xl border border-outline-variant/20 solid-panel shadow-2xl transition-all duration-200 ${
         isOpen ? 'agent-dropdown-enter' : 'agent-dropdown-exit'
       }`}
     >

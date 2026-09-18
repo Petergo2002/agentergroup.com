@@ -159,6 +159,8 @@ export interface DashboardLatestActivityResponse {
   > | null;
   newLeadCount: number;
   latestLeadCreatedAt?: string | null;
+  openQuestionCount: number;
+  latestQuestionCreatedAt?: string | null;
 }
 
 export interface DashboardSummaryResponse {

@@ -139,27 +139,72 @@ test("lead notification email template normalizes to Milo, strips raw tags, and 
   assert.match(themeSource, /#ff5c02/);
 });
 
-test("leads and analytics notifications clear smartly on click and route visit", () => {
+test("leads, analytics and question notifications clear smartly on click and route visit", () => {
   const appShellSource = readFileSync("src/components/layout/AppShell.tsx", "utf8");
   const sidebarSource = readFileSync("src/components/layout/Sidebar.tsx", "utf8");
   const analyticsSource = readFileSync("src/lib/dashboard/analytics.ts", "utf8");
+  const enNavSource = readFileSync("src/locales/en/nav.ts", "utf8");
+  const svNavSource = readFileSync("src/locales/sv/nav.ts", "utf8");
 
-  // AppShell tracks both analytics and leads seen timestamps in localStorage
+  // AppShell keeps a seen timestamp per notification surface, workspace scoped.
   assert.match(appShellSource, /agenter_leads_last_seen_at/);
   assert.match(appShellSource, /agenter_analytics_last_seen_at/);
+  assert.match(appShellSource, /agenter_questions_last_seen_at/);
   assert.match(appShellSource, /clearLeadsBadge/);
   assert.match(appShellSource, /clearAnalyticsAttention/);
+  assert.match(appShellSource, /clearQuestionsBadge/);
 
-  // AppShell computes effective lead count based on last seen timestamp
+  // Counts are gated on that timestamp rather than shown unconditionally.
   assert.match(appShellSource, /effectiveNewLeadCount/);
+  assert.match(appShellSource, /effectiveOpenQuestionCount/);
 
-  // Sidebar suppresses badge when item is active and executes clear on click
+  // Visiting a route marks it seen even when the sidebar item is never clicked.
+  assert.match(appShellSource, /if \(!isAnalyticsRoute\) return;/);
+  assert.match(appShellSource, /if \(!isLeadsRoute\) return;/);
+  assert.match(appShellSource, /if \(!isQuestionsRoute\) return;/);
+
+  // The sidebar hides a badge on the active item, and clears through the item's
+  // own callback. Routing it per item rather than by hardcoded href means a new
+  // badged destination cannot silently forget to wire clearing up.
   assert.match(sidebarSource, /hasBadge = Boolean\(badgeCount > 0 && !isActive\)/);
-  assert.match(sidebarSource, /onClearLeads\?\.()/);
-  assert.match(sidebarSource, /onClearAnalyticsActivity\?\.()/);
+  assert.match(sidebarSource, /item\.onSeen\?\.\(\)/);
+  assert.match(sidebarSource, /onSeen: onClearLeads/);
+  assert.match(sidebarSource, /onSeen: onClearAnalyticsActivity/);
+  assert.match(sidebarSource, /onSeen: onClearQuestions/);
 
-  // Analytics helper tracks newest lead creation timestamp
+  // Each badge describes itself instead of every badge claiming to be leads.
+  assert.match(sidebarSource, /badgeLabelKey: "nav\.newLeads"/);
+  assert.match(sidebarSource, /badgeLabelKey: "nav\.newQuestions"/);
+  assert.match(enNavSource, /newQuestions:/);
+  assert.match(svNavSource, /newQuestions:/);
+
+  // The activity payload reports when the newest lead and question arrived, so
+  // "is there anything new" is answerable without a second request.
   assert.match(analyticsSource, /latestLeadCreatedAt/);
+  assert.match(analyticsSource, /latestQuestionCreatedAt/);
+
+  // Seen timestamps are anchored to the value the server reported, never to the
+  // browser clock. Those are different clocks: a client running slow stamps a
+  // "seen" time older than an item that already exists, so the badge survives
+  // the click and returns on the next poll.
+  assert.match(
+    appShellSource,
+    /markSeenNow\(analyticsStorageKey, latestAnalyticsActivityAt/,
+  );
+  assert.match(appShellSource, /markSeenNow\(leadsStorageKey, latestLeadCreatedAt/);
+  assert.match(
+    appShellSource,
+    /markSeenNow\(questionsStorageKey, latestQuestionCreatedAt/,
+  );
+  assert.doesNotMatch(appShellSource, /markSeenNow\([A-Za-z]+StorageKey\)/);
+
+  // The badge entrance is real CSS, and it stands down under reduced motion.
+  const globalsSource = readFileSync("src/app/globals.css", "utf8");
+  assert.match(globalsSource, /\.sidebar-badge-enter \{/);
+  assert.match(
+    globalsSource,
+    /\.sidebar-badge-enter \{\s*animation: none;/,
+  );
 });
 
 
