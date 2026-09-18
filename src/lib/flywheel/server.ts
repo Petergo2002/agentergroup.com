@@ -890,6 +890,17 @@ export async function linkKnowledgeSourceToVerifiedAnswersFolder(
   return folder;
 }
 
+/**
+ * How many times one request will drive the processor.
+ *
+ * Each run resumes from the last checkpoint, so re-invoking is how a source
+ * that paused — a rate limit, or a budget that ran out mid-way — finishes
+ * without the customer touching anything.
+ */
+const KNOWLEDGE_PROCESSING_ATTEMPTS = 3;
+/** Cap on how long we wait between attempts, to stay inside the request's own budget. */
+const KNOWLEDGE_RESUME_MAX_WAIT_MS = 15_000;
+
 export function queueKnowledgeProcessing(
   supabase: SupabaseAny,
   sourceId: string,
@@ -897,44 +908,82 @@ export function queueKnowledgeProcessing(
 ) {
   after(async () => {
     const admin = createAdminClient();
-    const processResponse = await supabase.functions.invoke(
-      "process-knowledge-source",
-      {
-        headers: accessToken
-          ? {
-              Authorization: `Bearer ${accessToken}`,
-            }
-          : undefined,
-        body: { sourceId },
-      },
-    );
 
-    if (!processResponse.error) {
-      return;
+    for (let attempt = 1; attempt <= KNOWLEDGE_PROCESSING_ATTEMPTS; attempt += 1) {
+      const processResponse = await supabase.functions.invoke(
+        "process-knowledge-source",
+        {
+          headers: accessToken
+            ? {
+                Authorization: `Bearer ${accessToken}`,
+              }
+            : undefined,
+          body: { sourceId },
+        },
+      );
+
+      if (processResponse.error) {
+        const { data: failedSource } = await supabase
+          .from("knowledge_sources")
+          .select("error_message")
+          .eq("id", sourceId)
+          .maybeSingle();
+        const errorMessage =
+          failedSource?.error_message ??
+          processResponse.error.message ??
+          "Knowledge processing failed.";
+
+        console.error("[flywheel] Knowledge processing failed.", {
+          sourceId,
+          attempt,
+          error: errorMessage,
+        });
+
+        await admin
+          .from("knowledge_sources")
+          .update({
+            status: "failed",
+            error_message: errorMessage,
+          })
+          .eq("id", sourceId);
+        return;
+      }
+
+      // The processor answers 202 with resume:true when it stopped early but
+      // kept its progress. That is a pause, not a failure, so the source stays
+      // pending and we simply run it again.
+      const result = processResponse.data as
+        | { resume?: boolean; retryAfterMs?: number | null; message?: string }
+        | null;
+
+      if (!result?.resume) {
+        return;
+      }
+
+      if (attempt === KNOWLEDGE_PROCESSING_ATTEMPTS) {
+        // Out of attempts for this request. The source keeps its saved chunks
+        // and its pending status, so the retry control picks up where this
+        // left off rather than starting over.
+        console.warn("[flywheel] Knowledge processing still incomplete.", {
+          sourceId,
+          attempts: attempt,
+          message: result.message,
+        });
+        return;
+      }
+
+      const waitMs = Math.min(
+        Math.max(result.retryAfterMs ?? 1_000, 1_000),
+        KNOWLEDGE_RESUME_MAX_WAIT_MS,
+      );
+      console.info("[flywheel] Knowledge processing paused; resuming.", {
+        sourceId,
+        attempt,
+        waitMs,
+        message: result.message,
+      });
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
-
-    const { data: failedSource } = await supabase
-      .from("knowledge_sources")
-      .select("error_message")
-      .eq("id", sourceId)
-      .maybeSingle();
-    const errorMessage =
-      failedSource?.error_message ??
-      processResponse.error.message ??
-      "Knowledge processing failed.";
-
-    console.error("[flywheel] Knowledge processing failed.", {
-      sourceId,
-      error: errorMessage,
-    });
-
-    await admin
-      .from("knowledge_sources")
-      .update({
-        status: "failed",
-        error_message: errorMessage,
-      })
-      .eq("id", sourceId);
   });
 }
 
