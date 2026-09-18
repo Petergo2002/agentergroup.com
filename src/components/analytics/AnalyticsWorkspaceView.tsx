@@ -1,5 +1,8 @@
 "use client";
 
+/** Per-browser view preference; see the collapse toggle below. */
+const ANALYTICS_STATS_COLLAPSED_KEY = "avenro.analytics.statsCollapsed";
+
 import Link from "next/link";
 import {
   useDeferredValue,
@@ -15,6 +18,7 @@ import useSWR from "swr";
 import { useAppContext } from "@/components/app/AppContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
+import { MiloLogo } from "@/components/brand/MiloLogo";
 import { hasAutomationsEnabled } from "@/lib/assistants/feature-flags";
 import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
 import { formatRelativeDate } from "@/lib/utils";
@@ -32,10 +36,11 @@ import {
   Activity,
   AlertCircle,
   BarChart3,
-  Bot,
   Bug,
   CheckCircle2,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   MessageSquare,
   MessagesSquare,
   Paperclip,
@@ -677,9 +682,11 @@ function ConversationDetail({
                       : "bg-primary/10 text-primary ring-primary/15"
                   }`}
                   >
-                    {message.role === "user"
-                      ? (identityDisplay?.initials || "U")
-                      : <Bot className="h-4 w-4" aria-hidden="true" />}
+                    {message.role === "user" ? (
+                      identityDisplay?.initials || "U"
+                    ) : (
+                      <MiloLogo size={24} />
+                    )}
                   </div>
 
                   <div className={`space-y-2 ${message.role === "user" ? "text-right" : ""}`}>
@@ -1650,6 +1657,36 @@ export function AnalyticsWorkspaceView() {
   }, [hasActiveAutomations, filters.automationStatus, filters.agentId, state.data?.filters.agents]);
 
   const isOverviewLoading = state.isLoading && !state.data;
+
+  // Reading a long transcript is the main job on this page, and the stat row
+  // costs it around 120px of height. Collapsing is remembered locally: it is a
+  // per-person view preference, not workspace state.
+  const [areStatsCollapsed, setAreStatsCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      setAreStatsCollapsed(
+        window.localStorage.getItem(ANALYTICS_STATS_COLLAPSED_KEY) === "true",
+      );
+    } catch {
+      // Private browsing or blocked storage: the default stays expanded.
+    }
+  }, []);
+
+  const toggleStats = () => {
+    setAreStatsCollapsed((previous) => {
+      const next = !previous;
+      try {
+        window.localStorage.setItem(
+          ANALYTICS_STATS_COLLAPSED_KEY,
+          String(next),
+        );
+      } catch {
+        // Not worth failing the interaction over.
+      }
+      return next;
+    });
+  };
   const trend = state.data?.trend ?? [];
   const conversationStats: AnalyticsStatItem[] = [
     {
@@ -1756,17 +1793,47 @@ export function AnalyticsWorkspaceView() {
               </p>
             </div>
 
-            {hasActiveAutomations ? (
-              <AnalyticsViewSwitch
-                activeView={effectiveActiveView}
-                conversations={overview?.conversations ?? 0}
-                automations={automation?.totalEvents ?? 0}
-                onChange={handleViewChange}
-              />
-            ) : null}
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleStats}
+                aria-expanded={!areStatsCollapsed}
+                aria-controls="analytics-stat-row"
+                title={
+                  areStatsCollapsed
+                    ? t("analytics.showStats")
+                    : t("analytics.hideStats")
+                }
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 text-xs font-semibold text-on-surface-variant transition-colors hover:border-primary/25 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                {areStatsCollapsed ? (
+                  <ChevronsUpDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronsDownUp className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden sm:inline">
+                  {areStatsCollapsed
+                    ? t("analytics.showStats")
+                    : t("analytics.hideStats")}
+                </span>
+              </button>
+
+              {hasActiveAutomations ? (
+                <AnalyticsViewSwitch
+                  activeView={effectiveActiveView}
+                  conversations={overview?.conversations ?? 0}
+                  automations={automation?.totalEvents ?? 0}
+                  onChange={handleViewChange}
+                />
+              ) : null}
+            </div>
           </div>
 
-          <AnalyticsStatRow items={stats} isLoading={isOverviewLoading} />
+          {areStatsCollapsed ? null : (
+            <div id="analytics-stat-row">
+              <AnalyticsStatRow items={stats} isLoading={isOverviewLoading} />
+            </div>
+          )}
 
           <AnalyticsFilterBar
             filters={filters}
