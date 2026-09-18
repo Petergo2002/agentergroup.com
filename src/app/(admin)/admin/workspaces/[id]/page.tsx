@@ -101,6 +101,9 @@ export default async function AdminWorkspaceDetailPage({
                 currentPlan={workspace.planTier}
                 isActivated={workspace.onboardingCompleted}
                 trialEndsAt={workspace.trialEndsAt}
+                billingCycleEnd={workspace.billingCycleEnd}
+                messagesUsed={workspace.messagesUsed}
+                agentCount={workspace.agentCount}
               />
               <AdminExtraCreditsGrant
                 workspaceId={workspace.id}
