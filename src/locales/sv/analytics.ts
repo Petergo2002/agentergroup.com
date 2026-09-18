@@ -48,6 +48,8 @@ export const analytics = {
   automationsSubtitle: "Hur dina automationer presterar.",
 
   // Nyckeltal
+  showStats: "Visa statistik",
+  hideStats: "Dölj statistik",
   statConversations: "Konversationer",
   statConversationsMeta: "I perioden",
   statLeads: "Leads",

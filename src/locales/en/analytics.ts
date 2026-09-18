@@ -48,6 +48,8 @@ export const analytics = {
   automationsSubtitle: "How your automations are performing.",
 
   // Stat tiles
+  showStats: "Show stats",
+  hideStats: "Hide stats",
   statConversations: "Conversations",
   statConversationsMeta: "In range",
   statLeads: "Leads",
