@@ -5,9 +5,9 @@ describes the **current, verified state** of the codebase. Anything that no
 longer does has been moved to [`archive/`](./archive/README.md) with a banner
 explaining what superseded it.
 
-**Verified on 11 September 2026:** Next.js 16.3.4 · React 19.2.8 · Tailwind CSS v4
-· Supabase with 105 migrations and RLS tenant isolation · Vite/React 18 widget
-runtime in `apps/widget-v2` · 355/355 tests passing · 0 TypeScript errors · 0
+**Verified on 17 September 2026:** Next.js 16.3.4 · React 19.2.8 · Tailwind CSS v4
+· Supabase with 107 migrations and RLS tenant isolation · Vite/React 18 widget
+runtime in `apps/widget-v2` · 402/402 tests passing · 0 TypeScript errors · 0
 ESLint warnings.
 
 ## Current Product Model
@@ -75,6 +75,7 @@ website is a **roadmap proposal**, not part of the current Website Chat release.
 | **[Demo Tester Release Checklist](./runbooks/demo-tester-release-checklist.md)** | Before inviting testers. Gate list that must be complete and verified from a clean build. |
 | **[avenro.se: Vercel och one.com](./runbooks/avenro-domain-setup.md)** | Domains and DNS. Domäner, DNS, Widget V2, inloggning och e-post. *(Svenska)* |
 | **[Transactional Email](./runbooks/transactional-email.md)** | Email design. The shared template system, Resend setup, and installing the Supabase Auth templates. |
+| **[Observability](./runbooks/observability.md)** | Error reporting. Sentry configuration, what it is allowed to collect, sourcemaps, the two CLIs, and why reporting goes quiet when it does. |
 
 ## 🔒 Security & Compliance
 
@@ -87,6 +88,7 @@ website is a **roadmap proposal**, not part of the current Website Chat release.
 | --- | --- |
 | **[Performance Audit 2026-09-11](./roadmap/performance-audit-2026-09-11.md)** | **Active.** Function/database region mismatch and the per-navigation waterfall. A1 (loader concurrency), A2 (verified single-call auth), and analytics aggregation are done; the remaining findings table is the live backlog. |
 | **[UI & UX Refinement Board](./roadmap/ui-ux-refinement-board.md)** | **Active.** Phase 1 complete; Phases 2–5 (Agents, Leads, Knowledge, Analytics) open. |
+| [Production Hardening 2026-09-17](./roadmap/production-hardening-2026-09-17.md) | **Complete & merged** (PR #7). Observability, bounded upstream calls, server-side analytics aggregation, behavioural security tests, duplicate-index removal. Retained as the implementation record; carries the remaining deferred items. |
 | [Widget V2 Remediation](./roadmap/widget-v2-remediation.md) | **Complete & verified.** Trigger fast-paths, dynamic summary refresh, loader query concurrency, dead-code cleanup. Retained as the implementation record. |
 | [Milo Single-Agent Implementation Plan](./roadmap/milo-single-agent-experience-implementation-plan.md) | **Implemented.** Product contract, migration phases, verification, compatibility, and rollback. |
 | [Agent-Native Websites](./roadmap/agent-native-websites.md) | **Proposed — not started.** Future Agent Site delivery mode for the same Milo that powers Website Chat. |
@@ -118,4 +120,4 @@ report**. If an archived document contradicts one above, the document above wins
    python3 scripts/check-doc-links.py
    ```
 
-*Last updated: September 11, 2026.*
+*Last updated: September 17, 2026.*

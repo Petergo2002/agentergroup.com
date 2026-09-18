@@ -45,6 +45,26 @@ Use dark or error-specific buttons only when the action is not a normal primary 
 - Use `ToastProvider` for transient outcomes. Errors are announced assertively; success, warning, and informational notices use a polite status announcement.
 - Preserve `focus-visible` styles and provide an accessible name for icon-only controls.
 
+### Interaction defaults you get for free
+
+`globals.css` sets these in the **base** layer, wrapped in `:where()` so their
+specificity is zero. Any component that declares its own focus or cursor
+utilities still wins, so these are a floor, not an override:
+
+| Rule | Applies to |
+| --- | --- |
+| A `focus-visible` outline in the brand colour, offset 2px, inheriting the element's radius | `button`, `[role="button"]`, `a[href]`, `summary` |
+| `cursor: pointer` | The same elements, when not `:disabled` or `[aria-disabled="true"]` |
+| `cursor: not-allowed` | Disabled buttons, inputs, textareas and selects |
+
+The `cursor: pointer` default exists because Tailwind's Preflight resets buttons
+to `cursor: default`, and only a handful of call sites had re-added it — so most
+buttons in the app showed an arrow rather than a hand.
+
+**Do not add a competing global focus rule for form fields.** Inputs already get
+a focus ring from `@plugin "@tailwindcss/forms"`, and a `:where()` rule cannot
+beat it (specificity 0). Style inputs at the component level instead.
+
 ## Liquid Glass Controls & Segmented Switches
 
 For elevated navigation switches (e.g. `AgentViewTabs` switching between **BUILDER** and **TEST MILO**), use the **Liquid Glass Segmented Control** pattern:
