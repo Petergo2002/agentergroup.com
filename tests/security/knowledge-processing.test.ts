@@ -45,7 +45,11 @@ test('permanent errors do not consume retries', async () => {
   }
 });
 
-test('inference is one bounded content item per authenticated remote request', async () => {
+test('inference is a bounded batch per authenticated remote request', async () => {
+  // The wire shape is now a batch — one call per chunk made a 60-chunk page
+  // take 111 seconds and trip the per-trace rate limiter. Everything this test
+  // guards is unchanged: the endpoint, the service-key header, an abort signal,
+  // and a hard bound on what may be sent.
   let calls = 0;
   const embedding = Array.from({ length: 384 }, () => 0.05);
   const result = await generateRemoteEmbedding('saved text', {
@@ -53,10 +57,10 @@ test('inference is one bounded content item per authenticated remote request', a
     fetcher: async (url, options) => {
       calls++;
       assert.equal(url, 'https://example.test/functions/v1/embed-knowledge-chunk');
-      assert.deepEqual(JSON.parse(String(options?.body)), { content: 'saved text' });
+      assert.deepEqual(JSON.parse(String(options?.body)), { contents: ['saved text'] });
       assert.equal(new Headers(options?.headers).get('x-internal-service-key'), 'test-service-key');
       assert.ok(options?.signal);
-      return Response.json({ embedding });
+      return Response.json({ embeddings: [embedding] });
     },
   });
   assert.deepEqual(result, embedding);

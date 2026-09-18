@@ -6,10 +6,27 @@ checkpoints embeddings before publishing the source as `ready`.
 
 ## CPU isolation and retries
 
-`embed-knowledge-chunk` performs one `gte-small` inference per request. Only service
-keys can invoke it. Input is bounded to 1,400 characters and 10KB of JSON; vectors
-must contain 384 finite numbers. The orchestrator sends at most two requests at a
-time and retries transient failures at most three times with backoff and jitter.
+`embed-knowledge-chunk` runs `gte-small` over a small batch per request — at most
+`MAX_EMBEDDING_BATCH` (4) chunks, embedded one after another so a batch costs the
+same CPU as those chunks did individually, minus the per-request overhead. Only
+service keys can invoke it. Input is bounded to 1,400 characters per chunk;
+vectors must contain 384 finite numbers, and a response whose vector count does
+not match the request is rejected rather than risking a chunk being paired with
+the wrong embedding. The single-item `{ content }` form still works so the two
+functions can be deployed moments apart.
+
+**Four is measured, not chosen.** Against the live worker: batches of 1-4
+returned 200 (four chunks in ~2.0s) while 6 and 8 returned **HTTP 546**, the
+worker's own CPU ceiling. That ceiling is why the original design used one
+inference per request. Because chunk cost varies with content, no fixed size is
+safe for every page, so `embedWithWorkerLimitFallback` halves a batch that is
+refused and retries — worst case degrading to one chunk per call, which is
+exactly the old behaviour and so can never be slower.
+
+A worker limit is recoverable but is never retried identically: the same chunks
+cost the same CPU next time, and spending three attempts on it only burns the
+budget before the batch can be split. `shouldRetrySameRequest()` encodes that,
+separately from `isTransientFailure()` which decides whether the source resumes.
 Permanent HTTP errors are not retried. The model remains compatible with the
 existing `search-knowledge` function and vector columns.
 
@@ -37,11 +54,9 @@ Three things keep it working now:
 - A 250ms gap between embedding batches keeps the burst under the limiter in the
   first place.
 
-**If this resurfaces, the next lever is call volume, not backoff.** Batching
-several chunks per worker request would cut 62 calls to a handful, but it
-trades against the deliberate one-inference-per-request CPU isolation above —
-which exists because the worker has its own CPU ceiling (`EMBEDDING_WORKER_LIMIT`,
-HTTP 546). Change it knowing that trade.
+Call volume was the underlying cause, and batching addressed it: a 63-chunk
+source now makes ~16 worker calls instead of 63. The remaining levers, if this
+ever resurfaces, are the crawl itself and the 110-second budget — not backoff.
 
 Firecrawl is pinned to 4.32.0 in the Edge Function, uses explicit request timeouts,
 bounded retries and TLS verification. A selected page that fails or returns an
@@ -70,6 +85,16 @@ re-invokes it — up to three times per request, waiting the stated delay capped
 15 seconds — and each run continues from the last checkpoint. `failed` is
 reserved for what will not heal on its own: a missing Firecrawl key, an exceeded
 storage limit, unreadable pages.
+
+**Something must still drive a source whose request has ended.** Otherwise a
+paused source sits at "Pending" forever, which is a worse failure than the one it
+replaced: it looks hung rather than actionable. `GET /api/knowledge/sources`
+therefore re-queues pending sources that hold no lease and have not been touched
+for 30 seconds, capped at five per load — alongside the older sweep that marks
+leases abandoned mid-run as interrupted. Opening the Knowledge page is the
+recovery point the pipeline already relied on; it now resumes as well as relabels.
+A source younger than the grace window still has its original run in flight, and
+even if that races, `claim_knowledge_processing` refuses the second worker.
 
 Only a website crawl that times out *before* its text is saved really starts
 over, because `raw_text` is written once the whole selection is scraped. The
@@ -100,3 +125,10 @@ chunks with `RateLimitError ... Retry after 47249ms`, surfacing in Vercel as
 the same source resumed from its 30 saved embeddings and finished all 62. The
 diagnosis came from `function_logs`, which carries the real error — the source
 row only ever held the generic fallback message.
+
+A second run of the same four pages then took **111 seconds and still did not
+finish**: every chunk embedded, but the deadline arrived before finalization and
+the source sat at `pending`. That produced the batching work and the resume path
+below. Measured on the same four pages afterwards, from a cleared source:
+**40 seconds, 63 chunks, `ready`.** The temporary verification source was
+deleted.
