@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import {
   AlertCircle,
   CheckCircle2,
-  Clock,
+  Loader2,
   Eye,
   FileText,
   Folder,
@@ -204,6 +204,19 @@ export function SourceTable({
               const isProcessing = processingId === source.id;
               const isDeleting = deletingId === source.id;
               const status = source.status;
+              // Written by every checkpoint, so it advances live while the
+              // list polls — the difference between "something is happening"
+              // and a spinner that could mean anything.
+              const rawProgress = (source.metadata as
+                | { processingProgress?: { completed?: unknown; total?: unknown } }
+                | null)?.processingProgress;
+              const progress =
+                typeof rawProgress?.completed === "number" &&
+                typeof rawProgress?.total === "number" &&
+                rawProgress.total > 0 &&
+                rawProgress.completed < rawProgress.total
+                  ? { completed: rawProgress.completed, total: rawProgress.total }
+                  : null;
               const sourceFolders = allFolders.filter((folder) => folder.sourceIds.includes(source.id));
               const checked = selectedSourceSet.has(source.id);
 
@@ -257,16 +270,23 @@ export function SourceTable({
                           <span className="text-success">{t("statuses.knowledge.ready")}</span>
                         </>
                       )}
-                      {status === "processing" && (
+                      {(status === "processing" || status === "pending") && (
                         <>
-                          <Clock className="h-3.5 w-3.5 text-primary animate-pulse" />
-                          <span className="text-primary">{t("statuses.knowledge.syncing")}</span>
-                        </>
-                      )}
-                      {status === "pending" && (
-                        <>
-                          <Clock className="h-3.5 w-3.5 text-on-surface-variant animate-pulse" />
-                          <span className="text-on-surface-variant">{t("statuses.knowledge.pending")}</span>
+                          {/* Pending used to render in neutral grey, which
+                              reads as idle. It means queued or paused and
+                              still working, so it wears the same active
+                              treatment as processing. */}
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                          <span className="text-primary">
+                            {status === "processing"
+                              ? t("statuses.knowledge.syncing")
+                              : t("statuses.knowledge.pending")}
+                          </span>
+                          {progress ? (
+                            <span className="tabular-nums text-[11px] font-medium text-on-surface-variant">
+                              {progress.completed}/{progress.total}
+                            </span>
+                          ) : null}
                         </>
                       )}
                       {status === "failed" && (

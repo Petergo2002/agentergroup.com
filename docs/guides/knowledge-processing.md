@@ -132,3 +132,23 @@ the source sat at `pending`. That produced the batching work and the resume path
 below. Measured on the same four pages afterwards, from a cleared source:
 **40 seconds, 63 chunks, `ready`.** The temporary verification source was
 deleted.
+
+## The status a customer actually sees
+
+Ingestion takes tens of seconds, so the Knowledge list refreshes itself rather
+than waiting to be reloaded. `KNOWLEDGE_POLL_INTERVAL_MS` is 3 seconds and the
+timer only runs while a source is `pending` or `processing` — a settled list
+polls nothing, and a hidden tab skips its ticks and catches up on
+`visibilitychange`.
+
+Three things the list gets right, each of which was wrong before:
+
+- **`pending` reads as working.** It renders with the same spinner and accent as
+  `processing`. Neutral grey read as idle, which is the opposite of what pending
+  means now that a paused source resumes on its own.
+- **The Syncing tile counts `pending` as well as `processing`.** Counting only
+  the latter left a paused source inside Total but in none of Ready, Syncing or
+  Failed, so the summary said "Syncing 0" next to a visibly pending row.
+- **Progress is shown while it moves.** `metadata.processingProgress` is written
+  by every checkpoint, so "42/63" advances as the polls come in. It disappears
+  once complete, so a finished source never shows a stale count.
