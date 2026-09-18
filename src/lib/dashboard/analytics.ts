@@ -1211,6 +1211,39 @@ async function countRecentWorkspaceLeads(
   };
 }
 
+/**
+ * Counts the workspace's open Improve Milo questions and reports when the most
+ * recent one arrived, so the sidebar can show the size of the backlog and still
+ * decide whether anything is new since the operator last looked.
+ *
+ * Deliberately one round trip: the exact count and the newest row come from the
+ * same query, and unanswered_queries_workspace_status_created_idx
+ * (workspace_id, status, created_at desc) serves both.
+ */
+async function countOpenWorkspaceQuestions(
+  supabase: AdminSupabase,
+  workspaceId: string,
+): Promise<{ count: number; latestQuestionCreatedAt: string | null }> {
+  const { data, count, error } = await supabase
+    .from("unanswered_queries")
+    .select("created_at", { count: "exact" })
+    .eq("workspace_id", workspaceId)
+    .eq("status", "open")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const [newest] = data ?? [];
+
+  return {
+    count: count ?? 0,
+    latestQuestionCreatedAt: (newest?.created_at as string | undefined) ?? null,
+  };
+}
+
 interface CachedLatestActivity {
   payload: DashboardLatestActivityResponse;
   expiresAt: number;
@@ -1238,14 +1271,16 @@ export async function getDashboardLatestActivity(
     return cached.payload;
   }
 
-  const [recentConversations, leadActivityResult] = await Promise.all([
-    listRecentDashboardConversations(supabase, {
-      workspaceId,
-      range: "30d",
-      limit: 1,
-    }),
-    countRecentWorkspaceLeads(supabase, workspaceId),
-  ]);
+  const [recentConversations, leadActivityResult, questionActivityResult] =
+    await Promise.all([
+      listRecentDashboardConversations(supabase, {
+        workspaceId,
+        range: "30d",
+        limit: 1,
+      }),
+      countRecentWorkspaceLeads(supabase, workspaceId),
+      countOpenWorkspaceQuestions(supabase, workspaceId),
+    ]);
   const [latest] = recentConversations;
 
   const payload: DashboardLatestActivityResponse = !latest
@@ -1253,6 +1288,8 @@ export async function getDashboardLatestActivity(
         latestConversation: null,
         newLeadCount: leadActivityResult.count,
         latestLeadCreatedAt: leadActivityResult.latestLeadCreatedAt,
+        openQuestionCount: questionActivityResult.count,
+        latestQuestionCreatedAt: questionActivityResult.latestQuestionCreatedAt,
       }
     : {
         latestConversation: {
@@ -1267,6 +1304,8 @@ export async function getDashboardLatestActivity(
         },
         newLeadCount: leadActivityResult.count,
         latestLeadCreatedAt: leadActivityResult.latestLeadCreatedAt,
+        openQuestionCount: questionActivityResult.count,
+        latestQuestionCreatedAt: questionActivityResult.latestQuestionCreatedAt,
       };
 
   latestActivityCache.set(workspaceId, {

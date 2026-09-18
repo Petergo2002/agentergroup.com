@@ -29,6 +29,11 @@ export const leads = {
   sourceLabel: "Källa",
   sourceContactForm: "Kontaktformulär",
   sourceChat: "AI-chatt",
+  sourceAll: "Alla",
+  sourceFilterLabel: "Filtrera leads på källa",
+  noCategoryResultsTitle: "Inga leads i den här kategorin",
+  noCategoryResultsDescription:
+    "Inget har kommit in via den här kanalen ännu. Växla till Alla för att se alla leads.",
   messageLabel: "Meddelande",
   noMessage: "Inget meddelande inkluderades med detta lead.",
   unknownAgent: "Ej tilldelad",

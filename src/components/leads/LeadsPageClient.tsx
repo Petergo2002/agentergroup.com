@@ -12,6 +12,7 @@ import {
   Search,
   UserCheck,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
@@ -51,6 +52,23 @@ function buildLeadsUrl(search: string) {
   return `/api/leads?${params.toString()}`;
 }
 
+type LeadSourceFilter = "all" | "chat" | "contact_form";
+
+/**
+ * The inbox tabs. Filtering happens on the client because source_channel is
+ * derived per row in the API from the message prefix and conversation length
+ * rather than stored as a column, so it cannot be expressed as a SQL filter.
+ */
+const LEAD_SOURCE_FILTERS: ReadonlyArray<{
+  value: LeadSourceFilter;
+  labelKey: string;
+  Icon: LucideIcon | null;
+}> = [
+  { value: "all", labelKey: "leads.sourceAll", Icon: null },
+  { value: "chat", labelKey: "leads.sourceChat", Icon: MessageSquareText },
+  { value: "contact_form", labelKey: "leads.sourceContactForm", Icon: Phone },
+];
+
 /**
  * Produces compact initials for the contact avatar shown in lead rows.
  */
@@ -85,7 +103,13 @@ function LeadsTableSkeleton() {
 /**
  * Explains either the first-use state or a search with no matching contacts.
  */
-function LeadsEmptyState({ hasSearch }: { hasSearch: boolean }) {
+function LeadsEmptyState({
+  hasSearch,
+  isFiltered = false,
+}: {
+  hasSearch: boolean;
+  isFiltered?: boolean;
+}) {
   const { t } = useLanguage();
 
   return (
@@ -98,10 +122,18 @@ function LeadsEmptyState({ hasSearch }: { hasSearch: boolean }) {
         )}
       </div>
       <h2 className="text-base font-semibold tracking-normal text-on-surface">
-        {hasSearch ? t("leads.noSearchResultsTitle") : t("leads.noLeadsTitle")}
+        {isFiltered
+          ? t("leads.noCategoryResultsTitle")
+          : hasSearch
+            ? t("leads.noSearchResultsTitle")
+            : t("leads.noLeadsTitle")}
       </h2>
       <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-on-surface-variant/70">
-        {hasSearch ? t("leads.noSearchResultsDescription") : t("leads.noLeadsDescription")}
+        {isFiltered
+          ? t("leads.noCategoryResultsDescription")
+          : hasSearch
+            ? t("leads.noSearchResultsDescription")
+            : t("leads.noLeadsDescription")}
       </p>
     </section>
   );
@@ -129,8 +161,17 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
 
     document.body.style.overflow = "hidden";
 
-    // Trigger smooth slide-in
-    const timer = requestAnimationFrame(() => setIsOpen(true));
+    // Two frames, not one. Opening is a discrete click event, so React can
+    // flush this effect before the browser has painted the freshly mounted
+    // panel. A single rAF callback then runs in that same pre-paint frame:
+    // React commits translate-x-0, the closed state never reaches the screen,
+    // and with no start value to interpolate from the browser skips the
+    // transition entirely — the panel pops in instead of sliding. A second
+    // frame guarantees translate-x-full is painted first.
+    let openFrame = 0;
+    const timer = requestAnimationFrame(() => {
+      openFrame = requestAnimationFrame(() => setIsOpen(true));
+    });
     closeButtonRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -143,6 +184,7 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
 
     return () => {
       cancelAnimationFrame(timer);
+      cancelAnimationFrame(openFrame);
       if (closeTimeoutRef.current !== null) {
         clearTimeout(closeTimeoutRef.current);
       }
@@ -158,7 +200,7 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
       <button
         type="button"
         aria-label={t("leads.closeDetails")}
-        className={`fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out motion-reduce:transition-none ${
           isOpen ? "opacity-100" : "opacity-0"
         }`}
         onClick={handleClose}
@@ -169,7 +211,7 @@ function LeadDetailPanel({ lead, onClose, onSummaryChange }: LeadDetailPanelProp
         role="dialog"
         aria-modal="true"
         aria-labelledby="lead-detail-title"
-        className={`relative z-10 flex h-full w-full max-w-xl sm:max-w-2xl lg:max-w-3xl flex-col border-l border-outline-variant/15 bg-surface-container-lowest shadow-[0_0_60px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out transform ${
+        className={`relative z-10 flex h-full w-full max-w-xl sm:max-w-2xl lg:max-w-3xl flex-col border-l border-outline-variant/15 bg-surface-container-lowest shadow-[0_0_60px_rgba(0,0,0,0.3)] transform will-change-transform transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -324,6 +366,7 @@ export default function LeadsPageClient({
   const { language, t } = useLanguage();
   const [search, setSearch] = useState("");
   const [selectedLead, setSelectedLead] = useState<WidgetLeadListItem | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<LeadSourceFilter>("all");
   const deferredSearch = useDeferredValue(search);
   const leadsUrl = useMemo(() => buildLeadsUrl(deferredSearch), [deferredSearch]);
   const {
@@ -346,6 +389,29 @@ export default function LeadsPageClient({
 
   const { showToast } = useToast();
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Treat anything that is not explicitly a contact form as chat, matching how
+  // the row and detail badges already decide which label to show.
+  const sourceCounts = useMemo(() => {
+    const all = leads?.length ?? 0;
+    const contactForm = (leads ?? []).filter(
+      (lead) => lead.source_channel === "contact_form",
+    ).length;
+
+    return { all, chat: all - contactForm, contact_form: contactForm };
+  }, [leads]);
+
+  const visibleLeads = useMemo(() => {
+    if (!leads || sourceFilter === "all") {
+      return leads ?? [];
+    }
+
+    return leads.filter((lead) =>
+      sourceFilter === "contact_form"
+        ? lead.source_channel === "contact_form"
+        : lead.source_channel !== "contact_form",
+    );
+  }, [leads, sourceFilter]);
 
   const closeLeadDetails = useCallback(() => setSelectedLead(null), []);
 
@@ -417,7 +483,7 @@ export default function LeadsPageClient({
         </div>
       </header>
 
-      <section className="app-filter-panel flex items-center gap-3">
+      <section className="app-filter-panel flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/40" />
           <input
@@ -428,6 +494,42 @@ export default function LeadsPageClient({
             aria-label={t("leads.contactSearchPlaceholder")}
             className="h-12 w-full rounded-xl border border-transparent bg-surface-container-low pl-11 pr-4 text-sm font-medium text-on-surface outline-none transition-all placeholder:text-on-surface-variant/40 focus:border-primary/20 focus:bg-background focus:ring-2 focus:ring-primary/15"
           />
+        </div>
+
+        <div
+          role="group"
+          aria-label={t("leads.sourceFilterLabel")}
+          className="flex shrink-0 items-center gap-1 rounded-xl border border-outline-variant/15 bg-surface-container-low p-1"
+        >
+          {LEAD_SOURCE_FILTERS.map(({ value, labelKey, Icon }) => {
+            const isActive = sourceFilter === value;
+
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setSourceFilter(value)}
+                className={`inline-flex h-10 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:flex-none ${
+                  isActive
+                    ? "bg-background text-on-surface shadow-xs"
+                    : "text-on-surface-variant/80 hover:text-on-surface"
+                }`}
+              >
+                {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+                {t(labelKey)}
+                <span
+                  className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "bg-surface-container-high text-on-surface-variant/70"
+                  }`}
+                >
+                  {sourceCounts[value]}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -452,6 +554,8 @@ export default function LeadsPageClient({
         </section>
       ) : !leads?.length ? (
         <LeadsEmptyState hasSearch={hasSearch} />
+      ) : !visibleLeads.length ? (
+        <LeadsEmptyState hasSearch={hasSearch} isFiltered />
       ) : (
         <section className="space-y-4">
           <div className="hidden gap-4 px-4 py-2 text-xs font-semibold text-on-surface-variant/65 md:grid md:grid-cols-[1.15fr_1.35fr_0.9fr_0.75fr] lg:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.75fr] xl:grid-cols-[1.15fr_1.35fr_0.9fr_0.9fr_0.9fr_0.75fr]">
@@ -464,7 +568,7 @@ export default function LeadsPageClient({
           </div>
 
           <div className="space-y-3">
-            {leads.map((lead) => (
+            {visibleLeads.map((lead) => (
               <div
                 key={lead.id}
                 className="group relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-container-low/45"

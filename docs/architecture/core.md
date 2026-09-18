@@ -1685,6 +1685,19 @@ Current behavior:
 - automation analytics does not expose raw provider payloads or raw email bodies
 - conversation-detail `debugTrace` remains available only to workspace owners and admins
 
+### Server-side aggregation
+
+Conversation analytics is aggregated in Postgres rather than in the API route:
+
+| RPC | Returns |
+| --- | --- |
+| `dashboard_conversation_analytics_totals` | Range totals behind the header stats. |
+| `dashboard_conversation_analytics_trend` | Per-day conversation counts for the trend chart. Days with no activity come back as explicit zero rows via `generate_series`, rather than gaps the client has to reconstruct. |
+
+Both are `security invoker` with `set search_path = ''`, and `execute` is granted
+to `service_role` only. The trend RPC mirrors the totals RPC's filters so the two
+cannot disagree about the same range.
+
 ### Dashboard summary
 
 `src/lib/dashboard/summary.ts` is the server-side loader for the `/dashboard` home page.
@@ -1765,6 +1778,19 @@ OpenRouter integration lives in:
 This module is a thin transport wrapper around:
 
 - `https://openrouter.ai/api/v1/chat/completions`
+
+### Bounded by construction
+
+No upstream call is unbounded. `src/lib/openrouter.ts` enforces both a connect
+timeout and a **stall** timeout (`OPENROUTER_CONNECT_TIMEOUT_MS`,
+`OPENROUTER_STALL_TIMEOUT_MS`), raising `OpenRouterTimeoutError`. The stall
+timeout matters separately from the connect timeout: a streaming response that
+opens successfully and then goes silent would otherwise hold a serverless
+function until the platform kills it.
+
+Tool execution is bounded independently in `src/lib/runtime/agent-chat.ts`
+(`TOOL_EXECUTION_TIMEOUT_MS`, via `withToolExecutionTimeout()`), so one slow
+third-party tool cannot consume the whole turn.
 
 ### Current behavior
 
@@ -2464,6 +2490,8 @@ The core environment contract is:
 - `NEXT_PUBLIC_MILO_EXPERIENCE_ENABLED`
 - `NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID`
 - `NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID`
+- `NEXT_PUBLIC_SENTRY_DSN` (optional; see the [Observability runbook](../runbooks/observability.md))
+- `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` (optional, defaults to `0`)
 
 ### Server-only
 
@@ -2539,6 +2567,11 @@ The production-generated public schema types are committed at
 migrations and review the diff before deploying application code.
 
 ## Observability and Debugging
+
+This section covers **agent run observability** — what an agent did, recorded in
+Postgres. For **failure reporting** (Sentry, `src/lib/observability/report.ts`,
+and what is allowed to leave the process), see the
+[Observability runbook](../runbooks/observability.md).
 
 ### Primary runtime records
 

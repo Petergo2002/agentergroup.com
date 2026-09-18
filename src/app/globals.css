@@ -239,6 +239,19 @@
     border: 1px solid var(--color-outline-variant);
     box-shadow: var(--shadow-panel);
   }
+  /* Floating menus sit directly on top of application content and get read
+     carefully, so they are opaque. .glass-panel is only 70% opaque, which
+     leaves the navigation behind a menu legible straight through it. Keep
+     .glass-panel for surfaces where the translucency is the point: the sticky
+     mobile topbar, and dialogs that already sit on their own dark scrim. */
+  .solid-panel {
+    background: var(--surface-container-lowest);
+  }
+  .dark .solid-panel {
+    /* Elevation reads as lighter in dark mode, not darker — the sidebar behind
+       this menu is already --surface-container-low. */
+    background: var(--surface-container-high);
+  }
   .app-shell-gradient {
     background: var(--app-shell-bg);
   }
@@ -930,13 +943,32 @@
   animation: sidebarContentB 180ms ease-out 40ms both;
 }
 
+/* Attention badges and dots scale in, so a count that arrives on a background
+   poll grows into the rail instead of popping into existence. */
+@keyframes sidebarBadgeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.sidebar-badge-enter {
+  animation: sidebarBadgeIn 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sidebar-panel {
     transition: none;
   }
 
   .sidebar-content-a,
-  .sidebar-content-b {
+  .sidebar-content-b,
+  .sidebar-badge-enter {
     animation: none;
   }
 }

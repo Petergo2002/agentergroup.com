@@ -47,8 +47,10 @@ interface SidebarProps {
   analyticsHasNewActivity?: boolean;
   analyticsActivitySummary?: AnalyticsActivitySummary | null;
   newLeadCount?: number;
+  openQuestionCount?: number;
   onClearAnalyticsActivity?: () => void;
   onClearLeads?: () => void;
+  onClearQuestions?: () => void;
 }
 
 interface SidebarNavItem {
@@ -60,6 +62,10 @@ interface SidebarNavItem {
   hasAttention?: boolean;
   attentionSummary?: AnalyticsActivitySummary | null;
   badgeCount?: number;
+  /** Translation key describing the badge, e.g. "12 leads in the last 24 hours". */
+  badgeLabelKey?: string;
+  /** Marks this destination as seen. Runs when the item is clicked. */
+  onSeen?: () => void;
 }
 
 export function Sidebar({
@@ -70,8 +76,10 @@ export function Sidebar({
   analyticsHasNewActivity = false,
   analyticsActivitySummary = null,
   newLeadCount = 0,
+  openQuestionCount = 0,
   onClearAnalyticsActivity,
   onClearLeads,
+  onClearQuestions,
 }: SidebarProps) {
   const pathname = usePathname();
   const { membership, workspace, subscription } = useAppContext();
@@ -102,14 +110,24 @@ export function Sidebar({
           icon: BarChart3,
           hasAttention: analyticsHasNewActivity,
           attentionSummary: analyticsActivitySummary,
+          onSeen: onClearAnalyticsActivity,
         },
         {
           name: t("nav.leads"),
           href: "/leads",
           icon: Users,
           badgeCount: newLeadCount,
+          badgeLabelKey: "nav.newLeads",
+          onSeen: onClearLeads,
         },
-        { name: t("nav.questions"), href: "/questions", icon: CircleHelp },
+        {
+          name: t("nav.questions"),
+          href: "/questions",
+          icon: CircleHelp,
+          badgeCount: openQuestionCount,
+          badgeLabelKey: "nav.newQuestions",
+          onSeen: onClearQuestions,
+        },
       ],
     },
     {
@@ -145,9 +163,30 @@ export function Sidebar({
       title: t("nav.groups.grow"),
       items: [
         { name: t("nav.knowledge"), href: "/knowledge", icon: Database },
-        { name: t("nav.leads"), href: "/leads", icon: Users, badgeCount: newLeadCount },
-        { name: t("nav.improveMilo"), href: "/questions", icon: CircleHelp },
-        { name: t("nav.analytics"), href: "/analytics", icon: BarChart3, hasAttention: analyticsHasNewActivity, attentionSummary: analyticsActivitySummary },
+        {
+          name: t("nav.leads"),
+          href: "/leads",
+          icon: Users,
+          badgeCount: newLeadCount,
+          badgeLabelKey: "nav.newLeads",
+          onSeen: onClearLeads,
+        },
+        {
+          name: t("nav.improveMilo"),
+          href: "/questions",
+          icon: CircleHelp,
+          badgeCount: openQuestionCount,
+          badgeLabelKey: "nav.newQuestions",
+          onSeen: onClearQuestions,
+        },
+        {
+          name: t("nav.analytics"),
+          href: "/analytics",
+          icon: BarChart3,
+          hasAttention: analyticsHasNewActivity,
+          attentionSummary: analyticsActivitySummary,
+          onSeen: onClearAnalyticsActivity,
+        },
       ],
     },
     ...(subscription?.integrations_enabled
@@ -243,6 +282,9 @@ export function Sidebar({
               const badgeCount = Math.max(0, item.badgeCount ?? 0);
               const hasBadge = Boolean(badgeCount > 0 && !isActive);
               const badgeLabel = badgeCount > 99 ? "99+" : String(badgeCount);
+              const badgeDescription = t(item.badgeLabelKey ?? "nav.newLeads", {
+                count: badgeCount,
+              });
               const attentionAgent =
                 item.attentionSummary?.agentName || t("common.unknownAgent");
               const attentionWidget =
@@ -258,11 +300,7 @@ export function Sidebar({
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => {
                     onNavigate?.();
-                    if (item.href === "/analytics") {
-                      onClearAnalyticsActivity?.();
-                    } else if (item.href === "/leads") {
-                      onClearLeads?.();
-                    }
+                    item.onSeen?.();
                   }}
                   aria-label={
                     isCollapsed && !mobile
@@ -270,7 +308,7 @@ export function Sidebar({
                           hasAttention
                             ? ` (${t("nav.newAnalyticsActivity")}: ${attentionAgent}, ${attentionWidget})`
                             : ""
-                        }${hasBadge ? ` (${t("nav.newLeads", { count: badgeCount })})` : ""}`
+                        }${hasBadge ? ` (${badgeDescription})` : ""}`
                       : undefined
                   }
                   title={
@@ -279,7 +317,7 @@ export function Sidebar({
                           hasAttention
                             ? ` (${t("nav.newAnalyticsActivity")}: ${attentionAgent}, ${attentionWidget})`
                             : ""
-                        }${hasBadge ? ` (${t("nav.newLeads", { count: badgeCount })})` : ""}`
+                        }${hasBadge ? ` (${badgeDescription})` : ""}`
                       : undefined
                   }
                   className={`depth-nav-item group relative flex items-center gap-3 rounded-lg border py-2 transition-all duration-200 ${
@@ -303,15 +341,15 @@ export function Sidebar({
                     />
                   )}
                   {hasAttention && isCollapsed && !mobile ? (
-                    <span className="absolute right-2.5 top-2.5 flex h-2.5 w-2.5" aria-hidden="true">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+                    <span className="sidebar-badge-enter absolute right-2.5 top-2.5 flex h-2.5 w-2.5" aria-hidden="true">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75 motion-reduce:animate-none" />
                       <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-500 ring-1 ring-orange-300/80" />
                     </span>
                   ) : null}
                   {hasBadge && isCollapsed && !mobile ? (
                     <span
-                      className="app-selected-control absolute right-0.5 top-0 flex min-h-4 min-w-4 items-center justify-center rounded-full px-1 text-[8px] font-extrabold leading-none ring-2 ring-surface-container-low"
-                      aria-label={t("nav.newLeads", { count: badgeCount })}
+                      className="sidebar-badge-enter app-selected-control absolute right-0.5 top-0 flex min-h-4 min-w-4 items-center justify-center rounded-full px-1 text-[8px] font-extrabold leading-none ring-2 ring-surface-container-low"
+                      aria-hidden="true"
                     >
                       {badgeLabel}
                     </span>
@@ -333,18 +371,21 @@ export function Sidebar({
                     </span>
                   )}
                   {hasAttention && (!isCollapsed || mobile) ? (
-                    <span className="ml-2 flex h-2.5 w-2.5 shrink-0 relative" aria-hidden="true">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+                    <span className="sidebar-badge-enter ml-2 flex h-2.5 w-2.5 shrink-0 relative" aria-hidden="true">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75 motion-reduce:animate-none" />
                       <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-500 ring-1 ring-orange-300/80" />
                     </span>
                   ) : null}
                   {hasBadge && (!isCollapsed || mobile) ? (
                     <span
-                      className="ml-2 inline-flex min-w-6 items-center justify-center rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-bold text-primary ring-1 ring-primary/15"
-                      aria-label={t("nav.newLeads", { count: badgeCount })}
+                      className="sidebar-badge-enter ml-2 inline-flex min-w-6 items-center justify-center rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-bold text-primary ring-1 ring-primary/15"
+                      aria-hidden="true"
                     >
                       {badgeLabel}
                     </span>
+                  ) : null}
+                  {hasBadge && (!isCollapsed || mobile) ? (
+                    <span className="sr-only">{badgeDescription}</span>
                   ) : null}
                   {hasAttention ? (
                     <span className="sr-only">{t("nav.newAnalyticsActivity")}</span>
