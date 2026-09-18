@@ -29,6 +29,11 @@ export const leads = {
   sourceLabel: "Source",
   sourceContactForm: "Contact Form",
   sourceChat: "AI Chat",
+  sourceAll: "All",
+  sourceFilterLabel: "Filter leads by source",
+  noCategoryResultsTitle: "No leads in this category",
+  noCategoryResultsDescription:
+    "Nothing has arrived through this channel yet. Switch to All to see every lead.",
   messageLabel: "Message",
   noMessage: "No message was included with this lead.",
   unknownAgent: "Unassigned",
