@@ -123,9 +123,20 @@ entire job of a trial.
 
 Capabilities are unlocked; allowances are not. The trial keeps 500 messages,
 3 agents and 25MB, so it never becomes a way to get Premium volume for free.
-`hasPremiumCapabilities()` in `src/lib/plan-limits.ts` is the single gate —
-both the crawl and the sitemap discovery that feeds it use it, because
-unlocking one without the other leaves "Find pages" returning 403.
+`hasPremiumCapabilities()` in `src/lib/plan-limits.ts` is the gate for the app,
+covering both the crawl and the sitemap discovery that feeds it — unlocking one
+without the other leaves "Find pages" returning 403.
+
+**There is a third check, and it is the one that actually holds.**
+`supabase/functions/process-knowledge-source` re-reads the plan itself, because
+the route's decision reaches it as source metadata that it is right not to
+trust. It runs in Deno and cannot import from the app, so the rule is repeated
+there as `planMayCrawlWholeSite()`. **Change both together**, and remember the
+function needs deploying separately:
+
+```bash
+supabase functions deploy process-knowledge-source --no-verify-jwt
+```
 
 **Widget branding removal is deliberately excluded.** A trial that strips
 Avenro branding from a live customer site gives away attribution exactly when

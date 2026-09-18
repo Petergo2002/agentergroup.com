@@ -65,3 +65,23 @@ test("widget branding removal is deliberately NOT part of the trial", () => {
   assert.match(brandingLoader, /planTier === "premium"/);
   assert.doesNotMatch(brandingLoader, /hasPremiumCapabilities/);
 });
+
+test("the edge function applies the same rule as the route it trusts least", () => {
+  // The route's decision reaches the processor as source metadata, which the
+  // processor is right not to trust — so it re-checks the plan itself. That
+  // check is what actually holds, and leaving it on "premium" would have let a
+  // trial pass the route and then fail during processing, which is worse than
+  // being capped at one page.
+  const edgeFunction = readFileSync(
+    "supabase/functions/process-knowledge-source/index.ts",
+    "utf8",
+  );
+
+  assert.match(
+    edgeFunction,
+    /planTier === "premium" \|\| planTier === "trial"/,
+  );
+  assert.doesNotMatch(edgeFunction, /const isPremium =/);
+  // Every branch must use the capability, not a leftover tier comparison.
+  assert.doesNotMatch(edgeFunction, /&& isPremium\b/);
+});
