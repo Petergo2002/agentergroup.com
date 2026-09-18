@@ -56,7 +56,12 @@ export function AppShell({ children, context, user }: AppShellProps) {
     workspaceSWRKey(
       user.id,
       context.workspace.id,
-      "/api/dashboard/latest-activity",
+      // The workspace goes in the URL, not just the SWR key. The response is
+      // browser-cached for 15s, so a URL shared across workspaces served the
+      // previous workspace's badge counts after a switch.
+      `/api/dashboard/latest-activity?workspaceId=${encodeURIComponent(
+        context.workspace.id,
+      )}`,
     ),
     jsonFetcher,
     {
