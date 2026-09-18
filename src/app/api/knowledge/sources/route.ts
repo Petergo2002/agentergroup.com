@@ -195,6 +195,11 @@ function queueKnowledgeProcessing(
   });
 }
 
+/** A source younger than this still has its original run in flight. */
+const RESUME_GRACE_MS = 30_000;
+/** Ceiling on resumes kicked off by one page load. */
+const RESUME_BATCH_LIMIT = 5;
+
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -206,13 +211,44 @@ export async function GET() {
   }
 
   const context = await ensureWorkspaceContext(supabase as never, user);
+  const admin = createAdminClient();
   // Recover workers killed by the platform before their catch handler could run.
-  const recovery = await createAdminClient().from("knowledge_sources")
+  const recovery = await admin.from("knowledge_sources")
     .update({ status: "failed", processing_token: null, processing_expires_at: null,
       error_message: "Processing was interrupted. Saved progress can be retried." })
     .eq("workspace_id", context.workspace.id).eq("status", "processing")
     .not("processing_token", "is", null).lt("processing_expires_at", new Date().toISOString());
   if (recovery.error) console.error("[knowledge/sources] Stale processing recovery failed", recovery.error);
+
+  // Resume anything that paused with nobody left to drive it.
+  //
+  // A run that hits a rate limit or its time budget returns the source to
+  // pending, but the request that started it has since ended — so without this
+  // the source sits at "Pending" forever, which is what a stuck import looked
+  // like. Opening this page is the recovery point the pipeline already relies
+  // on, so it is also where a paused source gets picked back up.
+  //
+  // Anything newer than the grace window still has its original run in flight.
+  // Even if that races, `claim_knowledge_processing` refuses a second worker,
+  // so the duplicate invocation is a no-op rather than a conflict.
+  const resumeBefore = new Date(Date.now() - RESUME_GRACE_MS).toISOString();
+  const { data: resumable, error: resumableError } = await admin
+    .from("knowledge_sources")
+    .select("id")
+    .eq("workspace_id", context.workspace.id)
+    .eq("status", "pending")
+    .is("processing_token", null)
+    .lt("updated_at", resumeBefore)
+    .limit(RESUME_BATCH_LIMIT);
+
+  if (resumableError) {
+    console.error("[knowledge/sources] Could not look for paused sources", resumableError);
+  }
+
+  for (const row of (resumable ?? []) as Array<{ id: string }>) {
+    console.info("[knowledge/sources] Resuming paused source", { sourceId: row.id });
+    queueKnowledgeProcessing(admin, row.id);
+  }
   const { data, error } = await supabase
     .from("knowledge_sources")
     .select(KNOWLEDGE_SOURCE_LIST_SELECT)

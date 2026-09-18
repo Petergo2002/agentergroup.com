@@ -1,5 +1,18 @@
 export const MAX_EMBEDDING_CHARACTERS = 1400;
 export const EMBEDDING_DIMENSIONS = 384;
+/**
+ * Chunks embedded per worker request.
+ *
+ * One call per chunk made a 60-chunk page take 111 seconds and trip the
+ * per-trace rate limiter. Batching cuts the nested calls that cause both.
+ *
+ * Four is measured, not guessed: against the live worker, batches of 1-4
+ * returned 200 (4 chunks in ~2.0s) while 6 and 8 returned HTTP 546 — the
+ * worker's own CPU ceiling, which is why the single-inference design existed in
+ * the first place. Four leaves headroom under that ceiling, and
+ * `embedWithWorkerLimitFallback` handles the case where even it is too much.
+ */
+export const MAX_EMBEDDING_BATCH = 4;
 
 export function validEmbedding(value: unknown): value is number[] {
   return Array.isArray(value) && value.length === EMBEDDING_DIMENSIONS &&
@@ -55,6 +68,21 @@ export function isTransientFailure(error: unknown) {
   if (error instanceof ProcessingError) return isTransientStatus(error.status);
   if (error instanceof TypeError) return true;
   return error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name);
+}
+
+/**
+ * Whether re-sending the identical request could succeed.
+ *
+ * The worker's CPU ceiling is recoverable but not by repetition: the same
+ * chunks cost the same CPU next time. Retrying it three times only spends the
+ * budget before the caller can split the batch, which is the thing that
+ * actually helps. It stays transient for resume purposes.
+ */
+export function shouldRetrySameRequest(error: unknown) {
+  if (error instanceof ProcessingError && error.code === 'EMBEDDING_WORKER_LIMIT') {
+    return false;
+  }
+  return isTransientFailure(error);
 }
 
 export async function beforeDeadline<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -120,7 +148,7 @@ export async function retryTransient<T>(
       // The deadline expiring is not a transient fault to retry against; it is
       // the run being over. Sleeping on it only burns the remaining budget.
       if (signal?.aborted) throw error;
-      if (!isTransientFailure(error) || attempt + 1 >= attempts) throw error;
+      if (!shouldRetrySameRequest(error) || attempt + 1 >= attempts) throw error;
 
       const rateLimitMs = readRateLimitRetryMs(error);
       const backoffMs = 500 * 2 ** attempt + Math.floor(Math.random() * 250);
@@ -133,22 +161,35 @@ export async function retryTransient<T>(
   }
 }
 
-export async function generateRemoteEmbedding(
-  content: string,
-  options: { url: string; key: string; signal?: AbortSignal; fetcher?: typeof fetch },
-) {
-  if (!content.trim() || content.length > MAX_EMBEDDING_CHARACTERS) {
+interface EmbeddingCallOptions {
+  url: string;
+  key: string;
+  signal?: AbortSignal;
+  fetcher?: typeof fetch;
+}
+
+/** Embeds a batch in one worker round trip, in the order given. */
+export async function generateRemoteEmbeddings(
+  contents: string[],
+  options: EmbeddingCallOptions,
+): Promise<number[][]> {
+  if (contents.length === 0 || contents.length > MAX_EMBEDDING_BATCH) {
+    throw new ProcessingError('Invalid embedding batch size.', 'INVALID_EMBEDDING_INPUT', 400);
+  }
+  if (contents.some((content) => !content.trim() || content.length > MAX_EMBEDDING_CHARACTERS)) {
     throw new ProcessingError('Invalid embedding input size.', 'INVALID_EMBEDDING_INPUT', 400);
   }
+
   return retryTransient(async () => {
     options.signal?.throwIfAborted();
     const response = await (options.fetcher ?? fetch)(`${options.url}/functions/v1/embed-knowledge-chunk`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: options.key, 'x-internal-service-key': options.key },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ contents }),
+      // A batch does more work per call, so it gets proportionally longer.
       signal: options.signal
-        ? AbortSignal.any([options.signal, AbortSignal.timeout(15_000)])
-        : AbortSignal.timeout(15_000),
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(30_000)])
+        : AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
       await response.body?.cancel();
@@ -159,9 +200,45 @@ export async function generateRemoteEmbedding(
       );
     }
     const result = await response.json();
-    if (!validEmbedding(result.embedding)) {
+    const embeddings = result?.embeddings;
+    if (!Array.isArray(embeddings) || embeddings.length !== contents.length
+      || !embeddings.every((embedding) => validEmbedding(embedding))) {
       throw new ProcessingError('Embedding service returned an invalid vector.', 'INVALID_EMBEDDING', 502);
     }
-    return result.embedding as number[];
+    return embeddings as number[][];
   }, { signal: options.signal });
+}
+
+export async function generateRemoteEmbedding(content: string, options: EmbeddingCallOptions) {
+  const [embedding] = await generateRemoteEmbeddings([content], options);
+  return embedding;
+}
+
+/**
+ * Embeds a batch, halving it if the worker reports its CPU ceiling.
+ *
+ * Chunk cost varies with content, so no fixed batch size is safe for every
+ * page. Rather than pausing the whole source on an HTTP 546, the batch splits
+ * and retries: worst case it degrades to one chunk per call, which is exactly
+ * the behaviour this replaced, so it can never be slower than before.
+ */
+export async function embedWithWorkerLimitFallback(
+  contents: string[],
+  options: EmbeddingCallOptions,
+): Promise<number[][]> {
+  try {
+    return await generateRemoteEmbeddings(contents, options);
+  } catch (error) {
+    const hitWorkerLimit = error instanceof ProcessingError
+      && error.code === 'EMBEDDING_WORKER_LIMIT';
+
+    if (!hitWorkerLimit || contents.length === 1) throw error;
+
+    const half = Math.ceil(contents.length / 2);
+    console.warn(`[embedding] Worker limit at batch ${contents.length}; splitting to ${half}.`);
+    return [
+      ...(await embedWithWorkerLimitFallback(contents.slice(0, half), options)),
+      ...(await embedWithWorkerLimitFallback(contents.slice(half), options)),
+    ];
+  }
 }

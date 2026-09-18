@@ -3,9 +3,10 @@ import Firecrawl from "npm:@mendable/firecrawl-js@4.32.0";
 import { json } from "../_shared/http.ts";
 import {
   beforeDeadline,
-  generateRemoteEmbedding,
+  embedWithWorkerLimitFallback,
   isRateLimitError,
   isTransientFailure,
+  MAX_EMBEDDING_BATCH,
   ProcessingError,
   readRateLimitRetryMs,
 } from "../_shared/processing.ts";
@@ -53,8 +54,6 @@ const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
 
 const DEFAULT_KNOWLEDGE_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 const MAX_WEBSITE_KNOWLEDGE_PAGES = 30;
-/** Gap between embedding batches; keeps nested worker calls under the limiter. */
-const EMBEDDING_BATCH_GAP_MS = 250;
 
 /**
  * Plans that may crawl more than one page.
@@ -514,29 +513,27 @@ Deno.serve(async (request) => {
     }
     const pending = chunks.filter((chunk) => !completed.has(chunk.chunkIndex));
     console.log(`[Process] Embedding ${pending.length}/${chunks.length} chunks; ${completed.size} already saved.`);
-    for (let index = 0; index < pending.length; index += 2) {
+    // One worker call per batch, sized to the checkpoint RPC's own cap, so each
+    // round trip embeds and saves the same eight chunks. Embedding one chunk per
+    // call made a 60-chunk page take 111 seconds and trip the per-trace limiter.
+    for (let index = 0; index < pending.length; index += MAX_EMBEDDING_BATCH) {
       deadline.throwIfAborted();
-      // One worker call per chunk means a 30-chunk page fires 30 nested
-      // invocations as fast as the loop can issue them, which is what trips the
-      // edge runtime's per-trace limiter. A short gap between batches costs a
-      // couple of seconds on a full source and keeps the burst under it.
-      if (index > 0) {
-        await new Promise((resolve) => setTimeout(resolve, EMBEDDING_BATCH_GAP_MS));
-      }
-      // Remote inference, with at most two in flight. Each worker performs ONE inference.
-      const rows = await Promise.all(pending.slice(index, index + 2).map(async (chunk) => ({
+      const batch = pending.slice(index, index + MAX_EMBEDDING_BATCH);
+      const embeddings = await embedWithWorkerLimitFallback(
+        batch.map((chunk) => chunk.content),
+        { url: supabaseUrl, key: supabaseAdminKey, signal: deadline },
+      );
+      const rows = batch.map((chunk, position) => ({
         chunk_index: chunk.chunkIndex,
         content: chunk.content,
-        embedding: await generateRemoteEmbedding(chunk.content, {
-          url: supabaseUrl, key: supabaseAdminKey, signal: deadline,
-        }),
-      })));
+        embedding: embeddings[position],
+      }));
       const checkpoint = await adminClient.rpc("checkpoint_knowledge_processing", {
         p_source_id: source.id, p_token: processingToken, p_revision: revision,
         p_chunks: rows, p_total_chunks: chunks.length,
       });
       if (checkpoint.error) throw checkpoint.error;
-      console.log(`[Process] Saved ${Math.min(index + 2, pending.length) + completed.size}/${chunks.length} embeddings.`);
+      console.log(`[Process] Saved ${Math.min(index + batch.length, pending.length) + completed.size}/${chunks.length} embeddings.`);
     }
     const finalized = await adminClient.rpc("checkpoint_knowledge_processing", {
       p_source_id: source.id, p_token: processingToken, p_revision: revision,
