@@ -6,6 +6,10 @@ import { useWidgetBuilder } from './WidgetBuilderContext';
 import { getAppUrl } from '@/lib/env';
 import { MiloLogo } from '@/components/brand/MiloLogo';
 import {
+  pickReadableTextColor,
+  pickVisibleIconColor,
+} from '@/lib/widgets/contrast';
+import {
   ExternalLink,
   Lock,
   MessageSquare,
@@ -176,6 +180,19 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
 
   const brandDisplayName = form?.brandName?.trim() || 'Avenro';
   const primaryColor = form?.primaryColor || '#ff5c02';
+  // The shipped launcher computes these in loader.js; the preview hardcoded
+  // white and drew white-on-white as soon as someone picked a light brand
+  // colour. A preview that does not match the launcher is a preview that lies.
+  //
+  // The preferred colour is theme-dependent exactly as loader.js has it: a
+  // light widget prefers near-black text, a dark one near-white, and either is
+  // overridden when it fails contrast against the brand colour.
+  const launcherFg = pickReadableTextColor(
+    primaryColor,
+    form?.theme === 'light' ? '#171717' : '#f5f5f5',
+  );
+  const launcherDivider = `${launcherFg}4d`; // ~30% opacity, matching bg-white/30
+  const markColor = pickVisibleIconColor(primaryColor);
   const siteDomain = `${brandDisplayName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'avenro'}.se`;
 
   return (
@@ -284,7 +301,7 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
                     className="h-9 w-9 object-contain"
                   />
                 ) : (
-                  <MiloLogo size={32} color={primaryColor} />
+                  <MiloLogo size={32} color={markColor} />
                 )}
               </div>
               <h3 className="mt-3 text-sm font-headline font-bold text-on-surface tracking-tight">
@@ -348,8 +365,8 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
                   type="button"
                   onClick={() => toggleWidgetOpen(true)}
                   title="Open chat"
-                  className="group relative flex h-14 items-center rounded-full pl-2 pr-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.22)] ring-1 ring-white/20 transition-all duration-200 hover:scale-[1.03] hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer"
-                  style={{ backgroundColor: primaryColor }}
+                  className="group relative flex h-14 items-center rounded-full pl-2 pr-5 shadow-[0_10px_30px_rgba(0,0,0,0.22)] ring-1 ring-black/5 transition-all duration-200 hover:scale-[1.03] hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer"
+                  style={{ backgroundColor: primaryColor, color: launcherFg }}
                 >
                   {/* Canonical 40px White Circular Logo Icon */}
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-xs overflow-hidden">
@@ -361,15 +378,18 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
                         className="h-full w-full object-contain p-1"
                       />
                     ) : (
-                      <MiloLogo size={26} color={primaryColor} />
+                      <MiloLogo size={26} color={markColor} />
                     )}
                   </div>
 
                   {/* Canonical Divider Line */}
-                  <div className="h-6 w-px bg-white/30 ml-3 mr-3" />
+                  <div
+                    className="h-6 w-px ml-3 mr-3"
+                    style={{ backgroundColor: launcherDivider }}
+                  />
 
                   {/* Canonical Milo Text */}
-                  <span className="text-[15px] font-semibold text-white tracking-[-0.01em] pr-1 select-none">
+                  <span className="text-[15px] font-semibold tracking-[-0.01em] pr-1 select-none">
                     Milo
                   </span>
                 </button>
