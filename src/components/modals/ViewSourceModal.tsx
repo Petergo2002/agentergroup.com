@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import { useDialogFocus } from '@/lib/hooks/useDialogFocus';
 import type { KnowledgeSourceRecord } from '@/lib/types';
 
 interface ViewSourceModalProps {
@@ -75,26 +76,19 @@ export function ViewSourceModal({ isOpen, onClose, source, onSourceUpdated }: Vi
     void fetchContent();
   }, [isOpen, source, t]);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (isEditing) {
-          setIsEditing(false);
-          setEditedText(content?.type === 'text' ? content.content : '');
-        } else {
-          onClose();
-        }
-      }
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'hidden';
+  // Escape backs out of editing first and only then closes, so a half-typed
+  // edit is never thrown away by one keystroke.
+  const handleDismiss = useCallback(() => {
+    if (isEditing) {
+      setIsEditing(false);
+      setEditedText(content?.type === 'text' ? content.content : '');
+      return;
     }
-    return () => {
-      window.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen, onClose, isEditing, content]);
+    onClose();
+  }, [content, isEditing, onClose]);
+
+  const dialogRef = useDialogFocus({ isOpen, onClose: handleDismiss });
+  const titleId = useId();
 
   const handleSave = async () => {
     if (!source || !content || content.type !== 'text') return;
@@ -266,15 +260,27 @@ export function ViewSourceModal({ isOpen, onClose, source, onSourceUpdated }: Vi
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
+        aria-hidden="true"
         className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
-        onClick={isEditing ? handleCancelEdit : onClose}
+        onClick={handleDismiss}
       />
-      <div className="relative w-full max-w-4xl glass-panel border border-outline-variant/15 rounded-[2.5rem] shadow-premium animate-in zoom-in-95 duration-300 overflow-hidden max-h-[90vh] flex flex-col">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="relative w-full max-w-4xl glass-panel border border-outline-variant/15 rounded-[2.5rem] shadow-premium animate-in zoom-in-95 duration-300 overflow-hidden max-h-[90vh] flex flex-col"
+      >
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
         <div className="px-8 pt-8 pb-4 flex items-center justify-between shrink-0">
           <div className="min-w-0 flex-1 mr-4">
-            <h3 className="text-xl font-headline font-bold text-on-surface tracking-tight truncate">
+            <h3
+              id={titleId}
+              title={source.name}
+              className="text-xl font-headline font-bold text-on-surface tracking-tight truncate"
+            >
               {source.name}
             </h3>
             <p className="mt-1 text-xs text-on-surface-variant">

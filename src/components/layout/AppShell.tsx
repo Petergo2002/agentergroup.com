@@ -279,6 +279,15 @@ export function AppShell({ children, context, user }: AppShellProps) {
             <div className="min-h-screen bg-background">{children}</div>
           ) : (
             <div className="app-shell-gradient flex min-h-screen">
+              {/* First tab stop on every page. Without it a keyboard user
+                  walks the whole sidebar — a dozen links and a workspace
+                  switcher — before reaching the page they navigated to. */}
+              <a
+                href="#main-content"
+                className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-xl focus:bg-on-surface focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-surface focus:shadow-2xl focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                {t('common.skipToContent')}
+              </a>
               <div className="hidden lg:flex lg:shrink-0 relative z-50">
                 <Sidebar 
                   userEmail={user.email} 
@@ -356,6 +365,8 @@ export function AppShell({ children, context, user }: AppShellProps) {
               <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 <Topbar onOpenSidebar={openMobileSidebar} />
                 <main
+                  id="main-content"
+                  tabIndex={-1}
                   className={`flex-1 w-full ${
                     isAnalyticsRoute ? "overflow-hidden" : "overflow-y-auto"
                   }`}

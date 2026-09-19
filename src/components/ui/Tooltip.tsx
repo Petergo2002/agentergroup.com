@@ -3,11 +3,21 @@
 import { useId, useState, type ReactNode } from "react";
 
 interface TooltipProps {
-  /** The text shown on hover or focus. */
-  label: string;
+  /**
+   * The text shown on hover or focus. Nullish renders the children bare, so a
+   * call site can pass a reason that only exists in some states without
+   * branching the markup around it.
+   */
+  label?: string | null;
   children: ReactNode;
   side?: "top" | "bottom";
   className?: string;
+  /**
+   * Let the trigger fill the wrapper. Both spans need the width: an
+   * inline-flex wrapper shrink-to-fits, which silently narrows a w-full
+   * button to its text.
+   */
+  block?: boolean;
 }
 
 /**
@@ -26,16 +36,19 @@ export function Tooltip({
   children,
   side = "top",
   className = "",
+  block = false,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const tooltipId = useId();
+
+  if (!label) return <>{children}</>;
 
   const show = () => setIsVisible(true);
   const hide = () => setIsVisible(false);
 
   return (
     <span
-      className={`relative inline-flex ${className}`}
+      className={`relative inline-flex ${block ? "w-full" : ""} ${className}`}
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocus={show}
@@ -45,7 +58,10 @@ export function Tooltip({
         if (event.key === "Escape") hide();
       }}
     >
-      <span aria-describedby={isVisible ? tooltipId : undefined} className="inline-flex">
+      <span
+        aria-describedby={isVisible ? tooltipId : undefined}
+        className={`inline-flex ${block ? "w-full" : ""}`}
+      >
         {children}
       </span>
 

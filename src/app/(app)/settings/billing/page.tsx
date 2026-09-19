@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { Coins, CreditCard, Download, CheckCircle2, MessageSquare, ExternalLink, Loader2, LockKeyhole } from 'lucide-react';
 import { useAppContext } from '@/components/app/AppContext';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -289,7 +290,6 @@ export default function BillingSettingsPage() {
                 onClick={() => handleUpgrade('starter')}
                 disabled={!isAdmin || checkoutLoading === 'starter'}
                 className="app-primary-button rounded-2xl px-5 disabled:cursor-not-allowed disabled:opacity-50"
-                title={!isAdmin ? t('settings.billing.extraCreditsAdminOnly') : undefined}
               >
                 {checkoutLoading === 'starter' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -304,7 +304,6 @@ export default function BillingSettingsPage() {
                 onClick={handleExtraCreditsCheckout}
                 disabled={!isAdmin || creditsCheckoutLoading}
                 className="app-primary-button rounded-2xl px-5 disabled:cursor-not-allowed disabled:opacity-50"
-                title={!isAdmin ? t('settings.billing.extraCreditsAdminOnly') : undefined}
               >
                 {creditsCheckoutLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -349,19 +348,20 @@ export default function BillingSettingsPage() {
             </div>
             {/* Manage Billing Portal button — only for paid plans */}
             {currentPlan !== 'free' && (
-              <button
-                onClick={handlePortal}
-                disabled={!isAdmin || portalLoading}
-                className="flex items-center gap-2 rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:opacity-60"
-                title={!isAdmin ? 'Only workspace admins can manage billing' : undefined}
-              >
-                {portalLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ExternalLink className="h-4 w-4" />
-                )}
-                {isAdmin ? 'Manage Billing' : 'Admin Only'}
-              </button>
+              <Tooltip label={isAdmin ? null : 'Only workspace admins can manage billing'}>
+                <button
+                  onClick={handlePortal}
+                  disabled={!isAdmin || portalLoading}
+                  className="flex items-center gap-2 rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:opacity-60"
+                >
+                  {portalLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4" />
+                  )}
+                  {isAdmin ? 'Manage Billing' : 'Admin Only'}
+                </button>
+              </Tooltip>
             )}
           </div>
         </div>
@@ -400,11 +400,15 @@ export default function BillingSettingsPage() {
                 const buttonDisabled = !isAdmin || currentPlan === plan || checkoutLoading === plan || (portalLoading && isDowngrade);
 
                 return (
+                  <Tooltip
+                    label={isAdmin ? null : 'Only workspace admins can change plans'}
+                    className="mt-8"
+                    block
+                  >
                   <button
                     disabled={buttonDisabled}
                     onClick={() => isDowngrade ? handlePortal() : handleUpgrade(plan)}
-                    title={!isAdmin ? 'Only workspace admins can change plans' : undefined}
-                    className={`mt-8 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold uppercase tracking-widest transition-all ${
+                    className={`w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold uppercase tracking-widest transition-all ${
                       currentPlan === plan
                         ? 'bg-surface-container text-on-surface-variant cursor-default'
                         : !isAdmin
@@ -429,6 +433,7 @@ export default function BillingSettingsPage() {
                       `Upgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`
                     )}
                   </button>
+                  </Tooltip>
                 );
               })()}
             </div>
@@ -460,15 +465,16 @@ export default function BillingSettingsPage() {
               </div>
             </div>
             {currentPlan !== 'free' && (
-              <button
-                onClick={handlePortal}
-                disabled={!isAdmin || portalLoading}
-                title={!isAdmin ? 'Only workspace admins can manage billing' : undefined}
-                className="flex items-center gap-2 rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:opacity-60"
-              >
-                {portalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {isAdmin ? t('settings.billing.updatePayment') : 'Admin Only'}
-              </button>
+              <Tooltip label={isAdmin ? null : 'Only workspace admins can manage billing'}>
+                <button
+                  onClick={handlePortal}
+                  disabled={!isAdmin || portalLoading}
+                  className="flex items-center gap-2 rounded-2xl border border-outline-variant/20 bg-background px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container disabled:opacity-60"
+                >
+                  {portalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {isAdmin ? t('settings.billing.updatePayment') : 'Admin Only'}
+                </button>
+              </Tooltip>
             )}
           </div>
         </div>
@@ -494,10 +500,12 @@ export default function BillingSettingsPage() {
                 <table className="w-full min-w-[30rem] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-outline-variant/10">
-                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.billing.invoiceColumnDate')}</th>
-                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.billing.invoiceColumnAmount')}</th>
-                    <th className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.billing.invoiceColumnStatus')}</th>
-                    <th className="pb-4 text-right" />
+                    <th scope="col" className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.billing.invoiceColumnDate')}</th>
+                    <th scope="col" className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.billing.invoiceColumnAmount')}</th>
+                    <th scope="col" className="pb-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">{t('settings.billing.invoiceColumnStatus')}</th>
+                    <th scope="col" className="pb-4 text-right">
+                      <span className="sr-only">{t('common.actions')}</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/5">

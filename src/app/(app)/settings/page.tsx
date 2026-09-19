@@ -338,20 +338,22 @@ export default function SettingsPage() {
           </p>
           <div className="mt-6 space-y-5">
             <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+              <label htmlFor="profile-full-name" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                 {t('settings.fullName')}
               </label>
               <input
+                          id="profile-full-name"
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
                 className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-3 text-sm outline-none"
               />
             </div>
             <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+              <label htmlFor="profile-company-name" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                 {t('settings.companyName')}
               </label>
               <input
+                          id="profile-company-name"
                 value={companyName}
                 onChange={(event) => setCompanyName(event.target.value)}
                 disabled={!canEditWorkspace}
@@ -362,10 +364,11 @@ export default function SettingsPage() {
               </p>
             </div>
             <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+              <label htmlFor="profile-email" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                 {t('common.email')}
               </label>
               <input
+                          id="profile-email"
                 readOnly
                 value={user.email ?? ''}
                 className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-3 text-sm text-on-surface-variant outline-none"
@@ -390,6 +393,7 @@ export default function SettingsPage() {
                   </p>
                   <div className="mt-3">
                     <input
+                      aria-label="Change email address"
                       type="email"
                       value={newEmail}
                       onChange={(e) => setNewEmail(e.target.value)}
@@ -435,10 +439,11 @@ export default function SettingsPage() {
           </p>
           <div className="mt-6 space-y-4">
             <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+              <label htmlFor="platform-language" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                 {t('common.language')}
               </label>
               <select
+                          id="platform-language"
                 value={language}
                 onChange={(event) => setLanguage(event.target.value as PlatformLanguage)}
                 className="w-full rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-3 text-sm outline-none"
@@ -464,20 +469,22 @@ export default function SettingsPage() {
             <div className="rounded-2xl border border-outline-variant/10 bg-surface-container px-4 py-4">
               <div className="grid gap-5">
                 <div>
-                  <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                  <label htmlFor="workspace-slug" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                     {t('settings.workspaceSlug')}
                   </label>
                   <input
+                          id="workspace-slug"
                     readOnly
                     value={workspace.slug}
                     className="w-full rounded-2xl border border-outline-variant/10 bg-background px-4 py-3 text-sm text-on-surface-variant outline-none"
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                  <label htmlFor="workspace-description" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                     {t('settings.workspaceDescription')}
                   </label>
                   <textarea
+                          id="workspace-description"
                     value={workspaceDescription}
                     onChange={(event) => setWorkspaceDescription(event.target.value)}
                     disabled={!canEditWorkspace}
@@ -571,10 +578,11 @@ export default function SettingsPage() {
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                    <label htmlFor="privacy-email" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                       {t('settings.exactEmail')}
                     </label>
                     <input
+                          id="privacy-email"
                       value={privacyEmail}
                       onChange={(event) => setPrivacyEmail(event.target.value)}
                       placeholder={t('settings.privacyEmailPlaceholder')}
@@ -582,10 +590,11 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                    <label htmlFor="privacy-session-id" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                       {t('settings.exactSessionId')}
                     </label>
                     <input
+                          id="privacy-session-id"
                       value={privacySessionId}
                       onChange={(event) => setPrivacySessionId(event.target.value)}
                       placeholder={t('settings.privacySessionPlaceholder')}
@@ -723,10 +732,11 @@ export default function SettingsPage() {
                           </label>
                         </div>
                         <div>
-                          <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                          <label htmlFor="privacy-request-reference" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                             {t('settings.requestReference')}
                           </label>
                           <input
+                          id="privacy-request-reference"
                             value={privacyRequestReference}
                             onChange={(event) => setPrivacyRequestReference(event.target.value)}
                             placeholder={t('settings.requestReferencePlaceholder')}
@@ -734,10 +744,11 @@ export default function SettingsPage() {
                           />
                         </div>
                         <div>
-                          <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                          <label htmlFor="privacy-delete-confirmation" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                             {t('settings.typeDelete')}
                           </label>
                           <input
+                          id="privacy-delete-confirmation"
                             value={privacyDeleteConfirmation}
                             onChange={(event) => setPrivacyDeleteConfirmation(event.target.value)}
                             placeholder="DELETE"

@@ -171,14 +171,15 @@ export function BehaviorTab() {
           {form.proactiveEnabled && (
             <div className="space-y-2">
               <div className="flex items-baseline justify-between gap-3">
-                <span className={fieldLabelClassName}>
+                <label htmlFor="proactive-message" className={fieldLabelClassName}>
                   {t('widgetBuilder.behavior.proactiveMessage')}
-                </span>
+                </label>
                 <span className="text-[10px] tabular-nums text-on-surface-variant/60">
                   {form.proactiveMessage.length}/{PROACTIVE_MESSAGE_MAX_LENGTH}
                 </span>
               </div>
               <textarea
+                id="proactive-message"
                 value={form.proactiveMessage}
                 maxLength={PROACTIVE_MESSAGE_MAX_LENGTH}
                 onChange={(e) =>
@@ -207,8 +208,11 @@ export function BehaviorTab() {
 
           <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-xs space-y-4">
             <div className="space-y-2">
-              <span className={fieldLabelClassName}>{t('widgetBuilder.behavior.homeTitle')}</span>
+              <label htmlFor="home-title" className={fieldLabelClassName}>
+                {t('widgetBuilder.behavior.homeTitle')}
+              </label>
               <input
+                id="home-title"
                 type="text"
                 value={form.homeTitle}
                 onChange={(e) => setForm((c) => (c ? { ...c, homeTitle: e.target.value } : c))}
@@ -218,8 +222,11 @@ export function BehaviorTab() {
             </div>
 
             <div className="space-y-2">
-              <span className={fieldLabelClassName}>{t('widgetBuilder.behavior.homeSubtitle')}</span>
+              <label htmlFor="home-subtitle" className={fieldLabelClassName}>
+                {t('widgetBuilder.behavior.homeSubtitle')}
+              </label>
               <textarea
+                id="home-subtitle"
                 value={form.homeSubtitle}
                 onChange={(e) => setForm((c) => (c ? { ...c, homeSubtitle: e.target.value } : c))}
                 className={`${inputFieldClassName} h-20 resize-none`}

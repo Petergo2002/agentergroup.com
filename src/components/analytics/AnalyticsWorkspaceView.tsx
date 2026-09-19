@@ -988,6 +988,7 @@ function AnalyticsFilterBar({
               aria-hidden="true"
             />
             <input
+              type="search"
               aria-label={t("analytics.searchLabel")}
               value={filters.search}
               onChange={(event) =>
@@ -1210,13 +1211,13 @@ function AutomationPerformancePanel({
                 <table className="w-full min-w-[720px] text-left text-sm">
                   <thead className="bg-surface-container-low text-xs font-semibold text-on-surface-variant">
                     <tr>
-                      <th className="px-5 py-3">{t("analytics.automationColAgent")}</th>
-                      <th className="px-3 py-3">{t("analytics.automationColEvents")}</th>
-                      <th className="px-3 py-3">{t("analytics.automationColProcessed")}</th>
-                      <th className="px-3 py-3">{t("analytics.automationColFailed")}</th>
-                      <th className="px-3 py-3">{t("analytics.automationColAction")}</th>
-                      <th className="px-3 py-3">{t("analytics.automationColLastEvent")}</th>
-                      <th className="px-5 py-3 text-right">{t("analytics.automationColActivity")}</th>
+                      <th scope="col" className="px-5 py-3">{t("analytics.automationColAgent")}</th>
+                      <th scope="col" className="px-3 py-3">{t("analytics.automationColEvents")}</th>
+                      <th scope="col" className="px-3 py-3">{t("analytics.automationColProcessed")}</th>
+                      <th scope="col" className="px-3 py-3">{t("analytics.automationColFailed")}</th>
+                      <th scope="col" className="px-3 py-3">{t("analytics.automationColAction")}</th>
+                      <th scope="col" className="px-3 py-3">{t("analytics.automationColLastEvent")}</th>
+                      <th scope="col" className="px-5 py-3 text-right">{t("analytics.automationColActivity")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/10">

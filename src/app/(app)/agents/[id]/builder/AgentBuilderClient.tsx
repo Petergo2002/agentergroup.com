@@ -5376,10 +5376,11 @@ export default function AgentBuilderClient() {
                   search
                 </span>
                 <input
-                  type="text"
+                  type="search"
                   value={knowledgeSearchQuery}
                   onChange={(e) => setKnowledgeSearchQuery(e.target.value)}
                   placeholder={t('agentBuilder.searchSourcesPlaceholder')}
+                  aria-label={t('agentBuilder.searchSourcesPlaceholder')}
                   className="w-full rounded-xl border border-outline-variant/15 bg-surface-container-lowest py-2 pl-9 pr-8 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 {knowledgeSearchQuery ? (

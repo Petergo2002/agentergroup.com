@@ -202,9 +202,11 @@ export default function AgentsPageClient({
         <div className="relative w-full md:max-w-sm">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant/50" />
           <input
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('agents.searchPlaceholder')}
+            aria-label={t('agents.searchPlaceholder')}
             className="depth-input h-9 w-full rounded-xl border border-outline-variant/15 bg-surface-container-low pl-10 pr-4 text-xs font-semibold text-on-surface outline-none placeholder:text-on-surface-variant/45 transition-colors focus:border-primary/40 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/15"
           />
         </div>

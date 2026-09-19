@@ -448,8 +448,15 @@ export default function ConnectionsPageClient({
   };
 
   const handleCopyAuthLink = async (url: string) => {
-    await navigator.clipboard.writeText(url);
-    showToast(t('connections.authLinkCopied'), 'success');
+    // writeText rejects on an insecure origin, when the document is not
+    // focused, or when clipboard permission is denied. Awaiting it without a
+    // catch left an unhandled rejection and told the user it had worked.
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(t('connections.authLinkCopied'), 'success');
+    } catch {
+      showToast(t('common.copyFailed'), 'error');
+    }
   };
 
   const handleRevokeAuthLink = async (authLinkId: string) => {
