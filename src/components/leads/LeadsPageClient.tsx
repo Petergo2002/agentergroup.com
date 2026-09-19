@@ -722,7 +722,6 @@ export default function LeadsPageClient({
                         type="button"
                         onClick={(e) => handleCopy(e, lead.email!, `email-${lead.id}`)}
                         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-on-surface-variant/50 transition-colors hover:bg-surface-container hover:text-on-surface"
-                        title="Copy email"
                         aria-label="Copy email"
                       >
                         {copiedField === `email-${lead.id}` ? (
@@ -750,7 +749,6 @@ export default function LeadsPageClient({
                           type="button"
                           onClick={(e) => handleCopy(e, lead.phone!, `phone-${lead.id}`)}
                           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-on-surface-variant/50 transition-colors hover:bg-surface-container hover:text-on-surface"
-                          title="Copy phone"
                           aria-label="Copy phone"
                         >
                           {copiedField === `phone-${lead.id}` ? (

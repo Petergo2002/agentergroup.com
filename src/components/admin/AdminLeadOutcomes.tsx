@@ -142,7 +142,7 @@ export function AdminLeadOutcomes({
                       ends up louder than the green. */}
                   <div className="flex h-32 w-full items-end border-b border-outline">
                     <div
-                      className="w-full rounded-t-md bg-emerald-500 transition-opacity hover:opacity-80"
+                      className="animate-chart-grow w-full rounded-t-md bg-emerald-500 transition-opacity hover:opacity-80"
                       style={{ height }}
                       title={`${point.label}: ${formatAdminNumber(
                         point.leadCount,

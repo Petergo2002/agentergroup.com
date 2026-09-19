@@ -264,7 +264,14 @@ export function SourceTable({
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors">
+                    {/* The list polls, so this cell changes without the reader
+                        touching anything. Without a live region a screen-reader
+                        user is never told the source became ready. */}
+                    <div
+                      aria-live="polite"
+                      aria-atomic="true"
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors"
+                    >
                       {status === "ready" && (
                         <>
                           <CheckCircle2 className="h-3.5 w-3.5 text-success" />

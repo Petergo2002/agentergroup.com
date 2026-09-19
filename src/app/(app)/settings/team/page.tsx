@@ -474,7 +474,7 @@ export default function TeamSettingsPage() {
                           copyToClipboard(link);
                         }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-                        title={t('common.copyLink') || 'Copy invite link'}
+                        aria-label={t('common.copyLink') || 'Copy invite link'}
                       >
                         <Copy className="h-4 w-4" />
                       </button>
@@ -556,7 +556,7 @@ export default function TeamSettingsPage() {
                     <button
                       onClick={() => copyToClipboard(lastInviteLink)}
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface transition-all hover:bg-primary/10 hover:text-primary active:scale-95"
-                      title={t('common.copyLink') || 'Copy link'}
+                      aria-label={t('common.copyLink') || 'Copy link'}
                     >
                       <Copy className="h-4 w-4" />
                     </button>

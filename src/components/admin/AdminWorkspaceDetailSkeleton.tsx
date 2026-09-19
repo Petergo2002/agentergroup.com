@@ -1,5 +1,5 @@
 function SkeletonBlock({ className }: { className: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-surface-container-high ${className}`} />;
+  return <div className={`animate-skeleton rounded-2xl bg-surface-container-high ${className}`} />;
 }
 
 export function AdminWorkspaceDetailSkeleton() {

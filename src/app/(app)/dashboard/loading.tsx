@@ -1,6 +1,6 @@
 export default function DashboardLoading() {
   return (
-    <div className="app-page animate-pulse space-y-6">
+    <div className="app-page animate-skeleton space-y-6">
       {/* Header Skeleton */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-2">
