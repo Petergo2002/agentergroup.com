@@ -1503,10 +1503,22 @@ export default function Widget({
       ? "Stäng av notisljud"
       : "Turn notification sound off";
   const showStandaloneDesktopShell = !isEmbedded;
+  // Reading a conversation that was opened from the list. The surface nav
+  // deliberately hides here to give the thread the full height.
+  const isReadingThread =
+    activeTab === "messages" && hasStarted && !showConversationList;
   const showSurfaceNav =
-    Boolean(selectedAgent) &&
-    !isChooserMode &&
-    !(activeTab === "messages" && hasStarted && !showConversationList);
+    Boolean(selectedAgent) && !isChooserMode && !isReadingThread;
+
+  // The history icon duplicated the Messages tab everywhere the nav is on
+  // screen, and collided with the centred brand name while doing it. It now
+  // survives only where nothing else reaches the list: the chooser, before a
+  // returning visitor has picked an agent.
+  const showHistoryButton =
+    !showConversationList &&
+    !showSurfaceNav &&
+    !isReadingThread &&
+    (hasStarted || conversations.length > 0);
 
 
 
@@ -1625,6 +1637,24 @@ export default function Widget({
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </motion.button>
+              ) : isReadingThread ? (
+                // Without this the thread is a dead end: the nav is hidden and
+                // ChatView has no exit of its own.
+                <motion.button
+                  key="thread-back-button"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  onClick={() => {
+                    setShowConversationList(true);
+                    setActiveTab("messages");
+                    void refreshConversationList();
+                  }}
+                  className="widget-icon-button mr-1 p-1"
+                  aria-label={navLabelMessages}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </motion.button>
               ) : (activeTab === "home" && selectedAgent && config.home.mode === "chooser" && !hasStarted) ? (
                 <motion.button
                   key="back-button"
@@ -1711,8 +1741,7 @@ export default function Widget({
                 </button>
               </div>
             ) : null}
-            {!showConversationList &&
-            (hasStarted || conversations.length > 0) ? (
+            {showHistoryButton ? (
               <button
                 type="button"
                 onClick={() => {
