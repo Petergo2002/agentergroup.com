@@ -59,7 +59,7 @@ function WidgetBuilderLayout() {
       {/* Full-width Studio Split Workspace */}
       <div className="flex-1 flex flex-col lg:flex-row w-full min-h-0">
         {/* Left Column: Configuration Controls (Scrollable) */}
-        <div className="w-full lg:w-[420px] xl:w-[460px] 2xl:w-[480px] shrink-0 border-r border-outline-variant/15 p-6 lg:p-7 xl:p-8 overflow-y-auto pb-28 lg:pb-12 bg-background">
+        <div className="w-full lg:w-[440px] xl:w-[540px] 2xl:w-[620px] shrink-0 border-r border-outline-variant/15 p-6 lg:p-7 xl:p-8 overflow-y-auto pb-28 lg:pb-12 bg-background">
           {activeTab === 'aesthetics' && <AppearanceTab />}
           {activeTab === 'agents' && <AgentsTab />}
           {activeTab === 'behavior' && <BehaviorTab />}
@@ -67,8 +67,15 @@ function WidgetBuilderLayout() {
         </div>
 
         {/* Right Column: Full-Height Expansive Live Studio Canvas */}
-        <main className="hidden lg:flex flex-1 min-w-0 bg-surface-container-low/20 p-3 xl:p-5 flex-col sticky top-[57px] h-[calc(100vh-57px)] overflow-hidden">
-          <WidgetDevicePreview />
+        {/* The widget renders at its true 420px, so the canvas only needs
+            enough page around it to read as "bottom-right of a website".
+            Letting it take every remaining pixel meant a 2000px area showing a
+            420px object, with the rest as empty dotted background — width the
+            configuration column badly needed. Capped and centred instead. */}
+        <main className="hidden lg:flex flex-1 min-w-0 bg-surface-container-low/20 p-3 xl:p-5 flex-col items-center sticky top-[57px] h-[calc(100vh-57px)] overflow-hidden">
+          <div className="flex h-full w-full max-w-[980px] flex-col">
+            <WidgetDevicePreview />
+          </div>
         </main>
       </div>
 
