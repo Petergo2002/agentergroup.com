@@ -44,6 +44,9 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
   const [isOpen, setIsOpen] = useState(true);
   const [iframeKey, setIframeKey] = useState(0);
   const [isIframeLoading, setIsIframeLoading] = useState(true);
+  // Which message text the user dismissed in the preview. Keyed on the text
+  // rather than a boolean so editing the copy brings the bubble straight back.
+  const [dismissedTeaser, setDismissedTeaser] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const widgetOrigin = summary?.hostedUrl ? new URL(summary.hostedUrl).origin : null;
@@ -80,6 +83,36 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
     setIsOpen(updated);
     sendWidgetState(updated);
   };
+
+  // The attention message only exists in the launcher's closed state, and the
+  // preview opens the chat by default — so turning the setting on would look
+  // like it did nothing at all. Closing the preview on that transition puts
+  // the panel in the one state where the thing being configured is visible.
+  //
+  // Adjusted during render rather than from an effect: it is derived from a
+  // prop change, and an effect would paint the open chat and then close it.
+  const proactiveEnabled = form?.proactiveEnabled ?? false;
+  const [lastProactiveEnabled, setLastProactiveEnabled] = useState(proactiveEnabled);
+  if (proactiveEnabled !== lastProactiveEnabled) {
+    setLastProactiveEnabled(proactiveEnabled);
+    if (proactiveEnabled) {
+      setDismissedTeaser(null);
+      setIsOpen(false);
+    }
+  }
+
+  // The block above can change the open state without going through
+  // toggleWidgetOpen, so the widget in the iframe is synced here instead.
+  useEffect(() => {
+    try {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'ag:widget:state', isOpen, at: Date.now() },
+        '*',
+      );
+    } catch {
+      // Ignored
+    }
+  }, [isOpen]);
 
   // Sync color/theme overrides immediately into the preview iframe without reloading
   useEffect(() => {
@@ -193,6 +226,16 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
   );
   const launcherDivider = `${launcherFg}4d`; // ~30% opacity, matching bg-white/30
   const markColor = pickVisibleIconColor(primaryColor);
+  // The attention message, drawn to the same spec as .ag-widget-teaser in
+  // loader.js. loader.js only adds ag-is-dark for an explicitly dark widget,
+  // so anything else takes the light bubble here too.
+  const proactiveMessage = form?.proactiveMessage?.trim() ?? '';
+  const isTeaserDark = form?.theme === 'dark';
+  const isTeaserVisible =
+    !isOpen &&
+    Boolean(form?.proactiveEnabled) &&
+    proactiveMessage.length > 0 &&
+    dismissedTeaser !== proactiveMessage;
   const previewChromeLabel = `${brandDisplayName} — preview`;
 
   return (
@@ -356,6 +399,49 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
 
             {/* The Canonical Milo Floating Chat Launcher */}
             <div className="absolute bottom-5 right-5 sm:right-6 z-40">
+              {/* Attention message — .ag-widget-teaser in loader.js, to the same
+                  geometry, colours and asymmetric corner. Drawn without the 8s
+                  delay the live widget waits: the builder is where you judge
+                  how it reads, not how long it takes to arrive. */}
+              <div
+                role="button"
+                tabIndex={isTeaserVisible ? 0 : -1}
+                aria-hidden={!isTeaserVisible}
+                aria-label={proactiveMessage}
+                onClick={() => toggleWidgetOpen(true)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleWidgetOpen(true);
+                  }
+                }}
+                className={`absolute bottom-[68px] right-0 z-[1] flex w-max max-w-[288px] cursor-pointer items-start gap-2.5 rounded-[16px_16px_4px_16px] border px-3.5 py-3 text-left text-sm leading-[1.42] shadow-[0_10px_32px_rgba(0,0,0,0.16)] transition-all duration-300 ease-out motion-reduce:transition-none ${
+                  isTeaserVisible
+                    ? 'translate-y-0 scale-100 opacity-100'
+                    : 'pointer-events-none translate-y-2.5 scale-95 opacity-0'
+                } ${
+                  isTeaserDark
+                    ? 'border-white/10 bg-[#1c1d21] text-[#f4f4f5]'
+                    : 'border-black/[0.06] bg-white text-[#17181a]'
+                }`}
+              >
+                <span className="flex-1 [overflow-wrap:anywhere]">
+                  {proactiveMessage}
+                </span>
+                <button
+                  type="button"
+                  aria-label={t('common.close')}
+                  tabIndex={isTeaserVisible ? 0 : -1}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setDismissedTeaser(proactiveMessage);
+                  }}
+                  className="-mr-1 -mt-0.5 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-[15px] leading-none opacity-40 transition-opacity hover:opacity-[0.85]"
+                >
+                  {'\u00d7'}
+                </button>
+              </div>
+
               {isOpen ? (
                 /* Canonical Open State: 56px circular button with clean X */
                 <button
