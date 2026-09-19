@@ -29,6 +29,8 @@ export function ConfirmSimpleModal({
 }: ConfirmSimpleModalProps) {
   const { t } = useLanguage();
 
+  // Modal draws `title` in its own header, so the body carries the icon and
+  // the description only. Repeating it here printed the heading twice.
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-6">
@@ -36,8 +38,7 @@ export function ConfirmSimpleModal({
           <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${variant === 'error' ? 'bg-error/10' : 'bg-primary/10'} mb-4`}>
             <TriangleAlert className={`h-8 w-8 ${variant === 'error' ? 'text-error' : 'text-primary'}`} />
           </div>
-          <h3 className="text-lg font-headline font-bold text-on-surface">{title}</h3>
-          <p className="mt-2 text-[13px] font-medium leading-relaxed text-on-surface-variant/80 max-w-sm">
+          <p className="text-[13px] font-medium leading-relaxed text-on-surface-variant/80 max-w-sm">
             {description}
           </p>
         </div>

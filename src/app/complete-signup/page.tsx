@@ -71,13 +71,29 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
 
         <form action={updatePassword} className="space-y-6">
           <input type="hidden" name="redirectTo" value={redirectTo} />
+          {/* A password manager files a saved password under a username. This
+              screen is reached from an email link and shows no email field, so
+              without this the password has nothing to be saved against and is
+              never offered back at sign-in. Deliberately unnamed: it is a hint
+              for the browser, not part of the submission. */}
+          <input
+            type="email"
+            defaultValue={user.email ?? ''}
+            autoComplete="username"
+            readOnly
+            tabIndex={-1}
+            aria-hidden="true"
+            className="sr-only"
+          />
           <div className="space-y-5">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
+              <label htmlFor="full-name" className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
                 Full Name
               </label>
               <input
                 className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
+                id="full-name"
+                autoComplete="name"
                 name="fullName"
                 type="text"
                 placeholder="John Doe"
@@ -87,11 +103,13 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
 
             {!isInviteSignup && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
+                <label htmlFor="company-name" className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
                   Company Name
                 </label>
                 <input
                   className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
+                  id="company-name"
+                  autoComplete="organization"
                   name="companyName"
                   type="text"
                   placeholder="Avenro AB"
@@ -103,11 +121,13 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
             <div className="h-px w-full bg-[#161616] my-4" />
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
+              <label htmlFor="new-password" className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
                 {messages.login.setPassword}
               </label>
               <input
                 className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
+                id="new-password"
+                autoComplete="new-password"
                 name="password"
                 type="password"
                 placeholder="••••••••"
@@ -117,11 +137,13 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
+              <label htmlFor="confirm-password" className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9d948a]/75 ml-1">
                 {messages.login.confirmPassword}
               </label>
               <input
                 className="w-full rounded-[2px] border border-[#1f1f1f] bg-[#050505] px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ff5c00]/60 focus:ring-1 focus:ring-[#ff5c00]/10 placeholder:text-[#9d948a]/30 font-medium"
+                id="confirm-password"
+                autoComplete="new-password"
                 name="confirmPassword"
                 type="password"
                 placeholder="••••••••"
