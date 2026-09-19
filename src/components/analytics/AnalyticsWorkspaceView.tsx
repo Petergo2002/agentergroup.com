@@ -16,6 +16,7 @@ import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
 import { useAppContext } from "@/components/app/AppContext";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 import { useToast } from "@/components/ui/ToastProvider";
 import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
 import { MiloLogo } from "@/components/brand/MiloLogo";
@@ -351,12 +352,10 @@ function ConversationRow({
   conversation,
   selected,
   onClick,
-  language,
 }: {
   conversation: DashboardAnalyticsConversationListItem;
   selected: boolean;
   onClick: () => void;
-  language: "en" | "sv";
 }) {
   const { t } = useLanguage();
   const identityDisplay = resolveIdentityDisplay(
@@ -395,7 +394,7 @@ function ConversationRow({
               {identityDisplay.primary}
             </p>
             <span className="shrink-0 text-xs font-medium text-on-surface-variant/70">
-              {formatRelativeDate(conversation.lastActivityAt, language)}
+              <RelativeTime value={conversation.lastActivityAt} />
             </span>
           </div>
 
@@ -457,7 +456,7 @@ function ConversationInboxPane({
   onSelectConversation: (widgetSessionId: string) => void;
   onLoadMore: () => void;
 }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const conversations = state.data?.conversations ?? [];
   const hasMore = Boolean(state.data?.pageInfo.hasMore);
 
@@ -495,7 +494,6 @@ function ConversationInboxPane({
                 conversation={conversation}
                 selected={state.selectedWidgetSessionId === conversation.widgetSessionId}
                 onClick={() => onSelectConversation(conversation.widgetSessionId)}
-                language={language}
               />
             ))}
             {hasMore && (
@@ -531,7 +529,7 @@ function ConversationDetail({
     summary: LeadConversationSummary,
   ) => void;
 }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const identityDisplay = detail
     ? resolveIdentityDisplay(
         detail.identitySummary,
@@ -564,7 +562,7 @@ function ConversationDetail({
                   {detail.conversation.source}
                 </span>
                 <span className="text-xs font-medium text-on-surface-variant">
-                  {t("analytics.sessionInitialized")} {formatRelativeDate(detail.conversation.startedAt, language)}
+                  {t("analytics.sessionInitialized")} <RelativeTime value={detail.conversation.startedAt} />
                 </span>
                 {detail?.lead && (
                   <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
@@ -620,7 +618,7 @@ function ConversationDetail({
                   Captured
                 </p>
                 <p className="mt-1 truncate text-[13px] font-semibold text-on-surface">
-                  {formatRelativeDate(capturedAt, language)}
+                  <RelativeTime value={capturedAt} />
                 </p>
               </div>
             )}
@@ -696,7 +694,7 @@ function ConversationDetail({
                           ? (identityDisplay?.primary || t("analytics.anonymousUser"))
                           : (detail.conversation.agentLabel || t("analytics.aiAgent"))}
                       </span>
-                      <span className="text-xs font-medium text-on-surface-variant/50">{formatRelativeDate(message.createdAt, language)}</span>
+                      <span className="text-xs font-medium text-on-surface-variant/50"><RelativeTime value={message.createdAt} /></span>
                     </div>
 
                     <div className={`rounded-xl border p-4 shadow-sm ${
@@ -1277,7 +1275,7 @@ function AutomationPerformancePanel({
                         </span>
                       </div>
                       <p className="mt-2 text-xs text-on-surface-variant/55">
-                        {formatRelativeDate(failure.createdAt, language)}
+                        <RelativeTime value={failure.createdAt} />
                       </p>
                     </Link>
                   ))}

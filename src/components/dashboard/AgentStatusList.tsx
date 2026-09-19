@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Bot, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
-import { formatRelativeDate } from "@/lib/utils";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 import type { AgentRecord } from "@/lib/types";
 import { CreateAgentDropdown } from "@/components/agents/CreateAgentDropdown";
 
@@ -16,7 +16,7 @@ export function AgentStatusList({
   agents,
   isLoading,
 }: AgentStatusListProps) {
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
 
   const getStatusConfig = (agent: AgentRecord) => {
     if (agent.archived_at) {
@@ -114,7 +114,10 @@ export function AgentStatusList({
                       {agent.name}
                     </h3>
                     <p className="mt-0.5 text-xs font-medium text-on-surface-variant/80">
-                      {`${t("common.updated")} ${formatRelativeDate(agent.updated_at, language)}`}
+                      <>
+                        {t("common.updated")}{" "}
+                        <RelativeTime value={agent.updated_at} />
+                      </>
                     </p>
                   </div>
                 </div>

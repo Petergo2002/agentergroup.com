@@ -1006,3 +1006,32 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-headline), sans-serif;
   letter-spacing: -0.02em;
 }
+
+/*
+ * Motion preference, applied to everything rather than to named animations.
+ *
+ * The blocks above opt specific animations out, which left the bulk of the app
+ * moving: animate-pulse alone appears ~119 times, plus spin, ping and the
+ * enter animations. Someone who asked their OS to reduce motion was still
+ * getting most of it.
+ *
+ * Animations are reduced to a single frame rather than removed, so anything
+ * that depends on an animationend event still fires and does not hang. Spinners
+ * are the deliberate exception: a frozen spinner reads as a crash, so they keep
+ * turning, just slowly enough not to provoke.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
+  }
+}

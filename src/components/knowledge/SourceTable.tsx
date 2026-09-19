@@ -14,8 +14,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { formatLocaleNumber } from "@/lib/i18n";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 import type { KnowledgeFolderWithSources, KnowledgeSourceRecord } from "@/lib/types";
-import { formatRelativeDate } from "@/lib/utils";
 
 interface SourceTableProps {
   sources: KnowledgeSourceRecord[];
@@ -165,7 +166,7 @@ export function SourceTable({
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-on-surface-variant/80 font-medium">
-                    {formatRelativeDate(folder.updated_at, language)}
+                    <RelativeTime value={folder.updated_at} />
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -252,7 +253,7 @@ export function SourceTable({
                         <p className="mt-0.5 truncate text-[11px] text-on-surface-variant/60">
                           {sourceFolders.length > 0
                             ? sourceFolders.map((folder) => folder.name).join(", ")
-                            : `${source.chunk_count} chunks • ${source.source_type === "website" && typeof source.metadata?.sourceUrl === "string" ? source.metadata.sourceUrl : source.description || t("assistants.noDescription")}`}
+                            : `${formatLocaleNumber(source.chunk_count, language)} chunks • ${source.source_type === "website" && typeof source.metadata?.sourceUrl === "string" ? source.metadata.sourceUrl : source.description || t("assistants.noDescription")}`}
                         </p>
                       </div>
                     </div>
@@ -298,7 +299,7 @@ export function SourceTable({
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-on-surface-variant/80 font-medium">
-                    {formatRelativeDate(source.updated_at, language)}
+                    <RelativeTime value={source.updated_at} />
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">

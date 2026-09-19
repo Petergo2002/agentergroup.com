@@ -20,13 +20,13 @@ import {
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { useAppContext } from "@/components/app/AppContext";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 import { LeadAiSummaryCard } from "@/components/leads/LeadAiSummaryCard";
 import { formatLocaleDateTime } from "@/lib/i18n";
 import { jsonFetcher, workspaceSWRKey } from "@/lib/json-fetcher";
 import type { LeadConversationSummary, WidgetLeadListItem } from "@/lib/types";
-import { formatRelativeDate } from "@/lib/utils";
 import {
   groupLeadsByContact,
   type LeadContactGroup,
@@ -788,7 +788,7 @@ export default function LeadsPageClient({
                         title={formatLocaleDateTime(lead.created_at, language)}
                         className="rounded-lg bg-surface-container-low px-2.5 py-1 text-xs font-medium text-on-surface-variant/70 transition-colors group-hover:bg-primary/[0.06] group-hover:text-primary"
                       >
-                        {formatRelativeDate(lead.created_at, language)}
+                        <RelativeTime value={lead.created_at} />
                       </span>
                     </div>
                   </div>
@@ -822,7 +822,7 @@ export default function LeadsPageClient({
                           title={formatLocaleDateTime(capture.created_at, language)}
                           className="shrink-0 text-xs text-on-surface-variant/70"
                         >
-                          {formatRelativeDate(capture.created_at, language)}
+                          <RelativeTime value={capture.created_at} />
                         </span>
                       </button>
                     ))}

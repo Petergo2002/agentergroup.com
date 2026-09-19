@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, MessageSquare, User } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
-import { formatRelativeDate } from "@/lib/utils";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 
 interface Conversation {
   widgetSessionId: string;
@@ -20,7 +20,7 @@ interface RecentActivityProps {
 }
 
 export function RecentActivity({ conversations, isLoading }: RecentActivityProps) {
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
 
   return (
     <section className="app-card sm:p-6">
@@ -100,7 +100,7 @@ export function RecentActivity({ conversations, isLoading }: RecentActivityProps
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-on-surface-variant sm:justify-end">
-                <span>{formatRelativeDate(convo.lastActivityAt, language)}</span>
+                <span><RelativeTime value={convo.lastActivityAt} /></span>
                 <ArrowRight className="h-4 w-4 opacity-55 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100 group-hover:text-primary" />
               </div>
               </Link>
