@@ -4,6 +4,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { getMessages } from "@/lib/i18n";
 import { getServerLanguage } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
+import { EmailAuthSubmitButton } from "@/app/login/EmailAuthSubmitButton";
 import { updatePassword } from "@/app/login/actions";
 
 interface CompleteSignupPageProps {
@@ -153,12 +154,14 @@ export default async function CompleteSignupPage({ searchParams }: CompleteSignu
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="w-full flex h-11 items-center justify-center rounded-[2px] bg-[#ff5c00] hover:bg-[#e05100] text-white text-[11px] font-bold uppercase tracking-widest active:scale-[0.98] transition-all duration-200 cursor-pointer"
-          >
-            {messages.login.finishSignup}
-          </button>
+          {/* The plain button stayed enabled while the server action ran, so a
+              second click fired updatePassword again on a session the first
+              call had already changed. */}
+          <EmailAuthSubmitButton
+            idleLabel={messages.login.finishSignup}
+            pendingLabel={messages.login.creatingAccount}
+            className="w-full flex h-11 items-center justify-center gap-2 rounded-[2px] bg-[#ff5c00] hover:bg-[#e05100] text-white text-[11px] font-bold uppercase tracking-widest active:scale-[0.98] transition-all duration-200 cursor-pointer disabled:cursor-wait disabled:opacity-90"
+          />
         </form>
       </div>
 

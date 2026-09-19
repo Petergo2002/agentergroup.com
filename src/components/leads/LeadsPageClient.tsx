@@ -469,10 +469,18 @@ export default function LeadsPageClient({
 
   const closeLeadDetails = useCallback(() => setSelectedLead(null), []);
 
-  const handleCopy = (event: React.MouseEvent, text: string, fieldId: string) => {
+  const handleCopy = async (event: React.MouseEvent, text: string, fieldId: string) => {
     event.stopPropagation();
     event.preventDefault();
-    void navigator.clipboard.writeText(text);
+    // The tick and the toast used to fire before the write resolved, so a
+    // denied clipboard still reported success and the lead's email was never
+    // on the clipboard when they went to paste it.
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      showToast(t("common.copyFailed"), "error");
+      return;
+    }
     setCopiedField(fieldId);
     showToast(`Copied ${text}`, "success");
     setTimeout(() => setCopiedField(null), 2000);

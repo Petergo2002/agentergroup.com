@@ -1105,9 +1105,11 @@ export default function KnowledgePageClient({
                       <div className="flex flex-1 items-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 py-2">
                         <Search className="h-3.5 w-3.5 text-on-surface-variant/40" />
                         <input
+                          type="search"
                           value={pageSearch}
                           onChange={(e) => setPageSearch(e.target.value)}
                           placeholder={t("knowledge.searchPages")}
+                          aria-label={t("knowledge.searchPages")}
                           className="flex-1 bg-transparent text-sm outline-none"
                         />
                       </div>
@@ -1274,9 +1276,11 @@ export default function KnowledgePageClient({
                   <div className="relative flex-1">
                     <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-on-surface-variant/40" />
                     <input
+                      type="search"
                       value={driveSearch}
                       onChange={(event) => setDriveSearch(event.target.value)}
                       placeholder={t("knowledge.driveSearchPlaceholder")}
+                      aria-label={t("knowledge.driveSearchPlaceholder")}
                       className="h-11 w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest pl-11 pr-4 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/45 focus:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                     />
                   </div>

@@ -20,14 +20,29 @@ const confirmSimpleModal = readFileSync(
   "src/components/modals/ConfirmSimpleModal.tsx",
   "utf8",
 );
+const dialogFocus = readFileSync("src/lib/hooks/useDialogFocus.ts", "utf8");
+const viewSourceModal = readFileSync(
+  "src/components/modals/ViewSourceModal.tsx",
+  "utf8",
+);
+const sidebar = readFileSync("src/components/layout/Sidebar.tsx", "utf8");
+const tooltip = readFileSync("src/components/ui/Tooltip.tsx", "utf8");
+const billing = readFileSync("src/app/(app)/settings/billing/page.tsx", "utf8");
+const team = readFileSync("src/app/(app)/settings/team/page.tsx", "utf8");
+const sourceTable = readFileSync("src/components/knowledge/SourceTable.tsx", "utf8");
+const settings = readFileSync("src/app/(app)/settings/page.tsx", "utf8");
+const behaviorTab = readFileSync(
+  "src/components/widgets/builder/tabs/BehaviorTab.tsx",
+  "utf8",
+);
 
 test("the shared modal exposes dialog semantics and manages keyboard focus", () => {
   assert.match(modal, /role="dialog"/);
   assert.match(modal, /aria-modal="true"/);
   assert.match(modal, /aria-labelledby=\{titleId\}/);
-  assert.match(modal, /event\.key !== 'Tab'/);
-  assert.match(modal, /previouslyFocused\.focus\(\)/);
-  assert.match(modal, /previousBodyOverflow/);
+  // The trap moved into useDialogFocus so a second hand-rolled dialog could
+  // share it; the behaviour is asserted against the hook below.
+  assert.match(modal, /useDialogFocus\(\{ isOpen, onClose \}\)/);
 });
 
 test("the closed mobile navigation is removed from focus and accessibility trees", () => {
@@ -93,4 +108,122 @@ test("a confirmation dialog states its question once", () => {
   assert.match(confirmSimpleModal, /<Modal isOpen=\{isOpen\} onClose=\{onClose\} title=\{title\}>/);
   const body = confirmSimpleModal.slice(confirmSimpleModal.indexOf("<Modal"));
   assert.doesNotMatch(body, /<h[1-6][^>]*>\s*\{title\}/);
+});
+
+test("every dialog in the app traps focus, not just the shared one", () => {
+  // ViewSourceModal rolled its own shell: Escape and a scroll lock, but no
+  // focus trap — Tab walked straight out into the page behind it, where the
+  // user cannot see what they are focusing.
+  for (const marker of [/role="dialog"/, /aria-modal="true"/, /aria-labelledby=/]) {
+    assert.match(viewSourceModal, marker);
+  }
+  assert.match(viewSourceModal, /useDialogFocus\(/);
+  assert.match(modal, /useDialogFocus\(/);
+
+  // The trap itself now lives in one place; these are the parts a dialog
+  // cannot be missing.
+  assert.match(dialogFocus, /event\.key !== 'Tab'/);
+  assert.match(dialogFocus, /event\.key === 'Escape'/);
+  assert.match(dialogFocus, /previouslyFocused\.focus\(\)/);
+  assert.match(dialogFocus, /previousBodyOverflow/);
+});
+
+test("nothing falls back to the native confirm dialog", () => {
+  // window.confirm cannot be styled or translated, and once someone ticks
+  // "prevent this page from creating more dialogs" it silently returns false
+  // forever — a destructive action then appears to simply do nothing.
+  for (const [name, source] of [
+    ["team settings", team],
+    ["admin verification", readFileSync(
+      "src/app/(admin)/admin/verification/AdminVerificationPageClient.tsx",
+      "utf8",
+    )],
+  ] as const) {
+    assert.doesNotMatch(source, /window\.confirm/, `${name} still uses window.confirm`);
+    assert.match(source, /useConfirm\(\)/, `${name} has no replacement dialog`);
+    assert.match(source, /\{confirmDialog\}/, `${name} never renders the dialog`);
+  }
+});
+
+test("a keyboard reaches the page without walking the whole sidebar", () => {
+  assert.match(appShell, /href="#main-content"/);
+  assert.match(appShell, /id="main-content"/);
+  // sr-only until focused, or it is a permanently visible link.
+  assert.match(appShell, /sr-only focus:not-sr-only/);
+  assert.match(sidebar, /<nav\s+aria-label=/);
+});
+
+test("table headers say which column they head", () => {
+  for (const [name, source] of [
+    ["team", team],
+    ["billing", billing],
+    ["knowledge sources", sourceTable],
+  ] as const) {
+    const headers = source.match(/<th\b/g) ?? [];
+    const scoped = source.match(/<th scope="col"/g) ?? [];
+    assert.ok(headers.length > 0, `${name} has no headers to check`);
+    assert.equal(scoped.length, headers.length, `${name} has unscoped headers`);
+  }
+});
+
+test("search fields are search fields", () => {
+  // type="search" gives the native clear control and searchbox semantics;
+  // a bare text input gives neither.
+  for (const [name, path] of [
+    ["agents", "src/app/(app)/agents/AgentsPageClient.tsx"],
+    ["knowledge", "src/app/(app)/knowledge/KnowledgePageClient.tsx"],
+    ["analytics", "src/components/analytics/AnalyticsWorkspaceView.tsx"],
+    ["agent library", "src/components/agents/AgentLibraryDialog.tsx"],
+  ] as const) {
+    assert.match(readFileSync(path, "utf8"), /type="search"/, `${name} search is untyped`);
+  }
+});
+
+test("a reason for a disabled control is shown, not hidden in a title", () => {
+  // A disabled button suppresses pointer events, so a `title` on it is
+  // unreliable on hover and absent entirely on touch and keyboard. The
+  // wrapper carries the hover instead.
+  assert.doesNotMatch(billing, /title=/);
+  // Every admin-only control on the page, not just one of them.
+  assert.equal(
+    (billing.match(/label=\{isAdmin \? null : 'Only workspace admins manage|label=\{isAdmin \? null : 'Only workspace admins can (manage billing|change plans)'\}/g) ?? []).length,
+    3,
+  );
+  assert.equal((billing.match(/<Tooltip/g) ?? []).length, 3);
+  assert.match(team, /<Tooltip label=\{inviteDisabledReason\}>/);
+  // An absent reason must render the trigger bare rather than an empty bubble.
+  assert.match(tooltip, /if \(!label\) return <>\{children\}<\/>;/);
+});
+
+test("the settings and widget-behaviour fields are labelled", () => {
+  for (const id of [
+    "profile-full-name",
+    "profile-company-name",
+    "workspace-description",
+    "privacy-delete-confirmation",
+  ]) {
+    assert.match(settings, new RegExp(`htmlFor="${id}"`), `no label for ${id}`);
+    assert.match(settings, new RegExp(`id="${id}"`), `no field ${id}`);
+  }
+  // The change-email field has no label element at all, only a placeholder
+  // that disappears the moment someone types into it.
+  assert.match(settings, /aria-label="Change email address"/);
+
+  for (const id of ["proactive-message", "home-title", "home-subtitle"]) {
+    assert.match(behaviorTab, new RegExp(`htmlFor="${id}"`), `no label for ${id}`);
+    assert.match(behaviorTab, new RegExp(`id="${id}"`), `no field ${id}`);
+  }
+});
+
+test("a copy that failed says so instead of claiming success", () => {
+  // clipboard.writeText rejects on an insecure origin, an unfocused document
+  // or a denied permission. Both call sites used to report success anyway.
+  for (const [name, path] of [
+    ["connections", "src/app/(app)/connections/ConnectionsPageClient.tsx"],
+    ["leads", "src/components/leads/LeadsPageClient.tsx"],
+  ] as const) {
+    const source = readFileSync(path, "utf8");
+    assert.match(source, /copyFailed/, `${name} has no failure path`);
+    assert.doesNotMatch(source, /void navigator\.clipboard/, `${name} still fires and forgets`);
+  }
 });

@@ -261,7 +261,12 @@ export function Sidebar({
         </div>
       </div>
       
-      <nav className={`mt-2 flex-1 space-y-4 font-label ${contentFade} ${isCollapsed && !mobile ? 'px-2' : 'px-3'} overflow-y-auto overflow-x-hidden`}>
+      {/* A landmark with no name is announced as a bare "navigation", which
+          tells a screen reader user nothing about which region they are in. */}
+      <nav
+        aria-label={t("nav.navigationLandmark")}
+        className={`mt-2 flex-1 space-y-4 font-label ${contentFade} ${isCollapsed && !mobile ? 'px-2' : 'px-3'} overflow-y-auto overflow-x-hidden`}
+      >
         {navGroups.map((group, groupIndex) => (
           <div key={groupIndex} className="space-y-1 relative">
             {(!isCollapsed || mobile) && (

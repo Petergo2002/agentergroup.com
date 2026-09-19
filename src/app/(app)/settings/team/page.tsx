@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/components/app/AppContext';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { useConfirm } from '@/components/ui/useConfirm';
 import { getTeamMemberLimitForPlan } from '@/lib/plan-limits';
 import type { WorkspaceMemberWithProfile, WorkspaceInviteRecord, ExpandedWorkspaceInviteRecord } from '@/lib/types';
 import { Mail, Copy, X, Info } from 'lucide-react';
@@ -14,6 +16,7 @@ export default function TeamSettingsPage() {
   const { workspace, membership, subscription, user } = useAppContext();
   const { t } = useLanguage();
   const { showToast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
 
   const [members, setMembers] = useState<WorkspaceMemberWithProfile[]>([]);
   const [invites, setInvites] = useState<WorkspaceInviteRecord[]>([]);
@@ -169,9 +172,13 @@ export default function TeamSettingsPage() {
   };
 
   const handleRemoveMember = async (memberId: string, memberName: string) => {
-    const confirmed = window.confirm(
-      t('settings.team.removeMemberConfirm') || `Are you sure you want to remove ${memberName} from this workspace?`,
-    );
+    const confirmed = await confirm({
+      title: t('settings.team.removeMember') || 'Remove member',
+      description:
+        t('settings.team.removeMemberConfirm') ||
+        `Are you sure you want to remove ${memberName} from this workspace?`,
+      confirmLabel: t('settings.team.removeMember') || 'Remove member',
+    });
     if (!confirmed) return;
 
     setRemovingMemberId(memberId);
@@ -194,7 +201,12 @@ export default function TeamSettingsPage() {
   };
 
   const handleDeclineIncoming = async (token: string) => {
-    const confirmed = window.confirm(t('common.declineConfirm') || 'Are you sure you want to decline this invitation?');
+    const confirmed = await confirm({
+      title: t('common.decline') || 'Decline invitation',
+      description:
+        t('common.declineConfirm') || 'Are you sure you want to decline this invitation?',
+      confirmLabel: t('common.decline') || 'Decline',
+    });
     if (!confirmed) return;
 
     try {
@@ -256,6 +268,7 @@ export default function TeamSettingsPage() {
           </p>
         </div>
         {canManageTeam && (
+          <Tooltip label={inviteDisabledReason}>
           <button
             onClick={() => {
               if (!canCreateInvites) {
@@ -265,11 +278,11 @@ export default function TeamSettingsPage() {
               setLastInviteLink(null);
             }}
             disabled={!canCreateInvites}
-            title={inviteDisabledReason ?? undefined}
             className="app-primary-button rounded-full px-5 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t('settings.team.invite') || 'Invite member'}
           </button>
+          </Tooltip>
         )}
       </div>
 
@@ -370,13 +383,15 @@ export default function TeamSettingsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-outline-variant/10">
-                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                     {t('common.member') || 'Member'}
                   </th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                  <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
                     {t('common.role') || 'Role'}
                   </th>
-                  <th className="px-6 py-4 text-right" />
+                  <th scope="col" className="px-6 py-4 text-right">
+                    <span className="sr-only">{t('common.actions')}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/5">
@@ -585,6 +600,8 @@ export default function TeamSettingsPage() {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

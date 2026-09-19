@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, Clock, Database, Plug, Search, ShieldCheck, Trash2, X } from "lucide-react";
+import { useConfirm } from "@/components/ui/useConfirm";
 import type {
   AgentLibraryTemplateRecord,
   AgentLibraryTemplateSourceRecord,
@@ -15,6 +16,7 @@ type VerificationTemplate = AgentLibraryTemplateRecord & {
 
 export default function AdminVerificationPageClient() {
   const [templates, setTemplates] = useState<VerificationTemplate[]>([]);
+  const { confirm, confirmDialog } = useConfirm();
   const [query, setQuery] = useState("");
   const [activeStatus, setActiveStatus] = useState<"pending" | "approved" | "rejected">("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -93,9 +95,11 @@ export default function AdminVerificationPageClient() {
   };
 
   const deleteTemplate = async (template: VerificationTemplate) => {
-    const confirmed = window.confirm(
-      `Remove "${template.name}" from the agent library? This also removes its bundled knowledge snapshot.`,
-    );
+    const confirmed = await confirm({
+      title: "Remove template",
+      description: `Remove "${template.name}" from the agent library? This also removes its bundled knowledge snapshot.`,
+      confirmLabel: "Remove template",
+    });
 
     if (!confirmed) return;
 
@@ -138,9 +142,11 @@ export default function AdminVerificationPageClient() {
         <div className="relative w-full lg:max-w-sm">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
           <input
+            type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search queue..."
+            aria-label="Search the verification queue"
             className="w-full rounded-xl border border-outline bg-surface py-3 pl-11 pr-4 text-sm text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/50 focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
           />
         </div>
@@ -297,6 +303,8 @@ export default function AdminVerificationPageClient() {
           ))}
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

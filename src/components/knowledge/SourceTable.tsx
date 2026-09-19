@@ -107,7 +107,7 @@ export function SourceTable({
           <thead className="border-b border-outline-variant/10 bg-surface-container-low/50 text-xs font-semibold text-on-surface-variant">
             <tr>
               {selectable ? (
-                <th className="w-12 px-6 py-5">
+                <th scope="col" className="w-12 px-6 py-5">
                   <input
                     ref={selectAllRef}
                     type="checkbox"
@@ -118,11 +118,11 @@ export function SourceTable({
                   />
                 </th>
               ) : null}
-              <th className="px-6 py-5">{t("knowledge.sourceName")}</th>
-              <th className="px-6 py-5">{t("knowledge.type")}</th>
-              <th className="px-6 py-5 text-center">{t("common.status")}</th>
-              <th className="px-6 py-5">{t("knowledge.lastModified")}</th>
-              <th className="px-6 py-5 text-right">{t("knowledge.actions")}</th>
+              <th scope="col" className="px-6 py-5">{t("knowledge.sourceName")}</th>
+              <th scope="col" className="px-6 py-5">{t("knowledge.type")}</th>
+              <th scope="col" className="px-6 py-5 text-center">{t("common.status")}</th>
+              <th scope="col" className="px-6 py-5">{t("knowledge.lastModified")}</th>
+              <th scope="col" className="px-6 py-5 text-right">{t("knowledge.actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/5">

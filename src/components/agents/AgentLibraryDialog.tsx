@@ -400,9 +400,11 @@ export function AgentLibraryDialog({ isOpen, onClose }: AgentLibraryDialogProps)
                   <Search className="h-5 w-5 text-on-surface-variant/40 transition-colors group-focus-within:text-primary" />
                 </div>
                 <input
+                  type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search templates..."
+                  aria-label="Search templates"
                   className="w-full rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/50 py-3.5 pl-12 pr-10 text-sm font-medium text-on-surface shadow-sm outline-none transition-all duration-300 placeholder:text-on-surface-variant/40 hover:bg-surface-container-lowest focus:border-primary/50 focus:bg-surface-container-lowest focus:ring-4 focus:ring-primary/10"
                 />
                 {query ? (
