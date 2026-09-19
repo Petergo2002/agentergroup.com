@@ -40,7 +40,7 @@ export function AdminActivityChart({ points, language }: AdminActivityChartProps
             <div key={point.dateKey} className="flex min-w-0 flex-1 flex-col items-center gap-2">
               <div className="flex h-52 w-full items-end rounded-t-xl bg-surface-container-low px-1">
                 <div
-                  className="w-full rounded-t-xl bg-[#FF5C00] transition-opacity hover:opacity-90"
+                  className="animate-chart-grow w-full rounded-t-xl bg-[#FF5C00] transition-opacity hover:opacity-90"
                   style={{ height }}
                   title={
                     language === "sv"

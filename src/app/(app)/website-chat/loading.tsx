@@ -25,20 +25,20 @@ export default function WebsiteChatLoading() {
             </h1>
           </div>
           <div className="hidden items-center gap-3 sm:flex" aria-hidden="true">
-            <div className="h-10 w-28 animate-pulse rounded-md bg-surface-container-low" />
-            <div className="h-10 w-24 animate-pulse rounded-md bg-surface-container-low" />
+            <div className="h-10 w-28 animate-skeleton rounded-md bg-surface-container-low" />
+            <div className="h-10 w-24 animate-skeleton rounded-md bg-surface-container-low" />
           </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-[1320px] px-5 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-8 lg:flex-row">
           <div className="flex-1 space-y-8">
-            <div className="h-8 w-48 animate-pulse rounded-full bg-surface-container-low" />
-            <div className="h-64 w-full animate-pulse rounded-[2rem] bg-surface-container-low" />
-            <div className="h-64 w-full animate-pulse rounded-[2rem] bg-surface-container-low" />
+            <div className="h-8 w-48 animate-skeleton rounded-full bg-surface-container-low" />
+            <div className="h-64 w-full animate-skeleton rounded-[2rem] bg-surface-container-low" />
+            <div className="h-64 w-full animate-skeleton rounded-[2rem] bg-surface-container-low" />
           </div>
           <div className="hidden w-[360px] shrink-0 lg:block">
-            <div className="h-[600px] w-full animate-pulse rounded-[2.5rem] bg-surface-container-low" />
+            <div className="h-[600px] w-full animate-skeleton rounded-[2.5rem] bg-surface-container-low" />
           </div>
         </div>
       </main>

@@ -11,7 +11,7 @@ import {
 } from '@/lib/widgets/contrast';
 import {
   ExternalLink,
-  Lock,
+  Eye,
   MessageSquare,
   Monitor,
   RotateCw,
@@ -193,7 +193,7 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
   );
   const launcherDivider = `${launcherFg}4d`; // ~30% opacity, matching bg-white/30
   const markColor = pickVisibleIconColor(primaryColor);
-  const siteDomain = `${brandDisplayName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'avenro'}.se`;
+  const previewChromeLabel = `${brandDisplayName} — preview`;
 
   return (
     <div
@@ -211,10 +211,17 @@ export function WidgetDevicePreview({ isMobileModal = false }: WidgetDevicePrevi
             <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
           </div>
 
+          {/* Not a URL. This chrome used to render a realistic
+              "https://<brand>.se" address bar built by string-manipulating the
+              brand name, which reads as the customer's real site being loaded
+              in a frame — it is a mock, and it fooled us before it fooled
+              anyone else. Naming it removes the illusion without losing the
+              browser framing that makes the preview legible. */}
           <div className="hidden sm:flex items-center gap-1.5 rounded-lg border border-outline-variant/15 bg-background/80 px-3 py-1 text-[11px] font-medium text-on-surface-variant/75 truncate shadow-2xs">
-            <Lock className="h-3 w-3 text-on-surface-variant/40 shrink-0" />
-            <span className="text-on-surface-variant/40">https://</span>
-            <span className="font-semibold text-on-surface truncate">{siteDomain}</span>
+            <Eye className="h-3 w-3 text-on-surface-variant/40 shrink-0" />
+            <span className="font-semibold text-on-surface truncate">
+              {previewChromeLabel}
+            </span>
           </div>
         </div>
 

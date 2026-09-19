@@ -65,3 +65,51 @@ For every phase:
 1. **TypeScript Typecheck:** `npx tsc --noEmit` (Must pass with 0 errors).
 2. **ESLint Audit:** `npm run lint` (Must pass cleanly with 0 errors).
 3. **Mobile & Theme Test:** Verify Light Mode and Dark Mode contrast across mobile (<640px) and desktop viewports.
+
+---
+
+## Cross-Cutting Polish Pass — 19 September 2026
+
+Ten candidates surveyed across the app. Nine were real and are done; one was a
+miscount on my part and is recorded so nobody re-opens it.
+
+| # | Change | Where |
+| --- | --- | --- |
+| 1 | Relative timestamps tick instead of freezing | `RelativeTime`, `useTickingClock` |
+| 2 | Reduced motion applied to everything, not named animations | `globals.css` |
+| 3 | Counts go through `formatLocaleNumber` | `SourceTable` |
+| 4 | Icon-only buttons carry real labels; styled `Tooltip` available | `Tooltip`, team settings |
+| 5 | Charts and meters grow to their value on mount | `globals.css`, admin charts |
+| 6 | Loading shimmers; pulse reserved for live | 12 skeleton files |
+| 7 | Knowledge delete is optimistic, with rollback | `KnowledgePageClient` |
+| 8 | Polled status is a live region | `SourceTable` |
+| 9 | ~~Empty states~~ — **already covered**, see below | — |
+| 10 | Preview chrome no longer fakes a real URL | `WidgetDevicePreview` |
+
+### Notes worth keeping
+
+**Reduced motion was the biggest real gap.** Four media blocks existed but each
+named specific animations, leaving `animate-pulse` (~119 uses), `animate-spin`,
+`animate-ping` and the enter animations untouched. The blanket rule collapses
+animations to one frame rather than removing them, so anything awaiting an
+`animationend` still fires. Spinners are exempt and merely slowed — a frozen
+spinner reads as a crash.
+
+**Timestamps never updated.** `formatRelativeDate` reads the clock at render
+time, so "Just now" persisted until an unrelated repaint. `RelativeTime` ticks
+once a minute, idles in a hidden tab, catches up on return, and emits a real
+`<time>` element so the exact instant stays machine-readable.
+
+**Pulse was overloaded**, meaning loading, live and attention at once. Skeletons
+now shimmer, which frees pulse to mean one thing.
+
+**Empty states were not a gap.** The original finding came from grepping the
+literal string `EmptyState`, which missed the `app-empty-state` class and the
+per-page variants; 12 files have them, and Leads and Knowledge already
+distinguish searched, filtered, folder-scoped and genuinely-empty. No change
+made.
+
+**The preview chrome fake URL earned its place on this list** by fooling us
+first: it built `https://<brand>.se` from the brand name and drew a realistic
+address bar, which reads as the customer's live site being framed. It now says
+"<brand> — preview".

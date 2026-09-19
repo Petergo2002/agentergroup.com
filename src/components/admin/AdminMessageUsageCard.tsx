@@ -115,7 +115,7 @@ export function AdminMessageUsageCard({
           )} messages used`}
         >
           <div
-            className={`h-full rounded-full transition-[width] duration-300 ${style.fill}`}
+            className={`animate-meter-grow h-full rounded-full transition-[width] duration-300 ${style.fill}`}
             style={{ width: `${usage.percentUsed}%` }}
           />
         </div>

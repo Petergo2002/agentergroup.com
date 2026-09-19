@@ -818,8 +818,18 @@ export default function KnowledgePageClient({
     setDeletingSourceId(sourceToDelete.id);
     setIsDeleteOpen(false);
 
+    // Optimistic: the row disappears immediately rather than after a round
+    // trip to Supabase. Waiting made a confirmed delete feel broken — the
+    // dialog closed and the row sat there. Kept so it can be put back exactly
+    // where it was if the server refuses.
+    const removedSource = sourceToDelete;
+    const previousSources = sources;
+    setSources((current) =>
+      current.filter((source) => source.id !== removedSource.id),
+    );
+
     try {
-      const response = await fetch(`/api/knowledge/sources/${sourceToDelete.id}`, {
+      const response = await fetch(`/api/knowledge/sources/${removedSource.id}`, {
         method: "DELETE",
       });
       const payload = await response.json();
@@ -828,9 +838,13 @@ export default function KnowledgePageClient({
         throw new Error(payload.error ?? t("knowledge.deleteError"));
       }
 
+      // Folders still need re-reading: the source count on each one changed.
       await Promise.all([loadSources(), loadFolders()]);
       showToast(t("knowledge.removed"), "success");
     } catch (error) {
+      // Put it back. A row that vanished and then reappeared with an error is
+      // honest; one that vanished on a failed delete is a lie.
+      setSources(previousSources);
       showToast(
         error instanceof Error ? error.message : t("knowledge.deleteError"),
         "error",

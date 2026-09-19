@@ -1006,3 +1006,104 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-headline), sans-serif;
   letter-spacing: -0.02em;
 }
+
+/*
+ * Motion preference, applied to everything rather than to named animations.
+ *
+ * The blocks above opt specific animations out, which left the bulk of the app
+ * moving: animate-pulse alone appears ~119 times, plus spin, ping and the
+ * enter animations. Someone who asked their OS to reduce motion was still
+ * getting most of it.
+ *
+ * Animations are reduced to a single frame rather than removed, so anything
+ * that depends on an animationend event still fires and does not hang. Spinners
+ * are the deliberate exception: a frozen spinner reads as a crash, so they keep
+ * turning, just slowly enough not to provoke.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+/*
+ * Charts and meters grow to their value instead of appearing at it.
+ *
+ * A bar painted at its final height reads as a static image; the same bar
+ * arriving over a few hundred milliseconds reads as something that was
+ * measured. The blanket reduced-motion rule above collapses these to a single
+ * frame, so the value is still correct instantly for anyone who asked for that.
+ */
+@keyframes chart-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes meter-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.animate-chart-grow {
+  transform-origin: bottom;
+  animation: chart-grow-y 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-meter-grow {
+  transform-origin: left;
+  animation: meter-grow-x 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
+ * Loading shimmers, so pulse can go back to meaning one thing.
+ *
+ * animate-pulse currently signals "loading", "live" and "needs attention"
+ * depending on where you meet it, which makes all three ambiguous. A skeleton
+ * that shimmers reads as content arriving; a pulse then reliably means
+ * something is happening right now.
+ */
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.animate-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-surface-container-low, rgb(0 0 0 / 4%)) 0%,
+    var(--color-surface-container-high, rgb(0 0 0 / 8%)) 50%,
+    var(--color-surface-container-low, rgb(0 0 0 / 4%)) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--color-surface-container-low, rgb(0 0 0 / 4%));
+  }
+}
